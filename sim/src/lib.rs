@@ -676,6 +676,10 @@ impl Universe {
         if !self.in_bounds(nx, ny) {
             return false;
         }
+        let moving_cell = next[idx];
+        if moving_cell.kind != cell.kind {
+            return false;
+        }
         let target = self.idx(nx as u32, ny as u32);
         let target_old = old[target];
         let target_next = next[target];
@@ -687,7 +691,7 @@ impl Universe {
             return false;
         }
         next[idx] = Cell::empty();
-        next[target] = cell;
+        next[target] = moving_cell;
         true
     }
 }
