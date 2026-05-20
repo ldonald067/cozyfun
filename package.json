@@ -1,0 +1,15 @@
+{
+  "name": "cozy-pixel-sandbox",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "install:app": "npm --prefix app install",
+    "build:sim": "cargo build --manifest-path sim/Cargo.toml --target wasm32-unknown-unknown --release && node scripts/copy-wasm.mjs",
+    "dev": "npm run build:sim && npm --prefix app run dev -- --host 127.0.0.1",
+    "dev:fallback": "npm --prefix app run dev -- --host 127.0.0.1",
+    "build": "npm run build:sim && npm --prefix app run build",
+    "test:sim": "cargo test --manifest-path sim/Cargo.toml",
+    "check": "npm run test:sim && npm run build"
+  }
+}

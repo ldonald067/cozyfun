@@ -1,0 +1,11 @@
+node_modules/
+dist/
+target/
+pkg/
+.tools/
+.vite/
+app/public/sim/
+*.log
+.env
+.env.*
+
