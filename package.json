@@ -10,6 +10,7 @@
     "dev:fallback": "npm --prefix app run dev -- --host 127.0.0.1",
     "build": "npm run build:sim && npm --prefix app run build",
     "test:sim": "cargo test --manifest-path sim/Cargo.toml",
-    "check": "npm run test:sim && npm run build"
+    "test:wasm": "npm run build:sim && node scripts/smoke-wasm.mjs",
+    "check": "npm run test:sim && npm run test:wasm && npm run build"
   }
 }

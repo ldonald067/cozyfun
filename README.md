@@ -97,10 +97,15 @@ Useful local commands:
 
 ```powershell
 .\scripts\build.ps1
+.\scripts\test-wasm.ps1
 npm --prefix app audit --audit-level=moderate
 ```
 
 CI runs on pushes and pull requests to `main`.
+
+## Roadmap
+
+See `ROADMAP.md` for the current phase plan, including the planned material shape-language renderer.
 
 ## Troubleshooting
 
