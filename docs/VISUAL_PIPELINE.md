@@ -21,9 +21,12 @@ Each frame, `renderer.ts` asks `materialColor.ts` for a color per cell. That col
 Shape language is intentionally procedural:
 
 - Sand: grain speckles and warm surface highlights.
+- Soil: darker clumps, organic pockets, and occasional moss-adjacent green.
 - Seed: chestnut body, darker edges, and green flecks.
 - Ice: cube facets, bright top-left edges, darker bottom-right edges, and crack pixels.
-- Stone: chunky block shading and dark crack marks.
+- Wall: brick-like tile structure with mortar lines and lit exposed edges.
+- Stone: chunky block shading, facet shifts, and dark crack marks.
+- Smoke/Steam: edge-softened puff clusters with age fade and warm light near fire or lava.
 - Water/Moonwater: connected surface highlights and lower shadow.
 - Stardust: bright twinkles and nearby star glints.
 
@@ -61,3 +64,7 @@ Useful commands:
 .\scripts\build.ps1
 .\scripts\test-browser.ps1
 ```
+
+## Phase 2 Baseline
+
+The current baseline covers the first readability batch: sand, soil, wall, smoke, steam, seed, ice, stone, water, moonwater, and stardust all have renderer-level shape treatment. More realistic silhouettes, local lighting, and high-detail experiments belong in Phase 4 so Phase 3 can keep moving on atmosphere without destabilizing the simulation.

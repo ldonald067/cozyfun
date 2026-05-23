@@ -47,8 +47,8 @@ export const MATERIALS: MaterialDef[] = [
     id: MATERIAL.Wall,
     label: "Wall",
     slug: "wall",
-    color: "#b4b8c4",
-    palette: ["#686773", "#777783", "#878591", "#5b5b65"],
+    color: "#c2c8d4",
+    palette: ["#6a7180", "#7d8492", "#969da9", "#b7bcc6", "#555d6b"],
     group: "basic"
   },
   {
@@ -71,8 +71,8 @@ export const MATERIALS: MaterialDef[] = [
     id: MATERIAL.Smoke,
     label: "Smoke",
     slug: "smoke",
-    color: "#c5ccd6",
-    palette: ["#6d737b", "#828992", "#9aa0a8", "#b2b5bb"],
+    color: "#d3d9e1",
+    palette: ["#7d848c", "#969da6", "#b0b6be", "#c7ccd2"],
     group: "heat"
   },
   {
@@ -130,7 +130,7 @@ export const MATERIALS: MaterialDef[] = [
     label: "Seed",
     slug: "seed",
     color: "#7fc66f",
-    palette: ["#6f4a2a", "#835b32", "#9a6d3c", "#b1814a", "#6fae5f", "#8ed078", "#4f8a48", "#c79a5c"],
+    palette: ["#4f2b1d", "#6c3d23", "#8c5930", "#67aa54", "#8acb6c", "#d0a15f"],
     group: "life"
   },
   {

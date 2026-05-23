@@ -111,6 +111,10 @@ CI runs on pushes and pull requests to `main`. Browser smoke checks use an insta
 
 See `ROADMAP.md` for the current phase plan, including the planned material shape-language renderer.
 
+## License
+
+MIT. See `LICENSE`.
+
 ## Troubleshooting
 
 If the app says `js fallback online`, the WASM file was not found or failed to load. Run:
@@ -135,5 +139,3 @@ If a scene import fails, confirm it was exported from this app version and has t
 ## Repository status
 
 This is an early V0 prototype. The code is intentionally small and direct so the simulation feel, visuals, and interactions can evolve quickly.
-
-License is intentionally not chosen yet.

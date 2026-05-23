@@ -13,6 +13,7 @@ This roadmap keeps the project focused: make the toy feel good, keep the codebas
 - Browser, build, and WASM smoke checks wired into local scripts and GitHub CI.
 - Renderer cleanup: canvas orchestration is separate from reusable material color, glow, and shape-language helpers.
 - Architecture and visual pipeline docs added under `docs/`.
+- MIT license added for simple sharing and remixing.
 
 ## Phase 0: Playable V0
 
@@ -28,7 +29,7 @@ Status: done.
 
 ## Phase 1: Quality Foundation
 
-Status: mostly done.
+Status: done.
 
 Goal: make the project safer to change before adding more visual complexity.
 
@@ -36,11 +37,11 @@ Goal: make the project safer to change before adding more visual complexity.
 - Add a deterministic WASM smoke check that exercises a few core reactions from JavaScript.
 - Keep Rust tests focused on simulation behavior.
 - Document architecture, rendering boundaries, local dev quirks, and expected commands.
-- Decide project license before wider sharing.
+- MIT license selected before wider sharing.
 
 ## Phase 2: Visual Shape Language
 
-Status: in progress.
+Status: baseline done.
 
 Goal: make each material recognizable by silhouette and texture, not color alone.
 
@@ -78,6 +79,9 @@ Done in this phase:
 - Added reusable rendering modules for color math, cell inspection, deterministic cell hashing, glow, and material shape rules.
 - Added first-pass shape treatment for sand, seed, ice, stone, water, moonwater, and stardust.
 - Strengthened ice so it reads more like small cubes instead of pale liquid.
+- Added readability treatment for wall, soil, smoke, and steam so the first visual pass is not relying on color alone.
+
+Phase 2 is ready for Phase 3 atmosphere work. Deeper realism and more ambitious silhouettes continue in Phase 4.
 
 ## Phase 3: Cozy Atmosphere
 
