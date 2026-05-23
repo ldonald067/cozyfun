@@ -33,6 +33,7 @@ import {
   type LucideIcon
 } from "lucide-react";
 import {
+  AUDIO_CHANNELS,
   createAudioController,
   loadAudioPrefs,
   saveAudioPrefs,
@@ -48,7 +49,6 @@ const WORLD_WIDTH = 220;
 const WORLD_HEIGHT = 140;
 const DEFAULT_SEED = 1107;
 const SIM_TICK_MS = 42;
-const AUDIO_CHANNELS: AudioChannel[] = ["master", "ambience", "music", "effects"];
 
 const AUDIO_CHANNEL_LABELS: Record<AudioChannel, string> = {
   master: "Master",

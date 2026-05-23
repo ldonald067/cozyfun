@@ -9,7 +9,7 @@ This project is a static browser toy: React owns the interface, Rust/WASM owns t
 3. `sim` contains the Rust cellular automata rules.
 4. `app/src/renderer.ts` converts the engine cell bytes into base, glow, and atmosphere canvas layers.
 5. `app/src/storage.ts` handles browser-local saves and JSON scene import/export.
-6. `app/src/audio.ts` owns the optional procedural Web Audio soundscape.
+6. `app/src/audio.ts` exposes the optional procedural Web Audio controller.
 
 The built app is static. There is no server, account system, database, cloud save, streaming dependency, or paid API in the current architecture.
 
@@ -45,6 +45,19 @@ Material-specific color and texture decisions live under `app/src/rendering`:
 - `shapeLanguage.ts`: neighbor-aware material texture and silhouette cues.
 
 This split keeps Phase 2 visuals expandable without turning the renderer into a pile of unrelated rules.
+
+## Audio Boundary
+
+`app/src/audio.ts` should stay a public entrypoint. Audio implementation belongs under `app/src/audio`:
+
+- `controller.ts`: lifecycle, user-gesture initialization, and app-facing methods.
+- `mixer.ts`: channel graph and gain changes.
+- `preferences.ts`: persistent audio settings.
+- `ambience.ts`: long-running environment layers.
+- `music.ts`: procedural rainy lo-fi bed.
+- `effects.ts`: material and UI one-shots.
+
+This keeps Phase 3 music work reusable without burying composition, mixer state, and sound effects in one file.
 
 ## Adding A Material
 

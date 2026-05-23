@@ -10,6 +10,7 @@ This roadmap keeps the project focused: make the toy feel good, keep the codebas
 - Manual painting, brush size, pause/play, clear, local save/load, JSON export/import, and postcard export.
 - Soft reaction style: fire/water becomes glowing steam, lava cools near water, fire burns flammables over time.
 - Procedural Web Audio foundation with master, ambience, music, and effects channels.
+- Audio code split into reusable modules for mixer, preferences, ambience, music, effects, buffers, and controller lifecycle.
 - Browser, build, and WASM smoke checks wired into local scripts and GitHub CI.
 - Renderer cleanup: canvas orchestration is separate from reusable material color, glow, and shape-language helpers.
 - Architecture and visual pipeline docs added under `docs/`.
@@ -85,12 +86,21 @@ Phase 2 is ready for Phase 3 atmosphere work. Deeper realism and more ambitious 
 
 ## Phase 3: Cozy Atmosphere
 
-Status: started.
+Status: in progress.
+
+Done:
 
 - Procedural Web Audio foundation with master, ambience, music, and effects channels.
 - Optional sound enable flow that respects browser autoplay rules.
+- Rainy lo-fi music bed with soft chords, brushed percussion, low thump, and vinyl dust.
+- Reusable audio module boundaries for mixer, preferences, ambience, music, effects, buffers, and controller lifecycle.
+- Material paint sounds and basic UI cues.
+
+Next:
+
 - Rain/window ambience polish.
 - More material reaction sounds beyond paint cues.
+- Music variation controls without making the UI feel technical.
 - Softer UI transitions.
 - Better postcard export composition.
 - Optional scene presets.
