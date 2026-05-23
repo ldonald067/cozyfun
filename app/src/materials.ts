@@ -129,8 +129,8 @@ export const MATERIALS: MaterialDef[] = [
     id: MATERIAL.Seed,
     label: "Seed",
     slug: "seed",
-    color: "#e0bd68",
-    palette: ["#c79448", "#dfb65e", "#f0cf82", "#8e6838"],
+    color: "#7fc66f",
+    palette: ["#6f4a2a", "#835b32", "#9a6d3c", "#b1814a", "#6fae5f", "#8ed078", "#4f8a48", "#c79a5c"],
     group: "life"
   },
   {

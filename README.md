@@ -1,36 +1,16 @@
 # Cozy Pixel Sandbox
 
-A browser-playable cozy falling-sand sandbox built as a React/Vite app with a Rust/WASM simulation core.
+A browser-playable cozy falling-sand sandbox built with React, Vite, and a Rust/WASM simulation core.
 
-The first version focuses on manual creation: paint materials, watch soft reactions, save scenes locally, and export/import JSON worlds. The style direction is a rainy night desk terrarium with a few original cosmic materials.
+The project is a small interactive toy rather than a traditional game. You paint materials, watch soft reactions, save scenes locally, and export/import JSON worlds. The current style direction is a rainy night desk terrarium with original cosmic materials.
 
-## Structure
+## Quick start
 
-- `app` - React/Vite UI, renderer, input, local saves.
-- `sim` - Rust/WASM deterministic cell simulation.
-
-## Tooling
-
-Required for the full build:
+Requirements:
 
 - Node.js with npm
 - Rust stable
 - Rust target: `wasm32-unknown-unknown`
-
-Useful commands:
-
-```powershell
-.\scripts\dev.ps1
-.\scripts\build.ps1
-```
-
-If WASM is not built yet, the app can still run with the JS fallback engine:
-
-```powershell
-npm --prefix app run dev -- --host 127.0.0.1
-```
-
-## Fresh Setup
 
 After cloning:
 
@@ -41,26 +21,108 @@ npm --prefix app ci
 .\scripts\dev.ps1
 ```
 
-The app is static after build and does not require a backend. The Rust sim compiles to `app/public/sim/cozy_sandbox_sim.wasm` during `npm run build`.
+Open the local URL printed by Vite. The default dev URL is usually:
 
-## Deploy Notes
+```txt
+http://127.0.0.1:5173/
+```
+
+If the WASM file has not been built yet, you can still run the React app with the JavaScript fallback engine:
+
+```powershell
+npm --prefix app run dev -- --host 127.0.0.1
+```
+
+## Controls
+
+- Pick a material from the left toolbar.
+- Paint directly on the sandbox tray.
+- Use the brush slider to change brush size.
+- Pause/play the simulation from the control panel.
+- Clear, save, load, export, import, or export a postcard from the right controls.
+
+Saves are local to the browser unless you export a scene JSON file.
+
+## Materials
+
+Current V0 materials:
+
+```txt
+Eraser, Wall, Sand, Water, Smoke, Soil, Fire, Wood, Lava, Stone,
+Moss, Seed, Fungus, Oil, Ice, Steam, Stardust, Meteor, Moonwater
+```
+
+Some key reactions:
+
+- Water and moonwater soften fire into glowing steam instead of instantly deleting it.
+- Lava cools near water and moonwater.
+- Fire can burn wood, moss, seed, fungus, and oil.
+- Seeds can become moss near soil, moss, or moonwater.
+- Stardust, meteor, and moonwater add the cozy/cosmic identity.
+
+## Architecture
+
+- `app` contains the React/Vite UI, renderer, input handling, local saves, and JS fallback engine.
+- `sim` contains the Rust simulation compiled to WASM.
+- `scripts/build.ps1` builds the Rust sim, copies the generated WASM into `app/public/sim`, then builds the Vite app.
+- `scripts/dev.ps1` builds the sim first, then starts Vite.
+
+The app is static after build. There is no backend, account system, database, cloud save, or paid API dependency.
+
+## Scene format
+
+Scene export files are JSON snapshots with:
+
+- format/version marker
+- world width and height
+- simulation tick
+- source engine label
+- base64-encoded cell bytes
+- save timestamp
+
+Imports are validated before loading. A scene must match the current world size.
+
+## Deployment
 
 For Cloudflare Pages or another static host:
 
 - Build command: `rustup target add wasm32-unknown-unknown && npm --prefix app ci && npm run build`
 - Output directory: `app/dist`
 
-## GitHub Notes
+The generated WASM file is created during the build and is not committed.
 
-Recommended first repository setup:
+## Checks
+
+Useful local commands:
 
 ```powershell
-git init
-git add .
-git commit -m "Initial cozy pixel sandbox prototype"
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/cozyfun.git
-git push -u origin main
+.\scripts\build.ps1
+npm --prefix app audit --audit-level=moderate
 ```
+
+CI runs on pushes and pull requests to `main`.
+
+## Troubleshooting
+
+If the app says `js fallback online`, the WASM file was not found or failed to load. Run:
+
+```powershell
+.\scripts\build.ps1
+.\scripts\dev.ps1
+```
+
+If Rust cannot find the WASM target, run:
+
+```powershell
+rustup target add wasm32-unknown-unknown
+```
+
+If Vite reports `Access is denied` while loading `vite.config.ts` on Windows, use the checked-in dev script. The app dev command uses Vite's runner config loader to avoid that Windows path-walking issue.
+
+If a scene import fails, confirm it was exported from this app version and has the same world size.
+
+## Repository status
+
+This is an early V0 prototype. The code is intentionally small and direct so the simulation feel, visuals, and interactions can evolve quickly.
 
 License is intentionally not chosen yet.

@@ -10,6 +10,7 @@ export type SandboxEngine = {
   paint(x: number, y: number, radius: number, material: number): void;
   getCellBytes(): Uint8Array;
   loadCellBytes(bytes: Uint8Array): boolean;
+  dispose(): void;
 };
 
 type WasmModule = {
@@ -50,7 +51,7 @@ async function loadRawWasm(): Promise<WasmModule | null> {
 
 class WasmSandboxEngine implements SandboxEngine {
   readonly source = "wasm" as const;
-  private readonly ptr: number;
+  private ptr: number;
 
   constructor(private readonly wasm: WasmModule, width: number, height: number, seed: number) {
     this.ptr = wasm.universe_new(width, height, seed);
@@ -92,6 +93,12 @@ class WasmSandboxEngine implements SandboxEngine {
     const loaded = this.wasm.universe_load_cells(this.ptr, ptr, bytes.byteLength) === 1;
     this.wasm.dealloc(ptr, bytes.byteLength);
     return loaded;
+  }
+
+  dispose() {
+    if (this.ptr === 0) return;
+    this.wasm.universe_free(this.ptr);
+    this.ptr = 0;
   }
 }
 
@@ -186,6 +193,8 @@ class JsSandboxEngine implements SandboxEngine {
     this.cells.set(bytes);
     return true;
   }
+
+  dispose() {}
 
   private index(x: number, y: number) {
     return (y * this.w + x) * CELL_STRIDE;
@@ -320,10 +329,12 @@ class JsSandboxEngine implements SandboxEngine {
 
   private move(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
     if (!this.inBounds(x, y)) return false;
+    const movingCell = next.slice(idx, idx + CELL_STRIDE);
+    if (movingCell[0] !== cell[0]) return false;
     const target = this.index(x, y);
     if (old[target] !== MATERIAL.Empty && next[target] !== MATERIAL.Empty && old[target] !== MATERIAL.Smoke && old[target] !== MATERIAL.Steam) return false;
     next.fill(0, idx, idx + CELL_STRIDE);
-    next.set(cell, target);
+    next.set(movingCell, target);
     return true;
   }
 

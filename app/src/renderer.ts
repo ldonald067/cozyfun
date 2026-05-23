@@ -119,6 +119,12 @@ function colorFor(kind: number, variant: number, age: number, energy: number, ti
     b = clamp(b + twinkle);
   }
 
+  if (kind === MATERIAL.Seed) {
+    const sprout = variant % 3 === 1 ? 32 : 0;
+    g = clamp(g + sprout + Math.sin(time * 0.003 + variant) * 4);
+    r = clamp(r - sprout * 0.35);
+  }
+
   if (kind === MATERIAL.Smoke || kind === MATERIAL.Steam) {
     const fade = Math.max(0.35, 1 - age / (kind === MATERIAL.Steam ? 180 : 220));
     r = clamp(r * fade + 9 * (1 - fade));

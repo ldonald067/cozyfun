@@ -75,14 +75,20 @@ export function App() {
 
   useEffect(() => {
     let active = true;
+    let createdEngine: SandboxEngine | null = null;
     createEngine(WORLD_WIDTH, WORLD_HEIGHT, DEFAULT_SEED).then((created) => {
-      if (!active) return;
+      if (!active) {
+        created.dispose();
+        return;
+      }
+      createdEngine = created;
       setEngine(created);
       setStatus(created.source === "wasm" ? "wasm sim online" : "js fallback online");
       seedOpeningScene(created);
     });
     return () => {
       active = false;
+      createdEngine?.dispose();
     };
   }, []);
 
@@ -161,8 +167,8 @@ export function App() {
 
   function handleSave() {
     if (!engine) return;
-    saveLocal(engine);
-    setStatus("scene saved locally");
+    const saved = saveLocal(engine);
+    setStatus(saved ? "scene saved locally" : "local save failed");
   }
 
   function handleLoad() {
@@ -180,8 +186,8 @@ export function App() {
   async function handleImport(event: ChangeEvent<HTMLInputElement>) {
     if (!engine || !event.target.files?.[0]) return;
     const snapshot = await readSnapshotFile(event.target.files[0]);
-    const loaded = applySnapshot(engine, snapshot);
-    setStatus(loaded ? "scene imported" : "scene size mismatch");
+    const loaded = snapshot ? applySnapshot(engine, snapshot) : false;
+    setStatus(loaded ? "scene imported" : "invalid scene file");
     event.target.value = "";
   }
 

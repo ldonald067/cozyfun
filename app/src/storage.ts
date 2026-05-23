@@ -1,4 +1,5 @@
 import type { SandboxEngine } from "./engine";
+import { CELL_STRIDE } from "./materials";
 
 const STORAGE_KEY = "cozy-pixel-sandbox:scene:v1";
 const FORMAT = "CXS1";
@@ -25,20 +26,38 @@ export function createSnapshot(engine: SandboxEngine): SceneSnapshot {
   };
 }
 
-export function applySnapshot(engine: SandboxEngine, snapshot: SceneSnapshot): boolean {
-  if (snapshot.format !== FORMAT) return false;
-  if (snapshot.width !== engine.width() || snapshot.height !== engine.height()) return false;
-  return engine.loadCellBytes(base64ToBytes(snapshot.cells));
+export function applySnapshot(engine: SandboxEngine, snapshot: unknown): boolean {
+  const scene = validateSnapshot(snapshot);
+  if (!scene) return false;
+  let cellBytes: Uint8Array;
+  try {
+    cellBytes = base64ToBytes(scene.cells);
+  } catch {
+    return false;
+  }
+
+  if (cellBytes.byteLength !== engine.width() * engine.height() * CELL_STRIDE) return false;
+  if (scene.width !== engine.width() || scene.height !== engine.height()) return false;
+  return engine.loadCellBytes(cellBytes);
 }
 
 export function saveLocal(engine: SandboxEngine) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(createSnapshot(engine)));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(createSnapshot(engine)));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function loadLocal(engine: SandboxEngine) {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return false;
-  return applySnapshot(engine, JSON.parse(raw) as SceneSnapshot);
+  try {
+    return applySnapshot(engine, JSON.parse(raw));
+  } catch {
+    return false;
+  }
 }
 
 export function downloadSnapshot(engine: SandboxEngine) {
@@ -52,8 +71,25 @@ export function downloadSnapshot(engine: SandboxEngine) {
   URL.revokeObjectURL(url);
 }
 
-export async function readSnapshotFile(file: File): Promise<SceneSnapshot> {
-  return JSON.parse(await file.text()) as SceneSnapshot;
+export async function readSnapshotFile(file: File): Promise<SceneSnapshot | null> {
+  try {
+    return validateSnapshot(JSON.parse(await file.text()));
+  } catch {
+    return null;
+  }
+}
+
+function validateSnapshot(value: unknown): SceneSnapshot | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Partial<SceneSnapshot>;
+  if (candidate.format !== FORMAT) return null;
+  if (typeof candidate.width !== "number" || !Number.isInteger(candidate.width) || candidate.width <= 0) return null;
+  if (typeof candidate.height !== "number" || !Number.isInteger(candidate.height) || candidate.height <= 0) return null;
+  if (typeof candidate.tick !== "number" || !Number.isInteger(candidate.tick) || candidate.tick < 0) return null;
+  if (candidate.engine !== "wasm" && candidate.engine !== "js") return null;
+  if (typeof candidate.cells !== "string" || candidate.cells.length === 0) return null;
+  if (typeof candidate.savedAt !== "string") return null;
+  return candidate as SceneSnapshot;
 }
 
 function bytesToBase64(bytes: Uint8Array) {
@@ -71,4 +107,3 @@ function base64ToBytes(base64: string) {
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes;
 }
-
