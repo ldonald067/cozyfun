@@ -9,15 +9,15 @@ export type AudioPrefs = {
   volumes: Record<AudioChannel, number>;
 };
 
-const AUDIO_PREFS_KEY = "cozy-pixel-sandbox:audio:v1";
+const AUDIO_PREFS_KEY = "cozy-pixel-sandbox:audio:v2";
 
 export const DEFAULT_AUDIO_PREFS: AudioPrefs = {
   enabled: false,
   muted: false,
   volumes: {
-    master: 0.72,
-    ambience: 0.58,
-    music: 0.32,
+    master: 0.68,
+    ambience: 0.62,
+    music: 0.24,
     effects: 0.5
   }
 };
@@ -33,7 +33,7 @@ export function loadAudioPrefs(): AudioPrefs {
   try {
     const raw = localStorage.getItem(AUDIO_PREFS_KEY);
     if (!raw) return DEFAULT_AUDIO_PREFS;
-    return normalizeAudioPrefs(JSON.parse(raw));
+    return { ...normalizeAudioPrefs(JSON.parse(raw)), enabled: false };
   } catch {
     return DEFAULT_AUDIO_PREFS;
   }
@@ -57,9 +57,11 @@ class CozyAudioController {
   private ambienceNodes: AudioNode[] = [];
   private ambienceSources: AudioScheduledSourceNode[] = [];
   private musicSources: AudioScheduledSourceNode[] = [];
+  private musicTimers: number[] = [];
   private materialLastPlayedAt = new Map<number, number>();
   private ambienceStarted = false;
   private musicStarted = false;
+  private musicStep = 0;
 
   async init(prefs: AudioPrefs) {
     this.prefs = normalizeAudioPrefs(prefs);
@@ -126,7 +128,7 @@ class CozyAudioController {
     for (const channel of Object.keys(this.audio.channels) as AudioChannel[]) {
       const target = channel === "master" && (this.prefs.muted || !this.prefs.enabled) ? 0 : this.prefs.volumes[channel];
       this.audio.channels[channel].gain.cancelScheduledValues(now);
-      this.audio.channels[channel].gain.setTargetAtTime(target, now, 0.035);
+      this.audio.channels[channel].gain.setTargetAtTime(target, now, 0.055);
     }
   }
 
@@ -236,37 +238,29 @@ class CozyAudioController {
     if (!this.audio || this.musicStarted) return;
     this.musicStarted = true;
     const { context, channels } = this.audio;
-    const filter = context.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = 820;
-    const padGain = context.createGain();
-    padGain.gain.value = 0.06;
-    filter.connect(padGain);
-    padGain.connect(channels.music);
 
-    const notes = [146.83, 220, 293.66, 369.99];
-    notes.forEach((frequency, index) => {
-      const oscillator = context.createOscillator();
-      oscillator.type = index % 2 === 0 ? "sine" : "triangle";
-      oscillator.frequency.value = frequency;
-      oscillator.detune.value = index * 3 - 4;
-      const lfo = context.createOscillator();
-      const lfoGain = context.createGain();
-      lfo.type = "sine";
-      lfo.frequency.value = 0.018 + index * 0.006;
-      lfoGain.gain.value = 5;
-      lfo.connect(lfoGain);
-      lfoGain.connect(oscillator.detune);
-      const voiceGain = context.createGain();
-      voiceGain.gain.value = 0.18 / notes.length;
-      oscillator.connect(voiceGain);
-      voiceGain.connect(filter);
-      oscillator.start();
-      lfo.start();
-      this.musicSources.push(oscillator, lfo);
-      this.ambienceNodes.push(voiceGain, lfoGain);
-    });
-    this.ambienceNodes.push(filter, padGain);
+    const vinyl = context.createBufferSource();
+    vinyl.buffer = createDustBuffer(context, 2.75);
+    vinyl.loop = true;
+    const vinylFilter = context.createBiquadFilter();
+    vinylFilter.type = "bandpass";
+    vinylFilter.frequency.value = 1800;
+    vinylFilter.Q.value = 0.35;
+    const vinylGain = context.createGain();
+    vinylGain.gain.value = 0.014;
+    vinyl.connect(vinylFilter);
+    vinylFilter.connect(vinylGain);
+    vinylGain.connect(channels.music);
+    vinyl.start();
+
+    const scheduleStep = () => {
+      this.playLofiStep();
+      this.musicStep++;
+    };
+    scheduleStep();
+    this.musicTimers.push(window.setInterval(scheduleStep, 720));
+    this.musicSources.push(vinyl);
+    this.ambienceNodes.push(vinylFilter, vinylGain);
   }
 
   dispose() {
@@ -279,9 +273,12 @@ class CozyAudioController {
     }
     this.ambienceSources = [];
     this.musicSources = [];
+    for (const timer of this.musicTimers) window.clearInterval(timer);
+    this.musicTimers = [];
     this.ambienceNodes = [];
     this.ambienceStarted = false;
     this.musicStarted = false;
+    this.musicStep = 0;
     if (this.audio) {
       void this.audio.context.close();
       this.audio = null;
@@ -362,13 +359,101 @@ class CozyAudioController {
     oscillator.start(now);
     oscillator.stop(now + 0.1);
   }
+
+  private playLofiStep() {
+    if (!this.audio) return;
+    const step = this.musicStep;
+    const now = this.audio.context.currentTime;
+    if (step % 8 === 0) {
+      const chords = [
+        [146.83, 220, 261.63, 329.63],
+        [196, 246.94, 329.63, 440],
+        [130.81, 196, 246.94, 293.66],
+        [110, 196, 261.63, 329.63]
+      ];
+      this.playSoftChord(chords[(step / 8) % chords.length], now);
+      this.playLowThump(now);
+    }
+    if (step % 2 === 1) this.playBrushHat(now);
+    if (step % 8 === 4) this.playBrushSnare(now);
+  }
+
+  private playSoftChord(frequencies: number[], time: number) {
+    if (!this.audio) return;
+    const { context, channels } = this.audio;
+    const filter = context.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(1150, time);
+    filter.frequency.exponentialRampToValueAtTime(620, time + 1.6);
+    const chordGain = context.createGain();
+    chordGain.gain.setValueAtTime(0.0001, time);
+    chordGain.gain.exponentialRampToValueAtTime(0.032, time + 0.045);
+    chordGain.gain.exponentialRampToValueAtTime(0.0001, time + 2.85);
+    filter.connect(chordGain);
+    chordGain.connect(channels.music);
+
+    frequencies.forEach((frequency, index) => {
+      const oscillator = context.createOscillator();
+      oscillator.type = index % 2 === 0 ? "triangle" : "sine";
+      oscillator.frequency.value = frequency;
+      oscillator.detune.value = index * 2 - 3;
+      oscillator.connect(filter);
+      oscillator.start(time + index * 0.018);
+      oscillator.stop(time + 2.95);
+    });
+  }
+
+  private playBrushHat(time: number) {
+    this.playMusicNoise({ time, duration: 0.045, gain: 0.008, filter: 5200, type: "highpass" });
+  }
+
+  private playBrushSnare(time: number) {
+    this.playMusicNoise({ time, duration: 0.11, gain: 0.011, filter: 1900, type: "bandpass" });
+  }
+
+  private playLowThump(time: number) {
+    if (!this.audio) return;
+    const { context, channels } = this.audio;
+    const oscillator = context.createOscillator();
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(82, time);
+    oscillator.frequency.exponentialRampToValueAtTime(48, time + 0.16);
+    const gain = context.createGain();
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(0.018, time + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.22);
+    oscillator.connect(gain);
+    gain.connect(channels.music);
+    oscillator.start(time);
+    oscillator.stop(time + 0.24);
+  }
+
+  private playMusicNoise(options: { time: number; duration: number; gain: number; filter: number; type: BiquadFilterType }) {
+    if (!this.audio) return;
+    const { context, channels } = this.audio;
+    const source = context.createBufferSource();
+    source.buffer = createNoiseBuffer(context, options.duration);
+    const filter = context.createBiquadFilter();
+    filter.type = options.type;
+    filter.frequency.value = options.filter;
+    filter.Q.value = 0.5;
+    const gain = context.createGain();
+    gain.gain.setValueAtTime(0.0001, options.time);
+    gain.gain.exponentialRampToValueAtTime(options.gain, options.time + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, options.time + options.duration);
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(channels.music);
+    source.start(options.time);
+    source.stop(options.time + options.duration + 0.01);
+  }
 }
 
 function normalizeAudioPrefs(value: unknown): AudioPrefs {
   if (!value || typeof value !== "object") return DEFAULT_AUDIO_PREFS;
   const candidate = value as Partial<AudioPrefs>;
   return {
-    enabled: false,
+    enabled: typeof candidate.enabled === "boolean" ? candidate.enabled : DEFAULT_AUDIO_PREFS.enabled,
     muted: typeof candidate.muted === "boolean" ? candidate.muted : DEFAULT_AUDIO_PREFS.muted,
     volumes: {
       master: readVolume(candidate.volumes?.master, DEFAULT_AUDIO_PREFS.volumes.master),
@@ -377,6 +462,17 @@ function normalizeAudioPrefs(value: unknown): AudioPrefs {
       effects: readVolume(candidate.volumes?.effects, DEFAULT_AUDIO_PREFS.volumes.effects)
     }
   };
+}
+
+function createDustBuffer(context: AudioContext, duration: number) {
+  const length = Math.max(1, Math.floor(context.sampleRate * duration));
+  const buffer = context.createBuffer(1, length, context.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < length; i++) {
+    const dust = Math.random() > 0.992 ? Math.random() * 2 - 1 : 0;
+    data[i] = dust + (Math.random() * 2 - 1) * 0.08;
+  }
+  return buffer;
 }
 
 function readVolume(value: unknown, fallback: number) {

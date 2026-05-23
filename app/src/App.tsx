@@ -233,8 +233,16 @@ export function App() {
     setStatus("postcard exported");
   }
 
-  async function handleEnableSound() {
-    const nextPrefs = { ...audioPrefs, enabled: true };
+  async function handleToggleSound() {
+    if (audioPrefs.enabled) {
+      const nextPrefs = { ...audioPrefs, enabled: false };
+      setAudioPrefs(nextPrefs);
+      audio.setEnabled(false);
+      setStatus("rain lo-fi resting");
+      return;
+    }
+
+    const nextPrefs = { ...audioPrefs, enabled: true, muted: false };
     const ready = await audio.init(nextPrefs);
     if (!ready) {
       setStatus("audio unavailable");
@@ -242,15 +250,15 @@ export function App() {
     }
     setAudioPrefs(nextPrefs);
     audio.playUiCue("toggle");
-    setStatus("rain desk audio on");
+    setStatus("rain lo-fi on");
   }
 
   function handleMuteAudio() {
-    if (!audioPrefs.enabled) return;
     const muted = !audioPrefs.muted;
     setAudioPrefs((current) => ({ ...current, muted }));
     audio.setMuted(muted);
-    if (!muted) audio.playUiCue("toggle");
+    if (audioPrefs.enabled && !muted) audio.playUiCue("toggle");
+    setStatus(muted ? "audio muted" : "audio unmuted");
   }
 
   function handleAudioVolume(channel: AudioChannel, value: number) {
@@ -354,16 +362,15 @@ export function App() {
           <div className="audio-panel" aria-label="Audio">
             <div className="audio-panel-header">
               <span className="audio-panel-title">
-                <Music2 size={16} /> Sound
+                <Music2 size={16} /> Rain Lo-Fi
               </span>
               <button
                 type="button"
                 className={`audio-enable-button ${audioPrefs.enabled ? "active" : ""}`}
-                title={audioPrefs.enabled ? "Sound enabled" : "Enable sound"}
-                disabled={audioPrefs.enabled}
-                onClick={handleEnableSound}
+                title={audioPrefs.enabled ? "Turn sound off" : "Enable sound"}
+                onClick={handleToggleSound}
               >
-                {audioPrefs.enabled ? "On" : "Enable"}
+                {audioPrefs.enabled ? "Stop" : "Start"}
               </button>
             </div>
 
@@ -371,7 +378,6 @@ export function App() {
               type="button"
               className={`audio-mute-button ${audioPrefs.muted ? "muted" : ""}`}
               title={audioPrefs.muted ? "Unmute" : "Mute"}
-              disabled={!audioPrefs.enabled}
               onClick={handleMuteAudio}
             >
               {audioPrefs.muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
@@ -389,7 +395,6 @@ export function App() {
                     max={1}
                     step={0.01}
                     value={audioPrefs.volumes[channel]}
-                    disabled={!audioPrefs.enabled}
                     onChange={(event) => handleAudioVolume(channel, Number(event.target.value))}
                   />
                 </label>
