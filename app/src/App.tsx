@@ -11,6 +11,7 @@ import {
   FolderOpen,
   Gem,
   ImageDown,
+  Info,
   Leaf,
   Moon,
   Mountain,
@@ -54,6 +55,13 @@ const AUDIO_CHANNEL_LABELS: Record<AudioChannel, string> = {
   ambience: "Ambience",
   music: "Music",
   effects: "Effects"
+};
+
+const AUDIO_CHANNEL_HINTS: Record<AudioChannel, string> = {
+  master: "Overall volume for the whole soundscape.",
+  ambience: "Rain, window hush, room tone, and other environmental sounds.",
+  music: "Quiet lo-fi chords, beat, and vinyl texture.",
+  effects: "Small sounds from painting, reactions, saves, and controls."
 };
 
 const MATERIAL_ICONS: Record<MaterialId, LucideIcon> = {
@@ -387,7 +395,19 @@ export function App() {
             <div className="audio-sliders">
               {AUDIO_CHANNELS.map((channel) => (
                 <label className="audio-slider" key={channel}>
-                  <span>{AUDIO_CHANNEL_LABELS[channel]}</span>
+                  <span className="audio-slider-label">
+                    {AUDIO_CHANNEL_LABELS[channel]}
+                    <span
+                      className="audio-info"
+                      tabIndex={0}
+                      role="img"
+                      aria-label={AUDIO_CHANNEL_HINTS[channel]}
+                      title={AUDIO_CHANNEL_HINTS[channel]}
+                      data-tooltip={AUDIO_CHANNEL_HINTS[channel]}
+                    >
+                      <Info size={12} strokeWidth={2.2} />
+                    </span>
+                  </span>
                   <output>{Math.round(audioPrefs.volumes[channel] * 100)}</output>
                   <input
                     type="range"
