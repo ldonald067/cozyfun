@@ -14,6 +14,7 @@ import {
   Leaf,
   Moon,
   Mountain,
+  Music2,
   Orbit,
   Pause,
   Play,
@@ -24,10 +25,19 @@ import {
   Sparkles,
   Sprout,
   TreePine,
+  Volume2,
+  VolumeX,
   Waves,
   Wind,
   type LucideIcon
 } from "lucide-react";
+import {
+  createAudioController,
+  loadAudioPrefs,
+  saveAudioPrefs,
+  type AudioChannel,
+  type AudioPrefs
+} from "./audio";
 import { createEngine, type SandboxEngine } from "./engine";
 import { MATERIAL, MATERIALS, type MaterialDef, type MaterialId } from "./materials";
 import { applySnapshot, downloadSnapshot, loadLocal, readSnapshotFile, saveLocal } from "./storage";
@@ -37,6 +47,14 @@ const WORLD_WIDTH = 220;
 const WORLD_HEIGHT = 140;
 const DEFAULT_SEED = 1107;
 const SIM_TICK_MS = 42;
+const AUDIO_CHANNELS: AudioChannel[] = ["master", "ambience", "music", "effects"];
+
+const AUDIO_CHANNEL_LABELS: Record<AudioChannel, string> = {
+  master: "Master",
+  ambience: "Ambience",
+  music: "Music",
+  effects: "Effects"
+};
 
 const MATERIAL_ICONS: Record<MaterialId, LucideIcon> = {
   [MATERIAL.Empty]: Eraser,
@@ -61,6 +79,8 @@ const MATERIAL_ICONS: Record<MaterialId, LucideIcon> = {
 };
 
 export function App() {
+  const audio = useMemo(() => createAudioController(), []);
+  const [audioPrefs, setAudioPrefs] = useState<AudioPrefs>(() => loadAudioPrefs());
   const [engine, setEngine] = useState<SandboxEngine | null>(null);
   const [selected, setSelected] = useState<MaterialId>(MATERIAL.Sand);
   const [brushSize, setBrushSize] = useState(4);
@@ -91,6 +111,15 @@ export function App() {
       createdEngine?.dispose();
     };
   }, []);
+
+  useEffect(() => {
+    audio.applyPreferences(audioPrefs);
+    saveAudioPrefs(audioPrefs);
+  }, [audio, audioPrefs]);
+
+  useEffect(() => {
+    return () => audio.dispose();
+  }, [audio]);
 
   useEffect(() => {
     if (!engine) return;
@@ -139,8 +168,9 @@ export function App() {
       const x = Math.floor(((event.clientX - rect.left) / rect.width) * engine.width());
       const y = Math.floor(((event.clientY - rect.top) / rect.height) * engine.height());
       engine.paint(x, y, brushSize, selected);
+      audio.playMaterialPaint(selected, brushSize / 12);
     },
-    [brushSize, engine, selected]
+    [audio, brushSize, engine, selected]
   );
 
   function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
@@ -162,24 +192,28 @@ export function App() {
   function handleClear() {
     if (!engine) return;
     engine.clear();
+    audio.playUiCue("clear");
     setStatus("tray cleared");
   }
 
   function handleSave() {
     if (!engine) return;
     const saved = saveLocal(engine);
+    if (saved) audio.playUiCue("save");
     setStatus(saved ? "scene saved locally" : "local save failed");
   }
 
   function handleLoad() {
     if (!engine) return;
     const loaded = loadLocal(engine);
+    if (loaded) audio.playUiCue("load");
     setStatus(loaded ? "local scene loaded" : "no local save yet");
   }
 
   function handleExport() {
     if (!engine) return;
     downloadSnapshot(engine);
+    audio.playUiCue("export");
     setStatus("scene exported");
   }
 
@@ -187,6 +221,7 @@ export function App() {
     if (!engine || !event.target.files?.[0]) return;
     const snapshot = await readSnapshotFile(event.target.files[0]);
     const loaded = snapshot ? applySnapshot(engine, snapshot) : false;
+    if (loaded) audio.playUiCue("import");
     setStatus(loaded ? "scene imported" : "invalid scene file");
     event.target.value = "";
   }
@@ -194,7 +229,39 @@ export function App() {
   async function handlePostcard() {
     if (!engine || !baseCanvasRef.current || !glowCanvasRef.current) return;
     await exportPostcard(engine, baseCanvasRef.current, glowCanvasRef.current);
+    audio.playUiCue("export");
     setStatus("postcard exported");
+  }
+
+  async function handleEnableSound() {
+    const nextPrefs = { ...audioPrefs, enabled: true };
+    const ready = await audio.init(nextPrefs);
+    if (!ready) {
+      setStatus("audio unavailable");
+      return;
+    }
+    setAudioPrefs(nextPrefs);
+    audio.playUiCue("toggle");
+    setStatus("rain desk audio on");
+  }
+
+  function handleMuteAudio() {
+    if (!audioPrefs.enabled) return;
+    const muted = !audioPrefs.muted;
+    setAudioPrefs((current) => ({ ...current, muted }));
+    audio.setMuted(muted);
+    if (!muted) audio.playUiCue("toggle");
+  }
+
+  function handleAudioVolume(channel: AudioChannel, value: number) {
+    setAudioPrefs((current) => ({
+      ...current,
+      volumes: {
+        ...current.volumes,
+        [channel]: value
+      }
+    }));
+    audio.setVolume(channel, value);
   }
 
   return (
@@ -283,6 +350,52 @@ export function App() {
             />
             <output>{brushSize}</output>
           </label>
+
+          <div className="audio-panel" aria-label="Audio">
+            <div className="audio-panel-header">
+              <span className="audio-panel-title">
+                <Music2 size={16} /> Sound
+              </span>
+              <button
+                type="button"
+                className={`audio-enable-button ${audioPrefs.enabled ? "active" : ""}`}
+                title={audioPrefs.enabled ? "Sound enabled" : "Enable sound"}
+                disabled={audioPrefs.enabled}
+                onClick={handleEnableSound}
+              >
+                {audioPrefs.enabled ? "On" : "Enable"}
+              </button>
+            </div>
+
+            <button
+              type="button"
+              className={`audio-mute-button ${audioPrefs.muted ? "muted" : ""}`}
+              title={audioPrefs.muted ? "Unmute" : "Mute"}
+              disabled={!audioPrefs.enabled}
+              onClick={handleMuteAudio}
+            >
+              {audioPrefs.muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+              {audioPrefs.muted ? "Muted" : "Mute"}
+            </button>
+
+            <div className="audio-sliders">
+              {AUDIO_CHANNELS.map((channel) => (
+                <label className="audio-slider" key={channel}>
+                  <span>{AUDIO_CHANNEL_LABELS[channel]}</span>
+                  <output>{Math.round(audioPrefs.volumes[channel] * 100)}</output>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={audioPrefs.volumes[channel]}
+                    disabled={!audioPrefs.enabled}
+                    onChange={(event) => handleAudioVolume(channel, Number(event.target.value))}
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
 
           <div className="control-stack">
             <button type="button" onClick={handleSave}>

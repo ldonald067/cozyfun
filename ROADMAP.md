@@ -62,10 +62,12 @@ Implementation approach:
 
 ## Phase 3: Cozy Atmosphere
 
-Status: planned.
+Status: started.
 
-- Ambient audio controls.
+- Procedural Web Audio foundation with master, ambience, music, and effects channels.
+- Optional sound enable flow that respects browser autoplay rules.
 - Rain/window ambience polish.
+- More material reaction sounds beyond paint cues.
 - Softer UI transitions.
 - Better postcard export composition.
 - Optional scene presets.

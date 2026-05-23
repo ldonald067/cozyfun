@@ -45,6 +45,16 @@ button:active {
   transform: translateY(1px);
 }
 
+button:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
+button:disabled:hover {
+  border-color: rgba(244, 223, 189, 0.15);
+  background: rgba(22, 29, 39, 0.78);
+}
+
 .app-shell {
   min-height: 100%;
   position: relative;
@@ -317,6 +327,92 @@ button:active {
 
 .brush-control output {
   color: #ffe4ad;
+}
+
+.audio-panel {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 18px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(239, 211, 166, 0.12);
+}
+
+.audio-panel-header,
+.audio-panel-title {
+  display: flex;
+  align-items: center;
+}
+
+.audio-panel-header {
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.audio-panel-title {
+  gap: 6px;
+  color: #ffe4ad;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.audio-enable-button {
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #dceef5;
+}
+
+.audio-enable-button.active {
+  opacity: 1;
+  color: #f3fcff;
+  border-color: rgba(148, 216, 236, 0.36);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(148, 216, 236, 0.14), transparent 68%),
+    rgba(25, 39, 45, 0.86);
+  box-shadow: 0 0 18px rgba(116, 195, 221, 0.12);
+}
+
+.audio-mute-button {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 6px;
+  color: #d8eaf0;
+}
+
+.audio-mute-button.muted {
+  color: #b9a997;
+}
+
+.audio-sliders {
+  display: grid;
+  gap: 9px;
+}
+
+.audio-slider {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+  color: #d9cfbe;
+  font-size: 12px;
+}
+
+.audio-slider output {
+  color: #9bbfca;
+  font-variant-numeric: tabular-nums;
+}
+
+.audio-slider input {
+  grid-column: 1 / -1;
+  width: 100%;
+  accent-color: #8dcfe3;
+}
+
+.audio-slider input:disabled {
+  opacity: 0.42;
 }
 
 .control-stack {

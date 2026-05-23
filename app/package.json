@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --configLoader runner",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build --configLoader runner",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {

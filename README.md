@@ -39,6 +39,7 @@ npm --prefix app run dev -- --host 127.0.0.1
 - Paint directly on the sandbox tray.
 - Use the brush slider to change brush size.
 - Pause/play the simulation from the control panel.
+- Enable optional procedural audio and tune master, ambience, music, and effects volume.
 - Clear, save, load, export, import, or export a postcard from the right controls.
 
 Saves are local to the browser unless you export a scene JSON file.
@@ -62,12 +63,12 @@ Some key reactions:
 
 ## Architecture
 
-- `app` contains the React/Vite UI, renderer, input handling, local saves, and JS fallback engine.
+- `app` contains the React/Vite UI, renderer, procedural audio, input handling, local saves, and JS fallback engine.
 - `sim` contains the Rust simulation compiled to WASM.
 - `scripts/build.ps1` builds the Rust sim, copies the generated WASM into `app/public/sim`, then builds the Vite app.
 - `scripts/dev.ps1` builds the sim first, then starts Vite.
 
-The app is static after build. There is no backend, account system, database, cloud save, or paid API dependency.
+The app is static after build. There is no backend, account system, database, cloud save, streaming dependency, or paid API dependency.
 
 ## Scene format
 
@@ -122,7 +123,9 @@ If Rust cannot find the WASM target, run:
 rustup target add wasm32-unknown-unknown
 ```
 
-If Vite reports `Access is denied` while loading `vite.config.ts` on Windows, use the checked-in dev script. The app dev command uses Vite's runner config loader to avoid that Windows path-walking issue.
+If `npm run check` fails on Windows with `link.exe not found`, install Visual Studio Build Tools with the Visual C++ build tools workload. The browser build and WASM smoke test can still pass without the native Windows Rust linker.
+
+If Vite reports `Access is denied` while loading `vite.config.ts` on Windows, use the checked-in scripts. The app dev and build commands use Vite's runner config loader to avoid that Windows path-walking issue.
 
 If a scene import fails, confirm it was exported from this app version and has the same world size.
 
