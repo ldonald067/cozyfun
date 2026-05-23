@@ -28,7 +28,7 @@ Goal: make the project safer to change before adding more visual complexity.
 
 ## Phase 2: Visual Shape Language
 
-Status: planned.
+Status: started.
 
 Goal: make each material recognizable by silhouette and texture, not color alone.
 
@@ -55,7 +55,7 @@ Material directions:
 Implementation approach:
 
 - Add renderer helpers that can inspect neighboring cells.
-- Start with 5 materials: Ice, Stone, Seed, Water, Stardust.
+- First batch: Ice, Stone, Seed, Sand, Water/Moonwater, and Stardust.
 - Keep effects subtle at single-cell scale.
 - Avoid changing Rust simulation rules for this phase unless a visual need exposes a real behavior bug.
 - Verify desktop and mobile screenshots after each batch.
