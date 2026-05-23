@@ -222,15 +222,20 @@ function seedColor(
 
 function iceColor(color: [number, number, number], variant: number, cells: Uint8Array, width: number, height: number, x: number, y: number) {
   const hash = hashCell(x, y, variant);
+  const localX = (x + variant) & 3;
+  const localY = (y + (variant >> 1)) & 3;
   const top = !sameKind(cells, width, height, x, y - 1, MATERIAL.Ice);
   const left = !sameKind(cells, width, height, x - 1, y, MATERIAL.Ice);
   const right = !sameKind(cells, width, height, x + 1, y, MATERIAL.Ice);
   const bottom = !sameKind(cells, width, height, x, y + 1, MATERIAL.Ice);
-  let out = mixRgb(color, [204, 247, 255], 0.2);
-  if (top || left) out = adjustRgb(out, 20);
-  if (right || bottom) out = mixRgb(out, [88, 142, 171], 0.22);
-  if ((x + y * 2 + variant) % 17 === 0) out = mixRgb(out, [90, 143, 173], 0.45);
-  if (hash % 19 === 0) out = adjustRgb(out, 36);
+  let out = mixRgb(color, [181, 238, 250], 0.28);
+
+  if (localX === 0 || localY === 0) out = mixRgb(out, [236, 253, 255], 0.58);
+  if (localX === 3 || localY === 3) out = mixRgb(out, [58, 119, 156], 0.38);
+  if (top || left) out = adjustRgb(out, 26);
+  if (right || bottom) out = mixRgb(out, [49, 96, 134], 0.42);
+  if ((localX === 1 && localY === 2) || (hash % 17 === 0 && localX !== 0)) out = mixRgb(out, [39, 105, 145], 0.55);
+  if (hash % 29 === 0 || (top && localX === 1)) out = mixRgb(out, [255, 255, 255], 0.62);
   return out;
 }
 
