@@ -99,10 +99,11 @@ Useful local commands:
 ```powershell
 .\scripts\build.ps1
 .\scripts\test-wasm.ps1
+.\scripts\test-browser.ps1
 npm --prefix app audit --audit-level=moderate
 ```
 
-CI runs on pushes and pull requests to `main`.
+CI runs on pushes and pull requests to `main`. Browser smoke checks use an installed Chrome or Edge browser; set `BROWSER_BINARY` if your browser is in a custom location.
 
 ## Roadmap
 

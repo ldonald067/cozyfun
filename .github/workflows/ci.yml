@@ -37,3 +37,6 @@ jobs:
 
       - name: Build app
         run: npm run build
+
+      - name: Run browser smoke tests
+        run: npm run test:browser

@@ -16,11 +16,11 @@ Status: done.
 
 ## Phase 1: Quality Foundation
 
-Status: next.
+Status: in progress.
 
 Goal: make the project safer to change before adding more visual complexity.
 
-- Add lightweight smoke tests for app launch, painting, clear, save/load, import rejection, and export.
+- Add lightweight smoke tests for app launch, painting, clear, save/load, import rejection, export, and audio controls.
 - Add a deterministic WASM smoke check that exercises a few core reactions from JavaScript.
 - Keep Rust tests focused on simulation behavior.
 - Document known local dev quirks and expected commands.

@@ -325,6 +325,7 @@ export function App() {
           </div>
           <div
             className="tray"
+            data-testid="sandbox-tray"
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
@@ -335,7 +336,7 @@ export function App() {
             <div className="glass-sheen" aria-hidden="true" />
           </div>
           <div className="status-bar">
-            <span>{status}</span>
+            <span data-testid="status-message">{status}</span>
             <span>{engine?.source ?? "loading"} - {fps} fps</span>
           </div>
         </section>
@@ -345,7 +346,7 @@ export function App() {
             <button type="button" className="icon-button" title={paused ? "Play" : "Pause"} onClick={() => setPaused((value) => !value)}>
               {paused ? <Play size={18} /> : <Pause size={18} />}
             </button>
-            <button type="button" className="icon-button" title="Clear" onClick={handleClear}>
+            <button type="button" className="icon-button" title="Clear" data-testid="clear-scene" onClick={handleClear}>
               <RotateCcw size={18} />
             </button>
             <button type="button" className="icon-button" title="Use eraser" onClick={() => setSelected(MATERIAL.Empty)}>
@@ -375,6 +376,7 @@ export function App() {
               <button
                 type="button"
                 className={`audio-enable-button ${audioPrefs.enabled ? "active" : ""}`}
+                data-testid="audio-toggle"
                 title={audioPrefs.enabled ? "Turn sound off" : "Enable sound"}
                 onClick={handleToggleSound}
               >
@@ -385,6 +387,7 @@ export function App() {
             <button
               type="button"
               className={`audio-mute-button ${audioPrefs.muted ? "muted" : ""}`}
+              data-testid="audio-mute"
               title={audioPrefs.muted ? "Unmute" : "Mute"}
               onClick={handleMuteAudio}
             >
@@ -415,6 +418,7 @@ export function App() {
                     max={1}
                     step={0.01}
                     value={audioPrefs.volumes[channel]}
+                    data-testid={`audio-volume-${channel}`}
                     onChange={(event) => handleAudioVolume(channel, Number(event.target.value))}
                   />
                 </label>
@@ -423,23 +427,23 @@ export function App() {
           </div>
 
           <div className="control-stack">
-            <button type="button" onClick={handleSave}>
+            <button type="button" data-testid="save-scene" onClick={handleSave}>
               <Save size={16} /> Save
             </button>
-            <button type="button" onClick={handleLoad}>
+            <button type="button" data-testid="load-scene" onClick={handleLoad}>
               <FolderOpen size={16} /> Load
             </button>
-            <button type="button" onClick={handleExport}>
+            <button type="button" data-testid="export-scene" onClick={handleExport}>
               <Download size={16} /> Export
             </button>
-            <button type="button" onClick={() => fileInputRef.current?.click()}>
+            <button type="button" data-testid="import-scene" onClick={() => fileInputRef.current?.click()}>
               <FolderOpen size={16} /> Import
             </button>
             <button type="button" onClick={handlePostcard}>
               <ImageDown size={16} /> Postcard
             </button>
           </div>
-          <input ref={fileInputRef} type="file" accept="application/json" hidden onChange={handleImport} />
+          <input ref={fileInputRef} type="file" accept="application/json" data-testid="scene-file-input" hidden onChange={handleImport} />
         </aside>
       </section>
     </main>
