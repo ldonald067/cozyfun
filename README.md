@@ -70,6 +70,8 @@ Some key reactions:
 
 The app is static after build. There is no backend, account system, database, cloud save, streaming dependency, or paid API dependency.
 
+See `docs/ARCHITECTURE.md` for module boundaries and `docs/VISUAL_PIPELINE.md` for renderer and shape-language notes.
+
 ## Scene format
 
 Scene export files are JSON snapshots with:

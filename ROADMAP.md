@@ -23,7 +23,7 @@ Goal: make the project safer to change before adding more visual complexity.
 - Add lightweight smoke tests for app launch, painting, clear, save/load, import rejection, export, and audio controls.
 - Add a deterministic WASM smoke check that exercises a few core reactions from JavaScript.
 - Keep Rust tests focused on simulation behavior.
-- Document known local dev quirks and expected commands.
+- Document architecture, rendering boundaries, local dev quirks, and expected commands.
 - Decide project license before wider sharing.
 
 ## Phase 2: Visual Shape Language
@@ -56,6 +56,7 @@ Implementation approach:
 
 - Add renderer helpers that can inspect neighboring cells.
 - First batch: Ice, Stone, Seed, Sand, Water/Moonwater, and Stardust.
+- Keep renderer orchestration separate from material shape-language rules.
 - Keep effects subtle at single-cell scale.
 - Avoid changing Rust simulation rules for this phase unless a visual need exposes a real behavior bug.
 - Verify desktop and mobile screenshots after each batch.
