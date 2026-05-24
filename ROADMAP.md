@@ -13,6 +13,7 @@ This roadmap keeps the project focused: make the toy feel good, keep the codebas
 - Audio code split into reusable modules for mixer, preferences, ambience, music, effects, buffers, and controller lifecycle.
 - Sound moods added for Rain, Window, and Stardust variations.
 - Non-destructive room backdrops added for Rain Desk, Moonlit Garden, and Stardust Hearth.
+- Local credited room images added for those backdrops, with procedural lighting and weather still layered on top.
 - Painted scene seeds kept as internal QA/dev helpers instead of visible user-facing presets.
 - External music provider boundary added with generated music as the default and a planned Desk Radio slot for Phase 5.
 - Reaction audio cues added for steam, cooling lava, growth, and cosmic sparkle events.
@@ -113,10 +114,12 @@ Done:
 - Softer UI control treatment through reusable segmented controls, focus states, panel scrolling, and compact room controls.
 - Better postcard export composition with contextual scene, sound, and simulation metadata.
 - Room/backdrop switching that changes atmosphere and audio mood without replacing the sandbox.
+- Room photos now load locally from `app/public/rooms` with source tracking in `ASSET_CREDITS.md`.
 
 Remaining before Phase 4:
 
 - Listening pass on real speakers/headphones after more play time.
+- Visual pass on the sourced room photos after more play time, replacing any image that feels too literal, muddy, or distracting.
 - Small UI polish only if the added controls feel crowded during normal play.
 
 ## Phase 4: Sharper Realistic Visuals

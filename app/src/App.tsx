@@ -218,6 +218,17 @@ export function App() {
     []
   );
 
+  const sceneShellStyle = useMemo(
+    () =>
+      ({
+        "--room-image": `url("${activeSceneEnvironment.image}")`,
+        "--room-image-position": activeSceneEnvironment.imagePosition,
+        "--room-image-opacity": activeSceneEnvironment.imageOpacity,
+        "--room-image-filter": activeSceneEnvironment.imageFilter
+      }) as React.CSSProperties,
+    [activeSceneEnvironment]
+  );
+
   const sceneOptions = useMemo<SegmentOption<SceneEnvironmentId>[]>(
     () =>
       SCENE_ENVIRONMENTS.map((scene) => ({
@@ -373,7 +384,7 @@ export function App() {
   }
 
   return (
-    <main className={`app-shell ${activeSceneEnvironment.className}`}>
+    <main className={`app-shell ${activeSceneEnvironment.className}`} style={sceneShellStyle}>
       <canvas ref={motesCanvasRef} className="motes-canvas" aria-hidden="true" />
       <section className="workspace" aria-label="Cozy pixel sandbox">
         <aside className="tool-panel" aria-label="Materials">

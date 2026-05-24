@@ -67,6 +67,7 @@ Some key reactions:
 - `app` contains the React/Vite UI, renderer, procedural audio, input handling, local saves, and JS fallback engine.
 - `sim` contains the Rust simulation compiled to WASM.
 - `app/src/sceneEnvironments.ts` contains non-destructive room/backdrop definitions.
+- `app/public/rooms` contains local room backdrop images used by those scene definitions.
 - `app/src/devSceneSeeds.ts` contains internal painted seeds for QA experiments.
 - `app/src/reactions.ts` maps simulation changes to gentle audio cues.
 - `scripts/build.ps1` builds the Rust sim, copies the generated WASM into `app/public/sim`, then builds the Vite app.
@@ -74,7 +75,7 @@ Some key reactions:
 
 The app is static after build. There is no backend, account system, database, cloud save, streaming dependency, or paid API dependency.
 
-See `docs/ARCHITECTURE.md` for module boundaries, `docs/VISUAL_PIPELINE.md` for renderer and shape-language notes, and `docs/AUDIO.md` for the procedural sound foundation.
+See `docs/ARCHITECTURE.md` for module boundaries, `docs/VISUAL_PIPELINE.md` for renderer and shape-language notes, `docs/AUDIO.md` for the procedural sound foundation, and `ASSET_CREDITS.md` for third-party room backdrop sources.
 
 ## Scene format
 
@@ -117,7 +118,7 @@ See `ROADMAP.md` for the current phase plan, including the planned material shap
 
 ## License
 
-MIT. See `LICENSE`.
+MIT. See `LICENSE`. Third-party room images are credited in `ASSET_CREDITS.md`.
 
 ## Troubleshooting
 

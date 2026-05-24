@@ -72,6 +72,10 @@ input:focus-visible {
     linear-gradient(100deg, transparent 0 66%, rgba(255, 213, 145, 0.08) 67%, transparent 69%);
   --room-weather-size: 420px 100%, 680px 100%;
   --room-weather-duration: 12s;
+  --room-image: linear-gradient(transparent, transparent);
+  --room-image-position: center center;
+  --room-image-opacity: 0.56;
+  --room-image-filter: saturate(0.82) contrast(0.94) brightness(0.58);
   --room-lighting:
     linear-gradient(105deg, rgba(255, 218, 147, 0.06), transparent 32%),
     linear-gradient(260deg, rgba(112, 170, 191, 0.08), transparent 44%);
@@ -107,9 +111,20 @@ input:focus-visible {
 }
 
 .app-shell::after {
-  background: var(--room-lighting);
+  background:
+    var(--room-lighting),
+    linear-gradient(180deg, rgba(3, 6, 10, 0.08), rgba(3, 6, 10, 0.68)),
+    var(--room-image);
+  background-repeat: no-repeat;
+  background-size: cover, cover, cover;
+  background-position: center, center, var(--room-image-position);
+  filter: var(--room-image-filter);
   mix-blend-mode: screen;
-  opacity: 0.72;
+  opacity: var(--room-image-opacity);
+  transition:
+    background 260ms ease,
+    filter 260ms ease,
+    opacity 260ms ease;
 }
 
 .app-shell.scene-moonwater-garden {
@@ -178,6 +193,7 @@ input:focus-visible {
   backdrop-filter: blur(16px);
   border-radius: 8px;
   max-height: calc(100vh - 36px);
+  overflow-x: hidden;
   overflow-y: auto;
 }
 

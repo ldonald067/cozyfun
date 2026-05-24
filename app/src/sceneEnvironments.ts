@@ -9,6 +9,10 @@ export type SceneEnvironment = {
   status: string;
   mood: AudioMood;
   className: string;
+  image: string;
+  imagePosition: string;
+  imageOpacity: number;
+  imageFilter: string;
 };
 
 const SCENE_ENVIRONMENT_KEY = "cozy-pixel-sandbox:room:v1";
@@ -21,7 +25,11 @@ export const SCENE_ENVIRONMENTS: SceneEnvironment[] = [
     title: "Rain Desk",
     status: "rain desk backdrop on",
     mood: "rain",
-    className: "scene-rain-desk"
+    className: "scene-rain-desk",
+    image: "/rooms/rain-desk.jpg",
+    imagePosition: "center center",
+    imageOpacity: 0.58,
+    imageFilter: "saturate(0.82) contrast(0.94) brightness(0.58)"
   },
   {
     id: "moonwater-garden",
@@ -29,7 +37,11 @@ export const SCENE_ENVIRONMENTS: SceneEnvironment[] = [
     title: "Moonlit Garden",
     status: "moonlit garden backdrop on",
     mood: "window",
-    className: "scene-moonwater-garden"
+    className: "scene-moonwater-garden",
+    image: "/rooms/moonwater-garden.jpg",
+    imagePosition: "center 38%",
+    imageOpacity: 0.6,
+    imageFilter: "saturate(0.86) contrast(0.98) brightness(0.66)"
   },
   {
     id: "stardust-hearth",
@@ -37,7 +49,11 @@ export const SCENE_ENVIRONMENTS: SceneEnvironment[] = [
     title: "Stardust Hearth",
     status: "stardust hearth backdrop on",
     mood: "stardust",
-    className: "scene-stardust-hearth"
+    className: "scene-stardust-hearth",
+    image: "/rooms/stardust-hearth.jpg",
+    imagePosition: "center 45%",
+    imageOpacity: 0.54,
+    imageFilter: "saturate(0.76) contrast(0.9) brightness(0.6)"
   }
 ];
 

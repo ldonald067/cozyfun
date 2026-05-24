@@ -13,10 +13,14 @@ const distDir = path.join(root, "app", "dist");
 const mimeTypes = new Map([
   [".css", "text/css"],
   [".html", "text/html; charset=utf-8"],
+  [".jpeg", "image/jpeg"],
+  [".jpg", "image/jpeg"],
   [".js", "text/javascript"],
   [".json", "application/json"],
+  [".png", "image/png"],
   [".svg", "image/svg+xml"],
-  [".wasm", "application/wasm"]
+  [".wasm", "application/wasm"],
+  [".webp", "image/webp"]
 ]);
 
 const checks = [];
@@ -83,6 +87,7 @@ async function main() {
       audioMoods: document.querySelectorAll(".audio-mood-control button").length,
       musicProviders: document.querySelectorAll(".music-source-control button").length,
       sceneEnvironments: document.querySelectorAll('[data-testid^="scene-environment-"]').length,
+      roomImage: getComputedStyle(document.querySelector(".app-shell")).getPropertyValue("--room-image"),
       status: document.querySelector('[data-testid="status-message"]')?.textContent ?? ""
     }))()`);
     assert(state.title === "Cozy Pixel Sandbox", "unexpected page title");
@@ -91,6 +96,7 @@ async function main() {
     assert(state.audioMoods === 3, `expected three audio mood buttons, found ${state.audioMoods}`);
     assert(state.musicProviders === 2, `expected two music provider buttons, found ${state.musicProviders}`);
     assert(state.sceneEnvironments === 3, `expected three room buttons, found ${state.sceneEnvironments}`);
+    assert(state.roomImage.includes("rain-desk.jpg"), `default room image was not applied: ${state.roomImage}`);
     assert(state.status.includes("online"), `engine did not report online: ${state.status}`);
   });
 
@@ -161,12 +167,16 @@ async function main() {
     await click(cdp, '[data-testid="scene-environment-moonwater-garden"]');
     await waitForStatus(cdp, "moonlit garden backdrop on");
     const moonClass = await evaluate(cdp, `document.querySelector(".app-shell")?.classList.contains("scene-moonwater-garden")`);
+    const moonImage = await evaluate(cdp, `getComputedStyle(document.querySelector(".app-shell")).getPropertyValue("--room-image")`);
     assert(moonClass, "moonwater room class was not applied");
+    assert(moonImage.includes("moonwater-garden.jpg"), `moonwater room image was not applied: ${moonImage}`);
     await waitUntil(() => textIncludes(cdp, '[data-testid="audio-mood-window"]', "Window"), "window mood control to stay visible");
     await click(cdp, '[data-testid="scene-environment-stardust-hearth"]');
     await waitForStatus(cdp, "stardust hearth backdrop on");
     const hearthClass = await evaluate(cdp, `document.querySelector(".app-shell")?.classList.contains("scene-stardust-hearth")`);
+    const hearthImage = await evaluate(cdp, `getComputedStyle(document.querySelector(".app-shell")).getPropertyValue("--room-image")`);
     assert(hearthClass, "stardust hearth room class was not applied");
+    assert(hearthImage.includes("stardust-hearth.jpg"), `hearth room image was not applied: ${hearthImage}`);
   });
 
   await check("page stayed free of browser errors", async () => {

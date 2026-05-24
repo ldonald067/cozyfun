@@ -4,8 +4,8 @@ target/
 pkg/
 .tools/
 .vite/
+.tmp/
 app/public/sim/
 *.log
 .env
 .env.*
-

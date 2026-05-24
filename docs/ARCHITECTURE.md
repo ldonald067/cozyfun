@@ -10,7 +10,7 @@ This project is a static browser toy: React owns the interface, Rust/WASM owns t
 4. `app/src/renderer.ts` converts the engine cell bytes into base, glow, and atmosphere canvas layers.
 5. `app/src/storage.ts` handles browser-local saves and JSON scene import/export.
 6. `app/src/audio.ts` exposes the optional procedural Web Audio controller.
-7. `app/src/sceneEnvironments.ts` provides non-destructive room/backdrop definitions.
+7. `app/src/sceneEnvironments.ts` provides non-destructive room/backdrop definitions and their local image metadata.
 8. `app/src/reactions.ts` detects coarse visual/audio reaction events from before/after cell snapshots.
 
 The built app is static. There is no server, account system, database, cloud save, streaming dependency, or paid API in the current architecture.
@@ -73,7 +73,9 @@ The app should favor compact controls over explanatory panels. Tooltips and titl
 
 ## Room Backdrops And Reactions
 
-Visible room controls change CSS atmosphere and the default audio mood without mutating the simulation. The selected room is persisted in localStorage, separate from scene JSON. This keeps the sandbox personal: user-created pixels are not replaced by a preset.
+Visible room controls change CSS atmosphere, local backdrop images, and the default audio mood without mutating the simulation. The selected room is persisted in localStorage, separate from scene JSON. This keeps the sandbox personal: user-created pixels are not replaced by a preset.
+
+Room images are served from `app/public/rooms` and referenced through scene metadata, then softened by CSS lighting, weather, and darkening layers. This keeps the source of truth in one small data file and prevents image paths from spreading across the UI. Third-party sources belong in `ASSET_CREDITS.md` and should be updated in the same change as any asset replacement.
 
 `app/src/devSceneSeeds.ts` keeps painted starter worlds for internal QA and future experiments. They are not part of the main UI until the visuals are strong enough to justify replacing a user's canvas.
 
@@ -102,8 +104,9 @@ CI runs Rust tests, the production build, and browser smoke checks on every push
 
 ## Design Rules
 
-- Prefer deterministic procedural visuals over asset files for V0.
+- Prefer deterministic procedural visuals for the sandbox itself; use local image assets only for room atmosphere when they strengthen the scene.
 - Keep simulation behavior and visual polish separate.
 - Keep audio optional and user-initiated.
 - Keep exported scene data stable and validated.
+- Keep third-party asset credits near the repo root for simple publishing audits.
 - Add small abstractions only when they make the next material or test easier.
