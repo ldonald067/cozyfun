@@ -62,26 +62,102 @@ input:focus-visible {
 }
 
 .app-shell {
+  --room-background:
+    linear-gradient(180deg, rgba(7, 10, 18, 0.4), rgba(7, 10, 18, 0.9)),
+    linear-gradient(125deg, rgba(74, 112, 126, 0.22), transparent 42%),
+    linear-gradient(120deg, #0b1118 0%, #111a22 46%, #1d2223 100%);
+  --room-weather-opacity: 0.28;
+  --room-weather-image:
+    linear-gradient(110deg, transparent 0 38%, rgba(130, 171, 195, 0.18) 39%, transparent 41%),
+    linear-gradient(100deg, transparent 0 66%, rgba(255, 213, 145, 0.08) 67%, transparent 69%);
+  --room-weather-size: 420px 100%, 680px 100%;
+  --room-weather-duration: 12s;
+  --room-lighting:
+    linear-gradient(105deg, rgba(255, 218, 147, 0.06), transparent 32%),
+    linear-gradient(260deg, rgba(112, 170, 191, 0.08), transparent 44%);
+  --window-background:
+    linear-gradient(180deg, rgba(17, 31, 45, 0.74), rgba(4, 8, 14, 0.18)),
+    repeating-linear-gradient(105deg, rgba(162, 204, 225, 0.18) 0 1px, transparent 1px 28px);
+  --window-border: rgba(117, 151, 164, 0.22);
+  --window-opacity: 0.56;
+  --tray-frame: #241b17;
+  --tray-highlight: rgba(255, 213, 150, 0.18);
+  --tray-inner-glow: rgba(255, 197, 106, 0.08);
   min-height: 100%;
   position: relative;
   overflow: hidden;
-  background:
-    linear-gradient(180deg, rgba(7, 10, 18, 0.4), rgba(7, 10, 18, 0.9)),
-    radial-gradient(ellipse at top left, rgba(74, 112, 126, 0.22), transparent 42%),
-    linear-gradient(120deg, #0b1118 0%, #111a22 46%, #1d2223 100%);
+  background: var(--room-background);
+  transition: background 260ms ease;
 }
 
-.app-shell::before {
+.app-shell::before,
+.app-shell::after {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0.28;
-  background-image:
-    linear-gradient(110deg, transparent 0 38%, rgba(130, 171, 195, 0.18) 39%, transparent 41%),
-    linear-gradient(100deg, transparent 0 66%, rgba(255, 213, 145, 0.08) 67%, transparent 69%);
-  background-size: 420px 100%, 680px 100%;
-  animation: rain-slide 12s linear infinite;
+}
+
+.app-shell::before {
+  opacity: var(--room-weather-opacity);
+  background-image: var(--room-weather-image);
+  background-size: var(--room-weather-size);
+  animation: rain-slide var(--room-weather-duration) linear infinite;
+  transition: opacity 260ms ease;
+}
+
+.app-shell::after {
+  background: var(--room-lighting);
+  mix-blend-mode: screen;
+  opacity: 0.72;
+}
+
+.app-shell.scene-moonwater-garden {
+  --room-background:
+    linear-gradient(180deg, rgba(8, 11, 22, 0.34), rgba(7, 9, 18, 0.94)),
+    linear-gradient(130deg, rgba(80, 91, 146, 0.28), transparent 48%),
+    linear-gradient(120deg, #080d18 0%, #10152a 52%, #161d2b 100%);
+  --room-weather-opacity: 0.2;
+  --room-weather-image:
+    linear-gradient(115deg, transparent 0 42%, rgba(175, 190, 255, 0.12) 43%, transparent 45%),
+    repeating-linear-gradient(90deg, rgba(151, 194, 196, 0.06) 0 1px, transparent 1px 70px);
+  --room-weather-size: 520px 100%, 700px 100%;
+  --room-weather-duration: 18s;
+  --room-lighting:
+    linear-gradient(120deg, rgba(152, 175, 255, 0.11), transparent 42%),
+    linear-gradient(260deg, rgba(102, 205, 190, 0.07), transparent 48%);
+  --window-background:
+    linear-gradient(180deg, rgba(21, 29, 59, 0.76), rgba(6, 9, 20, 0.2)),
+    repeating-linear-gradient(95deg, rgba(184, 199, 255, 0.16) 0 1px, transparent 1px 34px);
+  --window-border: rgba(161, 181, 255, 0.24);
+  --window-opacity: 0.62;
+  --tray-frame: #1e2230;
+  --tray-highlight: rgba(177, 190, 255, 0.2);
+  --tray-inner-glow: rgba(133, 182, 255, 0.08);
+}
+
+.app-shell.scene-stardust-hearth {
+  --room-background:
+    linear-gradient(180deg, rgba(12, 9, 10, 0.34), rgba(9, 7, 9, 0.94)),
+    linear-gradient(125deg, rgba(104, 67, 42, 0.22), transparent 46%),
+    linear-gradient(120deg, #100c0d 0%, #171017 52%, #201817 100%);
+  --room-weather-opacity: 0.18;
+  --room-weather-image:
+    linear-gradient(100deg, transparent 0 45%, rgba(255, 197, 120, 0.12) 46%, transparent 48%),
+    repeating-linear-gradient(0deg, rgba(255, 185, 101, 0.04) 0 1px, transparent 1px 42px);
+  --room-weather-size: 480px 100%, 100% 420px;
+  --room-weather-duration: 20s;
+  --room-lighting:
+    linear-gradient(110deg, rgba(255, 166, 85, 0.13), transparent 38%),
+    linear-gradient(270deg, rgba(178, 134, 255, 0.09), transparent 50%);
+  --window-background:
+    linear-gradient(180deg, rgba(46, 28, 30, 0.76), rgba(12, 6, 8, 0.2)),
+    repeating-linear-gradient(105deg, rgba(255, 183, 111, 0.12) 0 1px, transparent 1px 30px);
+  --window-border: rgba(255, 190, 117, 0.2);
+  --window-opacity: 0.5;
+  --tray-frame: #2a1812;
+  --tray-highlight: rgba(255, 176, 91, 0.18);
+  --tray-inner-glow: rgba(255, 143, 66, 0.1);
 }
 
 .workspace {
@@ -205,12 +281,14 @@ input:focus-visible {
   width: min(56vw, 680px);
   height: 150px;
   transform: translateX(-50%);
-  border: 1px solid rgba(117, 151, 164, 0.22);
+  border: 1px solid var(--window-border);
   border-radius: 8px;
-  background:
-    linear-gradient(180deg, rgba(17, 31, 45, 0.74), rgba(4, 8, 14, 0.18)),
-    repeating-linear-gradient(105deg, rgba(162, 204, 225, 0.18) 0 1px, transparent 1px 28px);
-  opacity: 0.56;
+  background: var(--window-background);
+  opacity: var(--window-opacity);
+  transition:
+    border-color 260ms ease,
+    background 260ms ease,
+    opacity 260ms ease;
 }
 
 .window-scene span {
@@ -238,15 +316,18 @@ input:focus-visible {
   width: min(72vw, 1050px);
   aspect-ratio: 11 / 7;
   margin: 86px auto 24px;
-  border: 12px solid #241b17;
+  border: 12px solid var(--tray-frame);
   border-radius: 8px;
   overflow: hidden;
   touch-action: none;
   background: #090e14;
   box-shadow:
     0 34px 120px rgba(0, 0, 0, 0.62),
-    0 0 0 1px rgba(255, 213, 150, 0.18),
-    inset 0 0 36px rgba(255, 197, 106, 0.08);
+    0 0 0 1px var(--tray-highlight),
+    inset 0 0 36px var(--tray-inner-glow);
+  transition:
+    border-color 260ms ease,
+    box-shadow 260ms ease;
 }
 
 .sandbox-canvas {
@@ -540,24 +621,24 @@ input:focus-visible {
   gap: 8px;
 }
 
-.preset-control {
+.environment-control {
   display: grid;
   gap: 7px;
   padding-top: 10px;
   border-top: 1px solid rgba(239, 211, 166, 0.12);
 }
 
-.preset-control > span {
+.environment-control > span {
   color: #ffe4ad;
   font-size: 13px;
   font-weight: 700;
 }
 
-.scene-preset-control {
+.scene-environment-control {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.scene-preset-control button {
+.scene-environment-control button {
   justify-content: center;
   min-height: 28px;
   padding: 0 5px;

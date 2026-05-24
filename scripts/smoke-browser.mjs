@@ -82,7 +82,7 @@ async function main() {
       audioInfos: document.querySelectorAll(".audio-info").length,
       audioMoods: document.querySelectorAll(".audio-mood-control button").length,
       musicProviders: document.querySelectorAll(".music-source-control button").length,
-      scenePresets: document.querySelectorAll(".scene-preset-control button").length,
+      sceneEnvironments: document.querySelectorAll('[data-testid^="scene-environment-"]').length,
       status: document.querySelector('[data-testid="status-message"]')?.textContent ?? ""
     }))()`);
     assert(state.title === "Cozy Pixel Sandbox", "unexpected page title");
@@ -90,7 +90,7 @@ async function main() {
     assert(state.audioInfos === 4, `expected four audio info icons, found ${state.audioInfos}`);
     assert(state.audioMoods === 3, `expected three audio mood buttons, found ${state.audioMoods}`);
     assert(state.musicProviders === 2, `expected two music provider buttons, found ${state.musicProviders}`);
-    assert(state.scenePresets === 3, `expected three scene preset buttons, found ${state.scenePresets}`);
+    assert(state.sceneEnvironments === 3, `expected three room buttons, found ${state.sceneEnvironments}`);
     assert(state.status.includes("online"), `engine did not report online: ${state.status}`);
   });
 
@@ -157,12 +157,16 @@ async function main() {
     await waitForStatus(cdp, "Stardust Study resting");
   });
 
-  await check("scene presets load starter worlds", async () => {
-    await click(cdp, '[data-testid="scene-preset-moonwater-garden"]');
-    await waitForStatus(cdp, "moonwater garden preset loaded");
+  await check("room scenes change the backdrop without loading starter worlds", async () => {
+    await click(cdp, '[data-testid="scene-environment-moonwater-garden"]');
+    await waitForStatus(cdp, "moonlit garden backdrop on");
+    const moonClass = await evaluate(cdp, `document.querySelector(".app-shell")?.classList.contains("scene-moonwater-garden")`);
+    assert(moonClass, "moonwater room class was not applied");
     await waitUntil(() => textIncludes(cdp, '[data-testid="audio-mood-window"]', "Window"), "window mood control to stay visible");
-    await click(cdp, '[data-testid="scene-preset-stardust-fireplace"]');
-    await waitForStatus(cdp, "stardust fireplace preset loaded");
+    await click(cdp, '[data-testid="scene-environment-stardust-hearth"]');
+    await waitForStatus(cdp, "stardust hearth backdrop on");
+    const hearthClass = await evaluate(cdp, `document.querySelector(".app-shell")?.classList.contains("scene-stardust-hearth")`);
+    assert(hearthClass, "stardust hearth room class was not applied");
   });
 
   await check("page stayed free of browser errors", async () => {

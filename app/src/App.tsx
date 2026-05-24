@@ -52,7 +52,13 @@ import { MATERIAL, MATERIALS, type MaterialDef, type MaterialId } from "./materi
 import { detectReactionEvents } from "./reactions";
 import { applySnapshot, downloadSnapshot, loadLocal, readSnapshotFile, saveLocal } from "./storage";
 import { exportPostcard, renderSandbox } from "./renderer";
-import { applyScenePreset, getScenePreset, SCENE_PRESETS, type ScenePresetId } from "./scenePresets";
+import {
+  getSceneEnvironment,
+  loadSceneEnvironmentId,
+  saveSceneEnvironmentId,
+  SCENE_ENVIRONMENTS,
+  type SceneEnvironmentId
+} from "./sceneEnvironments";
 
 const WORLD_WIDTH = 220;
 const WORLD_HEIGHT = 140;
@@ -102,7 +108,8 @@ export function App() {
   const activeMusicProvider = getMusicProviderDef(audioPrefs.provider);
   const [engine, setEngine] = useState<SandboxEngine | null>(null);
   const [selected, setSelected] = useState<MaterialId>(MATERIAL.Sand);
-  const [scenePreset, setScenePreset] = useState<ScenePresetId>("rain-desk");
+  const [sceneEnvironment, setSceneEnvironment] = useState<SceneEnvironmentId>(() => loadSceneEnvironmentId());
+  const activeSceneEnvironment = getSceneEnvironment(sceneEnvironment);
   const [brushSize, setBrushSize] = useState(4);
   const [paused, setPaused] = useState(false);
   const [status, setStatus] = useState("warming tray");
@@ -124,7 +131,6 @@ export function App() {
       createdEngine = created;
       setEngine(created);
       setStatus(created.source === "wasm" ? "wasm sim online" : "js fallback online");
-      applyScenePreset(created, "rain-desk");
     });
     return () => {
       active = false;
@@ -136,6 +142,10 @@ export function App() {
     audio.applyPreferences(audioPrefs);
     saveAudioPrefs(audioPrefs);
   }, [audio, audioPrefs]);
+
+  useEffect(() => {
+    saveSceneEnvironmentId(sceneEnvironment);
+  }, [sceneEnvironment]);
 
   useEffect(() => {
     return () => audio.dispose();
@@ -208,13 +218,13 @@ export function App() {
     []
   );
 
-  const sceneOptions = useMemo<SegmentOption<ScenePresetId>[]>(
+  const sceneOptions = useMemo<SegmentOption<SceneEnvironmentId>[]>(
     () =>
-      SCENE_PRESETS.map((preset) => ({
-        value: preset.id,
-        label: preset.label,
-        title: preset.title,
-        testId: `scene-preset-${preset.id}`
+      SCENE_ENVIRONMENTS.map((scene) => ({
+        value: scene.id,
+        label: scene.label,
+        title: scene.title,
+        testId: `scene-environment-${scene.id}`
       })),
     []
   );
@@ -251,7 +261,6 @@ export function App() {
     if (!engine) return;
     engine.clear();
     audio.playUiCue("clear");
-    setScenePreset("rain-desk");
     setStatus("tray cleared");
   }
 
@@ -266,7 +275,6 @@ export function App() {
     if (!engine) return;
     const loaded = loadLocal(engine);
     if (loaded) audio.playUiCue("load");
-    if (loaded) setScenePreset("rain-desk");
     setStatus(loaded ? "local scene loaded" : "no local save yet");
   }
 
@@ -282,7 +290,6 @@ export function App() {
     const snapshot = await readSnapshotFile(event.target.files[0]);
     const loaded = snapshot ? applySnapshot(engine, snapshot) : false;
     if (loaded) audio.playUiCue("import");
-    if (loaded) setScenePreset("rain-desk");
     setStatus(loaded ? "scene imported" : "invalid scene file");
     event.target.value = "";
   }
@@ -290,7 +297,7 @@ export function App() {
   async function handlePostcard() {
     if (!engine || !baseCanvasRef.current || !glowCanvasRef.current) return;
     await exportPostcard(engine, baseCanvasRef.current, glowCanvasRef.current, {
-      sceneTitle: getScenePreset(scenePreset).title,
+      sceneTitle: activeSceneEnvironment.title,
       moodTitle: activeMood.title,
       musicSource: activeMusicProvider.label
     });
@@ -356,17 +363,17 @@ export function App() {
     setStatus(providerDef.status);
   }
 
-  function handleScenePreset(id: ScenePresetId) {
-    if (!engine) return;
-    const preset = applyScenePreset(engine, id);
-    setScenePreset(id);
-    handleAudioMood(preset.mood);
-    audio.playUiCue("load");
-    setStatus(preset.status);
+  function handleSceneEnvironment(id: SceneEnvironmentId) {
+    const scene = getSceneEnvironment(id);
+    setSceneEnvironment(id);
+    setAudioPrefs((current) => ({ ...current, mood: scene.mood }));
+    audio.setMood(scene.mood);
+    if (audioPrefs.enabled && !audioPrefs.muted) audio.playUiCue("toggle");
+    setStatus(scene.status);
   }
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell ${activeSceneEnvironment.className}`}>
       <canvas ref={motesCanvasRef} className="motes-canvas" aria-hidden="true" />
       <section className="workspace" aria-label="Cozy pixel sandbox">
         <aside className="tool-panel" aria-label="Materials">
@@ -454,14 +461,14 @@ export function App() {
           </label>
 
           <div className="control-stack">
-            <div className="preset-control">
-              <span>Scene</span>
+            <div className="environment-control">
+              <span>Room</span>
               <SegmentedControl
-                ariaLabel="Scene preset"
-                value={scenePreset}
+                ariaLabel="Room backdrop"
+                value={sceneEnvironment}
                 options={sceneOptions}
-                className="scene-preset-control"
-                onChange={handleScenePreset}
+                className="scene-environment-control"
+                onChange={handleSceneEnvironment}
               />
             </div>
             <button type="button" data-testid="save-scene" onClick={handleSave}>

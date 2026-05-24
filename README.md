@@ -39,11 +39,11 @@ npm --prefix app run dev -- --host 127.0.0.1
 - Paint directly on the sandbox tray.
 - Use the brush slider to change brush size.
 - Pause/play the simulation from the control panel.
-- Load a starter scene preset when you want a quick cozy setup.
+- Change the room backdrop without replacing your sandbox.
 - Enable optional procedural audio, pick a sound mood, choose the generated music source, and tune master, ambience, music, and effects volume.
 - Clear, save, load, export, import, or export a postcard from the right controls.
 
-Saves are local to the browser unless you export a scene JSON file.
+Saves and the selected room backdrop are local to the browser unless you export a scene JSON file.
 
 ## Materials
 
@@ -66,7 +66,8 @@ Some key reactions:
 
 - `app` contains the React/Vite UI, renderer, procedural audio, input handling, local saves, and JS fallback engine.
 - `sim` contains the Rust simulation compiled to WASM.
-- `app/src/scenePresets.ts` contains reusable starter scenes.
+- `app/src/sceneEnvironments.ts` contains non-destructive room/backdrop definitions.
+- `app/src/devSceneSeeds.ts` contains internal painted seeds for QA experiments.
 - `app/src/reactions.ts` maps simulation changes to gentle audio cues.
 - `scripts/build.ps1` builds the Rust sim, copies the generated WASM into `app/public/sim`, then builds the Vite app.
 - `scripts/dev.ps1` builds the sim first, then starts Vite.

@@ -10,7 +10,7 @@ This project is a static browser toy: React owns the interface, Rust/WASM owns t
 4. `app/src/renderer.ts` converts the engine cell bytes into base, glow, and atmosphere canvas layers.
 5. `app/src/storage.ts` handles browser-local saves and JSON scene import/export.
 6. `app/src/audio.ts` exposes the optional procedural Web Audio controller.
-7. `app/src/scenePresets.ts` provides starter scenes without changing the simulation core.
+7. `app/src/sceneEnvironments.ts` provides non-destructive room/backdrop definitions.
 8. `app/src/reactions.ts` detects coarse visual/audio reaction events from before/after cell snapshots.
 
 The built app is static. There is no server, account system, database, cloud save, streaming dependency, or paid API in the current architecture.
@@ -67,13 +67,15 @@ Future external music should enter through a provider boundary rather than repla
 
 ## UI Boundary
 
-Keep reusable controls in `app/src/components` when the same interaction pattern appears in more than one place. `SegmentedControl` is the first shared control and is used for sound moods, music source selection, and scene presets.
+Keep reusable controls in `app/src/components` when the same interaction pattern appears in more than one place. `SegmentedControl` is the first shared control and is used for sound moods, music source selection, and room backdrops.
 
 The app should favor compact controls over explanatory panels. Tooltips and titles are acceptable for details like channel meaning; the first screen should remain the toy itself.
 
-## Scene Presets And Reactions
+## Room Backdrops And Reactions
 
-Scene presets are authored as paint commands against the normal engine API. They are starter worlds, not special save formats, so loaded/exported scenes remain ordinary cell snapshots.
+Visible room controls change CSS atmosphere and the default audio mood without mutating the simulation. The selected room is persisted in localStorage, separate from scene JSON. This keeps the sandbox personal: user-created pixels are not replaced by a preset.
+
+`app/src/devSceneSeeds.ts` keeps painted starter worlds for internal QA and future experiments. They are not part of the main UI until the visuals are strong enough to justify replacing a user's canvas.
 
 Reaction detection compares before/after cell bytes after a tick and emits a small set of event types for audio feedback. It should stay coarse and throttled; high-volume per-cell sound would make the sandbox noisy and expensive.
 

@@ -1,10 +1,10 @@
 import type { SandboxEngine } from "./engine";
 import { MATERIAL, type MaterialId } from "./materials";
 
-export type ScenePresetId = "rain-desk" | "moonwater-garden" | "stardust-fireplace";
+export type DevSceneSeedId = "rain-desk" | "moonwater-garden" | "stardust-fireplace";
 
-export type ScenePreset = {
-  id: ScenePresetId;
+export type DevSceneSeed = {
+  id: DevSceneSeedId;
   label: string;
   title: string;
   status: string;
@@ -22,7 +22,7 @@ type PaintCommand = {
   dy?: number;
 };
 
-export const SCENE_PRESETS: ScenePreset[] = [
+export const DEV_SCENE_SEEDS: DevSceneSeed[] = [
   {
     id: "rain-desk",
     label: "Rain",
@@ -81,12 +81,12 @@ export const SCENE_PRESETS: ScenePreset[] = [
   }
 ];
 
-export function getScenePreset(id: ScenePresetId) {
-  return SCENE_PRESETS.find((preset) => preset.id === id) ?? SCENE_PRESETS[0];
+export function getDevSceneSeed(id: DevSceneSeedId) {
+  return DEV_SCENE_SEEDS.find((preset) => preset.id === id) ?? DEV_SCENE_SEEDS[0];
 }
 
-export function applyScenePreset(engine: SandboxEngine, id: ScenePresetId) {
-  const preset = getScenePreset(id);
+export function applyDevSceneSeed(engine: SandboxEngine, id: DevSceneSeedId) {
+  const preset = getDevSceneSeed(id);
   engine.clear();
   for (const command of preset.commands) {
     const repeat = command.repeat ?? 1;

@@ -12,7 +12,8 @@ This roadmap keeps the project focused: make the toy feel good, keep the codebas
 - Procedural Web Audio foundation with master, ambience, music, and effects channels.
 - Audio code split into reusable modules for mixer, preferences, ambience, music, effects, buffers, and controller lifecycle.
 - Sound moods added for Rain, Window, and Stardust variations.
-- Scene presets added for Rain Desk, Moonwater Garden, and Stardust Fireplace.
+- Non-destructive room backdrops added for Rain Desk, Moonlit Garden, and Stardust Hearth.
+- Painted scene seeds kept as internal QA/dev helpers instead of visible user-facing presets.
 - External music provider boundary added with generated music as the default and a planned Desk Radio slot for Phase 5.
 - Reaction audio cues added for steam, cooling lava, growth, and cosmic sparkle events.
 - Postcard export now includes scene, mood, music source, sim source, and tick context.
@@ -109,9 +110,9 @@ Done:
   - Desk Radio appears as a planned provider slot for Phase 5.
   - Preferences already understand provider selection without requiring accounts, API keys, or a backend.
   - Procedural ambience/effects remain native and separate from the music source.
-- Softer UI control treatment through reusable segmented controls, focus states, panel scrolling, and compact preset controls.
+- Softer UI control treatment through reusable segmented controls, focus states, panel scrolling, and compact room controls.
 - Better postcard export composition with contextual scene, sound, and simulation metadata.
-- Optional scene presets for quickly testing cozy starter worlds.
+- Room/backdrop switching that changes atmosphere and audio mood without replacing the sandbox.
 
 Remaining before Phase 4:
 
