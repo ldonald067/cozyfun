@@ -59,11 +59,11 @@ This split keeps Phase 2 visuals expandable without turning the renderer into a 
 - `providers.ts`: generated/external music provider definitions.
 - `ambience.ts`: long-running environment layers.
 - `music.ts`: procedural rainy lo-fi bed.
-- `effects.ts`: material and UI one-shots.
+- `effects.ts`: prototype material and UI one-shots, currently disabled until a realistic Foley pass.
 
 This keeps Phase 3 music work reusable without burying composition, mixer state, and sound effects in one file.
 
-Future external music should enter through a provider boundary rather than replacing this audio system. Generated music remains the default. YouTube or any other third-party player should be isolated behind an external provider and shown as a visible mini-player, while ambience and effects continue to use the native procedural mixer.
+Future external music should enter through a provider boundary rather than replacing this audio system. Generated music remains the default. YouTube or any other third-party player should be isolated behind an external provider and shown as a visible mini-player, while ambience and future realistic Foley continue to use the native procedural mixer.
 
 ## UI Boundary
 
@@ -79,7 +79,7 @@ Room images are served from `app/public/rooms` and referenced through scene meta
 
 `app/src/devSceneSeeds.ts` keeps painted starter worlds for internal QA and future experiments. They are not part of the main UI until the visuals are strong enough to justify replacing a user's canvas.
 
-Reaction detection compares before/after cell bytes after a tick and emits a small set of event types for audio feedback. It should stay coarse and throttled; high-volume per-cell sound would make the sandbox noisy and expensive.
+Reaction detection compares before/after cell bytes after a tick and emits a small set of event types for future audio feedback. It should stay coarse and throttled; high-volume per-cell sound would make the sandbox noisy and expensive.
 
 ## Adding A Material
 

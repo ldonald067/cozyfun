@@ -4,8 +4,10 @@ import type { AudioChannel, AudioPrefs } from "./types";
 import { clamp01 } from "./utils";
 
 const AUDIO_PREFS_KEY = "cozy-pixel-sandbox:audio:v2";
+const DISABLED_EFFECTS_VOLUME = 0;
 
 export const AUDIO_CHANNELS: AudioChannel[] = ["master", "ambience", "music", "effects"];
+export const VISIBLE_AUDIO_CHANNELS: AudioChannel[] = ["master", "ambience", "music"];
 
 export const DEFAULT_AUDIO_PREFS: AudioPrefs = {
   enabled: false,
@@ -16,7 +18,7 @@ export const DEFAULT_AUDIO_PREFS: AudioPrefs = {
     master: 0.68,
     ambience: 0.62,
     music: 0.24,
-    effects: 0.5
+    effects: DISABLED_EFFECTS_VOLUME
   }
 };
 
@@ -50,7 +52,7 @@ export function normalizeAudioPrefs(value: unknown): AudioPrefs {
       master: readVolume(candidate.volumes?.master, DEFAULT_AUDIO_PREFS.volumes.master),
       ambience: readVolume(candidate.volumes?.ambience, DEFAULT_AUDIO_PREFS.volumes.ambience),
       music: readVolume(candidate.volumes?.music, DEFAULT_AUDIO_PREFS.volumes.music),
-      effects: readVolume(candidate.volumes?.effects, DEFAULT_AUDIO_PREFS.volumes.effects)
+      effects: DISABLED_EFFECTS_VOLUME
     }
   };
 }

@@ -40,7 +40,7 @@ npm --prefix app run dev -- --host 127.0.0.1
 - Use the brush slider to change brush size.
 - Pause/play the simulation from the control panel.
 - Change the room backdrop without replacing your sandbox.
-- Enable optional procedural audio, pick a sound mood, choose the generated music source, and tune master, ambience, music, and effects volume.
+- Enable optional procedural audio, pick a sound mood, choose the generated music source, and tune master, ambience, and music volume.
 - Clear, save, load, export, import, or export a postcard from the right controls.
 
 Saves and the selected room backdrop are local to the browser unless you export a scene JSON file.
@@ -69,7 +69,7 @@ Some key reactions:
 - `app/src/sceneEnvironments.ts` contains non-destructive room/backdrop definitions.
 - `app/public/rooms` contains local room backdrop images used by those scene definitions.
 - `app/src/devSceneSeeds.ts` contains internal painted seeds for QA experiments.
-- `app/src/reactions.ts` maps simulation changes to gentle audio cues.
+- `app/src/reactions.ts` maps simulation changes to future audio cue hooks.
 - `scripts/build.ps1` builds the Rust sim, copies the generated WASM into `app/public/sim`, then builds the Vite app.
 - `scripts/dev.ps1` builds the sim first, then starts Vite.
 

@@ -1,10 +1,5 @@
 import type { MaterialId } from "../materials";
 import { startRainAmbience } from "./ambience";
-import {
-  playMaterialPaint as playMaterialPaintCue,
-  playReactionCue as playReactionCueSound,
-  playUiCue as playUiCueSound
-} from "./effects";
 import { createAudioMixer, applyMixerPreferences } from "./mixer";
 import { startRainLofiMusic } from "./music";
 import { DEFAULT_AUDIO_PREFS, normalizeAudioPrefs } from "./preferences";
@@ -20,8 +15,6 @@ class CozyAudioController {
   private prefs = DEFAULT_AUDIO_PREFS;
   private ambience: AudioLayerHandle | null = null;
   private music: AudioLayerHandle | null = null;
-  private materialLastPlayedAt = new Map<number, number>();
-  private reactionLastPlayedAt = new Map<ReactionAudioCue, number>();
 
   async init(prefs: AudioPrefs) {
     this.prefs = normalizeAudioPrefs(prefs);
@@ -90,31 +83,12 @@ class CozyAudioController {
     applyMixerPreferences(this.audio, this.prefs);
   }
 
-  playMaterialPaint(materialId: MaterialId, intensity: number) {
-    const audio = this.audibleAudio();
-    if (!audio) return;
-    const nowMs = performance.now();
-    const last = this.materialLastPlayedAt.get(materialId) ?? 0;
-    if (nowMs - last < 70) return;
-    this.materialLastPlayedAt.set(materialId, nowMs);
-    playMaterialPaintCue(audio, materialId, intensity);
-  }
+  // Keep the one-shot API stable while the prototype synth effects are paused.
+  playMaterialPaint(_materialId: MaterialId, _intensity: number) {}
 
-  playUiCue(cue: UiAudioCue) {
-    const audio = this.audibleAudio();
-    if (!audio) return;
-    playUiCueSound(audio, cue);
-  }
+  playUiCue(_cue: UiAudioCue) {}
 
-  playReactionCue(cue: ReactionAudioCue, intensity: number) {
-    const audio = this.audibleAudio();
-    if (!audio) return;
-    const nowMs = performance.now();
-    const last = this.reactionLastPlayedAt.get(cue) ?? 0;
-    if (nowMs - last < 180) return;
-    this.reactionLastPlayedAt.set(cue, nowMs);
-    playReactionCueSound(audio, cue, intensity);
-  }
+  playReactionCue(_cue: ReactionAudioCue, _intensity: number) {}
 
   startAmbience() {
     if (!this.audio || this.ambience) return;
@@ -132,17 +106,10 @@ class CozyAudioController {
     this.music?.stop();
     this.ambience = null;
     this.music = null;
-    this.materialLastPlayedAt.clear();
-    this.reactionLastPlayedAt.clear();
     if (this.audio) {
       void this.audio.context.close();
       this.audio = null;
     }
-  }
-
-  private audibleAudio() {
-    if (!this.audio || !this.prefs.enabled || this.prefs.muted) return null;
-    return this.audio;
   }
 
   private restartLongRunningLayers() {

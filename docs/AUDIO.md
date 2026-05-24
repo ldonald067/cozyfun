@@ -12,10 +12,10 @@ Focused implementation modules live under `app/src/audio`:
 - `preferences.ts`: localStorage shape, defaults, channel list, and normalization.
 - `moods.ts`: reusable sound moods shared by the controller and UI.
 - `providers.ts`: generated/external music provider definitions and availability rules.
-- `mixer.ts`: Web Audio graph for `master`, `ambience`, `music`, and `effects`.
+- `mixer.ts`: Web Audio graph for `master`, `ambience`, `music`, and the reserved `effects` channel.
 - `ambience.ts`: rain, room hush, low room tone, and occasional window drips.
 - `music.ts`: rainy lo-fi procedural music bed.
-- `effects.ts`: material paint sounds, reaction cues, and UI cues.
+- `effects.ts`: prototype material paint sounds, reaction cues, and UI cues. This module is currently disabled because the synthetic one-shots felt too arcade-like.
 - `buffers.ts`: reusable generated noise buffers.
 - `utils.ts`: small shared helpers.
 - `controller.ts`: lifecycle and public methods used by the app.
@@ -26,11 +26,11 @@ Focused implementation modules live under `app/src/audio`:
 - The app must fully work without sound.
 - Preferences persist, but `enabled` always reloads as false so browsers do not autoplay.
 - Mute and stop should fade through mixer gain instead of tearing down every node.
-- Music, ambience, and effects stay on separate channels so the simple panel can become a fuller mixer later.
-- Mood changes should restart long-running ambience/music layers cleanly, without changing the one-shot effects API.
+- Music, ambience, and future realistic Foley stay on separate channels so the simple panel can become a fuller mixer later.
+- Mood changes should restart long-running ambience/music layers cleanly.
 - One-shot sources should disconnect themselves after their `ended` event so long play sessions do not keep stale Web Audio nodes around.
 - External music must be optional. The generated music provider remains the default and fallback.
-- Reaction sounds should be throttled in the controller so busy simulations stay gentle.
+- One-shot effects are disabled in the current build. Re-enable them only after a more realistic Foley/sample direction replaces the prototype synth cues.
 
 ## Music Direction
 
@@ -69,7 +69,7 @@ The provider boundary should expose calm app-level methods:
 - `setMood` or `setSource`
 - `dispose`
 
-External music should replace only the music layer. Ambience and effects stay procedural so the sandbox remains coherent even if YouTube is blocked, unavailable, or showing ads.
+External music should replace only the music layer. Ambience stays native so the sandbox remains coherent even if YouTube is blocked, unavailable, or showing ads. Future realistic Foley should stay native too.
 
 YouTube-specific implementation belongs in Phase 5. It should use a visible mini-player/drawer and the official IFrame Player API. Do not scrape YouTube, hide the player, require an API key, or make YouTube the only music path.
 
@@ -82,13 +82,13 @@ The app detects broad simulation changes after each tick and maps them to a smal
 - `growth`: seeds, soil, or wood turning into moss/fungus.
 - `spark`: meteor/stardust changes.
 
-Detection lives in `app/src/reactions.ts`. Playback lives in `effects.ts` and is throttled by `controller.ts`.
+Detection lives in `app/src/reactions.ts`. Playback is currently disabled at the controller boundary until the effect palette has a more realistic Foley direction.
 
 ## Adding Audio
 
 Add new sounds in the narrowest module:
 
-- material or UI one-shots: `effects.ts`
+- material or UI one-shots: `effects.ts`, but only after a natural Foley/sample-like direction is ready
 - long environmental loop: `ambience.ts`
 - musical pattern, rhythm, or harmonic change: `music.ts`
 - new mood preset: `moods.ts`

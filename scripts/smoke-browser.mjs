@@ -86,13 +86,15 @@ async function main() {
       audioInfos: document.querySelectorAll(".audio-info").length,
       audioMoods: document.querySelectorAll(".audio-mood-control button").length,
       musicProviders: document.querySelectorAll(".music-source-control button").length,
+      effectsSlider: Boolean(document.querySelector('[data-testid="audio-volume-effects"]')),
       sceneEnvironments: document.querySelectorAll('[data-testid^="scene-environment-"]').length,
       roomImage: getComputedStyle(document.querySelector(".app-shell")).getPropertyValue("--room-image"),
       status: document.querySelector('[data-testid="status-message"]')?.textContent ?? ""
     }))()`);
     assert(state.title === "Cozy Pixel Sandbox", "unexpected page title");
     assert(state.materials >= 19, `expected material buttons, found ${state.materials}`);
-    assert(state.audioInfos === 4, `expected four audio info icons, found ${state.audioInfos}`);
+    assert(state.audioInfos === 3, `expected three audio info icons, found ${state.audioInfos}`);
+    assert(!state.effectsSlider, "disabled effects slider should not be visible");
     assert(state.audioMoods === 3, `expected three audio mood buttons, found ${state.audioMoods}`);
     assert(state.musicProviders === 2, `expected two music provider buttons, found ${state.musicProviders}`);
     assert(state.sceneEnvironments === 3, `expected three room buttons, found ${state.sceneEnvironments}`);

@@ -9,14 +9,15 @@ This roadmap keeps the project focused: make the toy feel good, keep the codebas
 - 18 V0 materials, including cozy/cosmic materials: Stardust, Meteor, and Moonwater.
 - Manual painting, brush size, pause/play, clear, local save/load, JSON export/import, and postcard export.
 - Soft reaction style: fire/water becomes glowing steam, lava cools near water, fire burns flammables over time.
-- Procedural Web Audio foundation with master, ambience, music, and effects channels.
-- Audio code split into reusable modules for mixer, preferences, ambience, music, effects, buffers, and controller lifecycle.
+- Procedural Web Audio foundation with master, ambience, music, and a reserved effects channel.
+- Audio code split into reusable modules for mixer, preferences, ambience, music, future effects, buffers, and controller lifecycle.
 - Sound moods added for Rain, Window, and Stardust variations.
 - Non-destructive room backdrops added for Rain Desk, Moonlit Garden, and Stardust Hearth.
 - Local credited room images added for those backdrops, with procedural lighting and weather still layered on top.
 - Painted scene seeds kept as internal QA/dev helpers instead of visible user-facing presets.
 - External music provider boundary added with generated music as the default and a planned Desk Radio slot for Phase 5.
-- Reaction audio cues added for steam, cooling lava, growth, and cosmic sparkle events.
+- Reaction cue detection added for steam, cooling lava, growth, and cosmic sparkle events.
+- Prototype synthetic one-shot effects disabled after listening review because they felt too arcade-like for the cozy direction.
 - Postcard export now includes scene, mood, music source, sim source, and tick context.
 - Browser, build, and WASM smoke checks wired into local scripts and GitHub CI.
 - Renderer cleanup: canvas orchestration is separate from reusable material color, glow, and shape-language helpers.
@@ -97,20 +98,20 @@ Status: foundation done.
 
 Done:
 
-- Procedural Web Audio foundation with master, ambience, music, and effects channels.
+- Procedural Web Audio foundation with master, ambience, music, and a reserved effects channel.
 - Optional sound enable flow that respects browser autoplay rules.
 - Rainy lo-fi music bed with soft chords, brushed percussion, low thump, and vinyl dust.
-- Reusable audio module boundaries for mixer, preferences, ambience, music, effects, buffers, and controller lifecycle.
+- Reusable audio module boundaries for mixer, preferences, ambience, music, future effects, buffers, and controller lifecycle.
 - Simple sound mood controls for Rain, Window, and Stardust.
-- Material paint sounds and basic UI cues.
+- Prototype material paint sounds and basic UI cues implemented, then disabled after listening review.
 - Rain/window ambience polish with room hush and occasional window drip accents.
-- Reaction sounds beyond paint cues: steam, lava cooling, growth, and cosmic sparkle.
+- Reaction event hooks beyond paint cues: steam, lava cooling, growth, and cosmic sparkle.
 - Sound mood tuning toward rainy lo-fi jazz rather than dramatic ambient pads.
 - External music provider foundation:
   - Generated music remains the live provider.
   - Desk Radio appears as a planned provider slot for Phase 5.
   - Preferences already understand provider selection without requiring accounts, API keys, or a backend.
-  - Procedural ambience/effects remain native and separate from the music source.
+  - Procedural ambience remains native and separate from the music source; future realistic Foley should use the reserved effects channel.
 - Softer UI control treatment through reusable segmented controls, focus states, panel scrolling, and compact room controls.
 - Better postcard export composition with contextual scene, sound, and simulation metadata.
 - Room/backdrop switching that changes atmosphere and audio mood without replacing the sandbox.
@@ -119,6 +120,7 @@ Done:
 Remaining before Phase 4:
 
 - Listening pass on real speakers/headphones after more play time.
+- Decide whether to keep effects off or reintroduce them with more realistic Foley samples/procedural texture.
 - Visual pass on the sourced room photos after more play time, replacing any image that feels too literal, muddy, or distracting.
 - Small UI polish only if the added controls feel crowded during normal play.
 

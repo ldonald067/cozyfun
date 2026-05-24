@@ -33,7 +33,6 @@ import {
   type LucideIcon
 } from "lucide-react";
 import {
-  AUDIO_CHANNELS,
   AUDIO_MOODS,
   createAudioController,
   getAudioMoodDef,
@@ -41,6 +40,7 @@ import {
   loadAudioPrefs,
   MUSIC_PROVIDERS,
   saveAudioPrefs,
+  VISIBLE_AUDIO_CHANNELS,
   type AudioChannel,
   type AudioMood,
   type AudioPrefs,
@@ -76,7 +76,7 @@ const AUDIO_CHANNEL_HINTS: Record<AudioChannel, string> = {
   master: "Overall volume for the whole soundscape.",
   ambience: "Rain, window hush, room tone, and other environmental sounds.",
   music: "Quiet lo-fi chords, beat, and vinyl texture.",
-  effects: "Small sounds from painting, reactions, saves, and controls."
+  effects: "Future realistic Foley layer. Disabled in this build."
 };
 
 const MATERIAL_ICONS: Record<MaterialId, LucideIcon> = {
@@ -538,7 +538,7 @@ export function App() {
             />
 
             <div className="audio-sliders">
-              {AUDIO_CHANNELS.map((channel) => (
+              {VISIBLE_AUDIO_CHANNELS.map((channel) => (
                 <label className="audio-slider" key={channel}>
                   <span className="audio-slider-label">
                     {AUDIO_CHANNEL_LABELS[channel]}
