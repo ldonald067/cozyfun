@@ -127,21 +127,22 @@ function seedColor({ color, variant, age, cells, width, height, x, y }: ShapeCon
 }
 
 function iceColor({ color, variant, cells, width, height, x, y }: ShapeContext) {
-  const hash = hashCell(x, y, variant);
-  const localX = (x + variant) & 3;
-  const localY = (y + (variant >> 1)) & 3;
+  const hash = hashCell(x >> 2, y >> 2, variant);
+  const localX = x & 3;
+  const localY = y & 3;
   const top = !sameKind(cells, width, height, x, y - 1, MATERIAL.Ice);
   const left = !sameKind(cells, width, height, x - 1, y, MATERIAL.Ice);
   const right = !sameKind(cells, width, height, x + 1, y, MATERIAL.Ice);
   const bottom = !sameKind(cells, width, height, x, y + 1, MATERIAL.Ice);
-  let out = mixRgb(color, [181, 238, 250], 0.28);
+  let out = mixRgb(color, [179, 235, 250], 0.38);
 
-  if (localX === 0 || localY === 0) out = mixRgb(out, [236, 253, 255], 0.58);
-  if (localX === 3 || localY === 3) out = mixRgb(out, [58, 119, 156], 0.38);
-  if (top || left) out = adjustRgb(out, 26);
-  if (right || bottom) out = mixRgb(out, [49, 96, 134], 0.42);
-  if ((localX === 1 && localY === 2) || (hash % 17 === 0 && localX !== 0)) out = mixRgb(out, [39, 105, 145], 0.55);
-  if (hash % 29 === 0 || (top && localX === 1)) out = mixRgb(out, [255, 255, 255], 0.62);
+  if (localX === 0 || localY === 0) out = mixRgb(out, [240, 253, 255], 0.72);
+  if (localX === 3 || localY === 3) out = mixRgb(out, [44, 94, 133], 0.5);
+  if (top || left) out = adjustRgb(out, 28);
+  if (right || bottom) out = mixRgb(out, [40, 83, 122], 0.46);
+  if (localX === 1 && localY === 1) out = mixRgb(out, [255, 255, 255], 0.46);
+  if ((localX === 2 && localY === 2) || hash % 19 === 0) out = mixRgb(out, [55, 120, 154], 0.32);
+  if (hash % 31 === 0 && (localX === 1 || localY === 1)) out = mixRgb(out, [255, 255, 255], 0.58);
   return out;
 }
 

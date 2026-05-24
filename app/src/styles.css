@@ -14,7 +14,6 @@ html,
 body,
 #root {
   width: 100%;
-  min-width: 1024px;
   height: 100%;
   margin: 0;
 }
@@ -166,6 +165,7 @@ input:focus-visible {
   min-height: 100vh;
   display: grid;
   grid-template-columns: 260px minmax(620px, 1fr) 220px;
+  grid-template-areas: "materials sandbox controls";
   gap: 18px;
   padding: 18px;
 }
@@ -183,10 +183,12 @@ input:focus-visible {
 }
 
 .tool-panel {
+  grid-area: materials;
   padding: 16px;
 }
 
 .control-panel {
+  grid-area: controls;
   align-self: start;
   padding: 14px;
 }
@@ -268,7 +270,9 @@ input:focus-visible {
 }
 
 .sandbox-stage {
+  grid-area: sandbox;
   position: relative;
+  min-width: 0;
   min-height: calc(100vh - 36px);
   display: grid;
   grid-template-rows: 1fr auto;
@@ -277,7 +281,7 @@ input:focus-visible {
 
 .tray {
   position: relative;
-  width: min(72vw, 1050px);
+  width: min(100%, 1050px);
   aspect-ratio: 11 / 7;
   margin: 62px auto 24px;
   border: 12px solid var(--tray-frame);
@@ -332,7 +336,7 @@ input:focus-visible {
 }
 
 .status-bar {
-  width: min(72vw, 1050px);
+  width: min(100%, 1050px);
   margin: 0 auto;
   min-height: 34px;
   display: flex;
@@ -625,5 +629,53 @@ input:focus-visible {
   }
   to {
     background-position: 420px 0, 680px 0;
+  }
+}
+
+@media (max-width: 1180px) {
+  .workspace {
+    grid-template-columns: 240px minmax(0, 1fr);
+    grid-template-areas:
+      "materials sandbox"
+      "materials controls";
+    align-items: start;
+  }
+
+  .sandbox-stage {
+    min-height: auto;
+  }
+
+  .tray {
+    margin-top: 28px;
+  }
+
+  .control-panel {
+    max-height: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "materials"
+      "sandbox"
+      "controls";
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .tool-panel,
+  .control-panel {
+    max-height: none;
+  }
+
+  .material-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .tray {
+    margin-top: 12px;
+    border-width: 8px;
   }
 }

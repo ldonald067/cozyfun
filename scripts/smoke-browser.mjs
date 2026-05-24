@@ -179,6 +179,33 @@ async function main() {
     assert(hearthImage.includes("stardust-hearth.jpg"), `hearth room image was not applied: ${hearthImage}`);
   });
 
+  await check("narrow desktop layout keeps controls from overlapping the tray", async () => {
+    await cdp.send("Emulation.setDeviceMetricsOverride", {
+      width: 960,
+      height: 800,
+      deviceScaleFactor: 1,
+      mobile: false
+    });
+    await sleep(160);
+    const layout = await evaluate(cdp, `(() => {
+      const tray = document.querySelector(".tray")?.getBoundingClientRect();
+      const controls = document.querySelector(".control-panel")?.getBoundingClientRect();
+      return {
+        viewportWidth: window.innerWidth,
+        trayRight: tray?.right ?? 0,
+        trayBottom: tray?.bottom ?? 0,
+        controlsLeft: controls?.left ?? 0,
+        controlsRight: controls?.right ?? 0,
+        controlsTop: controls?.top ?? 0
+      };
+    })()`);
+    assert(layout.controlsRight <= layout.viewportWidth + 1, `controls overflow viewport: ${JSON.stringify(layout)}`);
+    assert(
+      layout.trayRight <= layout.controlsLeft || layout.controlsTop >= layout.trayBottom - 1,
+      `controls overlap tray: ${JSON.stringify(layout)}`
+    );
+  });
+
   await check("page stayed free of browser errors", async () => {
     const pageErrors = await evaluate(cdp, `window.__smokeErrors ?? []`);
     assert(pageErrors.length === 0, `page errors: ${pageErrors.join("; ")}`);
