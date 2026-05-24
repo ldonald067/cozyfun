@@ -11,10 +11,11 @@ Focused implementation modules live under `app/src/audio`:
 - `types.ts`: shared audio types.
 - `preferences.ts`: localStorage shape, defaults, channel list, and normalization.
 - `moods.ts`: reusable sound moods shared by the controller and UI.
+- `providers.ts`: generated/external music provider definitions and availability rules.
 - `mixer.ts`: Web Audio graph for `master`, `ambience`, `music`, and `effects`.
-- `ambience.ts`: rain, room hush, and low room tone.
+- `ambience.ts`: rain, room hush, low room tone, and occasional window drips.
 - `music.ts`: rainy lo-fi procedural music bed.
-- `effects.ts`: material paint sounds and UI cues.
+- `effects.ts`: material paint sounds, reaction cues, and UI cues.
 - `buffers.ts`: reusable generated noise buffers.
 - `utils.ts`: small shared helpers.
 - `controller.ts`: lifecycle and public methods used by the app.
@@ -28,6 +29,7 @@ Focused implementation modules live under `app/src/audio`:
 - Music, ambience, and effects stay on separate channels so the simple panel can become a fuller mixer later.
 - Mood changes should restart long-running ambience/music layers cleanly, without changing the one-shot effects API.
 - External music must be optional. The generated music provider remains the default and fallback.
+- Reaction sounds should be throttled in the controller so busy simulations stay gentle.
 
 ## Music Direction
 
@@ -53,10 +55,10 @@ Mood definitions live in `moods.ts`. Keep mood names user-facing and calm; keep 
 
 ## Music Providers
 
-Phase 3 should prepare a provider boundary before adding YouTube:
+Phase 3 has the provider boundary in place before adding YouTube:
 
 - Generated provider: current procedural lo-fi bed owned by `music.ts`.
-- External provider: future wrapper for a visible third-party player, such as YouTube.
+- External provider: future wrapper for a visible third-party player, such as YouTube. The current UI shows this as the planned Desk Radio path, but does not start external playback yet.
 
 The provider boundary should expose calm app-level methods:
 
@@ -69,6 +71,17 @@ The provider boundary should expose calm app-level methods:
 External music should replace only the music layer. Ambience and effects stay procedural so the sandbox remains coherent even if YouTube is blocked, unavailable, or showing ads.
 
 YouTube-specific implementation belongs in Phase 5. It should use a visible mini-player/drawer and the official IFrame Player API. Do not scrape YouTube, hide the player, require an API key, or make YouTube the only music path.
+
+## Reaction Cues
+
+The app detects broad simulation changes after each tick and maps them to a small set of calm cues:
+
+- `steam`: water, moonwater, or fire becoming steam.
+- `cool`: lava cooling into stone.
+- `growth`: seeds, soil, or wood turning into moss/fungus.
+- `spark`: meteor/stardust changes.
+
+Detection lives in `app/src/reactions.ts`. Playback lives in `effects.ts` and is throttled by `controller.ts`.
 
 ## Adding Audio
 

@@ -56,7 +56,13 @@ export function renderSandbox(engine: SandboxEngine, targets: RenderTargets, tim
   drawMotes(targets.motes, time);
 }
 
-export async function exportPostcard(engine: SandboxEngine, base: HTMLCanvasElement, glow: HTMLCanvasElement) {
+export type PostcardOptions = {
+  sceneTitle: string;
+  moodTitle: string;
+  musicSource: string;
+};
+
+export async function exportPostcard(engine: SandboxEngine, base: HTMLCanvasElement, glow: HTMLCanvasElement, options: PostcardOptions) {
   const scale = 3;
   const width = base.width * scale;
   const height = base.height * scale;
@@ -74,22 +80,42 @@ export async function exportPostcard(engine: SandboxEngine, base: HTMLCanvasElem
   ctx.fillRect(0, 0, card.width, card.height);
 
   ctx.fillStyle = "rgba(255, 224, 170, 0.08)";
-  ctx.fillRect(58, 58, width + 44, height + 44);
+  roundRect(ctx, 58, 58, width + 44, height + 44, 18);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255, 224, 170, 0.18)";
+  ctx.stroke();
   ctx.drawImage(glow, 80, 80, width, height);
   ctx.drawImage(base, 80, 80, width, height);
 
   ctx.fillStyle = "#f4dfb8";
   ctx.font = "600 30px Georgia, serif";
-  ctx.fillText("Night Desk Terrarium", 80, height + 125);
+  ctx.fillText(options.sceneTitle, 80, height + 118);
   ctx.fillStyle = "#99b8c8";
   ctx.font = "18px system-ui, sans-serif";
-  ctx.fillText(`${engine.source.toUpperCase()} sim - tick ${engine.tickCount()}`, 80, height + 154);
+  ctx.fillText(`${options.moodTitle} - ${options.musicSource} - ${engine.source.toUpperCase()} sim - tick ${engine.tickCount()}`, 80, height + 148);
+  ctx.fillStyle = "rgba(255, 226, 177, 0.5)";
+  ctx.font = "14px system-ui, sans-serif";
+  ctx.fillText("cozy pixel sandbox", 80, height + 174);
 
   const url = card.toDataURL("image/png");
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = `night-desk-terrarium-${Date.now()}.png`;
   anchor.click();
+}
+
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + width - radius, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+  ctx.lineTo(x + width, y + height - radius);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+  ctx.lineTo(x + radius, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
 }
 
 function ensureCanvasSize(canvas: HTMLCanvasElement, width: number, height: number) {

@@ -7,6 +7,7 @@ export function startRainAmbience(audio: RunningAudio, mood: AudioMood): AudioLa
   const { context, channels } = audio;
   const settings = getAudioMoodDef(mood).ambience;
   const sources: AudioScheduledSourceNode[] = [];
+  const timers: number[] = [];
 
   const rain = context.createBufferSource();
   rain.buffer = createNoiseBuffer(context, 2.5);
@@ -45,13 +46,46 @@ export function startRainAmbience(audio: RunningAudio, mood: AudioMood): AudioLa
   hush.start();
   hum.start();
   sources.push(rain, hush, hum);
+  scheduleDrip();
 
   return {
     stop() {
       stopSources(sources);
+      for (const timer of timers) window.clearTimeout(timer);
       rain.disconnect();
       hush.disconnect();
       hum.disconnect();
     }
   };
+
+  function scheduleDrip() {
+    if (settings.dripGain <= 0) return;
+    const jitter = settings.dripMs * (0.72 + Math.random() * 0.56);
+    timers.push(
+      window.setTimeout(() => {
+        playWindowDrip(audio, settings.dripGain);
+        scheduleDrip();
+      }, jitter)
+    );
+  }
+}
+
+function playWindowDrip(audio: RunningAudio, gainValue: number) {
+  const { context, channels } = audio;
+  const now = context.currentTime;
+  [880, 660].forEach((frequency, index) => {
+    const oscillator = context.createOscillator();
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(frequency, now + index * 0.035);
+    oscillator.frequency.exponentialRampToValueAtTime(frequency * 0.82, now + 0.18 + index * 0.035);
+    const gain = context.createGain();
+    const start = now + index * 0.035;
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(gainValue / (index + 1.4), start + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.24);
+    oscillator.connect(gain);
+    gain.connect(channels.ambience);
+    oscillator.start(start);
+    oscillator.stop(start + 0.26);
+  });
 }

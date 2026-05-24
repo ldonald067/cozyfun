@@ -1,6 +1,6 @@
 import { MATERIAL, type MaterialId } from "../materials";
 import { createNoiseBuffer } from "./buffers";
-import type { RunningAudio, UiAudioCue } from "./types";
+import type { ReactionAudioCue, RunningAudio, UiAudioCue } from "./types";
 import { clamp01 } from "./utils";
 
 export function playMaterialPaint(audio: RunningAudio, materialId: MaterialId, intensity: number) {
@@ -51,6 +51,25 @@ export function playUiCue(audio: RunningAudio, cue: UiAudioCue) {
     return;
   }
   playTap(audio, 440, 0.018);
+}
+
+export function playReactionCue(audio: RunningAudio, cue: ReactionAudioCue, intensity: number) {
+  const amount = clamp01(intensity);
+  if (cue === "steam") {
+    playNoiseBurst(audio, { duration: 0.16, gain: 0.018 + amount * 0.014, filter: 760, type: "lowpass" });
+    playRipple(audio, 520, 0.012 + amount * 0.012);
+    return;
+  }
+  if (cue === "cool") {
+    playChime(audio, [360, 240], 0.018 + amount * 0.012);
+    playNoiseBurst(audio, { duration: 0.08, gain: 0.014 + amount * 0.01, filter: 1200, type: "bandpass" });
+    return;
+  }
+  if (cue === "growth") {
+    playChime(audio, [620, 840], 0.014 + amount * 0.012);
+    return;
+  }
+  playChime(audio, [980, 1470, 1960], 0.016 + amount * 0.014);
 }
 
 function playNoiseBurst(audio: RunningAudio, options: { duration: number; gain: number; filter: number; type: BiquadFilterType }) {

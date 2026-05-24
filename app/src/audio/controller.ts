@@ -1,10 +1,14 @@
 import type { MaterialId } from "../materials";
 import { startRainAmbience } from "./ambience";
-import { playMaterialPaint as playMaterialPaintCue, playUiCue as playUiCueSound } from "./effects";
+import {
+  playMaterialPaint as playMaterialPaintCue,
+  playReactionCue as playReactionCueSound,
+  playUiCue as playUiCueSound
+} from "./effects";
 import { createAudioMixer, applyMixerPreferences } from "./mixer";
 import { startRainLofiMusic } from "./music";
 import { DEFAULT_AUDIO_PREFS, normalizeAudioPrefs } from "./preferences";
-import type { AudioLayerHandle, AudioMood, AudioPrefs, RunningAudio, UiAudioCue } from "./types";
+import type { AudioLayerHandle, AudioMood, AudioPrefs, MusicProvider, ReactionAudioCue, RunningAudio, UiAudioCue } from "./types";
 import { clamp01, getAudioContextConstructor } from "./utils";
 
 export function createAudioController() {
@@ -17,6 +21,7 @@ class CozyAudioController {
   private ambience: AudioLayerHandle | null = null;
   private music: AudioLayerHandle | null = null;
   private materialLastPlayedAt = new Map<number, number>();
+  private reactionLastPlayedAt = new Map<ReactionAudioCue, number>();
 
   async init(prefs: AudioPrefs) {
     this.prefs = normalizeAudioPrefs(prefs);
@@ -72,6 +77,13 @@ class CozyAudioController {
     this.restartLongRunningLayers();
   }
 
+  setMusicProvider(provider: MusicProvider) {
+    const nextPrefs = normalizeAudioPrefs({ ...this.prefs, provider });
+    if (nextPrefs.provider === this.prefs.provider) return;
+    this.prefs = nextPrefs;
+    this.restartLongRunningLayers();
+  }
+
   applyPreferences(prefs: AudioPrefs) {
     this.prefs = normalizeAudioPrefs(prefs);
     if (!this.audio) return;
@@ -94,6 +106,16 @@ class CozyAudioController {
     playUiCueSound(audio, cue);
   }
 
+  playReactionCue(cue: ReactionAudioCue, intensity: number) {
+    const audio = this.audibleAudio();
+    if (!audio) return;
+    const nowMs = performance.now();
+    const last = this.reactionLastPlayedAt.get(cue) ?? 0;
+    if (nowMs - last < 180) return;
+    this.reactionLastPlayedAt.set(cue, nowMs);
+    playReactionCueSound(audio, cue, intensity);
+  }
+
   startAmbience() {
     if (!this.audio || this.ambience) return;
     this.ambience = startRainAmbience(this.audio, this.prefs.mood);
@@ -101,6 +123,7 @@ class CozyAudioController {
 
   startMusicBed() {
     if (!this.audio || this.music) return;
+    if (this.prefs.provider !== "generated") return;
     this.music = startRainLofiMusic(this.audio, this.prefs.mood);
   }
 
@@ -110,6 +133,7 @@ class CozyAudioController {
     this.ambience = null;
     this.music = null;
     this.materialLastPlayedAt.clear();
+    this.reactionLastPlayedAt.clear();
     if (this.audio) {
       void this.audio.context.close();
       this.audio = null;

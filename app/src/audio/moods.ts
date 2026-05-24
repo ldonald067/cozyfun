@@ -12,7 +12,9 @@ export const AUDIO_MOODS: AudioMoodDef[] = [
       hushGain: 0.04,
       hushFilter: 260,
       humFrequency: 72,
-      humGain: 0.018
+      humGain: 0.018,
+      dripGain: 0.012,
+      dripMs: 5600
     },
     music: {
       stepMs: 720,
@@ -42,7 +44,9 @@ export const AUDIO_MOODS: AudioMoodDef[] = [
       hushGain: 0.055,
       hushFilter: 220,
       humFrequency: 68,
-      humGain: 0.012
+      humGain: 0.012,
+      dripGain: 0.02,
+      dripMs: 3600
     },
     music: {
       stepMs: 900,
@@ -72,7 +76,9 @@ export const AUDIO_MOODS: AudioMoodDef[] = [
       hushGain: 0.03,
       hushFilter: 340,
       humFrequency: 84,
-      humGain: 0.014
+      humGain: 0.014,
+      dripGain: 0.008,
+      dripMs: 7200
     },
     music: {
       stepMs: 780,

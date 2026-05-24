@@ -10,6 +10,8 @@ This project is a static browser toy: React owns the interface, Rust/WASM owns t
 4. `app/src/renderer.ts` converts the engine cell bytes into base, glow, and atmosphere canvas layers.
 5. `app/src/storage.ts` handles browser-local saves and JSON scene import/export.
 6. `app/src/audio.ts` exposes the optional procedural Web Audio controller.
+7. `app/src/scenePresets.ts` provides starter scenes without changing the simulation core.
+8. `app/src/reactions.ts` detects coarse visual/audio reaction events from before/after cell snapshots.
 
 The built app is static. There is no server, account system, database, cloud save, streaming dependency, or paid API in the current architecture.
 
@@ -54,6 +56,7 @@ This split keeps Phase 2 visuals expandable without turning the renderer into a 
 - `mixer.ts`: channel graph and gain changes.
 - `preferences.ts`: persistent audio settings.
 - `moods.ts`: reusable sound mood definitions.
+- `providers.ts`: generated/external music provider definitions.
 - `ambience.ts`: long-running environment layers.
 - `music.ts`: procedural rainy lo-fi bed.
 - `effects.ts`: material and UI one-shots.
@@ -61,6 +64,18 @@ This split keeps Phase 2 visuals expandable without turning the renderer into a 
 This keeps Phase 3 music work reusable without burying composition, mixer state, and sound effects in one file.
 
 Future external music should enter through a provider boundary rather than replacing this audio system. Generated music remains the default. YouTube or any other third-party player should be isolated behind an external provider and shown as a visible mini-player, while ambience and effects continue to use the native procedural mixer.
+
+## UI Boundary
+
+Keep reusable controls in `app/src/components` when the same interaction pattern appears in more than one place. `SegmentedControl` is the first shared control and is used for sound moods, music source selection, and scene presets.
+
+The app should favor compact controls over explanatory panels. Tooltips and titles are acceptable for details like channel meaning; the first screen should remain the toy itself.
+
+## Scene Presets And Reactions
+
+Scene presets are authored as paint commands against the normal engine API. They are starter worlds, not special save formats, so loaded/exported scenes remain ordinary cell snapshots.
+
+Reaction detection compares before/after cell bytes after a tick and emits a small set of event types for audio feedback. It should stay coarse and throttled; high-volume per-cell sound would make the sandbox noisy and expensive.
 
 ## Adding A Material
 

@@ -81,12 +81,16 @@ async function main() {
       materials: document.querySelectorAll(".material-button").length,
       audioInfos: document.querySelectorAll(".audio-info").length,
       audioMoods: document.querySelectorAll(".audio-mood-control button").length,
+      musicProviders: document.querySelectorAll(".music-source-control button").length,
+      scenePresets: document.querySelectorAll(".scene-preset-control button").length,
       status: document.querySelector('[data-testid="status-message"]')?.textContent ?? ""
     }))()`);
     assert(state.title === "Cozy Pixel Sandbox", "unexpected page title");
     assert(state.materials >= 19, `expected material buttons, found ${state.materials}`);
     assert(state.audioInfos === 4, `expected four audio info icons, found ${state.audioInfos}`);
     assert(state.audioMoods === 3, `expected three audio mood buttons, found ${state.audioMoods}`);
+    assert(state.musicProviders === 2, `expected two music provider buttons, found ${state.musicProviders}`);
+    assert(state.scenePresets === 3, `expected three scene preset buttons, found ${state.scenePresets}`);
     assert(state.status.includes("online"), `engine did not report online: ${state.status}`);
   });
 
@@ -134,6 +138,8 @@ async function main() {
   });
 
   await check("audio controls start, mute, adjust, and stop", async () => {
+    await click(cdp, '[data-testid="music-provider-external"]');
+    await waitForStatus(cdp, "desk radio planned for sharing phase");
     await click(cdp, '[data-testid="audio-toggle"]');
     await waitForStatus(cdp, "rain lo-fi on");
     await waitUntil(() => textIncludes(cdp, '[data-testid="audio-toggle"]', "Stop"), "audio start button to become stop");
@@ -149,6 +155,14 @@ async function main() {
     await waitForStatus(cdp, "audio unmuted");
     await click(cdp, '[data-testid="audio-toggle"]');
     await waitForStatus(cdp, "Stardust Study resting");
+  });
+
+  await check("scene presets load starter worlds", async () => {
+    await click(cdp, '[data-testid="scene-preset-moonwater-garden"]');
+    await waitForStatus(cdp, "moonwater garden preset loaded");
+    await waitUntil(() => textIncludes(cdp, '[data-testid="audio-mood-window"]', "Window"), "window mood control to stay visible");
+    await click(cdp, '[data-testid="scene-preset-stardust-fireplace"]');
+    await waitForStatus(cdp, "stardust fireplace preset loaded");
   });
 
   await check("page stayed free of browser errors", async () => {
@@ -360,6 +374,7 @@ async function click(cdp, selector, options = {}) {
     `(() => {
       const element = document.querySelector(${JSON.stringify(selector)});
       if (!element) return null;
+      element.scrollIntoView({ block: "center", inline: "center" });
       const rect = element.getBoundingClientRect();
       return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
     })()`

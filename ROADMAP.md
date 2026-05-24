@@ -12,6 +12,10 @@ This roadmap keeps the project focused: make the toy feel good, keep the codebas
 - Procedural Web Audio foundation with master, ambience, music, and effects channels.
 - Audio code split into reusable modules for mixer, preferences, ambience, music, effects, buffers, and controller lifecycle.
 - Sound moods added for Rain, Window, and Stardust variations.
+- Scene presets added for Rain Desk, Moonwater Garden, and Stardust Fireplace.
+- External music provider boundary added with generated music as the default and a planned Desk Radio slot for Phase 5.
+- Reaction audio cues added for steam, cooling lava, growth, and cosmic sparkle events.
+- Postcard export now includes scene, mood, music source, sim source, and tick context.
 - Browser, build, and WASM smoke checks wired into local scripts and GitHub CI.
 - Renderer cleanup: canvas orchestration is separate from reusable material color, glow, and shape-language helpers.
 - Architecture and visual pipeline docs added under `docs/`.
@@ -87,7 +91,7 @@ Phase 2 is ready for Phase 3 atmosphere work. Deeper realism and more ambitious 
 
 ## Phase 3: Cozy Atmosphere
 
-Status: in progress.
+Status: foundation done.
 
 Done:
 
@@ -97,20 +101,22 @@ Done:
 - Reusable audio module boundaries for mixer, preferences, ambience, music, effects, buffers, and controller lifecycle.
 - Simple sound mood controls for Rain, Window, and Stardust.
 - Material paint sounds and basic UI cues.
-
-Next:
-
-- Rain/window ambience polish.
-- More material reaction sounds beyond paint cues.
-- More sound mood tuning after listening tests.
+- Rain/window ambience polish with room hush and occasional window drip accents.
+- Reaction sounds beyond paint cues: steam, lava cooling, growth, and cosmic sparkle.
+- Sound mood tuning toward rainy lo-fi jazz rather than dramatic ambient pads.
 - External music provider foundation:
-  - Add a provider interface that can switch between generated music and future external music.
-  - Keep procedural ambience/effects native even when external music is selected.
-  - Store provider preferences without requiring accounts, API keys, or a backend.
-  - Add a disabled/planned UI state for external music so the control layout is ready without shipping YouTube early.
-- Softer UI transitions.
-- Better postcard export composition.
-- Optional scene presets.
+  - Generated music remains the live provider.
+  - Desk Radio appears as a planned provider slot for Phase 5.
+  - Preferences already understand provider selection without requiring accounts, API keys, or a backend.
+  - Procedural ambience/effects remain native and separate from the music source.
+- Softer UI control treatment through reusable segmented controls, focus states, panel scrolling, and compact preset controls.
+- Better postcard export composition with contextual scene, sound, and simulation metadata.
+- Optional scene presets for quickly testing cozy starter worlds.
+
+Remaining before Phase 4:
+
+- Listening pass on real speakers/headphones after more play time.
+- Small UI polish only if the added controls feel crowded during normal play.
 
 ## Phase 4: Sharper Realistic Visuals
 

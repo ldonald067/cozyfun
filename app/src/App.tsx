@@ -37,16 +37,22 @@ import {
   AUDIO_MOODS,
   createAudioController,
   getAudioMoodDef,
+  getMusicProviderDef,
   loadAudioPrefs,
+  MUSIC_PROVIDERS,
   saveAudioPrefs,
   type AudioChannel,
   type AudioMood,
-  type AudioPrefs
+  type AudioPrefs,
+  type MusicProvider
 } from "./audio";
+import { SegmentedControl, type SegmentOption } from "./components/SegmentedControl";
 import { createEngine, type SandboxEngine } from "./engine";
 import { MATERIAL, MATERIALS, type MaterialDef, type MaterialId } from "./materials";
+import { detectReactionEvents } from "./reactions";
 import { applySnapshot, downloadSnapshot, loadLocal, readSnapshotFile, saveLocal } from "./storage";
 import { exportPostcard, renderSandbox } from "./renderer";
+import { applyScenePreset, getScenePreset, SCENE_PRESETS, type ScenePresetId } from "./scenePresets";
 
 const WORLD_WIDTH = 220;
 const WORLD_HEIGHT = 140;
@@ -93,8 +99,10 @@ export function App() {
   const audio = useMemo(() => createAudioController(), []);
   const [audioPrefs, setAudioPrefs] = useState<AudioPrefs>(() => loadAudioPrefs());
   const activeMood = getAudioMoodDef(audioPrefs.mood);
+  const activeMusicProvider = getMusicProviderDef(audioPrefs.provider);
   const [engine, setEngine] = useState<SandboxEngine | null>(null);
   const [selected, setSelected] = useState<MaterialId>(MATERIAL.Sand);
+  const [scenePreset, setScenePreset] = useState<ScenePresetId>("rain-desk");
   const [brushSize, setBrushSize] = useState(4);
   const [paused, setPaused] = useState(false);
   const [status, setStatus] = useState("warming tray");
@@ -116,7 +124,7 @@ export function App() {
       createdEngine = created;
       setEngine(created);
       setStatus(created.source === "wasm" ? "wasm sim online" : "js fallback online");
-      seedOpeningScene(created);
+      applyScenePreset(created, "rain-desk");
     });
     return () => {
       active = false;
@@ -142,7 +150,11 @@ export function App() {
 
     const loop = (time: number) => {
       if (!paused && time - lastSimTick >= SIM_TICK_MS) {
+        const before = engine.getCellBytes();
         engine.tick();
+        for (const event of detectReactionEvents(before, engine.getCellBytes())) {
+          audio.playReactionCue(event.cue, event.intensity);
+        }
         lastSimTick = time;
       }
       const base = baseCanvasRef.current;
@@ -161,7 +173,7 @@ export function App() {
 
     frame = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frame);
-  }, [engine, paused]);
+  }, [audio, engine, paused]);
 
   const groupedMaterials = useMemo<Record<string, MaterialDef[]>>(
     () => ({
@@ -170,6 +182,40 @@ export function App() {
       heat: MATERIALS.filter((material) => material.group === "heat"),
       cosmic: MATERIALS.filter((material) => material.group === "cosmic")
     }),
+    []
+  );
+
+  const moodOptions = useMemo<SegmentOption<AudioMood>[]>(
+    () =>
+      AUDIO_MOODS.map((mood) => ({
+        value: mood.id,
+        label: mood.label,
+        title: mood.title,
+        testId: `audio-mood-${mood.id}`
+      })),
+    []
+  );
+
+  const providerOptions = useMemo<SegmentOption<MusicProvider>[]>(
+    () =>
+      MUSIC_PROVIDERS.map((provider) => ({
+        value: provider.id,
+        label: provider.label,
+        title: provider.title,
+        badge: provider.badge,
+        testId: `music-provider-${provider.id}`
+      })),
+    []
+  );
+
+  const sceneOptions = useMemo<SegmentOption<ScenePresetId>[]>(
+    () =>
+      SCENE_PRESETS.map((preset) => ({
+        value: preset.id,
+        label: preset.label,
+        title: preset.title,
+        testId: `scene-preset-${preset.id}`
+      })),
     []
   );
 
@@ -205,6 +251,7 @@ export function App() {
     if (!engine) return;
     engine.clear();
     audio.playUiCue("clear");
+    setScenePreset("rain-desk");
     setStatus("tray cleared");
   }
 
@@ -219,6 +266,7 @@ export function App() {
     if (!engine) return;
     const loaded = loadLocal(engine);
     if (loaded) audio.playUiCue("load");
+    if (loaded) setScenePreset("rain-desk");
     setStatus(loaded ? "local scene loaded" : "no local save yet");
   }
 
@@ -234,13 +282,18 @@ export function App() {
     const snapshot = await readSnapshotFile(event.target.files[0]);
     const loaded = snapshot ? applySnapshot(engine, snapshot) : false;
     if (loaded) audio.playUiCue("import");
+    if (loaded) setScenePreset("rain-desk");
     setStatus(loaded ? "scene imported" : "invalid scene file");
     event.target.value = "";
   }
 
   async function handlePostcard() {
     if (!engine || !baseCanvasRef.current || !glowCanvasRef.current) return;
-    await exportPostcard(engine, baseCanvasRef.current, glowCanvasRef.current);
+    await exportPostcard(engine, baseCanvasRef.current, glowCanvasRef.current, {
+      sceneTitle: getScenePreset(scenePreset).title,
+      moodTitle: activeMood.title,
+      musicSource: activeMusicProvider.label
+    });
     audio.playUiCue("export");
     setStatus("postcard exported");
   }
@@ -290,6 +343,26 @@ export function App() {
     audio.setMood(mood);
     if (audioPrefs.enabled && !audioPrefs.muted) audio.playUiCue("toggle");
     setStatus(audioPrefs.enabled ? moodDef.status : `${moodDef.title} ready`);
+  }
+
+  function handleMusicProvider(provider: MusicProvider) {
+    const providerDef = getMusicProviderDef(provider);
+    if (!providerDef.available) {
+      setStatus(providerDef.status);
+      return;
+    }
+    setAudioPrefs((current) => ({ ...current, provider }));
+    audio.setMusicProvider(provider);
+    setStatus(providerDef.status);
+  }
+
+  function handleScenePreset(id: ScenePresetId) {
+    if (!engine) return;
+    const preset = applyScenePreset(engine, id);
+    setScenePreset(id);
+    handleAudioMood(preset.mood);
+    audio.playUiCue("load");
+    setStatus(preset.status);
   }
 
   return (
@@ -380,6 +453,34 @@ export function App() {
             <output>{brushSize}</output>
           </label>
 
+          <div className="control-stack">
+            <div className="preset-control">
+              <span>Scene</span>
+              <SegmentedControl
+                ariaLabel="Scene preset"
+                value={scenePreset}
+                options={sceneOptions}
+                className="scene-preset-control"
+                onChange={handleScenePreset}
+              />
+            </div>
+            <button type="button" data-testid="save-scene" onClick={handleSave}>
+              <Save size={16} /> Save
+            </button>
+            <button type="button" data-testid="load-scene" onClick={handleLoad}>
+              <FolderOpen size={16} /> Load
+            </button>
+            <button type="button" data-testid="export-scene" onClick={handleExport}>
+              <Download size={16} /> Export
+            </button>
+            <button type="button" data-testid="import-scene" onClick={() => fileInputRef.current?.click()}>
+              <FolderOpen size={16} /> Import
+            </button>
+            <button type="button" onClick={handlePostcard}>
+              <ImageDown size={16} /> Postcard
+            </button>
+          </div>
+
           <div className="audio-panel" aria-label="Audio">
             <div className="audio-panel-header">
               <span className="audio-panel-title">
@@ -407,20 +508,21 @@ export function App() {
               {audioPrefs.muted ? "Muted" : "Mute"}
             </button>
 
-            <div className="audio-mood-control" role="group" aria-label="Sound mood">
-              {AUDIO_MOODS.map((mood) => (
-                <button
-                  key={mood.id}
-                  type="button"
-                  className={audioPrefs.mood === mood.id ? "active" : ""}
-                  data-testid={`audio-mood-${mood.id}`}
-                  title={mood.title}
-                  onClick={() => handleAudioMood(mood.id)}
-                >
-                  {mood.label}
-                </button>
-              ))}
-            </div>
+            <SegmentedControl
+              ariaLabel="Sound mood"
+              value={audioPrefs.mood}
+              options={moodOptions}
+              className="audio-mood-control"
+              onChange={handleAudioMood}
+            />
+
+            <SegmentedControl
+              ariaLabel="Music source"
+              value={audioPrefs.provider}
+              options={providerOptions}
+              className="music-source-control"
+              onChange={handleMusicProvider}
+            />
 
             <div className="audio-sliders">
               {AUDIO_CHANNELS.map((channel) => (
@@ -452,44 +554,9 @@ export function App() {
               ))}
             </div>
           </div>
-
-          <div className="control-stack">
-            <button type="button" data-testid="save-scene" onClick={handleSave}>
-              <Save size={16} /> Save
-            </button>
-            <button type="button" data-testid="load-scene" onClick={handleLoad}>
-              <FolderOpen size={16} /> Load
-            </button>
-            <button type="button" data-testid="export-scene" onClick={handleExport}>
-              <Download size={16} /> Export
-            </button>
-            <button type="button" data-testid="import-scene" onClick={() => fileInputRef.current?.click()}>
-              <FolderOpen size={16} /> Import
-            </button>
-            <button type="button" onClick={handlePostcard}>
-              <ImageDown size={16} /> Postcard
-            </button>
-          </div>
           <input ref={fileInputRef} type="file" accept="application/json" data-testid="scene-file-input" hidden onChange={handleImport} />
         </aside>
       </section>
     </main>
   );
-}
-
-function seedOpeningScene(engine: SandboxEngine) {
-  for (let x = 0; x < engine.width(); x++) {
-    engine.paint(x, engine.height() - 2, 1, MATERIAL.Stone);
-  }
-  for (let x = 22; x < 74; x++) {
-    engine.paint(x, 28, 1, MATERIAL.Sand);
-  }
-  for (let x = 120; x < 168; x++) {
-    engine.paint(x, 35, 1, MATERIAL.Moonwater);
-  }
-  engine.paint(58, 102, 9, MATERIAL.Soil);
-  engine.paint(62, 94, 4, MATERIAL.Moss);
-  engine.paint(172, 92, 5, MATERIAL.Wood);
-  engine.paint(172, 82, 3, MATERIAL.Fire);
-  engine.paint(136, 26, 3, MATERIAL.Stardust);
 }
