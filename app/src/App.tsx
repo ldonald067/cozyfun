@@ -421,11 +421,6 @@ export function App() {
         </aside>
 
         <section className="sandbox-stage">
-          <div className="window-scene" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </div>
           <div
             className="tray"
             data-testid="sandbox-tray"
