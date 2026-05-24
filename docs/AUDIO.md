@@ -10,6 +10,7 @@ Focused implementation modules live under `app/src/audio`:
 
 - `types.ts`: shared audio types.
 - `preferences.ts`: localStorage shape, defaults, channel list, and normalization.
+- `moods.ts`: reusable sound moods shared by the controller and UI.
 - `mixer.ts`: Web Audio graph for `master`, `ambience`, `music`, and `effects`.
 - `ambience.ts`: rain, room hush, and low room tone.
 - `music.ts`: rainy lo-fi procedural music bed.
@@ -25,6 +26,7 @@ Focused implementation modules live under `app/src/audio`:
 - Preferences persist, but `enabled` always reloads as false so browsers do not autoplay.
 - Mute and stop should fade through mixer gain instead of tearing down every node.
 - Music, ambience, and effects stay on separate channels so the simple panel can become a fuller mixer later.
+- Mood changes should restart long-running ambience/music layers cleanly, without changing the one-shot effects API.
 
 ## Music Direction
 
@@ -38,6 +40,16 @@ The music layer should feel like rainy lo-fi desk music:
 
 Avoid dramatic pads, arcade leads, busy melodies, or anything that fights the sandbox sounds.
 
+## Sound Moods
+
+Sound moods are small procedural presets, not different audio files:
+
+- Rain: balanced rain, vinyl dust, warm chords, and brushed beat.
+- Window: louder rain, softer/slower music, and a more study-like feel.
+- Stardust: lighter ambience, airier chords, and occasional shimmer.
+
+Mood definitions live in `moods.ts`. Keep mood names user-facing and calm; keep implementation details inside the preset config.
+
 ## Adding Audio
 
 Add new sounds in the narrowest module:
@@ -45,6 +57,7 @@ Add new sounds in the narrowest module:
 - material or UI one-shots: `effects.ts`
 - long environmental loop: `ambience.ts`
 - musical pattern, rhythm, or harmonic change: `music.ts`
+- new mood preset: `moods.ts`
 - channel/routing behavior: `mixer.ts`
 - preference shape: `preferences.ts`
 

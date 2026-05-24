@@ -4,7 +4,7 @@ import { playMaterialPaint as playMaterialPaintCue, playUiCue as playUiCueSound 
 import { createAudioMixer, applyMixerPreferences } from "./mixer";
 import { startRainLofiMusic } from "./music";
 import { DEFAULT_AUDIO_PREFS, normalizeAudioPrefs } from "./preferences";
-import type { AudioLayerHandle, AudioPrefs, RunningAudio, UiAudioCue } from "./types";
+import type { AudioLayerHandle, AudioMood, AudioPrefs, RunningAudio, UiAudioCue } from "./types";
 import { clamp01, getAudioContextConstructor } from "./utils";
 
 export function createAudioController() {
@@ -65,6 +65,13 @@ class CozyAudioController {
     this.applyPreferences(this.prefs);
   }
 
+  setMood(mood: AudioMood) {
+    const nextPrefs = normalizeAudioPrefs({ ...this.prefs, mood });
+    if (nextPrefs.mood === this.prefs.mood) return;
+    this.prefs = nextPrefs;
+    this.restartLongRunningLayers();
+  }
+
   applyPreferences(prefs: AudioPrefs) {
     this.prefs = normalizeAudioPrefs(prefs);
     if (!this.audio) return;
@@ -89,12 +96,12 @@ class CozyAudioController {
 
   startAmbience() {
     if (!this.audio || this.ambience) return;
-    this.ambience = startRainAmbience(this.audio);
+    this.ambience = startRainAmbience(this.audio, this.prefs.mood);
   }
 
   startMusicBed() {
     if (!this.audio || this.music) return;
-    this.music = startRainLofiMusic(this.audio);
+    this.music = startRainLofiMusic(this.audio, this.prefs.mood);
   }
 
   dispose() {
@@ -112,5 +119,16 @@ class CozyAudioController {
   private audibleAudio() {
     if (!this.audio || !this.prefs.enabled || this.prefs.muted) return null;
     return this.audio;
+  }
+
+  private restartLongRunningLayers() {
+    if (!this.audio) return;
+    this.ambience?.stop();
+    this.music?.stop();
+    this.ambience = null;
+    this.music = null;
+    this.startAmbience();
+    this.startMusicBed();
+    this.applyPreferences(this.prefs);
   }
 }

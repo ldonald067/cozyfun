@@ -1,3 +1,4 @@
+import { DEFAULT_AUDIO_MOOD, isAudioMood } from "./moods";
 import type { AudioChannel, AudioPrefs } from "./types";
 import { clamp01 } from "./utils";
 
@@ -8,6 +9,7 @@ export const AUDIO_CHANNELS: AudioChannel[] = ["master", "ambience", "music", "e
 export const DEFAULT_AUDIO_PREFS: AudioPrefs = {
   enabled: false,
   muted: false,
+  mood: DEFAULT_AUDIO_MOOD,
   volumes: {
     master: 0.68,
     ambience: 0.62,
@@ -40,6 +42,7 @@ export function normalizeAudioPrefs(value: unknown): AudioPrefs {
   return {
     enabled: typeof candidate.enabled === "boolean" ? candidate.enabled : DEFAULT_AUDIO_PREFS.enabled,
     muted: typeof candidate.muted === "boolean" ? candidate.muted : DEFAULT_AUDIO_PREFS.muted,
+    mood: isAudioMood(candidate.mood) ? candidate.mood : DEFAULT_AUDIO_PREFS.mood,
     volumes: {
       master: readVolume(candidate.volumes?.master, DEFAULT_AUDIO_PREFS.volumes.master),
       ambience: readVolume(candidate.volumes?.ambience, DEFAULT_AUDIO_PREFS.volumes.ambience),

@@ -39,7 +39,7 @@ npm --prefix app run dev -- --host 127.0.0.1
 - Paint directly on the sandbox tray.
 - Use the brush slider to change brush size.
 - Pause/play the simulation from the control panel.
-- Enable optional procedural audio and tune master, ambience, music, and effects volume.
+- Enable optional procedural audio, pick a sound mood, and tune master, ambience, music, and effects volume.
 - Clear, save, load, export, import, or export a postcard from the right controls.
 
 Saves are local to the browser unless you export a scene JSON file.

@@ -34,10 +34,13 @@ import {
 } from "lucide-react";
 import {
   AUDIO_CHANNELS,
+  AUDIO_MOODS,
   createAudioController,
+  getAudioMoodDef,
   loadAudioPrefs,
   saveAudioPrefs,
   type AudioChannel,
+  type AudioMood,
   type AudioPrefs
 } from "./audio";
 import { createEngine, type SandboxEngine } from "./engine";
@@ -89,6 +92,7 @@ const MATERIAL_ICONS: Record<MaterialId, LucideIcon> = {
 export function App() {
   const audio = useMemo(() => createAudioController(), []);
   const [audioPrefs, setAudioPrefs] = useState<AudioPrefs>(() => loadAudioPrefs());
+  const activeMood = getAudioMoodDef(audioPrefs.mood);
   const [engine, setEngine] = useState<SandboxEngine | null>(null);
   const [selected, setSelected] = useState<MaterialId>(MATERIAL.Sand);
   const [brushSize, setBrushSize] = useState(4);
@@ -246,7 +250,7 @@ export function App() {
       const nextPrefs = { ...audioPrefs, enabled: false };
       setAudioPrefs(nextPrefs);
       audio.setEnabled(false);
-      setStatus("rain lo-fi resting");
+      setStatus(`${activeMood.title} resting`);
       return;
     }
 
@@ -258,7 +262,7 @@ export function App() {
     }
     setAudioPrefs(nextPrefs);
     audio.playUiCue("toggle");
-    setStatus("rain lo-fi on");
+    setStatus(getAudioMoodDef(nextPrefs.mood).status);
   }
 
   function handleMuteAudio() {
@@ -278,6 +282,14 @@ export function App() {
       }
     }));
     audio.setVolume(channel, value);
+  }
+
+  function handleAudioMood(mood: AudioMood) {
+    const moodDef = getAudioMoodDef(mood);
+    setAudioPrefs((current) => ({ ...current, mood }));
+    audio.setMood(mood);
+    if (audioPrefs.enabled && !audioPrefs.muted) audio.playUiCue("toggle");
+    setStatus(audioPrefs.enabled ? moodDef.status : `${moodDef.title} ready`);
   }
 
   return (
@@ -371,7 +383,7 @@ export function App() {
           <div className="audio-panel" aria-label="Audio">
             <div className="audio-panel-header">
               <span className="audio-panel-title">
-                <Music2 size={16} /> Rain Lo-Fi
+                <Music2 size={16} /> {activeMood.title}
               </span>
               <button
                 type="button"
@@ -394,6 +406,21 @@ export function App() {
               {audioPrefs.muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
               {audioPrefs.muted ? "Muted" : "Mute"}
             </button>
+
+            <div className="audio-mood-control" role="group" aria-label="Sound mood">
+              {AUDIO_MOODS.map((mood) => (
+                <button
+                  key={mood.id}
+                  type="button"
+                  className={audioPrefs.mood === mood.id ? "active" : ""}
+                  data-testid={`audio-mood-${mood.id}`}
+                  title={mood.title}
+                  onClick={() => handleAudioMood(mood.id)}
+                >
+                  {mood.label}
+                </button>
+              ))}
+            </div>
 
             <div className="audio-sliders">
               {AUDIO_CHANNELS.map((channel) => (

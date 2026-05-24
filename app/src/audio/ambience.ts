@@ -1,9 +1,11 @@
 import { createNoiseBuffer } from "./buffers";
-import type { AudioLayerHandle, RunningAudio } from "./types";
+import { getAudioMoodDef } from "./moods";
+import type { AudioLayerHandle, AudioMood, RunningAudio } from "./types";
 import { stopSources } from "./utils";
 
-export function startRainAmbience(audio: RunningAudio): AudioLayerHandle {
+export function startRainAmbience(audio: RunningAudio, mood: AudioMood): AudioLayerHandle {
   const { context, channels } = audio;
+  const settings = getAudioMoodDef(mood).ambience;
   const sources: AudioScheduledSourceNode[] = [];
 
   const rain = context.createBufferSource();
@@ -11,10 +13,10 @@ export function startRainAmbience(audio: RunningAudio): AudioLayerHandle {
   rain.loop = true;
   const rainFilter = context.createBiquadFilter();
   rainFilter.type = "bandpass";
-  rainFilter.frequency.value = 1450;
+  rainFilter.frequency.value = settings.rainFilter;
   rainFilter.Q.value = 0.65;
   const rainGain = context.createGain();
-  rainGain.gain.value = 0.085;
+  rainGain.gain.value = settings.rainGain;
   rain.connect(rainFilter);
   rainFilter.connect(rainGain);
   rainGain.connect(channels.ambience);
@@ -24,18 +26,18 @@ export function startRainAmbience(audio: RunningAudio): AudioLayerHandle {
   hush.loop = true;
   const hushFilter = context.createBiquadFilter();
   hushFilter.type = "lowpass";
-  hushFilter.frequency.value = 260;
+  hushFilter.frequency.value = settings.hushFilter;
   const hushGain = context.createGain();
-  hushGain.gain.value = 0.04;
+  hushGain.gain.value = settings.hushGain;
   hush.connect(hushFilter);
   hushFilter.connect(hushGain);
   hushGain.connect(channels.ambience);
 
   const hum = context.createOscillator();
   hum.type = "sine";
-  hum.frequency.value = 72;
+  hum.frequency.value = settings.humFrequency;
   const humGain = context.createGain();
-  humGain.gain.value = 0.018;
+  humGain.gain.value = settings.humGain;
   hum.connect(humGain);
   humGain.connect(channels.ambience);
 

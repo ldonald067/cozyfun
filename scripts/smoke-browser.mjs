@@ -80,11 +80,13 @@ async function main() {
       title: document.title,
       materials: document.querySelectorAll(".material-button").length,
       audioInfos: document.querySelectorAll(".audio-info").length,
+      audioMoods: document.querySelectorAll(".audio-mood-control button").length,
       status: document.querySelector('[data-testid="status-message"]')?.textContent ?? ""
     }))()`);
     assert(state.title === "Cozy Pixel Sandbox", "unexpected page title");
     assert(state.materials >= 19, `expected material buttons, found ${state.materials}`);
     assert(state.audioInfos === 4, `expected four audio info icons, found ${state.audioInfos}`);
+    assert(state.audioMoods === 3, `expected three audio mood buttons, found ${state.audioMoods}`);
     assert(state.status.includes("online"), `engine did not report online: ${state.status}`);
   });
 
@@ -135,6 +137,8 @@ async function main() {
     await click(cdp, '[data-testid="audio-toggle"]');
     await waitForStatus(cdp, "rain lo-fi on");
     await waitUntil(() => textIncludes(cdp, '[data-testid="audio-toggle"]', "Stop"), "audio start button to become stop");
+    await click(cdp, '[data-testid="audio-mood-stardust"]');
+    await waitForStatus(cdp, "stardust study on");
     await click(cdp, '[data-testid="audio-mute"]');
     await waitForStatus(cdp, "audio muted");
     await waitUntil(() => textIncludes(cdp, '[data-testid="audio-mute"]', "Muted"), "mute button to show muted");
@@ -144,7 +148,7 @@ async function main() {
     await click(cdp, '[data-testid="audio-mute"]');
     await waitForStatus(cdp, "audio unmuted");
     await click(cdp, '[data-testid="audio-toggle"]');
-    await waitForStatus(cdp, "rain lo-fi resting");
+    await waitForStatus(cdp, "Stardust Study resting");
   });
 
   await check("page stayed free of browser errors", async () => {

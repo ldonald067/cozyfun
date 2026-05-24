@@ -53,6 +53,7 @@ This split keeps Phase 2 visuals expandable without turning the renderer into a 
 - `controller.ts`: lifecycle, user-gesture initialization, and app-facing methods.
 - `mixer.ts`: channel graph and gain changes.
 - `preferences.ts`: persistent audio settings.
+- `moods.ts`: reusable sound mood definitions.
 - `ambience.ts`: long-running environment layers.
 - `music.ts`: procedural rainy lo-fi bed.
 - `effects.ts`: material and UI one-shots.
