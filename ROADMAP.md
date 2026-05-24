@@ -103,6 +103,11 @@ Next:
 - Rain/window ambience polish.
 - More material reaction sounds beyond paint cues.
 - More sound mood tuning after listening tests.
+- External music provider foundation:
+  - Add a provider interface that can switch between generated music and future external music.
+  - Keep procedural ambience/effects native even when external music is selected.
+  - Store provider preferences without requiring accounts, API keys, or a backend.
+  - Add a disabled/planned UI state for external music so the control layout is ready without shipping YouTube early.
 - Softer UI transitions.
 - Better postcard export composition.
 - Optional scene presets.
@@ -140,4 +145,10 @@ Status: planned.
 - Shareable exported scene files.
 - Better screenshot/postcard workflow.
 - Optional GIF or short clip export.
+- Optional YouTube desk radio:
+  - Add a visible mini-player/drawer for YouTube lo-fi jazz or user-provided playlist links.
+  - Use the YouTube IFrame Player API as an external music provider.
+  - Keep generated music as the default and fallback.
+  - Do not use YouTube search, Data API keys, scraping, hidden playback, or server-side music handling.
+  - Make shared scenes preserve the selected music source only when it is safe and user-controlled.
 - No accounts or backend unless the product direction clearly needs them.

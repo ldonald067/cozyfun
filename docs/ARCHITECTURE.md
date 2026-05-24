@@ -60,6 +60,8 @@ This split keeps Phase 2 visuals expandable without turning the renderer into a 
 
 This keeps Phase 3 music work reusable without burying composition, mixer state, and sound effects in one file.
 
+Future external music should enter through a provider boundary rather than replacing this audio system. Generated music remains the default. YouTube or any other third-party player should be isolated behind an external provider and shown as a visible mini-player, while ambience and effects continue to use the native procedural mixer.
+
 ## Adding A Material
 
 1. Add the material id to `MATERIAL` in `app/src/materials.ts`.
