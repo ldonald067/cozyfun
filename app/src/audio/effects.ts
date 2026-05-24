@@ -1,7 +1,7 @@
 import { MATERIAL, type MaterialId } from "../materials";
 import { createNoiseBuffer } from "./buffers";
 import type { ReactionAudioCue, RunningAudio, UiAudioCue } from "./types";
-import { clamp01 } from "./utils";
+import { clamp01, disconnectAfterEnded } from "./utils";
 
 export function playMaterialPaint(audio: RunningAudio, materialId: MaterialId, intensity: number) {
   const amount = clamp01(intensity);
@@ -87,6 +87,7 @@ function playNoiseBurst(audio: RunningAudio, options: { duration: number; gain: 
   source.connect(filter);
   filter.connect(gain);
   gain.connect(channels.effects);
+  disconnectAfterEnded(source, filter, gain);
   source.start(now);
   source.stop(now + options.duration + 0.01);
 }
@@ -104,6 +105,7 @@ function playRipple(audio: RunningAudio, frequency: number, gainValue: number) {
   gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
   oscillator.connect(gain);
   gain.connect(channels.effects);
+  disconnectAfterEnded(oscillator, gain);
   oscillator.start(now);
   oscillator.stop(now + 0.2);
 }
@@ -122,6 +124,7 @@ function playChime(audio: RunningAudio, frequencies: number[], gainValue: number
     gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.28);
     oscillator.connect(gain);
     gain.connect(channels.effects);
+    disconnectAfterEnded(oscillator, gain);
     oscillator.start(now + offset);
     oscillator.stop(now + offset + 0.3);
   });
@@ -139,6 +142,7 @@ function playTap(audio: RunningAudio, frequency: number, gainValue: number) {
   gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
   oscillator.connect(gain);
   gain.connect(channels.effects);
+  disconnectAfterEnded(oscillator, gain);
   oscillator.start(now);
   oscillator.stop(now + 0.1);
 }

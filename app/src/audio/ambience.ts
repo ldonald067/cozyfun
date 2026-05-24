@@ -1,7 +1,7 @@
 import { createNoiseBuffer } from "./buffers";
 import { getAudioMoodDef } from "./moods";
 import type { AudioLayerHandle, AudioMood, RunningAudio } from "./types";
-import { stopSources } from "./utils";
+import { disconnectAfterEnded, disconnectAudioNodes, stopSources } from "./utils";
 
 export function startRainAmbience(audio: RunningAudio, mood: AudioMood): AudioLayerHandle {
   const { context, channels } = audio;
@@ -52,9 +52,7 @@ export function startRainAmbience(audio: RunningAudio, mood: AudioMood): AudioLa
     stop() {
       stopSources(sources);
       for (const timer of timers) window.clearTimeout(timer);
-      rain.disconnect();
-      hush.disconnect();
-      hum.disconnect();
+      disconnectAudioNodes(rain, rainFilter, rainGain, hush, hushFilter, hushGain, hum, humGain);
     }
   };
 
@@ -85,6 +83,7 @@ function playWindowDrip(audio: RunningAudio, gainValue: number) {
     gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.24);
     oscillator.connect(gain);
     gain.connect(channels.ambience);
+    disconnectAfterEnded(oscillator, gain);
     oscillator.start(start);
     oscillator.stop(start + 0.26);
   });

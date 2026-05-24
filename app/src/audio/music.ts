@@ -1,7 +1,7 @@
 import { createDustBuffer, createNoiseBuffer } from "./buffers";
 import { getAudioMoodDef } from "./moods";
 import type { AudioLayerHandle, AudioMood, AudioMoodDef, RunningAudio } from "./types";
-import { stopSources } from "./utils";
+import { disconnectAfterEnded, disconnectAudioNodes, stopSources } from "./utils";
 
 export function startRainLofiMusic(audio: RunningAudio, mood: AudioMood): AudioLayerHandle {
   const { context, channels } = audio;
@@ -36,9 +36,7 @@ export function startRainLofiMusic(audio: RunningAudio, mood: AudioMood): AudioL
     stop() {
       stopSources(sources);
       for (const timer of timers) window.clearInterval(timer);
-      vinyl.disconnect();
-      vinylFilter.disconnect();
-      vinylGain.disconnect();
+      disconnectAudioNodes(vinyl, vinylFilter, vinylGain);
     }
   };
 }
@@ -55,6 +53,7 @@ function playLofiStep(audio: RunningAudio, settings: AudioMoodDef["music"], step
 }
 
 function playSoftChord(audio: RunningAudio, settings: AudioMoodDef["music"], frequencies: number[], time: number) {
+  if (frequencies.length === 0) return;
   const { context, channels } = audio;
   const filter = context.createBiquadFilter();
   filter.type = "lowpass";
@@ -67,7 +66,7 @@ function playSoftChord(audio: RunningAudio, settings: AudioMoodDef["music"], fre
   filter.connect(chordGain);
   chordGain.connect(channels.music);
 
-  frequencies.forEach((frequency, index) => {
+  const oscillators = frequencies.map((frequency, index) => {
     const oscillator = context.createOscillator();
     oscillator.type = index % 2 === 0 ? "triangle" : "sine";
     oscillator.frequency.value = frequency;
@@ -75,7 +74,10 @@ function playSoftChord(audio: RunningAudio, settings: AudioMoodDef["music"], fre
     oscillator.connect(filter);
     oscillator.start(time + index * 0.018);
     oscillator.stop(time + 2.95);
+    return oscillator;
   });
+  const finalOscillator = oscillators[oscillators.length - 1];
+  if (finalOscillator) disconnectAfterEnded(finalOscillator, filter, chordGain, ...oscillators.slice(0, -1));
 }
 
 function playBrushHat(audio: RunningAudio, settings: AudioMoodDef["music"], time: number) {
@@ -99,6 +101,7 @@ function playLowThump(audio: RunningAudio, settings: AudioMoodDef["music"], time
   gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.22);
   oscillator.connect(gain);
   gain.connect(channels.music);
+  disconnectAfterEnded(oscillator, gain);
   oscillator.start(time);
   oscillator.stop(time + 0.24);
 }
@@ -116,6 +119,7 @@ function playSparkle(audio: RunningAudio, time: number) {
     gain.gain.exponentialRampToValueAtTime(0.0001, time + offset + 0.36);
     oscillator.connect(gain);
     gain.connect(channels.music);
+    disconnectAfterEnded(oscillator, gain);
     oscillator.start(time + offset);
     oscillator.stop(time + offset + 0.38);
   });
@@ -139,6 +143,7 @@ function playMusicNoise(
   source.connect(filter);
   filter.connect(gain);
   gain.connect(channels.music);
+  disconnectAfterEnded(source, filter, gain);
   source.start(options.time);
   source.stop(options.time + options.duration + 0.01);
 }

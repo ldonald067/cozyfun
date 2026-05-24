@@ -22,3 +22,17 @@ export function stopSources(sources: AudioScheduledSourceNode[]) {
     }
   }
 }
+
+export function disconnectAudioNodes(...nodes: AudioNode[]) {
+  for (const node of nodes) {
+    try {
+      node.disconnect();
+    } catch {
+      // Disconnect can race with a browser-managed ended event.
+    }
+  }
+}
+
+export function disconnectAfterEnded(source: AudioScheduledSourceNode, ...nodes: AudioNode[]) {
+  source.addEventListener("ended", () => disconnectAudioNodes(source, ...nodes), { once: true });
+}

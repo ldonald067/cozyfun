@@ -28,6 +28,7 @@ Focused implementation modules live under `app/src/audio`:
 - Mute and stop should fade through mixer gain instead of tearing down every node.
 - Music, ambience, and effects stay on separate channels so the simple panel can become a fuller mixer later.
 - Mood changes should restart long-running ambience/music layers cleanly, without changing the one-shot effects API.
+- One-shot sources should disconnect themselves after their `ended` event so long play sessions do not keep stale Web Audio nodes around.
 - External music must be optional. The generated music provider remains the default and fallback.
 - Reaction sounds should be throttled in the controller so busy simulations stay gentle.
 

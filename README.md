@@ -114,7 +114,7 @@ CI runs on pushes and pull requests to `main`. Browser smoke checks use an insta
 
 ## Roadmap
 
-See `ROADMAP.md` for the current phase plan, including the planned material shape-language renderer.
+See `ROADMAP.md` for the current phase plan, including sharper material visuals, sharing, and the optional desk radio path.
 
 ## License
 
