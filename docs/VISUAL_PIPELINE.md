@@ -1,6 +1,6 @@
 # Visual Pipeline
 
-The sandbox still renders as a grid of cells, but the grid does not need to look flat. Phase 2 uses neighbor-aware color rules to make materials recognizable by texture and silhouette before adding heavier art systems.
+The sandbox still renders as a grid of cells, but the grid does not need to look flat. Phase 2 used neighbor-aware color rules to make materials recognizable by texture and silhouette before adding heavier art systems. Phase 4 builds on the same renderer boundary with stronger facets, puffs, heat seams, liquid surfaces, and subtle local light.
 
 ## Layers
 
@@ -29,6 +29,9 @@ Shape language is intentionally procedural:
 - Smoke/Steam: edge-softened puff clusters with age fade and warm light near fire or lava.
 - Water/Moonwater: connected surface highlights and lower shadow.
 - Stardust: bright twinkles and nearby star glints.
+- Fire/Lava/Meteor: heat cores, exposed flame tips, cooling crust, glowing seams, and ember-dark edges.
+- Moss/Fungus/Wood: organic clusters, cap highlights, and woodgrain lines.
+- Nearby light: hot and cosmic materials can tint adjacent cells without changing simulation state.
 
 Rules can inspect neighboring cells through `cells.ts`, but they should not modify simulation state.
 
@@ -68,3 +71,9 @@ Useful commands:
 ## Phase 2 Baseline
 
 The current baseline covers the first readability batch: sand, soil, wall, smoke, steam, seed, ice, stone, water, moonwater, and stardust all have renderer-level shape treatment. More realistic silhouettes, local lighting, and high-detail experiments belong in Phase 4 so Phase 3 can keep moving on atmosphere without destabilizing the simulation.
+
+## Phase 4 First Pass
+
+The first Phase 4 pass keeps rendering inside `shapeLanguage.ts` and avoids changing simulation behavior. It adds reusable helpers for exposed edges and nearby light, then applies them to ice, stone, wall, fire, lava, meteor, smoke, steam, water, moonwater, oil, moss, fungus, and wood.
+
+This is still procedural pixel art, not photorealism. The target is faster material recognition at normal play zoom: ice should feel faceted, lava should read as hot cracked crust, vapor should feel soft and puffy, and liquids should have connected surfaces.

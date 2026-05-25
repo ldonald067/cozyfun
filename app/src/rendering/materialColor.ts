@@ -53,7 +53,7 @@ export function colorForCell(options: {
     b = clampColor(b * fade + 20 * (1 - fade));
   }
 
-  return applyShapeLanguage({ kind, color: [r, g, b], variant, age, time, cells, width, height, x, y });
+  return applyShapeLanguage({ kind, color: [r, g, b], variant, age, energy, time, cells, width, height, x, y });
 }
 
 export function hasGlow(kind: number) {

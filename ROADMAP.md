@@ -126,7 +126,7 @@ Remaining before Phase 4:
 
 ## Phase 4: Sharper Realistic Visuals
 
-Status: planned.
+Status: in progress.
 
 Goal: make the sandbox feel more tactile and physically readable while keeping the cozy pixel style.
 
@@ -149,6 +149,20 @@ This is not photorealism. The target is clearer material identity: ice should fe
 - Add optional high-detail renderer mode for visual polish experiments.
 - Add visual QA screenshots for desktop and mobile after every major material batch.
 - Keep the simulation rules stable unless a visual idea needs a real new behavior.
+
+Started in this phase:
+
+- Added reusable edge and nearby-light helpers to the shape-language renderer.
+- Extended renderer treatment to more materials instead of keeping Phase 4 as isolated one-off tweaks.
+- First realism pass:
+  - Ice has stronger cube facets, corner highlights, darker edges, and internal crack marks.
+  - Stone has chunkier block shading and darker fracture marks.
+  - Wall has stronger mortar and exposed-edge structure.
+  - Fire, lava, and meteor have dedicated heat rendering instead of relying only on palette pulsing.
+  - Smoke and steam have larger puff/rim treatment.
+  - Water, moonwater, and oil have clearer surface, edge, and ripple cues.
+  - Moss, fungus, and wood now have basic organic/woodgrain texture treatment.
+  - Nearby fire/lava/meteor and stardust/moonwater tint adjacent cells with subtle local light.
 
 ## Phase 5: Sharing
 
