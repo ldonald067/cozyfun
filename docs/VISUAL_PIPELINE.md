@@ -34,7 +34,7 @@ Shape language is intentionally procedural:
 - Nearby light: hot and cosmic materials can tint adjacent cells without changing simulation state.
 - Interaction cues: water near heat brightens toward steam, lava near cool liquids darkens into crust, moonwater near life becomes pearly green-violet, and newly cooled stone picks up a faint wet edge.
 
-Rules can inspect neighboring cells through `cells.ts`, but they should not modify simulation state.
+Rules can inspect neighboring cells through `cells.ts`, but they should not modify simulation state. Shared edge/contact helpers belong in `cells.ts`; material-specific palette choices stay in `shapeLanguage.ts`.
 
 ## When To Add A Rule
 
@@ -61,6 +61,8 @@ For every visual batch:
 2. Paint a controlled scene with the changed materials side by side.
 3. Check that the material reads at normal zoom, not only when inspected closely.
 4. Run browser smoke tests.
+
+Temporary visual captures should go in `.tmp/` so they stay out of commits.
 
 Useful commands:
 

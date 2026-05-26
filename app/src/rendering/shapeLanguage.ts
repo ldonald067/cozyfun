@@ -1,6 +1,6 @@
 import { MATERIAL } from "../materials";
 import { adjustRgb, mixRgb, type Rgb } from "./color";
-import { cardinalNeighborCount, kindAt, sameKind, sameLiquid } from "./cells";
+import { cardinalNeighborCount, edgeInfo, hasNearbyKind, kindAt, sameKind, sameLiquid } from "./cells";
 import { hashCell } from "./hash";
 
 export type ShapeContext = {
@@ -17,10 +17,12 @@ export type ShapeContext = {
   y: number;
 };
 
-const HOT_LIGHT_KINDS = [MATERIAL.Fire, MATERIAL.Lava, MATERIAL.Meteor];
-const COSMIC_LIGHT_KINDS = [MATERIAL.Stardust, MATERIAL.Moonwater];
-const COOL_LIQUID_KINDS = [MATERIAL.Water, MATERIAL.Moonwater, MATERIAL.Ice];
-const LIFE_KINDS = [MATERIAL.Moss, MATERIAL.Seed, MATERIAL.Fungus, MATERIAL.Soil];
+const HOT_LIGHT_KINDS = [MATERIAL.Fire, MATERIAL.Lava, MATERIAL.Meteor] as const;
+const COSMIC_LIGHT_KINDS = [MATERIAL.Stardust, MATERIAL.Moonwater] as const;
+const COOL_LIQUID_KINDS = [MATERIAL.Water, MATERIAL.Moonwater, MATERIAL.Ice] as const;
+const LIFE_KINDS = [MATERIAL.Moss, MATERIAL.Seed, MATERIAL.Fungus, MATERIAL.Soil] as const;
+const MOONWATER_KINDS = [MATERIAL.Moonwater] as const;
+const WATER_KINDS = [MATERIAL.Water] as const;
 
 export function emptyCellColor(cells: Uint8Array, width: number, height: number, x: number, y: number, time: number): Rgb {
   const background: Rgb = [9, 14, 20];
@@ -58,40 +60,6 @@ export function applyShapeLanguage(context: ShapeContext): Rgb {
   else if (kind === MATERIAL.Wood) out = woodColor(context);
   else if (kind === MATERIAL.Stardust) out = stardustColor(context);
   return nearbyLight(context, out);
-}
-
-type EdgeInfo = {
-  top: boolean;
-  right: boolean;
-  bottom: boolean;
-  left: boolean;
-  count: number;
-};
-
-function edgeInfo(cells: Uint8Array, width: number, height: number, x: number, y: number, kind: number): EdgeInfo {
-  const top = !sameKind(cells, width, height, x, y - 1, kind);
-  const right = !sameKind(cells, width, height, x + 1, y, kind);
-  const bottom = !sameKind(cells, width, height, x, y + 1, kind);
-  const left = !sameKind(cells, width, height, x - 1, y, kind);
-  return { top, right, bottom, left, count: Number(top) + Number(right) + Number(bottom) + Number(left) };
-}
-
-function hasNearbyKind(
-  cells: Uint8Array,
-  width: number,
-  height: number,
-  x: number,
-  y: number,
-  kinds: number[],
-  radius = 1
-) {
-  for (let dy = -radius; dy <= radius; dy++) {
-    for (let dx = -radius; dx <= radius; dx++) {
-      if (dx === 0 && dy === 0) continue;
-      if (kinds.includes(kindAt(cells, width, height, x + dx, y + dy))) return true;
-    }
-  }
-  return false;
 }
 
 function nearbyLight({ kind, cells, width, height, x, y }: ShapeContext, color: Rgb): Rgb {
@@ -298,8 +266,8 @@ function liquidColor({ kind, color, variant, time, cells, width, height, x, y }:
 function growthColor({ kind, color, variant, age, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
   const edge = edgeInfo(cells, width, height, x, y, kind);
-  const moonFed = hasNearbyKind(cells, width, height, x, y, [MATERIAL.Moonwater]);
-  const damp = moonFed || hasNearbyKind(cells, width, height, x, y, [MATERIAL.Water]);
+  const moonFed = hasNearbyKind(cells, width, height, x, y, MOONWATER_KINDS);
+  const damp = moonFed || hasNearbyKind(cells, width, height, x, y, WATER_KINDS);
   let out = color;
 
   if (kind === MATERIAL.Moss) {

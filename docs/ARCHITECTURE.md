@@ -41,12 +41,12 @@ Rendering is allowed to inspect these bytes, but it should not mutate them. Visu
 Material-specific color and texture decisions live under `app/src/rendering`:
 
 - `color.ts`: RGB helpers and clamping.
-- `cells.ts`: read-only cell and neighbor helpers.
+- `cells.ts`: read-only cell, edge, and neighbor-contact helpers.
 - `hash.ts`: deterministic visual noise.
 - `materialColor.ts`: base material color, animation, fade, and glow.
 - `shapeLanguage.ts`: neighbor-aware material texture and silhouette cues.
 
-This split keeps Phase 2 visuals expandable without turning the renderer into a pile of unrelated rules.
+This split keeps visual work expandable without turning the renderer into a pile of unrelated rules. Renderer-level interaction cues, such as moonwater tinting nearby fungus or lava darkening near water, may inspect neighbors but must remain presentation only. Any change that moves, creates, destroys, or transforms cells belongs in the simulation boundary.
 
 ## Audio Boundary
 

@@ -19,6 +19,40 @@ export function sameLiquid(cells: Uint8Array, width: number, height: number, x: 
   return other === kind;
 }
 
+export type EdgeInfo = {
+  top: boolean;
+  right: boolean;
+  bottom: boolean;
+  left: boolean;
+  count: number;
+};
+
+export function edgeInfo(cells: Uint8Array, width: number, height: number, x: number, y: number, kind: number): EdgeInfo {
+  const top = !sameKind(cells, width, height, x, y - 1, kind);
+  const right = !sameKind(cells, width, height, x + 1, y, kind);
+  const bottom = !sameKind(cells, width, height, x, y + 1, kind);
+  const left = !sameKind(cells, width, height, x - 1, y, kind);
+  return { top, right, bottom, left, count: Number(top) + Number(right) + Number(bottom) + Number(left) };
+}
+
+export function hasNearbyKind(
+  cells: Uint8Array,
+  width: number,
+  height: number,
+  x: number,
+  y: number,
+  kinds: readonly number[],
+  radius = 1
+) {
+  for (let dy = -radius; dy <= radius; dy++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      if (dx === 0 && dy === 0) continue;
+      if (kinds.includes(kindAt(cells, width, height, x + dx, y + dy))) return true;
+    }
+  }
+  return false;
+}
+
 export function cardinalNeighborCount(cells: Uint8Array, width: number, height: number, x: number, y: number, kind: number) {
   let count = 0;
   if (sameKind(cells, width, height, x, y - 1, kind)) count++;
