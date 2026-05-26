@@ -30,8 +30,9 @@ Shape language is intentionally procedural:
 - Water/Moonwater: connected surface highlights and lower shadow.
 - Stardust: bright twinkles and nearby star glints.
 - Fire/Lava/Meteor: heat cores, exposed flame tips, cooling crust, glowing seams, and ember-dark edges.
-- Moss/Fungus/Wood: organic clusters, cap highlights, and woodgrain lines.
+- Moss/Fungus/Wood: organic clusters, fungus cap/gill/spore marks, damp moonwater tint, and woodgrain lines.
 - Nearby light: hot and cosmic materials can tint adjacent cells without changing simulation state.
+- Interaction cues: water near heat brightens toward steam, lava near cool liquids darkens into crust, moonwater near life becomes pearly green-violet, and newly cooled stone picks up a faint wet edge.
 
 Rules can inspect neighboring cells through `cells.ts`, but they should not modify simulation state.
 
@@ -77,3 +78,5 @@ The current baseline covers the first readability batch: sand, soil, wall, smoke
 The first Phase 4 pass keeps rendering inside `shapeLanguage.ts` and avoids changing simulation behavior. It adds reusable helpers for exposed edges and nearby light, then applies them to ice, stone, wall, fire, lava, meteor, smoke, steam, water, moonwater, oil, moss, fungus, and wood.
 
 This is still procedural pixel art, not photorealism. The target is faster material recognition at normal play zoom: ice should feel faceted, lava should read as hot cracked crust, vapor should feel soft and puffy, and liquids should have connected surfaces.
+
+The second pass starts visual interaction language. These cues are renderer-only: they describe contact between materials without adding new simulation state. Use this for gentle, readable feedback; keep actual chemistry and movement rules in Rust/engine code.

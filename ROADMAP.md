@@ -163,6 +163,8 @@ Started in this phase:
   - Water, moonwater, and oil have clearer surface, edge, and ripple cues.
   - Moss, fungus, and wood now have basic organic/woodgrain texture treatment.
   - Nearby fire/lava/meteor and stardust/moonwater tint adjacent cells with subtle local light.
+  - Fungus and moonwater received a second pass: cap/gill/spore structure, crescent highlights, and life/heat contact shimmer.
+  - Renderer-level interaction cues started for water/fire, water/lava, moonwater/life, and cooling stone edges.
 
 ## Phase 5: Sharing
 
