@@ -32,6 +32,12 @@ Focused implementation modules live under `app/src/audio`:
 - External music must be optional. The generated music provider remains the default and fallback.
 - One-shot effects are disabled in the current build. Re-enable them only after a more realistic Foley/sample direction replaces the prototype synth cues.
 
+## Effects Decision
+
+The Phase 3 leftovers pass keeps synthetic paint, UI, and reaction one-shots disabled. They were useful as architecture probes, but they read too arcade-like against the rainy desk direction.
+
+Keep the `effects` mixer channel and controller methods because they are the right boundary for future native Foley. Do not expose an effects slider or re-enable `effects.ts` until the sound source is closer to realistic texture: sand rubs, water movement, glassy ice ticks, soft fire crackle, or carefully sourced short samples.
+
 ## Music Direction
 
 The music layer should feel like rainy lo-fi desk music:

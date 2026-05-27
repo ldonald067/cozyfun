@@ -28,8 +28,8 @@ export const SCENE_ENVIRONMENTS: SceneEnvironment[] = [
     className: "scene-rain-desk",
     image: "/rooms/rain-desk.jpg",
     imagePosition: "center center",
-    imageOpacity: 0.66,
-    imageFilter: "saturate(0.82) contrast(0.94) brightness(0.66)"
+    imageOpacity: 0.54,
+    imageFilter: "saturate(0.74) contrast(0.84) brightness(0.58)"
   },
   {
     id: "moonwater-garden",
@@ -52,8 +52,8 @@ export const SCENE_ENVIRONMENTS: SceneEnvironment[] = [
     className: "scene-stardust-hearth",
     image: "/rooms/stardust-hearth.jpg",
     imagePosition: "center 45%",
-    imageOpacity: 0.64,
-    imageFilter: "saturate(0.76) contrast(0.9) brightness(0.68)"
+    imageOpacity: 0.58,
+    imageFilter: "saturate(0.72) contrast(0.86) brightness(0.62)"
   }
 ];
 

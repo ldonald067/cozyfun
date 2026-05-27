@@ -9,7 +9,7 @@ This roadmap keeps the project focused: make the toy feel good, keep the codebas
 - 18 V0 materials, including cozy/cosmic materials: Stardust, Meteor, and Moonwater.
 - Manual painting, brush size, pause/play, clear, local save/load, JSON export/import, and postcard export.
 - Soft reaction style: fire/water becomes glowing steam, lava cools near water, fire burns flammables over time.
-- Procedural Web Audio foundation with master, ambience, music, and a reserved effects channel.
+- Procedural Web Audio foundation with master, ambience, music, and a reserved native effects channel.
 - Audio code split into reusable modules for mixer, preferences, ambience, music, future effects, buffers, and controller lifecycle.
 - Sound moods added for Rain, Window, and Stardust variations.
 - Non-destructive room backdrops added for Rain Desk, Moonlit Garden, and Stardust Hearth.
@@ -18,6 +18,7 @@ This roadmap keeps the project focused: make the toy feel good, keep the codebas
 - External music provider boundary added with generated music as the default and a planned Desk Radio slot for Phase 5.
 - Reaction cue detection added for steam, cooling lava, growth, and cosmic sparkle events.
 - Prototype synthetic one-shot effects disabled after listening review because they felt too arcade-like for the cozy direction.
+- Phase 3 leftovers resolved: synthetic effects stay off for now, room photos received a visual pass, and control density is covered by visual QA.
 - Postcard export now includes scene, mood, music source, sim source, and tick context.
 - Browser, build, and WASM smoke checks wired into local scripts and GitHub CI.
 - Renderer cleanup: canvas orchestration is separate from reusable material color, glow, and shape-language helpers.
@@ -95,7 +96,7 @@ Phase 2 is ready for Phase 3 atmosphere work. Deeper realism and more ambitious 
 
 ## Phase 3: Cozy Atmosphere
 
-Status: foundation done.
+Status: done.
 
 Done:
 
@@ -117,13 +118,11 @@ Done:
 - Better postcard export composition with contextual scene, sound, and simulation metadata.
 - Room/backdrop switching that changes atmosphere and audio mood without replacing the sandbox.
 - Room photos now load locally from `app/public/rooms` with source tracking in `ASSET_CREDITS.md`.
-
-Deferred follow-ups:
-
-- Listening pass on real speakers/headphones after more play time.
-- Decide whether to keep effects off or reintroduce them with more realistic Foley samples/procedural texture.
-- Visual pass on the sourced room photos after more play time, replacing any image that feels too literal, muddy, or distracting.
-- Small UI polish only if the added controls feel crowded during normal play.
+- Leftover polish pass:
+  - Effects stay off in the live UI. The channel and API remain reserved for a future realistic Foley/sample direction.
+  - Rain Desk and Stardust Hearth backdrops were softened so the photos support the toy instead of competing with it.
+  - Moonlit Garden stayed as-is after the room-photo pass because it already reads calm and low-contrast.
+  - Visual QA now captures every room backdrop and checks desktop/mobile panel layout so control crowding is caught by a repeatable script.
 
 ## Phase 4: Sharper Realistic Visuals
 

@@ -53,6 +53,9 @@ async function main() {
     await paintPhaseFourScene(cdp);
     const materialCapture = await saveSandboxComposite(cdp, "phase4-materials.png");
     const desktopLayout = await layoutState(cdp);
+    assert(desktopLayout.controlsBottom <= desktopLayout.viewportHeight + 1, `desktop controls overflow vertically: ${JSON.stringify(desktopLayout)}`);
+    assert(desktopLayout.materialsBottom <= desktopLayout.viewportHeight + 1, `desktop materials overflow vertically: ${JSON.stringify(desktopLayout)}`);
+    const roomCaptures = await saveRoomCaptures(cdp);
 
     await cdp.send("Emulation.setDeviceMetricsOverride", {
       width: 390,
@@ -73,11 +76,28 @@ async function main() {
     console.log("Visual QA captures written:");
     console.log(`- ${materialCapture}`);
     console.log(`- ${path.join(outputDir, "phase4-layout.json")}`);
+    for (const capture of roomCaptures) console.log(`- ${capture}`);
     if (screenshotCapture) console.log(`- ${screenshotCapture}`);
   } finally {
     await browser.close();
     await staticServer.close();
   }
+}
+
+async function saveRoomCaptures(cdp) {
+  const captures = [];
+  for (const room of [
+    { id: "rain-desk", fileName: "room-rain-desk.png" },
+    { id: "moonwater-garden", fileName: "room-moonwater-garden.png" },
+    { id: "stardust-hearth", fileName: "room-stardust-hearth.png" }
+  ]) {
+    await evaluate(cdp, `window.scrollTo(0, 0); true`);
+    await clickTestId(cdp, `scene-environment-${room.id}`);
+    await sleep(260);
+    const capture = await saveScreenshot(cdp, room.fileName);
+    captures.push(capture);
+  }
+  return captures;
 }
 
 async function paintPhaseFourScene(cdp) {
@@ -171,13 +191,17 @@ async function saveSandboxComposite(cdp, fileName) {
 
 async function trySaveScreenshot(cdp, fileName) {
   try {
-    const result = await cdp.send("Page.captureScreenshot", { format: "png", fromSurface: true });
-    const outPath = path.join(outputDir, fileName);
-    await writeFile(outPath, Buffer.from(result.data, "base64"));
-    return outPath;
+    return await saveScreenshot(cdp, fileName);
   } catch {
     return null;
   }
+}
+
+async function saveScreenshot(cdp, fileName) {
+  const result = await cdp.send("Page.captureScreenshot", { format: "png", fromSurface: true });
+  const outPath = path.join(outputDir, fileName);
+  await writeFile(outPath, Buffer.from(result.data, "base64"));
+  return outPath;
 }
 
 async function layoutState(cdp) {
@@ -186,6 +210,7 @@ async function layoutState(cdp) {
     `(() => {
       const tray = document.querySelector(".tray")?.getBoundingClientRect();
       const controls = document.querySelector(".control-panel")?.getBoundingClientRect();
+      const materials = document.querySelector(".tool-panel")?.getBoundingClientRect();
       return {
         viewportWidth: window.innerWidth,
         viewportHeight: window.innerHeight,
@@ -193,7 +218,9 @@ async function layoutState(cdp) {
         trayBottom: tray?.bottom ?? 0,
         controlsLeft: controls?.left ?? 0,
         controlsRight: controls?.right ?? 0,
-        controlsTop: controls?.top ?? 0
+        controlsTop: controls?.top ?? 0,
+        controlsBottom: controls?.bottom ?? 0,
+        materialsBottom: materials?.bottom ?? 0
       };
     })()`
   );
@@ -399,6 +426,18 @@ async function click(cdp, x, y) {
   await cdp.send("Input.dispatchMouseEvent", { type: "mousePressed", x, y, button: "left", clickCount: 1 });
   await cdp.send("Input.dispatchMouseEvent", { type: "mouseReleased", x, y, button: "left", clickCount: 1 });
   await sleep(45);
+}
+
+async function clickTestId(cdp, testId) {
+  const rect = await evaluate(
+    cdp,
+    `(() => {
+      const rect = document.querySelector('[data-testid="${testId}"]')?.getBoundingClientRect();
+      return rect ? { left: rect.left, top: rect.top, width: rect.width, height: rect.height } : null;
+    })()`
+  );
+  assert(rect, `missing test id for visual QA: ${testId}`);
+  await click(cdp, rect.left + rect.width / 2, rect.top + rect.height / 2);
 }
 
 async function drag(cdp, path) {

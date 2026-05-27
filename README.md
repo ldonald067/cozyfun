@@ -73,7 +73,7 @@ Some key reactions:
 - `scripts/build.ps1` builds the Rust sim, copies the generated WASM into `app/public/sim`, then builds the Vite app.
 - `scripts/dev.ps1` builds the sim first, then starts Vite.
 - `scripts/test-sim.ps1` runs the Rust simulation tests with the checked-in local tool paths.
-- `scripts/visual-qa.ps1` captures a controlled Phase 4 material scene and responsive layout metrics into `.tmp/visual-qa`.
+- `scripts/visual-qa.ps1` captures a controlled Phase 4 material scene, room backdrops, and responsive layout metrics into `.tmp/visual-qa`.
 - `scripts/check.ps1` runs the full local gate with the checked-in local tool paths.
 
 The app is static after build. There is no backend, account system, database, cloud save, streaming dependency, or paid API dependency.
