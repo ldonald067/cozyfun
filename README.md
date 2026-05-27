@@ -72,6 +72,8 @@ Some key reactions:
 - `app/src/reactions.ts` maps simulation changes to future audio cue hooks.
 - `scripts/build.ps1` builds the Rust sim, copies the generated WASM into `app/public/sim`, then builds the Vite app.
 - `scripts/dev.ps1` builds the sim first, then starts Vite.
+- `scripts/test-sim.ps1` runs the Rust simulation tests with the checked-in local tool paths.
+- `scripts/visual-qa.ps1` captures a controlled Phase 4 material scene and responsive layout metrics into `.tmp/visual-qa`.
 
 The app is static after build. There is no backend, account system, database, cloud save, streaming dependency, or paid API dependency.
 
@@ -105,12 +107,16 @@ Useful local commands:
 
 ```powershell
 .\scripts\build.ps1
+.\scripts\test-sim.ps1
 .\scripts\test-wasm.ps1
 .\scripts\test-browser.ps1
+.\scripts\visual-qa.ps1
 npm --prefix app audit --audit-level=moderate
 ```
 
-CI runs on pushes and pull requests to `main`. Browser smoke checks use an installed Chrome or Edge browser; set `BROWSER_BINARY` if your browser is in a custom location.
+CI runs simulation tests, build, browser smoke checks, and visual QA on pushes and pull requests to `main`. Browser and visual checks use an installed Chrome or Edge browser; set `BROWSER_BINARY` if your browser is in a custom location.
+
+On Windows, `.\scripts\test-sim.ps1` and `npm run check` require Visual Studio Build Tools with the Visual C++ linker. The WASM, browser, visual QA, and build scripts can still pass without that native linker, and CI runs the native simulation tests on Ubuntu.
 
 ## Roadmap
 
@@ -135,7 +141,7 @@ If Rust cannot find the WASM target, run:
 rustup target add wasm32-unknown-unknown
 ```
 
-If `npm run check` fails on Windows with `link.exe not found`, install Visual Studio Build Tools with the Visual C++ build tools workload. The browser build and WASM smoke test can still pass without the native Windows Rust linker.
+If `npm run check` fails on Windows with `link.exe not found`, install Visual Studio Build Tools with the Visual C++ build tools workload. The browser build, visual QA, and WASM smoke test can still pass without the native Windows Rust linker.
 
 If Vite reports `Access is denied` while loading `vite.config.ts` on Windows, use the checked-in scripts. The app dev and build commands use Vite's runner config loader to avoid that Windows path-walking issue.
 

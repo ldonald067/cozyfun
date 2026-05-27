@@ -40,3 +40,6 @@ jobs:
 
       - name: Run browser smoke tests
         run: npm run test:browser
+
+      - name: Run visual QA capture
+        run: npm run visual:qa

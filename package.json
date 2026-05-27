@@ -12,6 +12,7 @@
     "test:sim": "cargo test --manifest-path sim/Cargo.toml",
     "test:wasm": "npm run build:sim && node scripts/smoke-wasm.mjs",
     "test:browser": "node scripts/smoke-browser.mjs",
-    "check": "npm run test:sim && npm run test:wasm && npm run build && npm run test:browser"
+    "visual:qa": "node scripts/visual-qa.mjs",
+    "check": "npm run test:sim && npm run test:wasm && npm run build && npm run test:browser && npm run visual:qa"
   }
 }

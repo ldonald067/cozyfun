@@ -69,7 +69,8 @@ function nearbyLight({ kind, cells, width, height, x, y }: ShapeContext, color: 
     out = mixRgb(out, [255, 166, 82], kind === MATERIAL.Smoke || kind === MATERIAL.Steam ? 0.2 : 0.11);
   }
   if (kind !== MATERIAL.Moonwater && hasNearbyKind(cells, width, height, x, y, COSMIC_LIGHT_KINDS)) {
-    out = mixRgb(out, [150, 181, 255], kind === MATERIAL.Water || kind === MATERIAL.Ice ? 0.18 : 0.1);
+    const amount = kind === MATERIAL.Water || kind === MATERIAL.Ice ? 0.18 : kind === MATERIAL.Smoke || kind === MATERIAL.Steam ? 0.16 : 0.1;
+    out = mixRgb(out, [150, 181, 255], amount);
   }
   if (kind === MATERIAL.Stone && hasNearbyKind(cells, width, height, x, y, COOL_LIQUID_KINDS)) {
     out = mixRgb(out, [126, 164, 183], 0.14);
@@ -95,24 +96,38 @@ function wallColor({ color, variant, cells, width, height, x, y }: ShapeContext)
 
 function sandColor({ color, variant, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
+  const localX = (x + (hash & 1)) & 3;
+  const localY = (y + ((hash >> 3) & 1)) & 3;
+  const surface = !sameKind(cells, width, height, x, y - 1, MATERIAL.Sand);
+  const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Sand);
+  const damp = hasNearbyKind(cells, width, height, x, y, COOL_LIQUID_KINDS);
+  const warm = hasNearbyKind(cells, width, height, x, y, HOT_LIGHT_KINDS);
   let out = adjustRgb(color, (hash % 5) * 3 - 6);
-  if (hash % 11 === 0) out = adjustRgb(out, -24);
-  if (hash % 13 === 0) out = mixRgb(out, [239, 213, 139], 0.28);
-  if (!sameKind(cells, width, height, x, y - 1, MATERIAL.Sand)) out = adjustRgb(out, 7);
+  if (surface || edge.left || edge.right) out = mixRgb(out, [238, 208, 124], 0.24);
+  if (localY === 3 || hash % 11 === 0) out = mixRgb(out, [115, 82, 43], 0.24);
+  if (localX === 0 && hash % 3 === 0) out = mixRgb(out, [250, 229, 151], 0.28);
+  if (hash % 17 === 0) out = mixRgb(out, [84, 62, 38], 0.32);
+  if (damp) out = mixRgb(out, [111, 91, 69], 0.28);
+  if (warm) out = mixRgb(out, [225, 137, 75], 0.18);
   return out;
 }
 
 function soilColor({ color, variant, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
   const surface = !sameKind(cells, width, height, x, y - 1, MATERIAL.Soil);
-  const edge = cardinalNeighborCount(cells, width, height, x, y, MATERIAL.Soil) < 3;
+  const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Soil);
+  const looseEdge = edge.count > 0 || cardinalNeighborCount(cells, width, height, x, y, MATERIAL.Soil) < 3;
+  const rooted = hasNearbyKind(cells, width, height, x, y, LIFE_KINDS);
+  const damp = hasNearbyKind(cells, width, height, x, y, COOL_LIQUID_KINDS);
+  const localX = (x + hash) & 3;
   let out = adjustRgb(color, (hash % 7) * 4 - 14);
 
-  if (surface) out = mixRgb(out, [131, 92, 61], 0.28);
-  if (edge) out = mixRgb(out, [53, 34, 25], 0.22);
-  if (hash % 11 === 0) out = mixRgb(out, [41, 27, 21], 0.45);
+  if (surface) out = mixRgb(out, [141, 96, 61], 0.32);
+  if (looseEdge || hash % 11 === 0) out = mixRgb(out, [43, 27, 21], 0.34);
+  if ((localX === 1 && hash % 5 === 0) || rooted) out = mixRgb(out, [83, 61, 39], rooted ? 0.22 : 0.16);
+  if (damp) out = mixRgb(out, [48, 43, 38], 0.22);
   if (hash % 19 === 0 || (kindAt(cells, width, height, x, y - 1) === MATERIAL.Moss && hash % 5 === 0)) {
-    out = mixRgb(out, [89, 126, 70], 0.35);
+    out = mixRgb(out, [89, 126, 70], damp ? 0.42 : 0.35);
   }
   return out;
 }
@@ -165,6 +180,7 @@ function vaporColor({ kind, color, variant, age, cells, width, height, x, y }: S
   const rim = localX === 0 || localY === 0 || localX === 3 || localY === 3;
   const edge = sameNeighbors < 3;
   const fade = Math.max(0, 1 - age / (kind === MATERIAL.Steam ? 155 : 210));
+  const cosmic = hasNearbyKind(cells, width, height, x, y, COSMIC_LIGHT_KINDS);
   const warm =
     kindAt(cells, width, height, x - 1, y) === MATERIAL.Fire ||
     kindAt(cells, width, height, x + 1, y) === MATERIAL.Fire ||
@@ -178,19 +194,23 @@ function vaporColor({ kind, color, variant, age, cells, width, height, x, y }: S
   if (!rim && hash % 5 === 0) out = mixRgb(out, [226, 236, 242], kind === MATERIAL.Steam ? 0.42 : 0.24);
   if (localY === 3 || hash % 7 === 0) out = mixRgb(out, [63, 70, 78], kind === MATERIAL.Steam ? 0.1 : 0.26);
   if (warm) out = mixRgb(out, [255, 183, 116], kind === MATERIAL.Steam ? 0.18 : 0.12);
+  if (cosmic) out = mixRgb(out, [178, 186, 255], kind === MATERIAL.Steam ? 0.2 : 0.14);
   return mixRgb([9, 14, 20], out, 0.52 + fade * 0.42);
 }
 
 function seedColor({ color, variant, age, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
   const neighbors = cardinalNeighborCount(cells, width, height, x, y, MATERIAL.Seed);
+  const localX = (x + (hash & 1)) & 3;
+  const localY = (y + ((hash >> 2) & 1)) & 3;
   const edge = neighbors < 3;
-  let out = edge ? mixRgb(color, [48, 25, 17], 0.62) : mixRgb(color, [116, 66, 34], 0.44);
-  if (hash % 7 === 0) out = mixRgb(out, [224, 163, 89], 0.28);
-  if (hash % 3 === 0 || (age > 24 && hash % 4 === 0)) out = mixRgb(out, [95, 181, 82], 0.78);
-
   const below = kindAt(cells, width, height, x, y + 1);
-  if (below === MATERIAL.Soil || below === MATERIAL.Moss || below === MATERIAL.Moonwater) out = mixRgb(out, [116, 202, 94], 0.32);
+  const fed = below === MATERIAL.Soil || below === MATERIAL.Moss || below === MATERIAL.Moonwater || hasNearbyKind(cells, width, height, x, y, MOONWATER_KINDS);
+  let out = edge ? mixRgb(color, [47, 25, 17], 0.64) : mixRgb(color, [119, 68, 34], 0.46);
+  if (localX === 1 && localY <= 2) out = mixRgb(out, [222, 154, 82], 0.26);
+  if (localY === 3 || hash % 7 === 0) out = mixRgb(out, [51, 27, 16], 0.3);
+  if (fed || hash % 3 === 0 || (age > 24 && hash % 4 === 0)) out = mixRgb(out, [95, 181, 82], fed ? 0.82 : 0.62);
+  if (below === MATERIAL.Moonwater) out = mixRgb(out, [184, 211, 255], 0.22);
   return out;
 }
 
@@ -200,6 +220,7 @@ function iceColor({ color, variant, cells, width, height, x, y }: ShapeContext) 
   const localY = (y + ((hash >> 2) & 1)) & 3;
   const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Ice);
   const crack = (localX === localY && hash % 5 === 0) || (localX + localY === 3 && hash % 7 === 0);
+  const heatContact = hasNearbyKind(cells, width, height, x, y, HOT_LIGHT_KINDS);
   let out = mixRgb(color, [186, 238, 250], 0.44);
 
   if (localX === 0 || localY === 0 || edge.top || edge.left) out = mixRgb(out, [245, 254, 255], 0.66);
@@ -207,6 +228,7 @@ function iceColor({ color, variant, cells, width, height, x, y }: ShapeContext) 
   if (localX === 1 && localY === 1) out = mixRgb(out, [255, 255, 255], 0.52);
   if (localX === 2 && localY === 1) out = mixRgb(out, [211, 249, 255], 0.28);
   if (crack) out = mixRgb(out, [39, 96, 131], 0.58);
+  if (heatContact) out = mixRgb(out, [183, 224, 236], 0.34);
   if (hash % 31 === 0 && (localX === 1 || localY === 1)) out = mixRgb(out, [255, 255, 255], 0.64);
   return out;
 }
@@ -237,9 +259,12 @@ function liquidColor({ kind, color, variant, time, cells, width, height, x, y }:
   let out = color;
 
   if (kind === MATERIAL.Oil) {
+    const heatContact = hasNearbyKind(cells, width, height, x, y, HOT_LIGHT_KINDS);
+    const sheen = top || (left || right) && (hash % 13 === 0 || ripple);
     if (top) out = mixRgb(out, [88, 105, 80], 0.22);
     if (!bottom) out = mixRgb(out, [8, 12, 10], 0.38);
-    if ((left || right) && hash % 13 === 0) out = mixRgb(out, [117, 127, 95], 0.28);
+    if (sheen) out = mixRgb(out, heatContact ? [211, 130, 82] : [118, 128, 98], heatContact ? 0.34 : 0.28);
+    if (heatContact) out = mixRgb(out, [95, 49, 30], 0.28);
     return out;
   }
 
@@ -271,9 +296,12 @@ function growthColor({ kind, color, variant, age, cells, width, height, x, y }: 
   let out = color;
 
   if (kind === MATERIAL.Moss) {
-    if (edge.top || edge.left) out = mixRgb(out, [129, 202, 111], 0.32);
-    if (edge.bottom || hash % 9 === 0) out = mixRgb(out, [30, 77, 40], 0.34);
-    if (hash % 7 === 0 || age > 90) out = mixRgb(out, [182, 223, 126], 0.24);
+    const localX = (x + (hash & 1)) & 3;
+    const localY = (y + ((hash >> 2) & 1)) & 3;
+    const leafy = localY === 0 || localX === 1 || hash % 7 === 0 || age > 90;
+    if (edge.top || edge.left || leafy) out = mixRgb(out, [129, 202, 111], leafy ? 0.38 : 0.3);
+    if (edge.bottom || localY === 3 || hash % 9 === 0) out = mixRgb(out, [30, 77, 40], 0.34);
+    if (hash % 13 === 0) out = mixRgb(out, [198, 225, 128], 0.32);
     if (moonFed) out = mixRgb(out, [143, 238, 177], 0.22);
     return out;
   }
@@ -294,18 +322,25 @@ function growthColor({ kind, color, variant, age, cells, width, height, x, y }: 
 function woodColor({ color, variant, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x >> 1, y, variant);
   const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Wood);
+  const ring = (x + hash) % 6 === 0 || (y + hash) % 11 === 0;
+  const charred = hasNearbyKind(cells, width, height, x, y, HOT_LIGHT_KINDS);
+  const damp = hasNearbyKind(cells, width, height, x, y, COOL_LIQUID_KINDS);
   let out = adjustRgb(color, (hash % 5) * 4 - 8);
-  if ((x + hash) % 5 === 0) out = mixRgb(out, [55, 31, 20], 0.35);
-  if ((x + y + hash) % 13 === 0) out = mixRgb(out, [156, 104, 61], 0.25);
+  if (ring) out = mixRgb(out, [57, 31, 20], 0.38);
+  if ((x + y + hash) % 13 === 0) out = mixRgb(out, [166, 112, 66], 0.26);
   if (edge.top || edge.left) out = mixRgb(out, [175, 119, 71], 0.2);
   if (edge.right || edge.bottom) out = mixRgb(out, [55, 31, 20], 0.2);
+  if (charred) out = mixRgb(out, [44, 24, 20], 0.34);
+  if (damp) out = mixRgb(out, [66, 60, 47], 0.18);
   return out;
 }
 
-function stardustColor({ color, variant, age, time, x, y }: ShapeContext) {
+function stardustColor({ color, variant, age, time, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
   const twinkle = (Math.sin(time * 0.02 + age * 0.2 + hash * 0.0002) + 1) * 0.5;
+  const moonContact = hasNearbyKind(cells, width, height, x, y, MOONWATER_KINDS);
   let out = mixRgb(color, hash % 3 === 0 ? [255, 233, 159] : [174, 227, 255], 0.32 + twinkle * 0.28);
+  if (moonContact) out = mixRgb(out, [236, 222, 255], 0.34);
   if (hash % 9 === 0) out = [255, 246, 197];
   return adjustRgb(out, twinkle * 22);
 }

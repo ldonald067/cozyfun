@@ -20,17 +20,17 @@ Each frame, `renderer.ts` asks `materialColor.ts` for a color per cell. That col
 
 Shape language is intentionally procedural:
 
-- Sand: grain speckles and warm surface highlights.
-- Soil: darker clumps, organic pockets, and occasional moss-adjacent green.
-- Seed: chestnut body, darker edges, and green flecks.
+- Sand: grain speckles, warmer exposed surfaces, and damp/heat contact tint.
+- Soil: darker clumps, roots, organic pockets, and occasional moss/moonwater-adjacent green.
+- Seed: chestnut body, darker edges, oval silhouette, sprout flecks, and moonwater-fed highlights.
 - Ice: cube facets, bright top-left edges, darker bottom-right edges, and crack pixels.
 - Wall: brick-like tile structure with mortar lines and lit exposed edges.
 - Stone: chunky block shading, facet shifts, and dark crack marks.
-- Smoke/Steam: edge-softened puff clusters with age fade and warm light near fire or lava.
+- Smoke/Steam: edge-softened puff clusters with age fade, warm light near fire or lava, and cool cosmic tint near stardust or moonwater.
 - Water/Moonwater: connected surface highlights and lower shadow.
-- Stardust: bright twinkles and nearby star glints.
+- Stardust: bright twinkles, nearby star glints, and a brighter violet treatment near moonwater.
 - Fire/Lava/Meteor: heat cores, exposed flame tips, cooling crust, glowing seams, and ember-dark edges.
-- Moss/Fungus/Wood: organic clusters, fungus cap/gill/spore marks, damp moonwater tint, and woodgrain lines.
+- Moss/Fungus/Wood: leafy clusters, fungus cap/gill/spore marks, damp moonwater tint, char/damp contact cues, and woodgrain lines.
 - Nearby light: hot and cosmic materials can tint adjacent cells without changing simulation state.
 - Interaction cues: water near heat brightens toward steam, lava near cool liquids darkens into crust, moonwater near life becomes pearly green-violet, and newly cooled stone picks up a faint wet edge.
 
@@ -68,6 +68,7 @@ Useful commands:
 
 ```powershell
 .\scripts\build.ps1
+.\scripts\visual-qa.ps1
 .\scripts\test-browser.ps1
 ```
 
@@ -75,10 +76,14 @@ Useful commands:
 
 The current baseline covers the first readability batch: sand, soil, wall, smoke, steam, seed, ice, stone, water, moonwater, and stardust all have renderer-level shape treatment. More realistic silhouettes, local lighting, and high-detail experiments belong in Phase 4 so Phase 3 can keep moving on atmosphere without destabilizing the simulation.
 
-## Phase 4 First Pass
+`.\scripts\visual-qa.ps1` saves a controlled material capture to `.tmp/visual-qa/phase4-materials.png` and responsive layout metrics to `.tmp/visual-qa/phase4-layout.json`.
 
-The first Phase 4 pass keeps rendering inside `shapeLanguage.ts` and avoids changing simulation behavior. It adds reusable helpers for exposed edges and nearby light, then applies them to ice, stone, wall, fire, lava, meteor, smoke, steam, water, moonwater, oil, moss, fungus, and wood.
+## Phase 4 Completion
+
+Phase 4 keeps rendering inside `shapeLanguage.ts` and avoids changing simulation behavior. It adds reusable helpers for exposed edges and nearby light, then applies them to ice, stone, wall, fire, lava, meteor, smoke, steam, water, moonwater, oil, moss, fungus, wood, sand, soil, seed, and stardust.
 
 This is still procedural pixel art, not photorealism. The target is faster material recognition at normal play zoom: ice should feel faceted, lava should read as hot cracked crust, vapor should feel soft and puffy, and liquids should have connected surfaces.
 
-The second pass starts visual interaction language. These cues are renderer-only: they describe contact between materials without adding new simulation state. Use this for gentle, readable feedback; keep actual chemistry and movement rules in Rust/engine code.
+The completion pass expands visual interaction language. These cues are renderer-only: they describe contact between materials without adding new simulation state. Use this for gentle, readable feedback; keep actual chemistry and movement rules in Rust/engine code.
+
+Phase 4 is closed when build, browser smoke, WASM smoke, and visual QA all pass. Future realism work should be treated as targeted polish, not as a reason to keep widening the renderer surface.

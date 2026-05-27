@@ -21,6 +21,7 @@ This roadmap keeps the project focused: make the toy feel good, keep the codebas
 - Postcard export now includes scene, mood, music source, sim source, and tick context.
 - Browser, build, and WASM smoke checks wired into local scripts and GitHub CI.
 - Renderer cleanup: canvas orchestration is separate from reusable material color, glow, and shape-language helpers.
+- Phase 4 material visuals completed with stronger texture identity, contact cues, local lighting, and repeatable visual QA captures.
 - Architecture and visual pipeline docs added under `docs/`.
 - MIT license added for simple sharing and remixing.
 
@@ -117,7 +118,7 @@ Done:
 - Room/backdrop switching that changes atmosphere and audio mood without replacing the sandbox.
 - Room photos now load locally from `app/public/rooms` with source tracking in `ASSET_CREDITS.md`.
 
-Remaining before Phase 4:
+Deferred follow-ups:
 
 - Listening pass on real speakers/headphones after more play time.
 - Decide whether to keep effects off or reintroduce them with more realistic Foley samples/procedural texture.
@@ -126,7 +127,7 @@ Remaining before Phase 4:
 
 ## Phase 4: Sharper Realistic Visuals
 
-Status: in progress.
+Status: done.
 
 Goal: make the sandbox feel more tactile and physically readable while keeping the cozy pixel style.
 
@@ -150,7 +151,7 @@ This is not photorealism. The target is clearer material identity: ice should fe
 - Add visual QA screenshots for desktop and mobile after every major material batch.
 - Keep the simulation rules stable unless a visual idea needs a real new behavior.
 
-Started in this phase:
+Completed in this phase:
 
 - Added reusable edge and nearby-light helpers to the shape-language renderer.
 - Extended renderer treatment to more materials instead of keeping Phase 4 as isolated one-off tweaks.
@@ -165,6 +166,13 @@ Started in this phase:
   - Nearby fire/lava/meteor and stardust/moonwater tint adjacent cells with subtle local light.
   - Fungus and moonwater received a second pass: cap/gill/spore structure, crescent highlights, and life/heat contact shimmer.
   - Renderer-level interaction cues started for water/fire, water/lava, moonwater/life, and cooling stone edges.
+- Completion pass:
+  - Sand, soil, seed, moss, oil, wood, smoke, steam, stardust, moonwater, and ice all received sharper material-specific identity rules.
+  - Interaction visuals were expanded for heat on ice/oil, moonwater near life, stardust near moonwater, and cosmic light through vapor.
+  - Added repeatable visual QA capture through `.\scripts\visual-qa.ps1`, including a controlled material scene and responsive layout metrics.
+  - Confirmed the responsive control panel does not overflow the QA mobile viewport.
+
+Phase 4 is now closed. Further realism experiments belong in later polish passes unless they directly support Phase 5 sharing.
 
 ## Phase 5: Sharing
 
