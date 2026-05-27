@@ -39,7 +39,7 @@ npm --prefix app run dev -- --host 127.0.0.1
 - Paint directly on the sandbox tray.
 - Use the brush slider to change brush size.
 - Pause/play the simulation from the control panel.
-- Change the room backdrop without replacing your sandbox.
+- Change the room backdrop without replacing your sandbox, including rainy, moonlit, hearth, fireplace, forest, and snow scenes.
 - Enable optional procedural audio, pick a sound mood, choose the generated music source, and tune master, ambience, and music volume.
 - Clear, save, load, export, import, or export a postcard from the right controls.
 

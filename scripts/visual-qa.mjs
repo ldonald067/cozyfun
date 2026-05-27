@@ -89,7 +89,10 @@ async function saveRoomCaptures(cdp) {
   for (const room of [
     { id: "rain-desk", fileName: "room-rain-desk.png" },
     { id: "moonwater-garden", fileName: "room-moonwater-garden.png" },
-    { id: "stardust-hearth", fileName: "room-stardust-hearth.png" }
+    { id: "stardust-hearth", fileName: "room-stardust-hearth.png" },
+    { id: "cozy-fireplace", fileName: "room-cozy-fireplace.png" },
+    { id: "forest-hut", fileName: "room-forest-hut.png" },
+    { id: "snow-window", fileName: "room-snow-window.png" }
   ]) {
     await evaluate(cdp, `window.scrollTo(0, 0); true`);
     await clickTestId(cdp, `scene-environment-${room.id}`);

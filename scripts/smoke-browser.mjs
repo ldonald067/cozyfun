@@ -97,7 +97,7 @@ async function main() {
     assert(!state.effectsSlider, "disabled effects slider should not be visible");
     assert(state.audioMoods === 3, `expected three audio mood buttons, found ${state.audioMoods}`);
     assert(state.musicProviders === 2, `expected two music provider buttons, found ${state.musicProviders}`);
-    assert(state.sceneEnvironments === 3, `expected three room buttons, found ${state.sceneEnvironments}`);
+    assert(state.sceneEnvironments === 6, `expected six room buttons, found ${state.sceneEnvironments}`);
     assert(state.roomImage.includes("rain-desk.jpg"), `default room image was not applied: ${state.roomImage}`);
     assert(state.status.includes("online"), `engine did not report online: ${state.status}`);
   });
@@ -179,6 +179,19 @@ async function main() {
     const hearthImage = await evaluate(cdp, `getComputedStyle(document.querySelector(".app-shell")).getPropertyValue("--room-image")`);
     assert(hearthClass, "stardust hearth room class was not applied");
     assert(hearthImage.includes("stardust-hearth.jpg"), `hearth room image was not applied: ${hearthImage}`);
+
+    for (const room of [
+      { id: "cozy-fireplace", status: "cozy fireplace backdrop on", className: "scene-cozy-fireplace", image: "cozy-fireplace.jpg" },
+      { id: "forest-hut", status: "forest hut backdrop on", className: "scene-forest-hut", image: "forest-hut.jpg" },
+      { id: "snow-window", status: "snow window backdrop on", className: "scene-snow-window", image: "snow-window.jpg" }
+    ]) {
+      await click(cdp, `[data-testid="scene-environment-${room.id}"]`);
+      await waitForStatus(cdp, room.status);
+      const hasClass = await evaluate(cdp, `document.querySelector(".app-shell")?.classList.contains("${room.className}")`);
+      const roomImage = await evaluate(cdp, `getComputedStyle(document.querySelector(".app-shell")).getPropertyValue("--room-image")`);
+      assert(hasClass, `${room.id} room class was not applied`);
+      assert(roomImage.includes(room.image), `${room.id} room image was not applied: ${roomImage}`);
+    }
   });
 
   await check("narrow desktop layout keeps controls from overlapping the tray", async () => {

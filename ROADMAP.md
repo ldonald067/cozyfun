@@ -12,7 +12,7 @@ This roadmap keeps the project focused: make the toy feel good, keep the codebas
 - Procedural Web Audio foundation with master, ambience, music, and a reserved native effects channel.
 - Audio code split into reusable modules for mixer, preferences, ambience, music, future effects, buffers, and controller lifecycle.
 - Sound moods added for Rain, Window, and Stardust variations.
-- Non-destructive room backdrops added for Rain Desk, Moonlit Garden, and Stardust Hearth.
+- Non-destructive room backdrops added for Rain Desk, Moonlit Garden, Stardust Hearth, Cozy Fireplace, Forest Hut, and Snow Window.
 - Local credited room images added for those backdrops, with procedural lighting and weather still layered on top.
 - Painted scene seeds kept as internal QA/dev helpers instead of visible user-facing presets.
 - External music provider boundary added with generated music as the default and a planned Desk Radio slot for Phase 5.
@@ -123,6 +123,7 @@ Done:
   - Rain Desk and Stardust Hearth backdrops were softened so the photos support the toy instead of competing with it.
   - Moonlit Garden stayed as-is after the room-photo pass because it already reads calm and low-contrast.
   - Visual QA now captures every room backdrop and checks desktop/mobile panel layout so control crowding is caught by a repeatable script.
+- Cozy Fireplace, Forest Hut, and Snow Window backdrops added as generated local assets with credits tracked in `ASSET_CREDITS.md`.
 
 ## Phase 4: Sharper Realistic Visuals
 

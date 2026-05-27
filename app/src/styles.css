@@ -159,6 +159,63 @@ input:focus-visible {
   --tray-inner-glow: rgba(255, 143, 66, 0.1);
 }
 
+.app-shell.scene-cozy-fireplace {
+  --room-background:
+    linear-gradient(180deg, rgba(12, 8, 7, 0.3), rgba(8, 6, 6, 0.94)),
+    linear-gradient(120deg, rgba(142, 76, 32, 0.22), transparent 44%),
+    linear-gradient(120deg, #100c0b 0%, #19100e 50%, #201411 100%);
+  --room-weather-opacity: 0.12;
+  --room-weather-image:
+    radial-gradient(circle at 46% 54%, rgba(255, 170, 80, 0.16), transparent 18%),
+    repeating-linear-gradient(0deg, rgba(255, 167, 86, 0.035) 0 1px, transparent 1px 48px);
+  --room-weather-size: 100% 100%, 100% 480px;
+  --room-weather-duration: 22s;
+  --room-lighting:
+    linear-gradient(110deg, rgba(255, 142, 57, 0.16), transparent 42%),
+    linear-gradient(270deg, rgba(255, 208, 138, 0.08), transparent 54%);
+  --tray-frame: #2d1911;
+  --tray-highlight: rgba(255, 169, 89, 0.2);
+  --tray-inner-glow: rgba(255, 122, 50, 0.12);
+}
+
+.app-shell.scene-forest-hut {
+  --room-background:
+    linear-gradient(180deg, rgba(4, 12, 13, 0.34), rgba(4, 8, 9, 0.94)),
+    linear-gradient(130deg, rgba(43, 102, 77, 0.2), transparent 48%),
+    linear-gradient(120deg, #06100f 0%, #0b1715 52%, #101918 100%);
+  --room-weather-opacity: 0.16;
+  --room-weather-image:
+    radial-gradient(circle at 20% 50%, rgba(255, 199, 94, 0.12), transparent 2px),
+    repeating-linear-gradient(90deg, rgba(119, 180, 137, 0.04) 0 1px, transparent 1px 84px);
+  --room-weather-size: 180px 140px, 760px 100%;
+  --room-weather-duration: 26s;
+  --room-lighting:
+    linear-gradient(125deg, rgba(92, 172, 125, 0.1), transparent 42%),
+    linear-gradient(265deg, rgba(255, 188, 94, 0.08), transparent 50%);
+  --tray-frame: #16241a;
+  --tray-highlight: rgba(139, 201, 143, 0.17);
+  --tray-inner-glow: rgba(79, 160, 112, 0.08);
+}
+
+.app-shell.scene-snow-window {
+  --room-background:
+    linear-gradient(180deg, rgba(6, 10, 16, 0.3), rgba(5, 7, 12, 0.94)),
+    linear-gradient(120deg, rgba(102, 139, 171, 0.24), transparent 48%),
+    linear-gradient(120deg, #08101a 0%, #0e1722 52%, #17191b 100%);
+  --room-weather-opacity: 0.24;
+  --room-weather-image:
+    radial-gradient(circle at 15% 20%, rgba(229, 242, 255, 0.22), transparent 2px),
+    radial-gradient(circle at 70% 30%, rgba(229, 242, 255, 0.14), transparent 2px);
+  --room-weather-size: 150px 180px, 260px 220px;
+  --room-weather-duration: 24s;
+  --room-lighting:
+    linear-gradient(120deg, rgba(167, 207, 238, 0.13), transparent 46%),
+    linear-gradient(270deg, rgba(255, 183, 88, 0.1), transparent 48%);
+  --tray-frame: #1c2530;
+  --tray-highlight: rgba(179, 219, 245, 0.18);
+  --tray-inner-glow: rgba(126, 184, 228, 0.08);
+}
+
 .workspace {
   position: relative;
   z-index: 1;

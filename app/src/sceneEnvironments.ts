@@ -1,6 +1,6 @@
 import type { AudioMood } from "./audio";
 
-export type SceneEnvironmentId = "rain-desk" | "moonwater-garden" | "stardust-hearth";
+export type SceneEnvironmentId = "rain-desk" | "moonwater-garden" | "stardust-hearth" | "cozy-fireplace" | "forest-hut" | "snow-window";
 
 export type SceneEnvironment = {
   id: SceneEnvironmentId;
@@ -45,7 +45,7 @@ export const SCENE_ENVIRONMENTS: SceneEnvironment[] = [
   },
   {
     id: "stardust-hearth",
-    label: "Hearth",
+    label: "Stardust",
     title: "Stardust Hearth",
     status: "stardust hearth backdrop on",
     mood: "stardust",
@@ -54,6 +54,42 @@ export const SCENE_ENVIRONMENTS: SceneEnvironment[] = [
     imagePosition: "center 45%",
     imageOpacity: 0.58,
     imageFilter: "saturate(0.72) contrast(0.86) brightness(0.62)"
+  },
+  {
+    id: "cozy-fireplace",
+    label: "Fire",
+    title: "Cozy Fireplace",
+    status: "cozy fireplace backdrop on",
+    mood: "stardust",
+    className: "scene-cozy-fireplace",
+    image: "/rooms/cozy-fireplace.jpg",
+    imagePosition: "center 48%",
+    imageOpacity: 0.62,
+    imageFilter: "saturate(0.78) contrast(0.86) brightness(0.6)"
+  },
+  {
+    id: "forest-hut",
+    label: "Forest",
+    title: "Forest Hut",
+    status: "forest hut backdrop on",
+    mood: "stardust",
+    className: "scene-forest-hut",
+    image: "/rooms/forest-hut.jpg",
+    imagePosition: "center 52%",
+    imageOpacity: 0.6,
+    imageFilter: "saturate(0.8) contrast(0.9) brightness(0.56)"
+  },
+  {
+    id: "snow-window",
+    label: "Snow",
+    title: "Snow Window",
+    status: "snow window backdrop on",
+    mood: "window",
+    className: "scene-snow-window",
+    image: "/rooms/snow-window.jpg",
+    imagePosition: "center 46%",
+    imageOpacity: 0.64,
+    imageFilter: "saturate(0.78) contrast(0.88) brightness(0.62)"
   }
 ];
 

@@ -2,7 +2,7 @@
 
 This project keeps external visuals local at runtime and tracks source pages here so future publishing, replacement, or license review stays straightforward.
 
-All listed images were downloaded on May 24, 2026 and are used as subtle room atmosphere behind the sandbox, not as standalone redistributed image packs.
+Room images are used as subtle atmosphere behind the sandbox, not as standalone redistributed image packs. Pixabay images were downloaded on May 24, 2026; generated images are tracked separately below.
 
 ## Pixabay Room Backdrops
 
@@ -11,6 +11,16 @@ All listed images were downloaded on May 24, 2026 and are used as subtle room at
 | Rain Desk | `app/public/rooms/rain-desk.jpg` | [Rain Glass Window Night City Glass](https://pixabay.com/photos/rain-glass-window-night-city-glass-1516388/) | WikimediaImages | [Pixabay Content License](https://pixabay.com/service/license-summary/) |
 | Moonlit Garden | `app/public/rooms/moonwater-garden.jpg` | [Night Moon Mountains Alps](https://pixabay.com/photos/night-moon-mountains-alps-4702174/) | jplenio | [Pixabay Content License](https://pixabay.com/service/license-summary/) |
 | Stardust Hearth | `app/public/rooms/stardust-hearth.jpg` | [Cozy Home Bedroom Bed Fireplace](https://pixabay.com/photos/cozy-home-bedroom-bed-fireplace-7023760/) | 10634669 | [Pixabay Content License](https://pixabay.com/service/license-summary/) |
+
+## Generated Room Backdrops
+
+These images were generated for this project on May 26, 2026 using OpenAI image generation, then compressed locally for the browser build.
+
+| App room | Local file | Source | Prompt summary |
+| --- | --- | --- | --- |
+| Cozy Fireplace | `app/public/rooms/cozy-fireplace.jpg` | OpenAI image generation | Cozy nighttime cabin interior with a glowing fireplace, dark UI-safe edges, no people or text. |
+| Forest Hut | `app/public/rooms/forest-hut.jpg` | OpenAI image generation | Night forest clearing with a small warm hut/window glow, dark UI-safe edges, no people or text. |
+| Snow Window | `app/public/rooms/snow-window.jpg` | OpenAI image generation | Snowy winter night viewed from a warm cabin window, dark UI-safe edges, no people or text. |
 
 ## Usage Notes
 

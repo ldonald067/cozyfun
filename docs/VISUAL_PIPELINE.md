@@ -76,7 +76,7 @@ Useful commands:
 
 The current baseline covers the first readability batch: sand, soil, wall, smoke, steam, seed, ice, stone, water, moonwater, and stardust all have renderer-level shape treatment. More realistic silhouettes, local lighting, and high-detail experiments belong in Phase 4 so Phase 3 can keep moving on atmosphere without destabilizing the simulation.
 
-`.\scripts\visual-qa.ps1` saves a controlled material capture to `.tmp/visual-qa/phase4-materials.png`, responsive layout metrics to `.tmp/visual-qa/phase4-layout.json`, and room backdrop captures for Rain Desk, Moonlit Garden, and Stardust Hearth.
+`.\scripts\visual-qa.ps1` saves a controlled material capture to `.tmp/visual-qa/phase4-materials.png`, responsive layout metrics to `.tmp/visual-qa/phase4-layout.json`, and room backdrop captures for every scene environment.
 
 The room captures are part of the visual QA contract. They should stay calm behind the sandbox and panels: if a photo becomes too busy, literal, or high-contrast, tune the scene metadata in `sceneEnvironments.ts` or replace the asset and update `ASSET_CREDITS.md` in the same change.
 
