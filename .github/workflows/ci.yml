@@ -33,7 +33,7 @@ jobs:
         run: npm --prefix app ci
 
       - name: Run sim tests
-        run: cargo test --manifest-path sim/Cargo.toml
+        run: npm run test:sim
 
       - name: Build app
         run: npm run build

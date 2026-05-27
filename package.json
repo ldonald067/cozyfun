@@ -9,7 +9,7 @@
     "dev": "npm run build:sim && npm --prefix app run dev -- --host 127.0.0.1",
     "dev:fallback": "npm --prefix app run dev -- --host 127.0.0.1",
     "build": "npm run build:sim && npm --prefix app run build",
-    "test:sim": "cargo test --manifest-path sim/Cargo.toml",
+    "test:sim": "node scripts/test-sim.mjs",
     "test:wasm": "npm run build:sim && node scripts/smoke-wasm.mjs",
     "test:browser": "node scripts/smoke-browser.mjs",
     "visual:qa": "node scripts/visual-qa.mjs",
