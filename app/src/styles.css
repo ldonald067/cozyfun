@@ -81,6 +81,7 @@ input:focus-visible {
   --tray-frame: #241b17;
   --tray-highlight: rgba(255, 213, 150, 0.18);
   --tray-inner-glow: rgba(255, 197, 106, 0.08);
+  --selected-material-color: #dfb65e;
   min-height: 100%;
   position: relative;
   overflow: hidden;
@@ -367,14 +368,26 @@ input:focus-visible {
   border-radius: 8px;
   overflow: hidden;
   touch-action: none;
+  cursor: crosshair;
   background: #090e14;
   box-shadow:
     0 34px 120px rgba(0, 0, 0, 0.62),
     0 0 0 1px var(--tray-highlight),
+    0 0 28px color-mix(in srgb, var(--selected-material-color) 11%, transparent),
     inset 0 0 36px var(--tray-inner-glow);
   transition:
     border-color 260ms ease,
     box-shadow 260ms ease;
+}
+
+.tray:hover,
+.tray:focus-within {
+  border-color: color-mix(in srgb, var(--tray-frame) 78%, var(--selected-material-color) 22%);
+  box-shadow:
+    0 34px 120px rgba(0, 0, 0, 0.62),
+    0 0 0 1px color-mix(in srgb, var(--selected-material-color) 24%, var(--tray-highlight)),
+    0 0 34px color-mix(in srgb, var(--selected-material-color) 15%, transparent),
+    inset 0 0 38px var(--tray-inner-glow);
 }
 
 .sandbox-canvas {
@@ -465,11 +478,18 @@ input:focus-visible {
 }
 
 .audio-panel {
+  position: sticky;
+  z-index: 2;
+  bottom: 0;
   display: grid;
   gap: 10px;
   margin: 0 0 18px;
-  padding-top: 14px;
+  padding: 14px 0 2px;
   border-top: 1px solid rgba(239, 211, 166, 0.12);
+  background:
+    linear-gradient(180deg, rgba(9, 13, 20, 0.72), rgba(9, 13, 20, 0.96) 18%),
+    rgba(9, 13, 20, 0.9);
+  box-shadow: 0 -16px 36px rgba(0, 0, 0, 0.24);
 }
 
 .audio-panel-header,
@@ -575,6 +595,8 @@ input:focus-visible {
 .desk-radio-panel {
   display: grid;
   gap: 8px;
+  max-height: min(360px, calc(100vh - 330px));
+  overflow-y: auto;
   padding: 9px;
   border: 1px solid rgba(141, 207, 227, 0.12);
   border-radius: 6px;
@@ -942,8 +964,8 @@ input:focus-visible {
   .workspace {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
-      "materials"
       "sandbox"
+      "materials"
       "controls";
     gap: 12px;
     padding: 12px;
@@ -958,8 +980,43 @@ input:focus-visible {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .material-button {
+    min-height: 44px;
+    font-size: 14px;
+  }
+
   .tray {
     margin-top: 12px;
     border-width: 8px;
+  }
+
+  .status-bar {
+    min-height: 38px;
+  }
+
+  .audio-panel {
+    position: static;
+    margin-bottom: 0;
+    padding-top: 14px;
+    box-shadow: none;
+  }
+
+  .segmented-control button,
+  .scene-environment-control button,
+  .audio-enable-button,
+  .desk-radio-controls button {
+    min-height: 42px;
+    font-size: 12px;
+  }
+
+  .audio-mute-button,
+  .desk-radio-controls input,
+  .control-stack button,
+  .control-stack .share-actions button {
+    min-height: 44px;
+  }
+
+  .desk-radio-panel {
+    max-height: none;
   }
 }

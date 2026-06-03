@@ -243,15 +243,18 @@ export function App() {
     []
   );
 
+  const selectedMaterial = useMemo(() => MATERIALS.find((material) => material.id === selected) ?? MATERIALS[0], [selected]);
+
   const sceneShellStyle = useMemo(
     () =>
       ({
         "--room-image": `url("${activeSceneEnvironment.image}")`,
         "--room-image-position": activeSceneEnvironment.imagePosition,
         "--room-image-opacity": activeSceneEnvironment.imageOpacity,
-        "--room-image-filter": activeSceneEnvironment.imageFilter
+        "--room-image-filter": activeSceneEnvironment.imageFilter,
+        "--selected-material-color": selectedMaterial.color
       }) as React.CSSProperties,
-    [activeSceneEnvironment]
+    [activeSceneEnvironment, selectedMaterial.color]
   );
 
   const sceneOptions = useMemo<SegmentOption<SceneEnvironmentId>[]>(
@@ -302,6 +305,11 @@ export function App() {
   function handlePointerUp(event: PointerEvent<HTMLDivElement>) {
     pointerDownRef.current = false;
     event.currentTarget.releasePointerCapture(event.pointerId);
+  }
+
+  function handleSelectMaterial(material: MaterialDef) {
+    setSelected(material.id);
+    setStatus(`${material.label} ready`);
   }
 
   function applySnapshotMetadata(metadata: SceneSnapshotMetadata | null) {
@@ -541,7 +549,7 @@ export function App() {
                       aria-label={`${material.label}: ${material.description}`}
                       title={`${material.label}: ${material.description}`}
                       style={{ "--material-color": material.color } as React.CSSProperties}
-                      onClick={() => setSelected(material.id)}
+                      onClick={() => handleSelectMaterial(material)}
                     >
                       <span className="material-icon">
                         <MaterialIcon size={17} strokeWidth={2.15} />
@@ -576,13 +584,28 @@ export function App() {
 
         <aside className="control-panel" aria-label="Controls">
           <div className="control-row">
-            <button type="button" className="icon-button" title={paused ? "Play" : "Pause"} onClick={() => setPaused((value) => !value)}>
+            <button
+              type="button"
+              className="icon-button"
+              title={paused ? "Play" : "Pause"}
+              aria-label={paused ? "Play simulation" : "Pause simulation"}
+              onClick={() => setPaused((value) => !value)}
+            >
               {paused ? <Play size={18} /> : <Pause size={18} />}
             </button>
-            <button type="button" className="icon-button" title="Clear" data-testid="clear-scene" onClick={handleClear}>
+            <button type="button" className="icon-button" title="Clear" aria-label="Clear tray" data-testid="clear-scene" onClick={handleClear}>
               <RotateCcw size={18} />
             </button>
-            <button type="button" className="icon-button" title="Use eraser" onClick={() => setSelected(MATERIAL.Empty)}>
+            <button
+              type="button"
+              className="icon-button"
+              title="Use eraser"
+              aria-label="Use eraser"
+              onClick={() => {
+                setSelected(MATERIAL.Empty);
+                setStatus("Eraser ready");
+              }}
+            >
               <Eraser size={18} />
             </button>
           </div>

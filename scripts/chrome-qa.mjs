@@ -122,7 +122,7 @@ async function exerciseDeskRadio(cdp) {
   );
   assert(state.generatedActive, "Blocked Desk Radio did not return to generated music");
   assert(state.message.includes("will not embed"), `Blocked Desk Radio message was unclear: ${state.message}`);
-  assert(state.message.includes("Generated music is still playing"), `Blocked Desk Radio fallback was unclear: ${state.message}`);
+  assert(state.message.includes("Generated music is selected again"), `Blocked Desk Radio fallback was unclear: ${state.message}`);
   assert(state.storedSource === null, "Blocked Desk Radio source was persisted");
 }
 

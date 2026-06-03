@@ -279,7 +279,7 @@ async function main() {
     assert(blockedState.generatedActive, "Blocked Desk Radio did not return to generated music");
     assert(blockedState.message.includes("will not embed"), `Blocked embed message was unclear: ${blockedState.message}`);
     assert(
-      blockedState.message.includes("Generated music is still playing"),
+      blockedState.message.includes("Generated music is selected again"),
       `Blocked embed fallback was unclear: ${blockedState.message}`
     );
     assert(blockedState.storedSource === null, "Blocked Desk Radio source was saved locally");
