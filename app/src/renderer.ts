@@ -32,8 +32,9 @@ export function renderSandbox(engine: SandboxEngine, targets: RenderTargets, tim
     const variant = cells[cellOffset + 1];
     const age = readU16(cells, cellOffset + 2);
     const energy = readU16(cells, cellOffset + 4);
+    const flags = readU16(cells, cellOffset + 6);
     const pixelOffset = i * 4;
-    const color = colorForCell({ kind, variant, age, energy, time, cells, width, height, x, y });
+    const color = colorForCell({ kind, variant, age, energy, flags, time, cells, width, height, x, y });
 
     base.data[pixelOffset] = color[0];
     base.data[pixelOffset + 1] = color[1];
@@ -67,10 +68,13 @@ export async function exportPostcard(engine: SandboxEngine, base: HTMLCanvasElem
   const width = base.width * scale;
   const height = base.height * scale;
   const card = document.createElement("canvas");
-  card.width = width + 160;
-  card.height = height + 180;
+  const margin = 80;
+  const footerHeight = 190;
+  card.width = width + margin * 2;
+  card.height = height + margin + footerHeight;
   const ctx = card.getContext("2d");
   if (!ctx) return;
+  ctx.imageSmoothingEnabled = false;
 
   const gradient = ctx.createLinearGradient(0, 0, card.width, card.height);
   gradient.addColorStop(0, "#0d121b");
@@ -80,28 +84,131 @@ export async function exportPostcard(engine: SandboxEngine, base: HTMLCanvasElem
   ctx.fillRect(0, 0, card.width, card.height);
 
   ctx.fillStyle = "rgba(255, 224, 170, 0.08)";
-  roundRect(ctx, 58, 58, width + 44, height + 44, 18);
+  roundRect(ctx, margin - 22, margin - 22, width + 44, height + 44, 18);
   ctx.fill();
   ctx.strokeStyle = "rgba(255, 224, 170, 0.18)";
   ctx.stroke();
-  ctx.drawImage(glow, 80, 80, width, height);
-  ctx.drawImage(base, 80, 80, width, height);
+  ctx.drawImage(glow, margin, margin, width, height);
+  ctx.drawImage(base, margin, margin, width, height);
 
+  const footerY = margin + height + 48;
   ctx.fillStyle = "#f4dfb8";
   ctx.font = "600 30px Georgia, serif";
-  ctx.fillText(options.sceneTitle, 80, height + 118);
+  drawFittedText(ctx, options.sceneTitle, margin, footerY, width);
   ctx.fillStyle = "#99b8c8";
   ctx.font = "18px system-ui, sans-serif";
-  ctx.fillText(`${options.moodTitle} - ${options.musicSource} - ${engine.source.toUpperCase()} sim - tick ${engine.tickCount()}`, 80, height + 148);
+  drawFittedText(ctx, `${options.moodTitle} / ${options.musicSource}`, margin, footerY + 32, width);
+  ctx.fillStyle = "rgba(153, 184, 200, 0.82)";
+  ctx.font = "15px system-ui, sans-serif";
+  drawFittedText(ctx, `${engine.source.toUpperCase()} sim  |  tick ${engine.tickCount()}  |  ${dateStamp()}`, margin, footerY + 60, width);
   ctx.fillStyle = "rgba(255, 226, 177, 0.5)";
   ctx.font = "14px system-ui, sans-serif";
-  ctx.fillText("cozy pixel sandbox", 80, height + 174);
+  ctx.fillText("cozy pixel sandbox", margin, footerY + 92);
 
-  const url = card.toDataURL("image/png");
+  await downloadCanvas(card, `${exportSlug(options.sceneTitle)}-${dateStamp()}.png`, "image/png");
+}
+
+export async function exportClip(engine: SandboxEngine, base: HTMLCanvasElement, glow: HTMLCanvasElement, options: PostcardOptions) {
+  if (!("MediaRecorder" in window) || !("captureStream" in HTMLCanvasElement.prototype)) return false;
+
+  const scale = 3;
+  const canvas = document.createElement("canvas");
+  canvas.width = base.width * scale;
+  canvas.height = base.height * scale + 74;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return false;
+
+  const stream = canvas.captureStream(12);
+  const mimeType = clipMimeType();
+  let recorder: MediaRecorder;
+  try {
+    recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+  } catch {
+    stream.getTracks().forEach((track) => track.stop());
+    return false;
+  }
+  const chunks: BlobPart[] = [];
+  recorder.addEventListener("dataavailable", (event) => {
+    if (event.data.size > 0) chunks.push(event.data);
+  });
+
+  const stopped = new Promise<Blob>((resolve) => {
+    recorder.addEventListener(
+      "stop",
+      () => {
+        stream.getTracks().forEach((track) => track.stop());
+        resolve(new Blob(chunks, { type: "video/webm" }));
+      },
+      { once: true }
+    );
+  });
+
+  const started = performance.now();
+  const duration = 3200;
+  recorder.start();
+
+  await new Promise<void>((resolve) => {
+    const draw = (time: number) => {
+      drawClipFrame(ctx, canvas, base, glow, engine, options);
+      if (time - started >= duration) {
+        resolve();
+        return;
+      }
+      requestAnimationFrame(draw);
+    };
+    requestAnimationFrame(draw);
+  });
+
+  recorder.stop();
+  const blob = await stopped;
+  if (blob.size === 0) return false;
+  downloadBlob(blob, `${exportSlug(options.sceneTitle)}-${dateStamp()}.webm`);
+  return true;
+}
+
+function clipMimeType() {
+  return ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
+}
+
+async function downloadCanvas(canvas: HTMLCanvasElement, filename: string, type: string) {
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type));
+  if (!blob) return;
+  downloadBlob(blob, filename);
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `night-desk-terrarium-${Date.now()}.png`;
+  anchor.download = filename;
   anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function drawClipFrame(
+  ctx: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  base: HTMLCanvasElement,
+  glow: HTMLCanvasElement,
+  engine: SandboxEngine,
+  options: PostcardOptions
+) {
+  const sceneHeight = canvas.height - 74;
+  ctx.fillStyle = "#0d121b";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.imageSmoothingEnabled = false;
+  ctx.globalAlpha = 0.72;
+  ctx.drawImage(glow, 0, 0, canvas.width, sceneHeight);
+  ctx.globalAlpha = 1;
+  ctx.drawImage(base, 0, 0, canvas.width, sceneHeight);
+  ctx.fillStyle = "rgba(13, 18, 27, 0.92)";
+  ctx.fillRect(0, sceneHeight, canvas.width, 74);
+  ctx.fillStyle = "#f4dfb8";
+  ctx.font = "600 24px Georgia, serif";
+  drawFittedText(ctx, options.sceneTitle, 24, sceneHeight + 31, canvas.width - 48);
+  ctx.fillStyle = "#99b8c8";
+  ctx.font = "15px system-ui, sans-serif";
+  drawFittedText(ctx, `${options.moodTitle} - ${options.musicSource} - ${engine.source.toUpperCase()} sim - tick ${engine.tickCount()}`, 24, sceneHeight + 56, canvas.width - 48);
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
@@ -116,6 +223,17 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: n
   ctx.lineTo(x, y + radius);
   ctx.quadraticCurveTo(x, y, x + radius, y);
   ctx.closePath();
+}
+
+function drawFittedText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number) {
+  if (ctx.measureText(text).width <= maxWidth) {
+    ctx.fillText(text, x, y);
+    return;
+  }
+  const suffix = "...";
+  let fitted = text;
+  while (fitted.length > 0 && ctx.measureText(`${fitted}${suffix}`).width > maxWidth) fitted = fitted.slice(0, -1);
+  ctx.fillText(`${fitted}${suffix}`, x, y);
 }
 
 function ensureCanvasSize(canvas: HTMLCanvasElement, width: number, height: number) {
@@ -146,4 +264,16 @@ function drawMotes(canvas: HTMLCanvasElement, time: number) {
     ctx.fillRect(x, y, i % 3 === 0 ? 2 : 1, i % 4 === 0 ? 2 : 1);
   }
   ctx.restore();
+}
+
+function exportSlug(label: string) {
+  const slug = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug ? `night-desk-terrarium-${slug}` : "night-desk-terrarium";
+}
+
+function dateStamp() {
+  return new Date().toISOString().slice(0, 10);
 }

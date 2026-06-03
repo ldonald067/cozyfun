@@ -68,6 +68,23 @@ async function main() {
         window.__smokeErrors.push(args.map(String).join(" "));
         originalError.apply(console, args);
       };
+      window.__cozyYouTubeMockMode = "ready";
+      window.YT = {
+        Player: function Player(element, options) {
+          const iframe = document.createElement("iframe");
+          const start = options.playerVars?.start ? "?start=" + options.playerVars.start : "";
+          iframe.src = options.videoId
+            ? "https://www.youtube.com/embed/" + options.videoId + start
+            : "https://www.youtube.com/embed/videoseries?list=" + options.playerVars.list;
+          iframe.title = "Mock YouTube player";
+          element.replaceChildren(iframe);
+          setTimeout(() => {
+            if (window.__cozyYouTubeMockMode === "blocked") options.events.onError({ data: 150 });
+            else options.events.onReady({});
+          }, 30);
+          this.destroy = () => element.replaceChildren();
+        }
+      };
     `
     });
 
@@ -83,20 +100,22 @@ async function main() {
     const state = await evaluate(cdp, `(() => ({
       title: document.title,
       materials: document.querySelectorAll(".material-button").length,
+      materialLabels: Array.from(document.querySelectorAll(".material-button")).map((button) => button.textContent.trim()),
       audioInfos: document.querySelectorAll(".audio-info").length,
       audioMoods: document.querySelectorAll(".audio-mood-control button").length,
       musicProviders: document.querySelectorAll(".music-source-control button").length,
-      effectsSlider: Boolean(document.querySelector('[data-testid="audio-volume-effects"]')),
+      shareActions: document.querySelectorAll(".share-actions button").length,
       sceneEnvironments: document.querySelectorAll('[data-testid^="scene-environment-"]').length,
       roomImage: getComputedStyle(document.querySelector(".app-shell")).getPropertyValue("--room-image"),
       status: document.querySelector('[data-testid="status-message"]')?.textContent ?? ""
     }))()`);
     assert(state.title === "Cozy Pixel Sandbox", "unexpected page title");
-    assert(state.materials >= 19, `expected material buttons, found ${state.materials}`);
+    assert(state.materials === 19, `expected exactly 19 selectable material buttons, found ${state.materials}: ${state.materialLabels.join(", ")}`);
+    assert(!state.materialLabels.includes("Flower"), "generated-only Flower should not be selectable");
     assert(state.audioInfos === 3, `expected three audio info icons, found ${state.audioInfos}`);
-    assert(!state.effectsSlider, "disabled effects slider should not be visible");
     assert(state.audioMoods === 3, `expected three audio mood buttons, found ${state.audioMoods}`);
     assert(state.musicProviders === 2, `expected two music provider buttons, found ${state.musicProviders}`);
+    assert(state.shareActions === 5, `expected five share actions, found ${state.shareActions}`);
     assert(state.sceneEnvironments === 6, `expected six room buttons, found ${state.sceneEnvironments}`);
     assert(state.roomImage.includes("rain-desk.jpg"), `default room image was not applied: ${state.roomImage}`);
     assert(state.status.includes("online"), `engine did not report online: ${state.status}`);
@@ -112,14 +131,20 @@ async function main() {
 
   await check("clear, save, and load update scene state", async () => {
     await click(cdp, '[data-testid="save-scene"]');
-    await waitForStatus(cdp, "scene saved locally");
+    await waitForStatus(cdp, "saved in browser");
     await click(cdp, '[data-testid="clear-scene"]');
     await waitForStatus(cdp, "tray cleared");
     await click(cdp, '[data-testid="load-scene"]');
-    await waitForStatus(cdp, "local scene loaded");
+    await waitForStatus(cdp, "browser save loaded");
+    const savedScene = await evaluate(cdp, `JSON.parse(localStorage.getItem("cozy-pixel-sandbox:scene:v1"))`);
+    assert(savedScene.format === "CXS2", `expected CXS2 local scene, got ${savedScene.format}`);
+    assert(savedScene.metadata?.app === "cozy-pixel-sandbox", "local scene metadata app marker missing");
+    assert(savedScene.metadata?.room === "rain-desk", `local scene room metadata mismatch: ${savedScene.metadata?.room}`);
+    assert(savedScene.metadata?.mood === "rain", `local scene mood metadata mismatch: ${savedScene.metadata?.mood}`);
+    assert(savedScene.metadata?.musicProvider === "generated", `local scene music metadata mismatch: ${savedScene.metadata?.musicProvider}`);
   });
 
-  await check("export and invalid import produce clear feedback", async () => {
+  await check("export, metadata import, and invalid import produce clear feedback", async () => {
     try {
       await cdp.send("Browser.setDownloadBehavior", {
         behavior: "allow",
@@ -129,7 +154,36 @@ async function main() {
       // Some Chromium builds only expose download behavior on browser contexts.
     }
     await click(cdp, '[data-testid="export-scene"]');
-    await waitForStatus(cdp, "scene exported");
+    await waitForStatus(cdp, "scene JSON exported");
+    await evaluate(
+      cdp,
+      `(() => {
+        const saved = JSON.parse(localStorage.getItem("cozy-pixel-sandbox:scene:v1"));
+        saved.metadata = {
+          app: "cozy-pixel-sandbox",
+          title: "Snow Window",
+          room: "snow-window",
+          mood: "window",
+          musicProvider: "generated"
+        };
+        const input = document.querySelector('[data-testid="scene-file-input"]');
+        const file = new File([JSON.stringify(saved)], "snow-window-scene.json", { type: "application/json" });
+        const transfer = new DataTransfer();
+        transfer.items.add(file);
+        Object.defineProperty(input, "files", { value: transfer.files, configurable: true });
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+        return true;
+      })()`
+    );
+    await waitForStatus(cdp, "scene JSON imported");
+    const importedMetadata = await evaluate(cdp, `(() => ({
+      roomClass: document.querySelector(".app-shell")?.classList.contains("scene-snow-window"),
+      roomImage: getComputedStyle(document.querySelector(".app-shell")).getPropertyValue("--room-image"),
+      windowMoodActive: document.querySelector('[data-testid="audio-mood-window"]')?.classList.contains("active")
+    }))()`);
+    assert(importedMetadata.roomClass, "imported scene metadata did not restore the snow room");
+    assert(importedMetadata.roomImage.includes("snow-window.jpg"), `imported scene room image was not applied: ${importedMetadata.roomImage}`);
+    assert(importedMetadata.windowMoodActive, "imported scene metadata did not restore the window sound mood");
     await evaluate(
       cdp,
       `(() => {
@@ -146,8 +200,14 @@ async function main() {
   });
 
   await check("audio controls start, mute, adjust, and stop", async () => {
+    await click(cdp, '[data-testid="scene-environment-rain-desk"]');
+    await waitForStatus(cdp, "rain desk backdrop on");
     await click(cdp, '[data-testid="music-provider-external"]');
-    await waitForStatus(cdp, "desk radio planned for sharing phase");
+    await waitForStatus(cdp, "desk radio needs a YouTube link");
+    await waitUntil(() => evaluate(cdp, `Boolean(document.querySelector('[data-testid="desk-radio-input"]'))`), "desk radio input to appear");
+    await setText(cdp, '[data-testid="desk-radio-input"]', "https://example.com/radio");
+    await click(cdp, '[data-testid="desk-radio-tune"]');
+    await waitForStatus(cdp, "invalid YouTube link");
     await click(cdp, '[data-testid="audio-toggle"]');
     await waitForStatus(cdp, "rain lo-fi on");
     await waitUntil(() => textIncludes(cdp, '[data-testid="audio-toggle"]', "Stop"), "audio start button to become stop");
@@ -163,6 +223,69 @@ async function main() {
     await waitForStatus(cdp, "audio unmuted");
     await click(cdp, '[data-testid="audio-toggle"]');
     await waitForStatus(cdp, "Stardust Study resting");
+  });
+
+  await check("desk radio handles playable and blocked YouTube embeds", async () => {
+    await evaluate(cdp, `window.__cozyYouTubeMockMode = "ready"`);
+    await click(cdp, '[data-testid="music-provider-external"]');
+    await waitForStatus(cdp, "desk radio needs a YouTube link");
+    await setText(cdp, '[data-testid="desk-radio-input"]', "https://youtu.be/dQw4w9WgXcQ?t=1m12s");
+    await click(cdp, '[data-testid="desk-radio-tune"]');
+    await waitForStatus(cdp, "desk radio ready");
+    const readyState = await evaluate(cdp, `(() => ({
+      externalActive: document.querySelector('[data-testid="music-provider-external"]')?.classList.contains("active"),
+      iframeSrc: document.querySelector('[data-testid="desk-radio-frame"] iframe')?.getAttribute("src") ?? "",
+      nowPlaying: document.querySelector('[data-testid="desk-radio-now"]')?.textContent ?? "",
+      storedSource: JSON.parse(localStorage.getItem("cozy-pixel-sandbox:desk-radio:v1") || "null")
+    }))()`);
+    assert(readyState.externalActive, "Desk Radio provider was not active after a playable embed");
+    assert(readyState.iframeSrc.includes("youtube.com/embed/dQw4w9WgXcQ"), `Desk Radio iframe source was wrong: ${readyState.iframeSrc}`);
+    assert(readyState.iframeSrc.includes("start=72"), `Desk Radio iframe start time was missing: ${readyState.iframeSrc}`);
+    assert(readyState.nowPlaying.includes("Video"), `Desk Radio ready state was missing: ${readyState.nowPlaying}`);
+    assert(readyState.storedSource?.id === "dQw4w9WgXcQ", "Playable Desk Radio source was not saved");
+    assert(readyState.storedSource?.startSeconds === 72, "Playable Desk Radio start time was not saved");
+    await click(cdp, '[data-testid="desk-radio-clear"]');
+    await waitForStatus(cdp, "generated music selected");
+
+    await click(cdp, '[data-testid="music-provider-external"]');
+    await waitForStatus(cdp, "desk radio needs a YouTube link");
+    await setText(cdp, '[data-testid="desk-radio-input"]', "https://www.youtube.com/watch?v=-rRFxzRCHKI&list=RD-rRFxzRCHKI&start_radio=1");
+    await click(cdp, '[data-testid="desk-radio-tune"]');
+    await waitForStatus(cdp, "desk radio ready");
+    const playlistState = await evaluate(cdp, `(() => ({
+      iframeSrc: document.querySelector('[data-testid="desk-radio-frame"] iframe')?.getAttribute("src") ?? "",
+      nowPlaying: document.querySelector('[data-testid="desk-radio-now"]')?.textContent ?? "",
+      storedSource: JSON.parse(localStorage.getItem("cozy-pixel-sandbox:desk-radio:v1") || "null")
+    }))()`);
+    assert(playlistState.iframeSrc.includes("youtube.com/embed/videoseries?list=RD-rRFxzRCHKI"), `Desk Radio playlist iframe source was wrong: ${playlistState.iframeSrc}`);
+    assert(playlistState.nowPlaying.includes("Playlist"), `Desk Radio playlist ready state was missing: ${playlistState.nowPlaying}`);
+    assert(playlistState.storedSource?.kind === "playlist", "Playlist Desk Radio source was not saved as a playlist");
+    assert(playlistState.storedSource?.id === "RD-rRFxzRCHKI", `Playlist Desk Radio source ID was wrong: ${playlistState.storedSource?.id}`);
+    await click(cdp, '[data-testid="desk-radio-clear"]');
+    await waitForStatus(cdp, "generated music selected");
+
+    await evaluate(cdp, `window.__cozyYouTubeMockMode = "blocked"`);
+    await click(cdp, '[data-testid="music-provider-external"]');
+    await waitForStatus(cdp, "desk radio needs a YouTube link");
+    await setText(cdp, '[data-testid="desk-radio-input"]', "https://www.youtube.com/watch?v=jfKfPfyJRdk");
+    await click(cdp, '[data-testid="desk-radio-tune"]');
+    await waitForStatus(cdp, "YouTube blocked embed; generated music restored");
+    const blockedState = await evaluate(cdp, `(() => ({
+      generatedActive: document.querySelector('[data-testid="music-provider-generated"]')?.classList.contains("active"),
+      message: document.querySelector('[data-testid="desk-radio-message"]')?.textContent ?? "",
+      storedSource: localStorage.getItem("cozy-pixel-sandbox:desk-radio:v1"),
+      shareSummary: document.querySelector(".share-summary")?.textContent ?? ""
+    }))()`);
+    assert(blockedState.generatedActive, "Blocked Desk Radio did not return to generated music");
+    assert(blockedState.message.includes("will not embed"), `Blocked embed message was unclear: ${blockedState.message}`);
+    assert(
+      blockedState.message.includes("Generated music is still playing"),
+      `Blocked embed fallback was unclear: ${blockedState.message}`
+    );
+    assert(blockedState.storedSource === null, "Blocked Desk Radio source was saved locally");
+    assert(blockedState.shareSummary.includes("Generated"), "Blocked Desk Radio still appeared in the share summary");
+    await click(cdp, '[data-testid="desk-radio-clear"]');
+    await waitForStatus(cdp, "generated music selected");
   });
 
   await check("room scenes change the backdrop without loading starter worlds", async () => {
@@ -233,7 +356,7 @@ async function main() {
     await staticServer.close();
   }
 
-  for (const name of checks) console.log(`✓ ${name}`);
+  for (const name of checks) console.log(`OK ${name}`);
   console.log("Browser smoke checks passed");
 }
 
@@ -257,7 +380,7 @@ async function startStaticServer() {
       }
       const pathname = decodeURIComponent(url.pathname === "/" ? "/index.html" : url.pathname);
       const filePath = path.resolve(distDir, `.${pathname}`);
-      if (!filePath.startsWith(distDir)) {
+      if (!isInsideDist(filePath)) {
         response.writeHead(403);
         response.end("Forbidden");
         return;
@@ -278,6 +401,11 @@ async function startStaticServer() {
     port,
     close: () => new Promise((resolve) => server.close(resolve))
   };
+}
+
+function isInsideDist(filePath) {
+  const relative = path.relative(distDir, filePath);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
 async function startBrowser() {
@@ -445,6 +573,21 @@ async function click(cdp, selector, options = {}) {
 }
 
 async function setRange(cdp, selector, value) {
+  await evaluate(
+    cdp,
+    `(() => {
+      const input = document.querySelector(${JSON.stringify(selector)});
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+      setter.call(input, ${JSON.stringify(value)});
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      return input.value;
+    })()`
+  );
+  await sleep(40);
+}
+
+async function setText(cdp, selector, value) {
   await evaluate(
     cdp,
     `(() => {

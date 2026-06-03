@@ -11,8 +11,12 @@
     "build": "npm run build:sim && npm --prefix app run build",
     "test:sim": "node scripts/test-sim.mjs",
     "test:wasm": "npm run build:sim && node scripts/smoke-wasm.mjs",
+    "test:js-fallback": "node scripts/smoke-js-fallback.mjs",
     "test:browser": "node scripts/smoke-browser.mjs",
+    "test:chrome": "powershell -ExecutionPolicy Bypass -File scripts/test-chrome.ps1",
+    "test:firefox": "powershell -ExecutionPolicy Bypass -File scripts/test-firefox.ps1",
     "visual:qa": "node scripts/visual-qa.mjs",
-    "check": "npm run test:sim && npm run test:wasm && npm run build && npm run test:browser && npm run visual:qa"
+    "audio:qa": "node scripts/audio-qa.mjs",
+    "check": "npm run test:sim && npm run build && node scripts/smoke-wasm.mjs && npm run test:js-fallback && npm run test:browser && npm run audio:qa && npm run visual:qa"
   }
 }

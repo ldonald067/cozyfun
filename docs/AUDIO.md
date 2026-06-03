@@ -1,6 +1,6 @@
 # Audio Foundation
 
-Audio is part of the product feel, not a decoration. The current direction is procedural, local, and low-cost: no streaming dependency, no bundled music files, no accounts, and no paid APIs.
+Audio is part of the product feel, not a decoration. The default direction is procedural, local, and low-cost: no bundled music files, no accounts, and no paid APIs. Desk Radio is the one optional external path, and it stays visible, user-provided, and replaceable by generated music when YouTube will not embed a link.
 
 ## Module Boundaries
 
@@ -12,10 +12,10 @@ Focused implementation modules live under `app/src/audio`:
 - `preferences.ts`: localStorage shape, defaults, channel list, and normalization.
 - `moods.ts`: reusable sound moods shared by the controller and UI.
 - `providers.ts`: generated/external music provider definitions and availability rules.
-- `mixer.ts`: Web Audio graph for `master`, `ambience`, `music`, and the reserved `effects` channel.
+- `mixer.ts`: Web Audio graph for `master`, `ambience`, and `music`.
 - `ambience.ts`: rain, room hush, low room tone, and occasional window drips.
-- `music.ts`: rainy lo-fi procedural music bed.
-- `effects.ts`: prototype material paint sounds, reaction cues, and UI cues. This module is currently disabled because the synthetic one-shots felt too arcade-like.
+- `music.ts`: procedural lo-fi jazz music bed.
+- `cues.ts`: short native paint cues for material interaction feedback.
 - `buffers.ts`: reusable generated noise buffers.
 - `utils.ts`: small shared helpers.
 - `controller.ts`: lifecycle and public methods used by the app.
@@ -26,29 +26,23 @@ Focused implementation modules live under `app/src/audio`:
 - The app must fully work without sound.
 - Preferences persist, but `enabled` always reloads as false so browsers do not autoplay.
 - Mute and stop should fade through mixer gain instead of tearing down every node.
-- Music, ambience, and future realistic Foley stay on separate channels so the simple panel can become a fuller mixer later.
+- Music and ambience stay on separate channels so the panel remains simple but useful.
 - Mood changes should restart long-running ambience/music layers cleanly.
-- One-shot sources should disconnect themselves after their `ended` event so long play sessions do not keep stale Web Audio nodes around.
 - External music must be optional. The generated music provider remains the default and fallback.
-- One-shot effects are disabled in the current build. Re-enable them only after a more realistic Foley/sample direction replaces the prototype synth cues.
-
-## Effects Decision
-
-The Phase 3 leftovers pass keeps synthetic paint, UI, and reaction one-shots disabled. They were useful as architecture probes, but they read too arcade-like against the rainy desk direction.
-
-Keep the `effects` mixer channel and controller methods because they are the right boundary for future native Foley. Do not expose an effects slider or re-enable `effects.ts` until the sound source is closer to realistic texture: sand rubs, water movement, glassy ice ticks, soft fire crackle, or carefully sourced short samples.
 
 ## Music Direction
 
 The music layer should feel like rainy lo-fi desk music:
 
-- slow chord changes
-- soft low thump
-- brushed hat/snare texture
+- swung jazz chord comping with seventh/ninth color
+- a soft walking bass line
+- small restrained melodic phrases
+- brushed hat/snare texture and low thump
 - vinyl dust
+- quiet texture layers and sparse brushed fills
 - low volume by default
 
-Avoid dramatic pads, arcade leads, busy melodies, or anything that fights the sandbox sounds.
+Avoid dramatic pads, arcade leads, busy melodies, or anything that fights the sandbox sounds. Generated music should feel composed, but it should stay humble enough to sit behind painting and rain.
 
 ## Sound Moods
 
@@ -62,12 +56,16 @@ Mood definitions live in `moods.ts`. Keep mood names user-facing and calm; keep 
 
 ## Music Providers
 
-Phase 3 has the provider boundary in place before adding YouTube:
+The music provider boundary keeps generated music and Desk Radio separate:
 
-- Generated provider: current procedural lo-fi bed owned by `music.ts`.
-- External provider: future wrapper for a visible third-party player, such as YouTube. The current UI shows this as the planned Desk Radio path, but does not start external playback yet.
+- Generated provider: local procedural lo-fi jazz bed owned by `music.ts`.
+- External provider: visible Desk Radio drawer for a user-provided YouTube video or playlist link.
 
-The provider boundary should expose calm app-level methods:
+`app/src/deskRadio.ts` owns YouTube URL parsing, source validation, watch URL creation, and local source persistence. It accepts regular YouTube watch links, `youtu.be` links, raw video IDs, playlist links, embed/live/shorts links, and `youtube-nocookie.com` links; it does not search YouTube, call the Data API, scrape pages, hide playback, auto-select playlists, or require a server. If a watch URL includes `list=...`, Desk Radio treats it as a playlist source; otherwise a valid watch/embed/live/shorts URL is treated as a single video. Timestamped video links preserve their start time when embedded.
+
+`DeskRadioPanel` renders the source through the YouTube player API so the app can detect embed failures such as error `101` or `150`. When YouTube blocks in-game playback, the app clears persisted Desk Radio state, returns the music provider to generated lo-fi jazz, keeps the attempted URL editable, and leaves the drawer open for another user-provided link.
+
+The provider boundary exposes calm app-level methods:
 
 - `start`
 - `pause`
@@ -75,31 +73,30 @@ The provider boundary should expose calm app-level methods:
 - `setMood` or `setSource`
 - `dispose`
 
-External music should replace only the music layer. Ambience stays native so the sandbox remains coherent even if YouTube is blocked, unavailable, or showing ads. Future realistic Foley should stay native too.
+External music replaces only the music layer. Ambience stays native so the sandbox remains coherent even if YouTube is blocked, unavailable, or showing ads. Future realistic Foley should stay native too.
 
-YouTube-specific implementation belongs in Phase 5. It should use a visible mini-player/drawer and the official IFrame Player API. Do not scrape YouTube, hide the player, require an API key, or make YouTube the only music path.
+## Audio QA
 
-## Reaction Cues
+Use the listening harness when generated music, ambience, or material cues change:
 
-The app detects broad simulation changes after each tick and maps them to a small set of calm cues:
+```powershell
+.\scripts\audio-qa.ps1
+```
 
-- `steam`: water, moonwater, or fire becoming steam.
-- `cool`: lava cooling into stone.
-- `growth`: seeds, soil, or wood turning into moss/fungus.
-- `spark`: meteor/stardust changes.
+It writes deterministic WAV references and a manifest to `.tmp/audio-qa`. The renderer is an offline reference built from the checked-in mood settings; browser Web Audio routing, autoplay behavior, and Desk Radio embedding are still covered by browser checks.
 
-Detection lives in `app/src/reactions.ts`. Playback is currently disabled at the controller boundary until the effect palette has a more realistic Foley direction.
+Reference tracks can guide taste, but do not sample, copy, scrape, or embed hidden audio from them. YouTube links remain user-provided Desk Radio sources only.
 
 ## Adding Audio
 
 Add new sounds in the narrowest module:
 
-- material or UI one-shots: `effects.ts`, but only after a natural Foley/sample-like direction is ready
 - long environmental loop: `ambience.ts`
 - musical pattern, rhythm, or harmonic change: `music.ts`
 - new mood preset: `moods.ts`
-- provider switching or external music hooks: add a provider boundary first, then keep YouTube-specific code isolated.
+- short material cue: `cues.ts`, routed through the ambience channel and throttled by `controller.ts`.
+- provider switching or external music hooks: keep YouTube-specific parsing and persistence isolated in `deskRadio.ts`.
 - channel/routing behavior: `mixer.ts`
 - preference shape: `preferences.ts`
 
-Keep source creation short-lived for one-shots. For long-running layers, return an `AudioLayerHandle` with a `stop` method so the controller can dispose cleanly.
+For long-running layers, return an `AudioLayerHandle` with a `stop` method so the controller can dispose cleanly. Add one-shot Foley only when there is a clear sound source and a live UI need.

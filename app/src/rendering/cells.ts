@@ -27,11 +27,21 @@ export type EdgeInfo = {
   count: number;
 };
 
+export type ContactInfo = EdgeInfo;
+
 export function edgeInfo(cells: Uint8Array, width: number, height: number, x: number, y: number, kind: number): EdgeInfo {
   const top = !sameKind(cells, width, height, x, y - 1, kind);
   const right = !sameKind(cells, width, height, x + 1, y, kind);
   const bottom = !sameKind(cells, width, height, x, y + 1, kind);
   const left = !sameKind(cells, width, height, x - 1, y, kind);
+  return { top, right, bottom, left, count: Number(top) + Number(right) + Number(bottom) + Number(left) };
+}
+
+export function contactInfo(cells: Uint8Array, width: number, height: number, x: number, y: number, kinds: readonly number[]): ContactInfo {
+  const top = kinds.includes(kindAt(cells, width, height, x, y - 1));
+  const right = kinds.includes(kindAt(cells, width, height, x + 1, y));
+  const bottom = kinds.includes(kindAt(cells, width, height, x, y + 1));
+  const left = kinds.includes(kindAt(cells, width, height, x - 1, y));
   return { top, right, bottom, left, count: Number(top) + Number(right) + Number(bottom) + Number(left) };
 }
 

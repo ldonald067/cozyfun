@@ -121,6 +121,28 @@ input:focus-visible {
     opacity 260ms ease;
 }
 
+.preview-build-badge {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  z-index: 20;
+  max-width: min(760px, calc(100vw - 32px));
+  transform: translateX(-50%);
+  padding: 5px 8px;
+  overflow: hidden;
+  border: 1px solid rgba(141, 207, 227, 0.44);
+  border-radius: 6px;
+  color: #d8edf4;
+  background: rgba(3, 8, 13, 0.84);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 .app-shell.scene-moonwater-garden {
   --room-background:
     linear-gradient(180deg, rgba(8, 11, 22, 0.34), rgba(7, 9, 18, 0.94)),
@@ -550,6 +572,155 @@ input:focus-visible {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.desk-radio-panel {
+  display: grid;
+  gap: 8px;
+  padding: 9px;
+  border: 1px solid rgba(141, 207, 227, 0.12);
+  border-radius: 6px;
+  background: rgba(7, 12, 18, 0.3);
+}
+
+.desk-radio-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #d8edf4;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.desk-radio-header span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.desk-radio-clear {
+  width: 26px;
+  height: 26px;
+  min-height: 26px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 26px;
+  padding: 0;
+  border-radius: 6px;
+}
+
+.desk-radio-frame {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid rgba(141, 207, 227, 0.16);
+  border-radius: 6px;
+  background: #05080d;
+}
+
+.desk-radio-frame > div,
+.desk-radio-frame iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.desk-radio-hint,
+.desk-radio-message {
+  margin: 0;
+  color: #b7cbd2;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.desk-radio-message {
+  display: grid;
+  gap: 5px;
+  padding: 8px;
+  border: 1px solid rgba(229, 187, 94, 0.18);
+  border-radius: 6px;
+  background: rgba(229, 187, 94, 0.07);
+}
+
+.desk-radio-now {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+  padding: 0 7px;
+  border: 1px solid rgba(141, 207, 227, 0.13);
+  border-radius: 6px;
+  color: #d9eef5;
+  background: rgba(14, 32, 39, 0.42);
+  font-size: 11px;
+}
+
+.desk-radio-now span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desk-radio-now a {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 22px;
+  padding: 0 6px;
+  border: 1px solid rgba(158, 217, 232, 0.18);
+  border-radius: 5px;
+  color: #9ed9e8;
+  background: rgba(10, 22, 28, 0.42);
+  text-decoration: none;
+}
+
+.desk-radio-now a:hover {
+  border-color: rgba(158, 217, 232, 0.36);
+  color: #d7f6ff;
+}
+
+.desk-radio-message strong {
+  color: #f4dfbd;
+}
+
+.desk-radio-message a {
+  width: max-content;
+  color: #9ed9e8;
+  text-decoration: none;
+}
+
+.desk-radio-message a:hover {
+  text-decoration: underline;
+}
+
+.desk-radio-controls {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+.desk-radio-controls input {
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid rgba(141, 207, 227, 0.16);
+  border-radius: 6px;
+  color: #f4dfbd;
+  background: rgba(4, 8, 12, 0.64);
+}
+
+.desk-radio-controls button {
+  width: 100%;
+  min-height: 32px;
+  padding: 0 9px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
 .audio-sliders {
   display: grid;
   gap: 9px;
@@ -678,6 +849,62 @@ input:focus-visible {
   gap: 8px;
   padding: 0 11px;
   border-radius: 6px;
+}
+
+.share-panel {
+  display: grid;
+  gap: 8px;
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(239, 211, 166, 0.12);
+}
+
+.share-panel-header span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #ffe4ad;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.share-summary {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding-bottom: 2px;
+}
+
+.share-summary span,
+.share-summary small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.share-summary span {
+  color: #e9dcc0;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.share-summary small {
+  color: #98b4bf;
+  font-size: 11px;
+}
+
+.share-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.control-stack .share-actions button {
+  min-height: 34px;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 7px;
+  font-size: 12px;
 }
 
 @keyframes rain-slide {

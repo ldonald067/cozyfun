@@ -114,6 +114,6 @@ export function saveSceneEnvironmentId(id: SceneEnvironmentId) {
   }
 }
 
-function isSceneEnvironmentId(value: unknown): value is SceneEnvironmentId {
+export function isSceneEnvironmentId(value: unknown): value is SceneEnvironmentId {
   return typeof value === "string" && SCENE_ENVIRONMENTS.some((scene) => scene.id === value);
 }

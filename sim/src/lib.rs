@@ -23,7 +23,15 @@ pub enum Material {
     Stardust = 16,
     Meteor = 17,
     Moonwater = 18,
+    Flower = 19,
 }
+
+const FLAG_WET: u16 = 1 << 0;
+const FLAG_ROOTED: u16 = 1 << 1;
+const FLAG_COSMIC: u16 = 1 << 2;
+const FLAG_FROZEN: u16 = 1 << 3;
+const FLAG_SCORCHED: u16 = 1 << 4;
+const FLAG_MASK: u16 = FLAG_WET | FLAG_ROOTED | FLAG_COSMIC | FLAG_FROZEN | FLAG_SCORCHED;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -127,7 +135,7 @@ impl Universe {
                     continue;
                 }
                 let idx = self.idx(px as u32, py as u32);
-                let kind = material.min(Material::Moonwater as u8);
+                let kind = material.min(Material::Flower as u8);
                 self.cells[idx] = if kind == Material::Empty as u8 {
                     Cell::empty()
                 } else {
@@ -143,12 +151,17 @@ impl Universe {
             return false;
         }
         for (idx, chunk) in data.chunks_exact(size_of::<Cell>()).enumerate() {
-            self.cells[idx] = Cell {
-                kind: chunk[0].min(Material::Moonwater as u8),
-                variant: chunk[1],
-                age: u16::from_le_bytes([chunk[2], chunk[3]]),
-                energy: u16::from_le_bytes([chunk[4], chunk[5]]),
-                flags: u16::from_le_bytes([chunk[6], chunk[7]]),
+            let kind = chunk[0].min(Material::Flower as u8);
+            self.cells[idx] = if kind == Material::Empty as u8 {
+                Cell::empty()
+            } else {
+                Cell {
+                    kind,
+                    variant: chunk[1] & 7,
+                    age: u16::from_le_bytes([chunk[2], chunk[3]]),
+                    energy: u16::from_le_bytes([chunk[4], chunk[5]]).min(255),
+                    flags: u16::from_le_bytes([chunk[6], chunk[7]]) & FLAG_MASK,
+                }
             };
         }
         true
@@ -167,8 +180,8 @@ impl Universe {
         for idx in bottom_up {
             let cell = old[idx];
             match cell.kind {
-                x if x == Material::Sand as u8 => self.update_powder(idx, cell, &old, &mut next, 1),
-                x if x == Material::Soil as u8 => self.update_powder(idx, cell, &old, &mut next, 2),
+                x if x == Material::Sand as u8 => self.update_sand(idx, cell, &old, &mut next),
+                x if x == Material::Soil as u8 => self.update_soil(idx, cell, &old, &mut next),
                 x if x == Material::Stardust as u8 => {
                     self.update_stardust(idx, cell, &old, &mut next)
                 }
@@ -177,7 +190,7 @@ impl Universe {
                 x if x == Material::Moonwater as u8 => {
                     self.update_liquid(idx, cell, &old, &mut next, 1)
                 }
-                x if x == Material::Oil as u8 => self.update_liquid(idx, cell, &old, &mut next, 2),
+                x if x == Material::Oil as u8 => self.update_oil(idx, cell, &old, &mut next),
                 x if x == Material::Lava as u8 => self.update_liquid(idx, cell, &old, &mut next, 4),
                 _ => {}
             }
@@ -377,13 +390,27 @@ impl Universe {
                 continue;
             }
             cell.age = cell.age.saturating_add(1);
-            cell.energy = cell.energy.saturating_sub(match cell.kind {
+            let drain = match cell.kind {
                 x if x == Material::Fire as u8 => 3,
                 x if x == Material::Steam as u8 => 2,
                 x if x == Material::Smoke as u8 => 1,
                 x if x == Material::Stardust as u8 => 1,
+                x if x == Material::Soil as u8 => 1,
+                x if x == Material::Seed as u8 => 1,
+                x if x == Material::Moss as u8 => 1,
+                x if x == Material::Fungus as u8 => 1,
+                x if x == Material::Flower as u8 => 1,
                 _ => 0,
-            });
+            } + if cell.flags & FLAG_FROZEN != 0 { 1 } else { 0 }
+                + if cell.flags & FLAG_WET != 0 && is_absorbent(cell.kind) { 1 } else { 0 };
+            cell.energy = cell.energy.saturating_sub(drain);
+            if cell.energy == 0 {
+                if cell.flags & FLAG_FROZEN != 0 {
+                    cell.flags = thawed_flags(cell.kind, cell.flags);
+                } else {
+                    cell.flags &= !(FLAG_WET | FLAG_COSMIC);
+                }
+            }
 
             if (cell.kind == Material::Smoke as u8 && cell.age > 180)
                 || (cell.kind == Material::Steam as u8 && cell.age > 150)
@@ -413,6 +440,12 @@ impl Universe {
                                 next[nidx] = Cell::new(Material::Steam as u8, other.variant, 180);
                             }
                         }
+                        if heat_softens_cell(next, nidx, other, 42) {
+                            if other.flags & FLAG_WET != 0 {
+                                self.emit_vapor_from(nidx, old, next, Material::Steam as u8, other.variant, 150);
+                            }
+                            continue;
+                        }
                         if is_flammable(other.kind) && self.chance(burn_chance(other.kind)) {
                             next[nidx] = Cell::new(Material::Fire as u8, other.variant, 220);
                         }
@@ -429,19 +462,22 @@ impl Universe {
                     for nidx in neighbors {
                         let other = old[nidx];
                         if other.kind == Material::Water as u8 || other.kind == Material::Moonwater as u8 {
-                            cooling += if other.kind == Material::Moonwater as u8 { 50 } else { 24 };
-                            if self.chance(3) {
+                            cooling += if other.kind == Material::Moonwater as u8 { 50 } else { 72 };
+                            if other.kind == Material::Water as u8 || self.chance(3) {
                                 next[nidx] = Cell::new(Material::Steam as u8, other.variant, 220);
                             }
+                        }
+                        if heat_softens_cell(next, nidx, other, 72) {
+                            if other.flags & FLAG_WET != 0 {
+                                self.emit_vapor_from(nidx, old, next, Material::Steam as u8, other.variant, 180);
+                            }
+                            continue;
                         }
                         if is_flammable(other.kind) && self.chance(3) {
                             next[nidx] = Cell::new(Material::Fire as u8, other.variant, 240);
                         }
-                        if other.kind == Material::Ice as u8 {
-                            next[nidx] = Cell::new(Material::Water as u8, other.variant, 40);
-                        }
                     }
-                    if cooling > 0 {
+                    if cooling > 0 && next[idx].kind == Material::Lava as u8 {
                         next[idx].energy = next[idx].energy.saturating_sub(cooling);
                         if next[idx].energy < 90 && self.chance(3) {
                             next[idx] = Cell::new(Material::Stone as u8, cell.variant, 0);
@@ -451,21 +487,181 @@ impl Universe {
                 x if x == Material::Stardust as u8 => {
                     for nidx in neighbors {
                         let other = old[nidx];
-                        if (other.kind == Material::Seed as u8 || other.kind == Material::Moss as u8)
-                            && self.chance(16)
+                        if (other.kind == Material::Seed as u8
+                            || other.kind == Material::Moss as u8
+                            || other.kind == Material::Flower as u8)
+                            && self.chance(12)
                         {
                             next[nidx].energy = next[nidx].energy.saturating_add(24).min(255);
+                            next[nidx].flags |= FLAG_COSMIC;
+                        }
+                        if other.kind == Material::Water as u8 {
+                            next[nidx] = Cell::new(Material::Moonwater as u8, other.variant, 130);
+                            next[nidx].flags = FLAG_COSMIC;
+                        }
+                        if (other.kind == Material::Soil as u8 || other.kind == Material::Fungus as u8)
+                            && self.chance(14)
+                        {
+                            next[nidx].energy = next[nidx].energy.saturating_add(18).min(255);
+                            next[nidx].flags |= FLAG_COSMIC;
+                        }
+                    }
+                }
+                x if x == Material::Water as u8 || x == Material::Moonwater as u8 => {
+                    let is_moonwater = cell.kind == Material::Moonwater as u8;
+                    let vigor = if is_moonwater { 96 } else { 56 };
+                    for nidx in neighbors {
+                        let other = old[nidx];
+                        if is_moonwater && other.kind == Material::Oil as u8 && self.chance(4) {
+                            next[nidx] = Cell::new(Material::Stardust as u8, other.variant, 150);
+                            continue;
+                        }
+                        if !is_moonwater && other.kind == Material::Lava as u8 {
+                            next[idx] = Cell::new(Material::Steam as u8, cell.variant, 220);
+                            next[nidx].energy = next[nidx].energy.saturating_sub(72);
+                            next[nidx].flags |= FLAG_SCORCHED;
+                            if next[nidx].energy < 120 {
+                                next[nidx] = Cell::new(Material::Stone as u8, other.variant, 0);
+                                next[nidx].flags = FLAG_SCORCHED;
+                            }
+                            continue;
+                        }
+                        if !is_moonwater && other.kind == Material::Meteor as u8 {
+                            next[idx] = Cell::new(Material::Steam as u8, cell.variant, 230);
+                            next[nidx] = Cell::new(Material::Stone as u8, other.variant, 0);
+                            next[nidx].flags = FLAG_SCORCHED;
+                            continue;
+                        }
+                        if !is_moonwater
+                            && is_hydratable(other.kind)
+                            && self.neighbor_has_kind(old, nidx, Material::Oil as u8)
+                        {
+                            next[nidx].energy = next[nidx].energy.saturating_sub(16);
+                            next[nidx].flags &= !FLAG_WET;
+                            continue;
+                        }
+                        if other.kind == Material::Seed as u8 {
+                            let seed_vigor = if is_moonwater { 130 } else { 90 };
+                            let energy = next[nidx].energy.saturating_add(seed_vigor).min(255);
+                            next[nidx].energy = energy;
+                            next[nidx].flags = (next[nidx].flags | FLAG_WET) & !FLAG_SCORCHED;
+                            if is_moonwater {
+                                next[nidx].flags |= FLAG_COSMIC;
+                            }
+                        }
+                        if other.kind == Material::Moss as u8
+                            || other.kind == Material::Fungus as u8
+                            || other.kind == Material::Flower as u8
+                        {
+                            next[nidx].energy = next[nidx].energy.saturating_add(vigor / 2).min(255);
+                            next[nidx].flags = (next[nidx].flags | FLAG_WET) & !FLAG_SCORCHED;
+                            if is_moonwater {
+                                next[nidx].flags |= FLAG_COSMIC;
+                            }
+                        }
+                        if other.kind == Material::Soil as u8 {
+                            next[nidx].energy = next[nidx].energy.saturating_add(vigor * 2).min(255);
+                            next[nidx].flags = (next[nidx].flags | FLAG_WET) & !FLAG_SCORCHED;
+                            if is_moonwater {
+                                next[nidx].flags |= FLAG_COSMIC;
+                            }
+                        }
+                        if other.kind == Material::Sand as u8 {
+                            next[nidx].energy = next[nidx].energy.saturating_add(vigor).min(255);
+                            next[nidx].flags |= FLAG_WET;
+                        }
+                        if other.kind == Material::Wood as u8 {
+                            next[nidx].energy = next[nidx].energy.saturating_add(vigor).min(255);
+                            next[nidx].flags |= FLAG_WET;
+                            if is_moonwater {
+                                next[nidx].flags &= !FLAG_SCORCHED;
+                                next[nidx].flags |= FLAG_COSMIC;
+                            }
+                        }
+                        if other.kind == Material::Stone as u8 {
+                            next[nidx].energy = next[nidx].energy.saturating_add(vigor / 2).min(255);
+                            next[nidx].flags |= FLAG_WET;
+                            if is_moonwater {
+                                next[nidx].flags |= FLAG_COSMIC;
+                            }
+                        }
+                        if other.kind == Material::Wall as u8 {
+                            let wall_vigor = (vigor / if is_moonwater { 3 } else { 5 }).max(8);
+                            next[nidx].energy = next[nidx].energy.saturating_add(wall_vigor).min(255);
+                            next[nidx].flags |= FLAG_WET;
+                            if is_moonwater {
+                                next[nidx].flags |= FLAG_COSMIC;
+                            }
                         }
                     }
                 }
                 x if x == Material::Ice as u8 => {
                     if neighbors.iter().any(|&nidx| is_hot(old[nidx].kind)) {
                         next[idx] = Cell::new(Material::Water as u8, cell.variant, 70);
+                        continue;
+                    }
+                    for nidx in neighbors {
+                        let other = old[nidx];
+                        if other.kind == Material::Water as u8 && self.chance(5) {
+                            next[nidx] = Cell::new(Material::Ice as u8, other.variant, 90);
+                        } else if other.kind == Material::Moonwater as u8 && self.chance(10) {
+                            next[nidx] = Cell::new(Material::Ice as u8, other.variant, 110);
+                            next[nidx].flags = FLAG_COSMIC;
+                        } else if other.kind == Material::Steam as u8 && self.chance(4) {
+                            next[nidx] = Cell::new(Material::Ice as u8, other.variant, 70);
+                        } else if (other.kind == Material::Stone as u8 || other.kind == Material::Wall as u8)
+                            && (other.flags & FLAG_WET != 0 || other.energy > 40)
+                        {
+                            next[nidx].flags = (next[nidx].flags | FLAG_FROZEN) & !FLAG_SCORCHED;
+                            next[nidx].energy = next[nidx].energy.max(88);
+                        } else if is_freezable(other.kind) && self.chance(4) {
+                            next[nidx].flags |= FLAG_FROZEN;
+                            next[nidx].energy = next[nidx].energy.max(72);
+                        }
+                    }
+                }
+                x if x == Material::Steam as u8 => {
+                    let ice_nearby = neighbors.iter().any(|&nidx| old[nidx].kind == Material::Ice as u8);
+                    if ice_nearby && self.chance(5) {
+                        next[idx] = Cell::new(Material::Ice as u8, cell.variant, 70);
+                    }
+                    let hot_nearby = neighbors.iter().any(|&nidx| is_hot(old[nidx].kind));
+                    if !ice_nearby && !hot_nearby {
+                        for nidx in neighbors {
+                            let other = old[nidx];
+                            if other.kind == Material::Stone as u8 || other.kind == Material::Wall as u8 {
+                                let condensation = if other.kind == Material::Stone as u8 { 58 } else { 26 };
+                                next[nidx].energy = next[nidx].energy.saturating_add(condensation).min(255);
+                                next[nidx].flags = (next[nidx].flags | FLAG_WET) & !FLAG_SCORCHED;
+                                if other.kind == Material::Stone as u8 && self.chance(4) {
+                                    next[idx] = Cell::new(Material::Water as u8, cell.variant, 50);
+                                }
+                            }
+                        }
+                    }
+                }
+                x if x == Material::Smoke as u8 => {
+                    for nidx in neighbors {
+                        let other = old[nidx];
+                        if is_sootable(other.kind)
+                            && other.flags & (FLAG_WET | FLAG_FROZEN) == 0
+                            && (cell.energy > 70 || cell.age > 16)
+                        {
+                            next[nidx].flags |= FLAG_SCORCHED;
+                        }
                     }
                 }
                 x if x == Material::Oil as u8 => {
                     if neighbors.iter().any(|&nidx| is_hot(old[nidx].kind)) {
                         next[idx] = Cell::new(Material::Fire as u8, cell.variant, 240);
+                        continue;
+                    }
+                    for nidx in neighbors {
+                        let other = old[nidx];
+                        if is_hydratable(other.kind) {
+                            next[nidx].energy = next[nidx].energy.saturating_sub(28);
+                            next[nidx].flags &= !FLAG_WET;
+                        }
                     }
                 }
                 _ => {}
@@ -490,6 +686,23 @@ impl Universe {
         indices
     }
 
+    fn neighbor_has_kind(&self, cells: &[Cell], idx: usize, kind: u8) -> bool {
+        let (x, y) = self.xy(idx);
+        self.neighbor_indices(x, y)
+            .iter()
+            .any(|&nidx| cells[nidx].kind == kind)
+    }
+
+    fn update_sand(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
+        let wet = cell.flags & FLAG_WET != 0 || cell.energy > 35;
+        self.update_powder(idx, cell, old, next, if wet { 2 } else { 1 });
+        if wet && next[idx].kind == Material::Sand as u8 && next[idx].energy > 0 {
+            next[idx].flags |= FLAG_WET;
+        } else if next[idx].kind == Material::Sand as u8 && next[idx].energy == 0 {
+            next[idx].flags &= !FLAG_WET;
+        }
+    }
+
     fn update_powder(
         &mut self,
         idx: usize,
@@ -507,6 +720,21 @@ impl Universe {
             if self.try_move(idx, x + dx, y + dy, cell, old, next, true) {
                 return;
             }
+        }
+    }
+
+    fn update_soil(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
+        self.update_powder(idx, cell, old, next, 2);
+        if next[idx].flags & FLAG_FROZEN != 0 {
+            return;
+        }
+        if next[idx].kind == Material::Soil as u8
+            && next[idx].energy > 140
+            && cell.age > 10
+            && self.chance(if next[idx].flags & FLAG_COSMIC != 0 { 7 } else { 12 })
+        {
+            next[idx] = Cell::new(Material::Moss as u8, cell.variant, 90);
+            next[idx].flags = FLAG_WET;
         }
     }
 
@@ -539,6 +767,43 @@ impl Universe {
         }
     }
 
+    fn update_oil(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
+        if self.tick_count % 2 != 0 {
+            return;
+        }
+        let (x, y) = self.xy(idx);
+        if y > 0 {
+            let above = self.idx(x as u32, (y - 1) as u32);
+            if is_water_like(old[above].kind)
+                && next[above].kind == old[above].kind
+                && next[idx].kind == Material::Oil as u8
+            {
+                let water = next[above];
+                next[above] = next[idx];
+                next[idx] = water;
+                return;
+            }
+        }
+
+        let below = if y + 1 < self.height as i32 {
+            old[self.idx(x as u32, (y + 1) as u32)].kind
+        } else {
+            Material::Wall as u8
+        };
+        let supported = below != Material::Empty as u8 && below != Material::Smoke as u8 && below != Material::Steam as u8;
+        let side = if self.tick_count % 2 == 0 { 1 } else { -1 };
+        let dirs = if supported {
+            [(side, 0), (-side, 0), (side * 2, 0), (-side * 2, 0), (0, 1), (side, 1), (-side, 1)]
+        } else {
+            [(0, 1), (side, 1), (-side, 1), (side, 0), (-side, 0), (side * 2, 0), (-side * 2, 0)]
+        };
+        for (dx, dy) in dirs {
+            if self.try_move(idx, x + dx, y + dy, cell, old, next, true) {
+                return;
+            }
+        }
+    }
+
     fn update_gas(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell], speed: u32) {
         if speed > 1 && self.tick_count % speed != 0 {
             return;
@@ -554,6 +819,9 @@ impl Universe {
     }
 
     fn update_fire(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
+        if next[idx].kind != Material::Fire as u8 {
+            return;
+        }
         let (x, y) = self.xy(idx);
         if self.chance(7) && y > 0 {
             let target = self.idx(x as u32, (y - 1) as u32);
@@ -574,42 +842,113 @@ impl Universe {
                 self.update_powder(idx, cell, old, next, 1);
                 return;
             }
-            if (below.kind == Material::Soil as u8
-                || below.kind == Material::Moss as u8
-                || below.kind == Material::Moonwater as u8)
-                && (cell.energy > 40 || self.chance(80))
+            if next[idx].flags & FLAG_FROZEN != 0 {
+                return;
+            }
+            let neighbors = self.neighbor_indices(x, y);
+            let wet = cell.flags & FLAG_WET != 0 || cell.energy > 70;
+            let cosmic = cell.flags & FLAG_COSMIC != 0
+                || neighbors.iter().any(|&nidx| {
+                    old[nidx].kind == Material::Moonwater as u8
+                        || old[nidx].kind == Material::Stardust as u8
+                });
+            if wet
+                && cell.energy > 80
+                && neighbors
+                    .iter()
+                    .any(|&nidx| old[nidx].kind == Material::Fungus as u8)
+                && self.chance(10)
             {
-                next[idx] = Cell::new(Material::Moss as u8, cell.variant, 90);
+                next[idx] = Cell::new(Material::Fungus as u8, cell.variant, 90);
+                next[idx].flags = FLAG_WET;
+                return;
+            }
+            if below.kind == Material::Soil as u8 && wet {
+                next[idx].flags |= FLAG_ROOTED;
+                if (cell.age > 16 && cell.energy > 90)
+                    || (cell.age > 6 && cell.energy > 55 && self.chance(if cosmic { 3 } else { 5 }))
+                {
+                    next[idx] = Cell::new(Material::Flower as u8, cell.variant, if cosmic { 150 } else { 90 });
+                    next[idx].flags = FLAG_ROOTED | if cosmic { FLAG_COSMIC } else { 0 };
+                    return;
+                }
+            }
+            if below.kind == Material::Moss as u8 && wet && cell.energy > 110 && self.chance(12) {
+                next[idx] = Cell::new(Material::Moss as u8, cell.variant, 100);
+                next[idx].flags = FLAG_WET;
             }
         }
     }
 
     fn update_moss(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
+        if next[idx].flags & FLAG_FROZEN != 0 {
+            return;
+        }
         let (x, y) = self.xy(idx);
-        if !(cell.energy > 70 || self.chance(110)) {
+        let wet = cell.flags & FLAG_WET != 0 || cell.energy > 70;
+        if !(wet || self.chance(120)) {
             return;
         }
         for nidx in self.neighbor_indices(x, y) {
             let other = old[nidx];
-            if (other.kind == Material::Soil as u8 || other.kind == Material::Wood as u8)
-                && self.chance(6)
+            let damp_substrate = other.flags & FLAG_WET != 0 || other.energy > 40;
+            let soft_substrate = other.kind == Material::Soil as u8 || other.kind == Material::Wood as u8;
+            let stone_substrate = other.kind == Material::Stone as u8;
+            let wall_substrate = other.kind == Material::Wall as u8;
+            if soft_substrate && (cell.energy > 110 || damp_substrate || self.chance(8))
             {
                 next[nidx] = Cell::new(Material::Moss as u8, other.variant, 70);
+                next[nidx].flags = if wet { FLAG_WET } else { 0 };
+                return;
+            }
+            if stone_substrate
+                && damp_substrate
+                && (cell.energy > 120 || self.chance(10))
+            {
+                next[nidx] = Cell::new(Material::Moss as u8, other.variant, 58);
+                next[nidx].flags = FLAG_WET;
+                return;
+            }
+            if wall_substrate && damp_substrate && cell.energy > 150 {
+                next[nidx] = Cell::new(Material::Moss as u8, other.variant, 48);
+                next[nidx].flags = FLAG_WET;
                 return;
             }
         }
     }
 
     fn update_fungus(&mut self, idx: usize, _cell: Cell, old: &[Cell], next: &mut [Cell]) {
+        if next[idx].flags & FLAG_FROZEN != 0 {
+            return;
+        }
         let (x, y) = self.xy(idx);
         if !self.chance(95) {
             return;
         }
         for nidx in self.neighbor_indices(x, y) {
             let other = old[nidx];
+            if other.kind == Material::Seed as u8
+                && other.flags & FLAG_FROZEN == 0
+                && (other.flags & FLAG_WET != 0 || other.energy > 70)
+                && self.chance(4)
+            {
+                next[nidx] = Cell::new(Material::Fungus as u8, other.variant, 90);
+                next[nidx].flags = FLAG_WET;
+                return;
+            }
+            if other.kind == Material::Moss as u8
+                && other.flags & FLAG_FROZEN == 0
+                && (other.flags & FLAG_WET != 0 || other.energy > 90 || other.age > 120)
+                && self.chance(7)
+            {
+                next[nidx] = Cell::new(Material::Fungus as u8, other.variant, 80);
+                next[nidx].flags = other.flags & FLAG_WET;
+                return;
+            }
             if (other.kind == Material::Wood as u8
                 || other.kind == Material::Moss as u8
                 || other.kind == Material::Soil as u8)
+                && other.flags & FLAG_FROZEN == 0
                 && self.chance(5)
             {
                 next[nidx] = Cell::new(Material::Fungus as u8, other.variant, 80);
@@ -633,6 +972,9 @@ impl Universe {
     }
 
     fn update_meteor(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
+        if next[idx].kind != Material::Meteor as u8 {
+            return;
+        }
         let (x, y) = self.xy(idx);
         if self.try_move(idx, x, y + 1, cell, old, next, true) {
             return;
@@ -647,8 +989,12 @@ impl Universe {
             Cell::new(Material::Stone as u8, cell.variant, 0)
         };
         for nidx in self.neighbor_indices(x, y) {
-            if old[nidx].is_empty() && self.chance(3) {
+            if old[nidx].kind == Material::Moonwater as u8 {
+                next[nidx] = Cell::new(Material::Stardust as u8, old[nidx].variant, 190);
+            } else if old[nidx].is_empty() && self.chance(3) {
                 next[nidx] = Cell::new(Material::Fire as u8, cell.variant, 190);
+            } else if heat_softens_cell(next, nidx, old[nidx], 72) {
+                continue;
             } else if is_flammable(old[nidx].kind) {
                 next[nidx] = Cell::new(Material::Fire as u8, old[nidx].variant, 230);
             }
@@ -694,6 +1040,25 @@ impl Universe {
         next[target] = moving_cell;
         true
     }
+
+    fn emit_vapor_from(
+        &self,
+        source_idx: usize,
+        old: &[Cell],
+        next: &mut [Cell],
+        vapor_kind: u8,
+        variant: u8,
+        energy: u16,
+    ) {
+        let (x, y) = self.xy(source_idx);
+        if y <= 0 {
+            return;
+        }
+        let above = self.idx(x as u32, (y - 1) as u32);
+        if old[above].is_empty() && next[above].is_empty() {
+            next[above] = Cell::new(vapor_kind, variant, energy);
+        }
+    }
 }
 
 fn starting_energy(kind: u8) -> u16 {
@@ -708,6 +1073,7 @@ fn starting_energy(kind: u8) -> u16 {
         x if x == Material::Seed as u8 => 50,
         x if x == Material::Moss as u8 => 70,
         x if x == Material::Fungus as u8 => 70,
+        x if x == Material::Flower as u8 => 90,
         _ => 0,
     }
 }
@@ -716,11 +1082,90 @@ fn is_hot(kind: u8) -> bool {
     kind == Material::Fire as u8 || kind == Material::Lava as u8 || kind == Material::Meteor as u8
 }
 
+fn is_water_like(kind: u8) -> bool {
+    kind == Material::Water as u8 || kind == Material::Moonwater as u8
+}
+
+fn is_absorbent(kind: u8) -> bool {
+    kind == Material::Wall as u8
+        || kind == Material::Sand as u8
+        || kind == Material::Wood as u8
+        || kind == Material::Stone as u8
+}
+
+fn is_hydratable(kind: u8) -> bool {
+    kind == Material::Wall as u8
+        || kind == Material::Sand as u8
+        || kind == Material::Soil as u8
+        || kind == Material::Wood as u8
+        || kind == Material::Stone as u8
+        || kind == Material::Moss as u8
+        || kind == Material::Seed as u8
+        || kind == Material::Fungus as u8
+        || kind == Material::Flower as u8
+}
+
+fn is_sootable(kind: u8) -> bool {
+    kind == Material::Wall as u8 || kind == Material::Stone as u8 || kind == Material::Wood as u8
+}
+
+fn is_freezable(kind: u8) -> bool {
+    kind == Material::Wall as u8
+        || kind == Material::Sand as u8
+        || kind == Material::Soil as u8
+        || kind == Material::Stone as u8
+        || kind == Material::Wood as u8
+        || kind == Material::Seed as u8
+        || kind == Material::Moss as u8
+        || kind == Material::Fungus as u8
+        || kind == Material::Flower as u8
+        || kind == Material::Oil as u8
+}
+
+fn is_scorchable(kind: u8) -> bool {
+    kind == Material::Wall as u8
+        || kind == Material::Sand as u8
+        || kind == Material::Soil as u8
+        || kind == Material::Stone as u8
+        || kind == Material::Wood as u8
+        || kind == Material::Seed as u8
+        || kind == Material::Moss as u8
+        || kind == Material::Fungus as u8
+        || kind == Material::Flower as u8
+}
+
+fn thawed_flags(kind: u8, flags: u16) -> u16 {
+    let residue = if is_hydratable(kind) { FLAG_WET } else { 0 };
+    (flags & !FLAG_FROZEN) | residue
+}
+
+fn heat_softens_cell(next: &mut [Cell], idx: usize, other: Cell, heat: u16) -> bool {
+    if other.kind == Material::Ice as u8 {
+        next[idx] = Cell::new(Material::Water as u8, other.variant, heat.max(40));
+        return true;
+    }
+    if !is_freezable(other.kind) && !is_scorchable(other.kind) {
+        return false;
+    }
+    if other.flags & FLAG_FROZEN != 0 {
+        next[idx].flags = thawed_flags(other.kind, next[idx].flags);
+        next[idx].energy = next[idx].energy.saturating_add(heat).min(255);
+        return true;
+    }
+    if is_scorchable(other.kind) && other.flags & FLAG_WET != 0 {
+        next[idx].flags = (next[idx].flags & !FLAG_WET) | FLAG_SCORCHED;
+        next[idx].energy = next[idx].energy.saturating_sub(heat);
+        return true;
+    }
+    false
+}
+
 fn is_flammable(kind: u8) -> bool {
     kind == Material::Wood as u8
         || kind == Material::Moss as u8
         || kind == Material::Seed as u8
         || kind == Material::Fungus as u8
+        || kind == Material::Flower as u8
         || kind == Material::Oil as u8
 }
 
@@ -728,6 +1173,7 @@ fn burn_chance(kind: u8) -> u32 {
     match kind {
         x if x == Material::Oil as u8 => 2,
         x if x == Material::Fungus as u8 => 5,
+        x if x == Material::Flower as u8 => 5,
         x if x == Material::Moss as u8 => 7,
         x if x == Material::Seed as u8 => 8,
         _ => 10,
@@ -740,6 +1186,38 @@ mod tests {
 
     fn kind_at(u: &Universe, x: u32, y: u32) -> u8 {
         u.cells[u.idx(x, y)].kind
+    }
+
+    fn flags_at(u: &Universe, x: u32, y: u32) -> u16 {
+        u.cells[u.idx(x, y)].flags
+    }
+
+    fn energy_at(u: &Universe, x: u32, y: u32) -> u16 {
+        u.cells[u.idx(x, y)].energy
+    }
+
+    fn set_cell(u: &mut Universe, x: u32, y: u32, material: Material) {
+        let idx = u.idx(x, y);
+        u.cells[idx] = Cell::new(material as u8, 0, starting_energy(material as u8));
+    }
+
+    fn set_cell_state(
+        u: &mut Universe,
+        x: u32,
+        y: u32,
+        material: Material,
+        age: u16,
+        energy: u16,
+        flags: u16,
+    ) {
+        let idx = u.idx(x, y);
+        u.cells[idx] = Cell {
+            kind: material as u8,
+            variant: 0,
+            age,
+            energy,
+            flags,
+        };
     }
 
     #[test]
@@ -784,6 +1262,303 @@ mod tests {
             u.tick();
         }
         assert!(u.cells.iter().any(|c| c.kind == Material::Stone as u8));
+    }
+
+    #[test]
+    fn wet_seed_on_soil_blooms() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell_state(&mut u, 8, 8, Material::Seed, 20, 180, FLAG_WET);
+        set_cell(&mut u, 8, 9, Material::Soil);
+        u.tick();
+        assert_eq!(kind_at(&u, 8, 8), Material::Flower as u8);
+    }
+
+    #[test]
+    fn watered_soil_greens_up() {
+        let mut u = Universe::new(16, 16, 11);
+        set_cell_state(&mut u, 8, 8, Material::Soil, 16, 190, FLAG_WET);
+        for _ in 0..36 {
+            u.tick();
+        }
+        assert!(u.cells.iter().any(|c| c.kind == Material::Moss as u8));
+    }
+
+    #[test]
+    fn fungus_can_rot_wet_seed() {
+        let mut u = Universe::new(16, 16, 3);
+        set_cell_state(&mut u, 8, 8, Material::Seed, 12, 150, FLAG_WET);
+        set_cell(&mut u, 8, 9, Material::Stone);
+        set_cell(&mut u, 7, 8, Material::Fungus);
+        for _ in 0..24 {
+            u.tick();
+        }
+        assert_eq!(kind_at(&u, 8, 8), Material::Fungus as u8);
+    }
+
+    #[test]
+    fn frozen_seed_waits_instead_of_blooming() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell_state(&mut u, 8, 8, Material::Seed, 20, 180, FLAG_WET | FLAG_FROZEN);
+        set_cell(&mut u, 8, 9, Material::Soil);
+        u.tick();
+        assert_eq!(kind_at(&u, 8, 8), Material::Seed as u8);
+        assert!(flags_at(&u, 8, 8) & FLAG_FROZEN != 0);
+    }
+
+    #[test]
+    fn ice_freezes_trapped_water() {
+        let mut u = Universe::new(16, 16, 11);
+        set_cell(&mut u, 7, 8, Material::Ice);
+        set_cell(&mut u, 8, 8, Material::Water);
+        for (x, y) in [(7, 7), (8, 7), (9, 7), (7, 9), (8, 9), (9, 9), (9, 8), (6, 8), (10, 8)] {
+            set_cell(&mut u, x, y, Material::Stone);
+        }
+        for _ in 0..36 {
+            u.tick();
+        }
+        assert_eq!(kind_at(&u, 8, 8), Material::Ice as u8);
+    }
+
+    #[test]
+    fn heat_dries_wet_growth_before_burning() {
+        let mut u = Universe::new(16, 16, 5);
+        set_cell(&mut u, 7, 8, Material::Fire);
+        set_cell_state(&mut u, 8, 8, Material::Moss, 20, 140, FLAG_WET);
+        set_cell(&mut u, 8, 9, Material::Stone);
+        u.tick();
+        assert_eq!(kind_at(&u, 8, 8), Material::Moss as u8);
+        assert!(flags_at(&u, 8, 8) & FLAG_SCORCHED != 0);
+        assert_eq!(flags_at(&u, 8, 8) & FLAG_WET, 0);
+    }
+
+    #[test]
+    fn steam_frosts_against_ice() {
+        let mut u = Universe::new(16, 16, 19);
+        set_cell(&mut u, 8, 7, Material::Ice);
+        set_cell(&mut u, 8, 8, Material::Steam);
+        for (x, y) in [(7, 7), (9, 7), (7, 8), (9, 8), (7, 9), (8, 9), (9, 9)] {
+            set_cell(&mut u, x, y, Material::Stone);
+        }
+        for _ in 0..36 {
+            u.tick();
+        }
+        assert_eq!(kind_at(&u, 8, 8), Material::Ice as u8);
+    }
+
+    #[test]
+    fn water_wets_sand_into_clumps() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 8, 8, Material::Sand);
+        set_cell(&mut u, 7, 9, Material::Stone);
+        set_cell(&mut u, 8, 9, Material::Stone);
+        set_cell(&mut u, 9, 9, Material::Stone);
+        set_cell(&mut u, 7, 8, Material::Water);
+        u.tick();
+        assert_eq!(kind_at(&u, 8, 8), Material::Sand as u8);
+        assert!(flags_at(&u, 8, 8) & FLAG_WET != 0);
+        assert!(energy_at(&u, 8, 8) > 0);
+    }
+
+    #[test]
+    fn moss_colonizes_damp_stone() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell_state(&mut u, 7, 8, Material::Moss, 12, 150, FLAG_WET);
+        set_cell_state(&mut u, 8, 8, Material::Stone, 20, 90, FLAG_WET);
+        u.tick();
+        assert_eq!(kind_at(&u, 8, 8), Material::Moss as u8);
+    }
+
+    #[test]
+    fn oil_blocks_plain_water_hydration() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell_state(&mut u, 8, 8, Material::Seed, 12, 80, 0);
+        set_cell(&mut u, 8, 9, Material::Stone);
+        set_cell(&mut u, 7, 8, Material::Water);
+        set_cell(&mut u, 9, 8, Material::Oil);
+        u.tick();
+        assert_eq!(kind_at(&u, 8, 8), Material::Seed as u8);
+        assert_eq!(flags_at(&u, 8, 8) & FLAG_WET, 0);
+        assert!(energy_at(&u, 8, 8) < 90);
+    }
+
+    #[test]
+    fn oil_rises_above_water() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 8, 7, Material::Water);
+        set_cell(&mut u, 8, 8, Material::Oil);
+        for (x, y) in [(6, 7), (7, 7), (9, 7), (10, 7), (7, 8), (9, 8), (8, 9)] {
+            set_cell(&mut u, x, y, Material::Stone);
+        }
+        for _ in 0..2 {
+            u.tick();
+        }
+        assert_eq!(kind_at(&u, 8, 7), Material::Oil as u8);
+        assert_eq!(kind_at(&u, 8, 8), Material::Water as u8);
+    }
+
+    #[test]
+    fn wet_sand_drains_back_to_loose_sand() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell_state(&mut u, 8, 8, Material::Sand, 0, 4, FLAG_WET);
+        set_cell(&mut u, 7, 9, Material::Stone);
+        set_cell(&mut u, 8, 9, Material::Stone);
+        set_cell(&mut u, 9, 9, Material::Stone);
+        for _ in 0..8 {
+            u.tick();
+        }
+        assert_eq!(kind_at(&u, 8, 8), Material::Sand as u8);
+        assert_eq!(flags_at(&u, 8, 8) & FLAG_WET, 0);
+        assert_eq!(energy_at(&u, 8, 8), 0);
+    }
+
+    #[test]
+    fn heat_stresses_damp_hard_materials() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 7, 8, Material::Fire);
+        set_cell_state(&mut u, 8, 8, Material::Stone, 12, 90, FLAG_WET);
+        set_cell_state(&mut u, 8, 9, Material::Wall, 12, 90, FLAG_WET);
+        u.tick();
+        assert_eq!(kind_at(&u, 8, 8), Material::Stone as u8);
+        assert!(flags_at(&u, 8, 8) & FLAG_SCORCHED != 0);
+        assert_eq!(flags_at(&u, 8, 8) & FLAG_WET, 0);
+        assert_eq!(kind_at(&u, 8, 9), Material::Wall as u8);
+        assert!(flags_at(&u, 8, 9) & FLAG_SCORCHED != 0);
+        assert_eq!(flags_at(&u, 8, 9) & FLAG_WET, 0);
+    }
+
+    #[test]
+    fn water_quenches_lava_into_steam_and_stone() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 7, 8, Material::Water);
+        set_cell_state(&mut u, 8, 8, Material::Lava, 12, 80, 0);
+        u.tick();
+        assert_eq!(kind_at(&u, 7, 8), Material::Steam as u8);
+        assert_eq!(kind_at(&u, 8, 8), Material::Stone as u8);
+        assert!(flags_at(&u, 8, 8) & FLAG_SCORCHED != 0);
+    }
+
+    #[test]
+    fn water_shocks_meteor_into_steam_and_stone() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 7, 8, Material::Water);
+        set_cell(&mut u, 8, 8, Material::Meteor);
+        set_cell(&mut u, 8, 9, Material::Stone);
+        u.tick();
+        assert_eq!(kind_at(&u, 7, 8), Material::Steam as u8);
+        assert_eq!(kind_at(&u, 8, 8), Material::Stone as u8);
+        assert!(flags_at(&u, 8, 8) & FLAG_SCORCHED != 0);
+    }
+
+    #[test]
+    fn ice_frost_stresses_damp_hard_materials() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 7, 8, Material::Ice);
+        set_cell_state(&mut u, 8, 8, Material::Stone, 12, 60, FLAG_WET);
+        set_cell_state(&mut u, 7, 9, Material::Wall, 12, 60, FLAG_WET);
+        u.tick();
+        assert_eq!(kind_at(&u, 8, 8), Material::Stone as u8);
+        assert!(flags_at(&u, 8, 8) & FLAG_FROZEN != 0);
+        assert_eq!(flags_at(&u, 8, 8) & FLAG_SCORCHED, 0);
+        assert_eq!(kind_at(&u, 7, 9), Material::Wall as u8);
+        assert!(flags_at(&u, 7, 9) & FLAG_FROZEN != 0);
+        assert_eq!(flags_at(&u, 7, 9) & FLAG_SCORCHED, 0);
+    }
+
+    #[test]
+    fn heat_steams_wet_wood_before_burning() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 7, 8, Material::Fire);
+        set_cell_state(&mut u, 8, 8, Material::Wood, 12, 90, FLAG_WET);
+        u.tick();
+        assert_eq!(kind_at(&u, 8, 7), Material::Steam as u8);
+        assert_eq!(kind_at(&u, 8, 8), Material::Wood as u8);
+        assert!(flags_at(&u, 8, 8) & FLAG_SCORCHED != 0);
+        assert_eq!(flags_at(&u, 8, 8) & FLAG_WET, 0);
+    }
+
+    #[test]
+    fn water_weathers_stone_more_than_sealed_wall() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 7, 8, Material::Water);
+        set_cell(&mut u, 8, 8, Material::Stone);
+        set_cell(&mut u, 7, 9, Material::Wall);
+        u.tick();
+        assert!(flags_at(&u, 8, 8) & FLAG_WET != 0);
+        assert!(flags_at(&u, 7, 9) & FLAG_WET != 0);
+        assert!(energy_at(&u, 8, 8) > energy_at(&u, 7, 9));
+    }
+
+    #[test]
+    fn steam_condenses_on_hard_surfaces() {
+        let mut u = Universe::new(16, 16, 19);
+        set_cell(&mut u, 7, 8, Material::Steam);
+        set_cell(&mut u, 8, 8, Material::Stone);
+        set_cell(&mut u, 7, 9, Material::Wall);
+        u.tick();
+        assert!(flags_at(&u, 8, 8) & FLAG_WET != 0);
+        assert!(flags_at(&u, 7, 9) & FLAG_WET != 0);
+        assert!(energy_at(&u, 8, 8) > energy_at(&u, 7, 9));
+    }
+
+    #[test]
+    fn smoke_leaves_soot_instead_of_condensation() {
+        let mut u = Universe::new(16, 16, 19);
+        set_cell(&mut u, 7, 8, Material::Smoke);
+        set_cell(&mut u, 8, 8, Material::Wall);
+        u.tick();
+        assert!(flags_at(&u, 8, 8) & FLAG_SCORCHED != 0);
+        assert_eq!(flags_at(&u, 8, 8) & FLAG_WET, 0);
+    }
+
+    #[test]
+    fn moss_needs_extra_energy_to_cross_wall() {
+        let mut weak = Universe::new(16, 16, 7);
+        set_cell_state(&mut weak, 7, 8, Material::Moss, 12, 130, FLAG_WET);
+        set_cell_state(&mut weak, 8, 8, Material::Wall, 12, 90, FLAG_WET);
+        weak.tick();
+        assert_eq!(kind_at(&weak, 8, 8), Material::Wall as u8);
+
+        let mut strong = Universe::new(16, 16, 7);
+        set_cell_state(&mut strong, 7, 8, Material::Moss, 12, 170, FLAG_WET);
+        set_cell_state(&mut strong, 8, 8, Material::Wall, 12, 90, FLAG_WET);
+        strong.tick();
+        assert_eq!(kind_at(&strong, 8, 8), Material::Moss as u8);
+    }
+
+    #[test]
+    fn stardust_charges_water_into_moonwater() {
+        let mut u = Universe::new(16, 16, 13);
+        set_cell(&mut u, 8, 8, Material::Water);
+        set_cell(&mut u, 7, 8, Material::Stardust);
+        for (x, y) in [(7, 7), (8, 7), (9, 7), (9, 8), (7, 9), (8, 9), (9, 9)] {
+            set_cell(&mut u, x, y, Material::Stone);
+        }
+        u.tick();
+        assert_eq!(kind_at(&u, 8, 8), Material::Moonwater as u8);
+    }
+
+    #[test]
+    fn moonwater_cleans_oil_into_stardust() {
+        let mut u = Universe::new(16, 16, 17);
+        set_cell(&mut u, 7, 8, Material::Moonwater);
+        set_cell(&mut u, 8, 8, Material::Oil);
+        set_cell(&mut u, 8, 9, Material::Stone);
+        for _ in 0..24 {
+            u.tick();
+        }
+        assert!(u.cells.iter().any(|cell| cell.kind == Material::Stardust as u8));
+    }
+
+    #[test]
+    fn meteor_moonwater_contact_bursts_to_stardust() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 8, 8, Material::Meteor);
+        set_cell(&mut u, 7, 8, Material::Moonwater);
+        set_cell(&mut u, 7, 9, Material::Stone);
+        set_cell(&mut u, 8, 9, Material::Stone);
+        set_cell(&mut u, 9, 9, Material::Stone);
+        u.tick();
+        assert_eq!(kind_at(&u, 7, 8), Material::Stardust as u8);
     }
 
     #[test]

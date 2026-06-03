@@ -1,8 +1,6 @@
-export type AudioChannel = "master" | "ambience" | "music" | "effects";
+export type AudioChannel = "master" | "ambience" | "music";
 export type AudioMood = "rain" | "window" | "stardust";
 export type MusicProvider = "generated" | "external";
-export type ReactionAudioCue = "steam" | "cool" | "growth" | "spark";
-export type UiAudioCue = "toggle" | "clear" | "save" | "load" | "import" | "export";
 
 export type AudioPrefs = {
   enabled: boolean;
@@ -44,8 +42,13 @@ export type AudioMoodDef = {
     chordFilterStart: number;
     chordFilterEnd: number;
     thumpGain: number;
+    bassGain: number;
+    melodyGain: number;
     brushGain: number;
     vinylGain: number;
+    textureGain: number;
+    fillGain: number;
+    swing: number;
     sparkle: boolean;
     progression: number[][];
   };

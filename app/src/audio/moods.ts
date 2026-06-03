@@ -21,15 +21,20 @@ export const AUDIO_MOODS: AudioMoodDef[] = [
       chordGain: 0.032,
       chordFilterStart: 1150,
       chordFilterEnd: 620,
-      thumpGain: 0.018,
-      brushGain: 0.01,
+      thumpGain: 0.014,
+      bassGain: 0.018,
+      melodyGain: 0.006,
+      brushGain: 0.009,
       vinylGain: 0.014,
+      textureGain: 0.006,
+      fillGain: 0.006,
+      swing: 0.14,
       sparkle: false,
       progression: [
-        [146.83, 220, 261.63, 329.63],
-        [196, 246.94, 329.63, 440],
-        [130.81, 196, 246.94, 293.66],
-        [110, 196, 261.63, 329.63]
+        [146.83, 220, 261.63, 329.63, 349.23],
+        [196, 246.94, 329.63, 392, 440],
+        [130.81, 196, 246.94, 293.66, 329.63],
+        [110, 164.81, 196, 277.18, 466.16]
       ]
     }
   },
@@ -53,15 +58,20 @@ export const AUDIO_MOODS: AudioMoodDef[] = [
       chordGain: 0.022,
       chordFilterStart: 920,
       chordFilterEnd: 480,
-      thumpGain: 0.009,
+      thumpGain: 0.007,
+      bassGain: 0.012,
+      melodyGain: 0.0035,
       brushGain: 0.005,
       vinylGain: 0.011,
+      textureGain: 0.0038,
+      fillGain: 0.0035,
+      swing: 0.1,
       sparkle: false,
       progression: [
-        [130.81, 196, 246.94, 329.63],
-        [146.83, 220, 277.18, 349.23],
-        [116.54, 174.61, 220, 293.66],
-        [98, 196, 246.94, 311.13]
+        [130.81, 196, 246.94, 293.66, 329.63],
+        [146.83, 220, 277.18, 329.63, 349.23],
+        [116.54, 174.61, 220, 261.63, 293.66],
+        [98, 146.83, 196, 246.94, 311.13]
       ]
     }
   },
@@ -85,15 +95,20 @@ export const AUDIO_MOODS: AudioMoodDef[] = [
       chordGain: 0.026,
       chordFilterStart: 1450,
       chordFilterEnd: 760,
-      thumpGain: 0.007,
+      thumpGain: 0.005,
+      bassGain: 0.01,
+      melodyGain: 0.007,
       brushGain: 0.004,
       vinylGain: 0.008,
+      textureGain: 0.007,
+      fillGain: 0.004,
+      swing: 0.12,
       sparkle: true,
       progression: [
-        [164.81, 246.94, 329.63, 493.88],
-        [146.83, 220, 293.66, 440],
-        [196, 293.66, 369.99, 554.37],
-        [123.47, 246.94, 311.13, 493.88]
+        [164.81, 246.94, 329.63, 392, 493.88],
+        [146.83, 220, 293.66, 349.23, 440],
+        [196, 293.66, 369.99, 493.88, 554.37],
+        [123.47, 185, 246.94, 311.13, 493.88]
       ]
     }
   }

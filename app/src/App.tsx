@@ -3,14 +3,12 @@ import {
   BrickWall,
   Brush,
   CloudFog,
-  Download,
   Droplet,
   Eraser,
   Flame,
   Flower2,
   FolderOpen,
   Gem,
-  ImageDown,
   Info,
   Leaf,
   Moon,
@@ -33,6 +31,7 @@ import {
   type LucideIcon
 } from "lucide-react";
 import {
+  AUDIO_CHANNELS,
   AUDIO_MOODS,
   createAudioController,
   getAudioMoodDef,
@@ -40,18 +39,32 @@ import {
   loadAudioPrefs,
   MUSIC_PROVIDERS,
   saveAudioPrefs,
-  VISIBLE_AUDIO_CHANNELS,
   type AudioChannel,
   type AudioMood,
   type AudioPrefs,
   type MusicProvider
 } from "./audio";
 import { SegmentedControl, type SegmentOption } from "./components/SegmentedControl";
+import { DeskRadioPanel, type DeskRadioPlaybackState } from "./components/DeskRadioPanel";
+import { SharePanel } from "./components/SharePanel";
+import {
+  loadDeskRadioSource,
+  parseDeskRadioUrl,
+  saveDeskRadioSource,
+  type DeskRadioSource
+} from "./deskRadio";
 import { createEngine, type SandboxEngine } from "./engine";
 import { MATERIAL, MATERIALS, type MaterialDef, type MaterialId } from "./materials";
-import { detectReactionEvents } from "./reactions";
-import { applySnapshot, downloadSnapshot, loadLocal, readSnapshotFile, saveLocal } from "./storage";
-import { exportPostcard, renderSandbox } from "./renderer";
+import {
+  applySnapshot,
+  downloadSnapshot,
+  loadLocal,
+  readSnapshotFile,
+  saveLocal,
+  type SceneSnapshotContext,
+  type SceneSnapshotMetadata
+} from "./storage";
+import { exportClip, exportPostcard, renderSandbox } from "./renderer";
 import {
   getSceneEnvironment,
   loadSceneEnvironmentId,
@@ -68,15 +81,13 @@ const SIM_TICK_MS = 38;
 const AUDIO_CHANNEL_LABELS: Record<AudioChannel, string> = {
   master: "Master",
   ambience: "Ambience",
-  music: "Music",
-  effects: "Effects"
+  music: "Music"
 };
 
 const AUDIO_CHANNEL_HINTS: Record<AudioChannel, string> = {
   master: "Overall volume for the whole soundscape.",
   ambience: "Rain, window hush, room tone, and other environmental sounds.",
-  music: "Quiet lo-fi chords, beat, and vinyl texture.",
-  effects: "Future realistic Foley layer. Disabled in this build."
+  music: "Quiet lo-fi chords, beat, and vinyl texture."
 };
 
 const MATERIAL_ICONS: Record<MaterialId, LucideIcon> = {
@@ -93,6 +104,7 @@ const MATERIAL_ICONS: Record<MaterialId, LucideIcon> = {
   [MATERIAL.Moss]: Leaf,
   [MATERIAL.Seed]: Sprout,
   [MATERIAL.Fungus]: Flower2,
+  [MATERIAL.Flower]: Flower2,
   [MATERIAL.Oil]: Droplet,
   [MATERIAL.Ice]: Snowflake,
   [MATERIAL.Steam]: Wind,
@@ -103,9 +115,15 @@ const MATERIAL_ICONS: Record<MaterialId, LucideIcon> = {
 
 export function App() {
   const audio = useMemo(() => createAudioController(), []);
+  const previewBadge = usePreviewBadge();
+  const [deskRadioSource, setDeskRadioSource] = useState<DeskRadioSource | null>(() => loadDeskRadioSource());
+  const [deskRadioInput, setDeskRadioInput] = useState("");
+  const [deskRadioOpen, setDeskRadioOpen] = useState(false);
+  const [deskRadioPlayback, setDeskRadioPlayback] = useState<DeskRadioPlaybackState>("idle");
   const [audioPrefs, setAudioPrefs] = useState<AudioPrefs>(() => loadAudioPrefs());
   const activeMood = getAudioMoodDef(audioPrefs.mood);
   const activeMusicProvider = getMusicProviderDef(audioPrefs.provider);
+  const musicSourceLabel = audioPrefs.provider === "external" && deskRadioSource ? deskRadioSource.label : activeMusicProvider.label;
   const [engine, setEngine] = useState<SandboxEngine | null>(null);
   const [selected, setSelected] = useState<MaterialId>(MATERIAL.Sand);
   const [sceneEnvironment, setSceneEnvironment] = useState<SceneEnvironmentId>(() => loadSceneEnvironmentId());
@@ -144,6 +162,13 @@ export function App() {
   }, [audio, audioPrefs]);
 
   useEffect(() => {
+    if (audioPrefs.provider !== "external" || deskRadioSource) return;
+    setAudioPrefs((current) => ({ ...current, provider: "generated" }));
+    audio.setMusicProvider("generated");
+    setDeskRadioPlayback("idle");
+  }, [audio, audioPrefs.provider, deskRadioSource]);
+
+  useEffect(() => {
     saveSceneEnvironmentId(sceneEnvironment);
   }, [sceneEnvironment]);
 
@@ -160,11 +185,7 @@ export function App() {
 
     const loop = (time: number) => {
       if (!paused && time - lastSimTick >= SIM_TICK_MS) {
-        const before = engine.getCellBytes();
         engine.tick();
-        for (const event of detectReactionEvents(before, engine.getCellBytes())) {
-          audio.playReactionCue(event.cue, event.intensity);
-        }
         lastSimTick = time;
       }
       const base = baseCanvasRef.current;
@@ -183,14 +204,14 @@ export function App() {
 
     frame = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frame);
-  }, [audio, engine, paused]);
+  }, [engine, paused]);
 
   const groupedMaterials = useMemo<Record<string, MaterialDef[]>>(
     () => ({
-      basic: MATERIALS.filter((material) => material.group === "basic"),
-      life: MATERIALS.filter((material) => material.group === "life"),
-      heat: MATERIALS.filter((material) => material.group === "heat"),
-      cosmic: MATERIALS.filter((material) => material.group === "cosmic")
+      basic: MATERIALS.filter((material) => material.group === "basic" && material.userSelectable !== false),
+      life: MATERIALS.filter((material) => material.group === "life" && material.userSelectable !== false),
+      heat: MATERIALS.filter((material) => material.group === "heat" && material.userSelectable !== false),
+      cosmic: MATERIALS.filter((material) => material.group === "cosmic" && material.userSelectable !== false)
     }),
     []
   );
@@ -240,6 +261,17 @@ export function App() {
     []
   );
 
+  const snapshotContext = useMemo<SceneSnapshotContext>(
+    () => ({
+      title: activeSceneEnvironment.title,
+      room: sceneEnvironment,
+      mood: audioPrefs.mood,
+      musicProvider: audioPrefs.provider,
+      deskRadio: deskRadioSource
+    }),
+    [activeSceneEnvironment.title, audioPrefs.mood, audioPrefs.provider, deskRadioSource, sceneEnvironment]
+  );
+
   const paintAtPointer = useCallback(
     (event: PointerEvent<HTMLDivElement>) => {
       if (!engine || !baseCanvasRef.current) return;
@@ -247,7 +279,7 @@ export function App() {
       const x = Math.floor(((event.clientX - rect.left) / rect.width) * engine.width());
       const y = Math.floor(((event.clientY - rect.top) / rect.height) * engine.height());
       engine.paint(x, y, brushSize, selected);
-      audio.playMaterialPaint(selected, brushSize / 12);
+      audio.playPaintCue(selected);
     },
     [audio, brushSize, engine, selected]
   );
@@ -268,40 +300,60 @@ export function App() {
     event.currentTarget.releasePointerCapture(event.pointerId);
   }
 
+  function applySnapshotMetadata(metadata: SceneSnapshotMetadata | null) {
+    if (!metadata) return;
+    const deskRadio = metadata.musicProvider === "external" ? (metadata.deskRadio ?? null) : null;
+    if (deskRadio) {
+      setDeskRadioSource(deskRadio);
+      setDeskRadioOpen(true);
+      setDeskRadioPlayback("loading");
+      saveDeskRadioSource(deskRadio);
+    } else {
+      setDeskRadioPlayback("idle");
+      setDeskRadioOpen(false);
+      saveDeskRadioSource(null);
+    }
+    setSceneEnvironment(metadata.room);
+    setAudioPrefs((current) => ({ ...current, mood: metadata.mood, provider: metadata.musicProvider }));
+    audio.setMood(metadata.mood);
+    audio.setMusicProvider(metadata.musicProvider);
+  }
+
   function handleClear() {
     if (!engine) return;
     engine.clear();
-    audio.playUiCue("clear");
     setStatus("tray cleared");
   }
 
   function handleSave() {
     if (!engine) return;
-    const saved = saveLocal(engine);
-    if (saved) audio.playUiCue("save");
-    setStatus(saved ? "scene saved locally" : "local save failed");
+    const saved = saveLocal(engine, snapshotContext);
+    setStatus(saved ? "saved in browser" : "browser save failed");
   }
 
   function handleLoad() {
     if (!engine) return;
-    const loaded = loadLocal(engine);
-    if (loaded) audio.playUiCue("load");
-    setStatus(loaded ? "local scene loaded" : "no local save yet");
+    const result = loadLocal(engine);
+    if (result.loaded) {
+      applySnapshotMetadata(result.metadata);
+    }
+    setStatus(result.loaded ? "browser save loaded" : "no browser save yet");
   }
 
   function handleExport() {
     if (!engine) return;
-    downloadSnapshot(engine);
-    audio.playUiCue("export");
-    setStatus("scene exported");
+    downloadSnapshot(engine, snapshotContext);
+    setStatus("scene JSON exported");
   }
 
   async function handleImport(event: ChangeEvent<HTMLInputElement>) {
     if (!engine || !event.target.files?.[0]) return;
     const snapshot = await readSnapshotFile(event.target.files[0]);
-    const loaded = snapshot ? applySnapshot(engine, snapshot) : false;
-    if (loaded) audio.playUiCue("import");
-    setStatus(loaded ? "scene imported" : "invalid scene file");
+    const result = snapshot ? applySnapshot(engine, snapshot) : { loaded: false, metadata: null };
+    if (result.loaded) {
+      applySnapshotMetadata(result.metadata);
+    }
+    setStatus(result.loaded ? "scene JSON imported" : "invalid scene file");
     event.target.value = "";
   }
 
@@ -310,10 +362,41 @@ export function App() {
     await exportPostcard(engine, baseCanvasRef.current, glowCanvasRef.current, {
       sceneTitle: activeSceneEnvironment.title,
       moodTitle: activeMood.title,
-      musicSource: activeMusicProvider.label
+      musicSource: musicSourceLabel
     });
-    audio.playUiCue("export");
-    setStatus("postcard exported");
+    setStatus("postcard PNG exported");
+  }
+
+  async function handleClip() {
+    if (!engine || !baseCanvasRef.current || !glowCanvasRef.current) return;
+    setStatus("recording clip");
+    const exported = await exportClip(engine, baseCanvasRef.current, glowCanvasRef.current, {
+      sceneTitle: activeSceneEnvironment.title,
+      moodTitle: activeMood.title,
+      musicSource: musicSourceLabel
+    });
+    setStatus(exported ? "clip WebM exported" : "clip unavailable");
+  }
+
+  async function handleCopyShareNote() {
+    if (!engine || !navigator.clipboard?.writeText) {
+      setStatus("clipboard unavailable");
+      return;
+    }
+
+    const shareSummary = [
+      "Night Desk Terrarium scene",
+      `Room: ${activeSceneEnvironment.title}`,
+      `Sound: ${activeMood.title} / ${musicSourceLabel}`,
+      `Sim: ${engine.source.toUpperCase()}, tick ${engine.tickCount()}`
+    ].join("\n");
+
+    try {
+      await navigator.clipboard.writeText(shareSummary);
+      setStatus("share note copied");
+    } catch {
+      setStatus("clipboard unavailable");
+    }
   }
 
   async function handleToggleSound() {
@@ -332,7 +415,6 @@ export function App() {
       return;
     }
     setAudioPrefs(nextPrefs);
-    audio.playUiCue("toggle");
     setStatus(getAudioMoodDef(nextPrefs.mood).status);
   }
 
@@ -340,7 +422,6 @@ export function App() {
     const muted = !audioPrefs.muted;
     setAudioPrefs((current) => ({ ...current, muted }));
     audio.setMuted(muted);
-    if (audioPrefs.enabled && !muted) audio.playUiCue("toggle");
     setStatus(muted ? "audio muted" : "audio unmuted");
   }
 
@@ -359,19 +440,64 @@ export function App() {
     const moodDef = getAudioMoodDef(mood);
     setAudioPrefs((current) => ({ ...current, mood }));
     audio.setMood(mood);
-    if (audioPrefs.enabled && !audioPrefs.muted) audio.playUiCue("toggle");
     setStatus(audioPrefs.enabled ? moodDef.status : `${moodDef.title} ready`);
   }
 
   function handleMusicProvider(provider: MusicProvider) {
     const providerDef = getMusicProviderDef(provider);
-    if (!providerDef.available) {
-      setStatus(providerDef.status);
+    if (provider === "external" && !deskRadioSource) {
+      setStatus("desk radio needs a YouTube link");
+      setDeskRadioOpen(true);
       return;
+    }
+    if (provider === "external") setDeskRadioPlayback("loading");
+    else {
+      setDeskRadioOpen(false);
+      setDeskRadioPlayback("idle");
     }
     setAudioPrefs((current) => ({ ...current, provider }));
     audio.setMusicProvider(provider);
     setStatus(providerDef.status);
+  }
+
+  function handleDeskRadioTune() {
+    const source = parseDeskRadioUrl(deskRadioInput);
+    if (!source) {
+      setStatus("invalid YouTube link");
+      return;
+    }
+    setDeskRadioSource(source);
+    setDeskRadioOpen(true);
+    setDeskRadioPlayback("loading");
+    setAudioPrefs((current) => ({ ...current, provider: "external" }));
+    audio.setMusicProvider("external");
+    setStatus("checking desk radio");
+  }
+
+  function handleDeskRadioClear() {
+    setDeskRadioSource(null);
+    setDeskRadioInput("");
+    setDeskRadioOpen(false);
+    setDeskRadioPlayback("idle");
+    saveDeskRadioSource(null);
+    setAudioPrefs((current) => ({ ...current, provider: "generated" }));
+    audio.setMusicProvider("generated");
+    setStatus("generated music selected");
+  }
+
+  function handleDeskRadioReady(source: DeskRadioSource) {
+    setDeskRadioPlayback("ready");
+    setDeskRadioInput("");
+    saveDeskRadioSource(source);
+    setStatus("desk radio ready");
+  }
+
+  function handleDeskRadioBlocked(code: number) {
+    setDeskRadioPlayback("blocked");
+    saveDeskRadioSource(null);
+    setAudioPrefs((current) => (current.provider === "external" ? { ...current, provider: "generated" } : current));
+    audio.setMusicProvider("generated");
+    setStatus(code === 101 || code === 150 ? "YouTube blocked embed; generated music restored" : "YouTube player unavailable; generated music restored");
   }
 
   function handleSceneEnvironment(id: SceneEnvironmentId) {
@@ -379,13 +505,17 @@ export function App() {
     setSceneEnvironment(id);
     setAudioPrefs((current) => ({ ...current, mood: scene.mood }));
     audio.setMood(scene.mood);
-    if (audioPrefs.enabled && !audioPrefs.muted) audio.playUiCue("toggle");
     setStatus(scene.status);
   }
 
   return (
     <main className={`app-shell ${activeSceneEnvironment.className}`} style={sceneShellStyle}>
       <canvas ref={motesCanvasRef} className="motes-canvas" aria-hidden="true" />
+      {previewBadge && (
+        <div className="preview-build-badge" data-testid="preview-build-badge">
+          {previewBadge}
+        </div>
+      )}
       <section className="workspace" aria-label="Cozy pixel sandbox">
         <aside className="tool-panel" aria-label="Materials">
           <div className="brand-mark">
@@ -404,7 +534,8 @@ export function App() {
                       className={`material-button ${selected === material.id ? "active" : ""}`}
                       key={material.id}
                       type="button"
-                      title={material.label}
+                      aria-label={`${material.label}: ${material.description}`}
+                      title={`${material.label}: ${material.description}`}
                       style={{ "--material-color": material.color } as React.CSSProperties}
                       onClick={() => setSelected(material.id)}
                     >
@@ -477,21 +608,22 @@ export function App() {
                 onChange={handleSceneEnvironment}
               />
             </div>
-            <button type="button" data-testid="save-scene" onClick={handleSave}>
+            <button type="button" title="Save in this browser" data-testid="save-scene" onClick={handleSave}>
               <Save size={16} /> Save
             </button>
-            <button type="button" data-testid="load-scene" onClick={handleLoad}>
+            <button type="button" title="Load browser save" data-testid="load-scene" onClick={handleLoad}>
               <FolderOpen size={16} /> Load
             </button>
-            <button type="button" data-testid="export-scene" onClick={handleExport}>
-              <Download size={16} /> Export
-            </button>
-            <button type="button" data-testid="import-scene" onClick={() => fileInputRef.current?.click()}>
-              <FolderOpen size={16} /> Import
-            </button>
-            <button type="button" onClick={handlePostcard}>
-              <ImageDown size={16} /> Postcard
-            </button>
+            <SharePanel
+              sceneTitle={activeSceneEnvironment.title}
+              moodTitle={activeMood.title}
+              musicSource={musicSourceLabel}
+              onCopyNote={handleCopyShareNote}
+              onExportClip={handleClip}
+              onExportPostcard={handlePostcard}
+              onExportScene={handleExport}
+              onImportScene={() => fileInputRef.current?.click()}
+            />
           </div>
 
           <div className="audio-panel" aria-label="Audio">
@@ -537,8 +669,22 @@ export function App() {
               onChange={handleMusicProvider}
             />
 
+            {(deskRadioOpen || audioPrefs.provider === "external") && (
+              <DeskRadioPanel
+                inputValue={deskRadioInput}
+                playbackState={deskRadioPlayback}
+                source={deskRadioSource}
+                usingExternalProvider={audioPrefs.provider === "external"}
+                onClear={handleDeskRadioClear}
+                onEmbedBlocked={handleDeskRadioBlocked}
+                onEmbedReady={handleDeskRadioReady}
+                onInputChange={setDeskRadioInput}
+                onTune={handleDeskRadioTune}
+              />
+            )}
+
             <div className="audio-sliders">
-              {VISIBLE_AUDIO_CHANNELS.map((channel) => (
+              {AUDIO_CHANNELS.map((channel) => (
                 <label className="audio-slider" key={channel}>
                   <span className="audio-slider-label">
                     {AUDIO_CHANNEL_LABELS[channel]}
@@ -572,4 +718,24 @@ export function App() {
       </section>
     </main>
   );
+}
+
+function usePreviewBadge() {
+  const [badge, setBadge] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const enabled = ["fresh", "visualQa", "chromeQa", "firefoxQa"].some((key) => params.has(key));
+    if (!enabled) return;
+
+    const label = params.get("fresh") ?? params.get("visualQa") ?? params.get("chromeQa") ?? params.get("firefoxQa") ?? "preview";
+    const assetName = (value: string | undefined) => (value ? value.split("/").pop() : "missing");
+    const script = assetName(Array.from(document.scripts, (item) => item.src).find((src) => src.includes("/assets/index-")));
+    const style = assetName(
+      Array.from(document.styleSheets, (sheet) => sheet.href ?? "").find((href) => href.includes("/assets/index-"))
+    );
+    setBadge(`${label} | js ${script} | css ${style}`);
+  }, []);
+
+  return badge;
 }

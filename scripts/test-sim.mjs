@@ -18,7 +18,7 @@ child.on("error", (error) => {
   process.exit(1);
 });
 
-child.on("exit", (code, signal) => {
+child.on("close", (code, signal) => {
   if (signal) {
     console.error(`cargo test stopped by ${signal}`);
     process.exit(1);

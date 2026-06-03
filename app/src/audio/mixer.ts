@@ -5,16 +5,14 @@ export function createAudioMixer(context: AudioContext): RunningAudio {
   const master = context.createGain();
   const ambience = context.createGain();
   const music = context.createGain();
-  const effects = context.createGain();
 
   ambience.connect(master);
   music.connect(master);
-  effects.connect(master);
   master.connect(context.destination);
 
   return {
     context,
-    channels: { master, ambience, music, effects }
+    channels: { master, ambience, music }
   };
 }
 

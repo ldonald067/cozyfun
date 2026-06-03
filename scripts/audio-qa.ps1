@@ -10,9 +10,9 @@ if (-not (Test-Path $Npm)) {
 
 Push-Location $Root
 try {
-  & $Npm run test:browser
+  & $Npm run audio:qa
   if ($LASTEXITCODE -ne 0) {
-    throw "npm run test:browser failed with exit code $LASTEXITCODE."
+    throw "npm run audio:qa failed with exit code $LASTEXITCODE."
   }
 }
 finally {

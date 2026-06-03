@@ -4,7 +4,7 @@ export const MUSIC_PROVIDERS: MusicProviderDef[] = [
   {
     id: "generated",
     label: "Generated",
-    title: "Generated lo-fi",
+    title: "Generated lo-fi jazz",
     status: "generated music selected",
     available: true
   },
@@ -12,9 +12,8 @@ export const MUSIC_PROVIDERS: MusicProviderDef[] = [
     id: "external",
     label: "Desk Radio",
     title: "YouTube desk radio",
-    status: "desk radio planned for sharing phase",
-    available: false,
-    badge: "Phase 5"
+    status: "desk radio selected",
+    available: true
   }
 ];
 

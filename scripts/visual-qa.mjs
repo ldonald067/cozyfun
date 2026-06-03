@@ -6,6 +6,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { PHASE_SEVEN_QA_LABEL, phaseSevenShowcaseScript } from "./phase-seven-showcase.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const distDir = path.join(root, "app", "dist");
@@ -42,7 +43,7 @@ async function main() {
       mobile: false
     });
 
-    const appUrl = `http://127.0.0.1:${staticServer.port}/?visualQa=phase4`;
+    const appUrl = `http://127.0.0.1:${staticServer.port}/?visualQa=${PHASE_SEVEN_QA_LABEL}`;
     await cdp.send("Page.navigate", { url: appUrl });
     await waitUntil(
       () => evaluate(cdp, `document.readyState === "complete" && Boolean(document.querySelector('[data-testid="sandbox-tray"]'))`),
@@ -50,8 +51,10 @@ async function main() {
     );
     await waitUntil(async () => (await statusText(cdp)).includes("online"), "engine online");
 
-    await paintPhaseFourScene(cdp);
-    const materialCapture = await saveSandboxComposite(cdp, "phase4-materials.png");
+    await paintCurrentVisualScene(cdp);
+    const materialCapture = await saveSandboxComposite(cdp, "current-materials.png");
+    await loadPhaseSevenShowcase(cdp);
+    const phaseSevenCapture = await saveSandboxComposite(cdp, `${PHASE_SEVEN_QA_LABEL}.png`);
     const desktopLayout = await layoutState(cdp);
     assert(desktopLayout.controlsBottom <= desktopLayout.viewportHeight + 1, `desktop controls overflow vertically: ${JSON.stringify(desktopLayout)}`);
     assert(desktopLayout.materialsBottom <= desktopLayout.viewportHeight + 1, `desktop materials overflow vertically: ${JSON.stringify(desktopLayout)}`);
@@ -68,20 +71,27 @@ async function main() {
     assert(mobileLayout.viewportWidth <= 390, `unexpected mobile viewport: ${JSON.stringify(mobileLayout)}`);
     assert(mobileLayout.controlsRight <= mobileLayout.viewportWidth + 1, `mobile controls overflow: ${JSON.stringify(mobileLayout)}`);
 
-    await writeFile(path.join(outputDir, "phase4-layout.json"), JSON.stringify({ desktopLayout, mobileLayout }, null, 2));
-    const screenshotCapture = await trySaveScreenshot(cdp, "phase4-mobile-layout.png");
+    await writeFile(path.join(outputDir, "current-layout.json"), JSON.stringify({ desktopLayout, mobileLayout }, null, 2));
+    const screenshotCapture = await trySaveScreenshot(cdp, "current-mobile-layout.png");
 
     await cdp.close();
 
     console.log("Visual QA captures written:");
     console.log(`- ${materialCapture}`);
-    console.log(`- ${path.join(outputDir, "phase4-layout.json")}`);
+    console.log(`- ${phaseSevenCapture}`);
+    console.log(`- ${path.join(outputDir, "current-layout.json")}`);
     for (const capture of roomCaptures) console.log(`- ${capture}`);
     if (screenshotCapture) console.log(`- ${screenshotCapture}`);
   } finally {
     await browser.close();
     await staticServer.close();
   }
+}
+
+async function loadPhaseSevenShowcase(cdp) {
+  await evaluate(cdp, phaseSevenShowcaseScript());
+  await waitUntil(async () => (await statusText(cdp)).includes("browser save loaded"), "phase 7 showcase");
+  await sleep(600);
 }
 
 async function saveRoomCaptures(cdp) {
@@ -103,7 +113,7 @@ async function saveRoomCaptures(cdp) {
   return captures;
 }
 
-async function paintPhaseFourScene(cdp) {
+async function paintCurrentVisualScene(cdp) {
   await evaluate(cdp, `window.scrollTo(0, 0); true`);
   await sleep(120);
   const rects = await evaluate(
@@ -118,7 +128,8 @@ async function paintPhaseFourScene(cdp) {
         "Sand", "Soil", "Seed", "Moss", "Fungus", "Oil", "Wood", "Ice",
         "Water", "Moonwater", "Lava", "Fire", "Smoke", "Steam", "Stardust"
       ]) {
-        const rect = document.querySelector(\`button[title="\${title}"]\`)?.getBoundingClientRect();
+        const button = Array.from(document.querySelectorAll(".material-button")).find((candidate) => candidate.textContent.trim() === title);
+        const rect = button?.getBoundingClientRect();
         materials[title] = rect ? { left: rect.left, top: rect.top, width: rect.width, height: rect.height } : null;
       }
       return { tray: rectOf('[data-testid="sandbox-tray"]'), clear: rectOf('[data-testid="clear-scene"]'), materials };
@@ -249,7 +260,7 @@ async function startStaticServer() {
       }
       const pathname = decodeURIComponent(url.pathname === "/" ? "/index.html" : url.pathname);
       const filePath = path.resolve(distDir, `.${pathname}`);
-      if (!filePath.startsWith(distDir)) {
+      if (!isInsideDist(filePath)) {
         response.writeHead(403);
         response.end("Forbidden");
         return;
@@ -268,6 +279,11 @@ async function startStaticServer() {
     port,
     close: () => new Promise((resolve) => server.close(resolve))
   };
+}
+
+function isInsideDist(filePath) {
+  const relative = path.relative(distDir, filePath);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
 async function startBrowser() {

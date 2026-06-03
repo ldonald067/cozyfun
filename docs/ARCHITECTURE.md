@@ -10,10 +10,10 @@ This project is a static browser toy: React owns the interface, Rust/WASM owns t
 4. `app/src/renderer.ts` converts the engine cell bytes into base, glow, and atmosphere canvas layers.
 5. `app/src/storage.ts` handles browser-local saves and JSON scene import/export.
 6. `app/src/audio.ts` exposes the optional procedural Web Audio controller.
-7. `app/src/sceneEnvironments.ts` provides non-destructive room/backdrop definitions and their local image metadata.
-8. `app/src/reactions.ts` detects coarse visual/audio reaction events from before/after cell snapshots.
+7. `app/src/deskRadio.ts` validates user-provided YouTube Desk Radio sources and creates visible watch/embed URLs.
+8. `app/src/sceneEnvironments.ts` provides non-destructive room/backdrop definitions and their local image metadata.
 
-The built app is static. There is no server, account system, database, cloud save, streaming dependency, or paid API in the current architecture.
+The built app is static. There is no server, account system, database, cloud save, hidden streaming dependency, or paid API in the current architecture. Desk Radio is an optional browser-side YouTube player selected by the user; generated music remains the default and fallback.
 
 ## Simulation Boundary
 
@@ -37,6 +37,7 @@ Rendering is allowed to inspect these bytes, but it should not mutate them. Visu
 - write glow pixels
 - draw global atmospheric motes
 - export postcards
+- export short clips when `MediaRecorder` is available
 
 Material-specific color and texture decisions live under `app/src/rendering`:
 
@@ -59,34 +60,39 @@ This split keeps visual work expandable without turning the renderer into a pile
 - `providers.ts`: generated/external music provider definitions.
 - `ambience.ts`: long-running environment layers.
 - `music.ts`: procedural rainy lo-fi bed.
-- `effects.ts`: prototype material and UI one-shots, currently disabled until a realistic Foley pass.
 
-This keeps Phase 3 music work reusable without burying composition, mixer state, and sound effects in one file.
+This keeps Phase 3 music work reusable without burying composition and mixer state in one file.
 
-Future external music should enter through a provider boundary rather than replacing this audio system. Generated music remains the default. YouTube or any other third-party player should be isolated behind an external provider and shown as a visible mini-player, while ambience and future realistic Foley continue to use the native procedural mixer.
+External music enters through the provider boundary rather than replacing this audio system. Generated music remains the default. Desk Radio parsing is isolated in `deskRadio.ts` and playback is shown as a visible mini-player, while ambience stays native.
 
 ## UI Boundary
 
-Keep reusable controls in `app/src/components` when the same interaction pattern appears in more than one place. `SegmentedControl` is the first shared control and is used for sound moods, music source selection, and room backdrops.
+Keep reusable controls in `app/src/components` when they remove real top-level UI weight. `SegmentedControl` is shared by sound moods, music source selection, and room backdrops. `SharePanel` and `DeskRadioPanel` keep Phase 5 controls out of the main app orchestration without inventing a larger UI framework.
 
 The app should favor compact controls over explanatory panels. Tooltips and titles are acceptable for details like channel meaning; the first screen should remain the toy itself.
 
-## Room Backdrops And Reactions
+## Room Backdrops
 
-Visible room controls change CSS atmosphere, local backdrop images, and the default audio mood without mutating the simulation. The selected room is persisted in localStorage, separate from scene JSON. This keeps the sandbox personal: user-created pixels are not replaced by a preset.
+Visible room controls change CSS atmosphere, local backdrop images, and the default audio mood without mutating the simulation. The selected room is persisted in localStorage and included as metadata in `CXS2` scene JSON so shared scenes can restore their atmosphere without replacing the user's pixels with a preset.
 
 Room images are served from `app/public/rooms` and referenced through scene metadata, then softened by CSS lighting, weather, and darkening layers. This keeps the source of truth in one small data file and prevents image paths from spreading across the UI. Third-party sources belong in `ASSET_CREDITS.md` and should be updated in the same change as any asset replacement.
 
 `app/src/devSceneSeeds.ts` keeps painted starter worlds for internal QA and future experiments. They are not part of the main UI until the visuals are strong enough to justify replacing a user's canvas.
 
-Reaction detection compares before/after cell bytes after a tick and emits a small set of event types for future audio feedback. It should stay coarse and throttled; high-volume per-cell sound would make the sandbox noisy and expensive.
+## Sharing Boundary
+
+`app/src/storage.ts` owns scene snapshots. `CXS2` files include validated share metadata for room, sound mood, generated/external music provider, and an optional Desk Radio source. Imports still accept legacy `CXS1` files, but only `CXS2` can restore atmosphere and music context.
+
+Sharing state belongs in `App.tsx`, the visible controls live in `SharePanel`, and image/clip generation stays in `renderer.ts`. This keeps export buttons thin and keeps canvas capture details out of React state.
+
+Desk Radio is user-controlled. It plays only a pasted YouTube video or playlist source through the visible YouTube player; it does not search, auto-pick playlists, use an API key, or hide playback. If YouTube reports that a link cannot be embedded, `App.tsx` switches back to generated music and keeps the drawer open for another link.
 
 ## Adding A Material
 
 1. Add the material id to `MATERIAL` in `app/src/materials.ts`.
 2. Add its label, slug, palette, group, and optional glow color to `MATERIALS`.
 3. Add simulation behavior in Rust, and mirror only necessary fallback behavior in `app/src/engine.ts`.
-4. Add a toolbar icon in `app/src/App.tsx`.
+4. Add a toolbar icon in `app/src/App.tsx` when users should be able to paint it directly. Generated-only outcomes can stay in `MATERIALS` with `userSelectable: false`.
 5. Add rendering rules in `app/src/rendering/shapeLanguage.ts` only if palette variation is not enough.
 6. Extend smoke tests if the material changes common workflows.
 
@@ -107,6 +113,6 @@ CI runs Rust tests, the production build, and browser smoke checks on every push
 - Prefer deterministic procedural visuals for the sandbox itself; use local image assets only for room atmosphere when they strengthen the scene.
 - Keep simulation behavior and visual polish separate.
 - Keep audio optional and user-initiated.
-- Keep exported scene data stable and validated.
+- Keep exported scene data stable, backward-compatible, and validated.
 - Keep third-party asset credits near the repo root for simple publishing audits.
 - Add small abstractions only when they make the next material or test easier.

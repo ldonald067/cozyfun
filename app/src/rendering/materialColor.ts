@@ -7,6 +7,7 @@ export function colorForCell(options: {
   variant: number;
   age: number;
   energy: number;
+  flags: number;
   time: number;
   cells: Uint8Array;
   width: number;
@@ -14,7 +15,7 @@ export function colorForCell(options: {
   x: number;
   y: number;
 }): Rgb {
-  const { kind, variant, age, energy, time, cells, width, height, x, y } = options;
+  const { kind, variant, age, energy, flags, time, cells, width, height, x, y } = options;
   if (kind === MATERIAL.Empty) return emptyCellColor(cells, width, height, x, y, time);
 
   const material = MATERIAL_BY_ID.get(kind as MaterialId);
@@ -53,7 +54,7 @@ export function colorForCell(options: {
     b = clampColor(b * fade + 20 * (1 - fade));
   }
 
-  return applyShapeLanguage({ kind, color: [r, g, b], variant, age, energy, time, cells, width, height, x, y });
+  return applyShapeLanguage({ kind, color: [r, g, b], variant, age, energy, flags, time, cells, width, height, x, y });
 }
 
 export function hasGlow(kind: number) {
@@ -62,7 +63,7 @@ export function hasGlow(kind: number) {
 
 export function glowIntensity(kind: number, energy: number, age: number, time: number) {
   const pulse = (Math.sin(time * 0.01 + age * 0.25) + 1) * 0.5;
-  const base = kind === MATERIAL.Stardust || kind === MATERIAL.Moonwater ? 80 : 120;
+  const base = kind === MATERIAL.Stardust || kind === MATERIAL.Moonwater || kind === MATERIAL.Flower ? 80 : 120;
   return clampColor(base + energy * 0.45 + pulse * 55);
 }
 
