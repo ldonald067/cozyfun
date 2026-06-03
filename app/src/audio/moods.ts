@@ -28,6 +28,9 @@ export const AUDIO_MOODS: AudioMoodDef[] = [
       vinylGain: 0.014,
       textureGain: 0.006,
       fillGain: 0.006,
+      grooveGain: 0.85,
+      colorGain: 0.82,
+      phraseGain: 0.78,
       swing: 0.14,
       sparkle: false,
       progression: [
@@ -65,6 +68,9 @@ export const AUDIO_MOODS: AudioMoodDef[] = [
       vinylGain: 0.011,
       textureGain: 0.0038,
       fillGain: 0.0035,
+      grooveGain: 0.48,
+      colorGain: 0.58,
+      phraseGain: 0.42,
       swing: 0.1,
       sparkle: false,
       progression: [
@@ -102,6 +108,9 @@ export const AUDIO_MOODS: AudioMoodDef[] = [
       vinylGain: 0.008,
       textureGain: 0.007,
       fillGain: 0.004,
+      grooveGain: 0.46,
+      colorGain: 0.9,
+      phraseGain: 0.72,
       swing: 0.12,
       sparkle: true,
       progression: [

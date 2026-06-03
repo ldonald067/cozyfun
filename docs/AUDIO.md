@@ -37,9 +37,10 @@ The music layer should feel like rainy lo-fi desk music:
 - swung jazz chord comping with seventh/ninth color
 - a soft walking bass line
 - small restrained melodic phrases
-- brushed hat/snare texture and low thump
+- brushed hat/snare texture, rim clicks, ghost notes, and low thump
+- hip-hop pocket variation through quiet pickup kicks and fills
 - vinyl dust
-- quiet texture layers and sparse brushed fills
+- quiet Rhodes-like color answers, texture layers, and sparse brushed fills
 - low volume by default
 
 Avoid dramatic pads, arcade leads, busy melodies, or anything that fights the sandbox sounds. Generated music should feel composed, but it should stay humble enough to sit behind painting and rain.

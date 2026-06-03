@@ -48,6 +48,9 @@ export type AudioMoodDef = {
     vinylGain: number;
     textureGain: number;
     fillGain: number;
+    grooveGain: number;
+    colorGain: number;
+    phraseGain: number;
     swing: number;
     sparkle: boolean;
     progression: number[][];

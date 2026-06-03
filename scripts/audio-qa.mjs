@@ -11,8 +11,13 @@ const melodyPhrases = [
   [-1, 2, -1, 3, 4, -1, 3, -1, -1, 2, 1, -1, 2, -1, -1, -1],
   [-1, -1, 3, -1, 4, 3, -1, 2, -1, -1, 1, -1, 2, 3, -1, -1],
   [-1, 2, -1, -1, 3, -1, 4, -1, 3, -1, 2, -1, -1, 1, -1, -1],
-  [-1, -1, 4, 3, -1, 2, -1, -1, -1, 3, -1, 2, 1, -1, -1, -1]
+  [-1, -1, 4, 3, -1, 2, -1, -1, -1, 3, -1, 2, 1, -1, -1, -1],
+  [-1, 1, -1, -1, 3, -1, 2, -1, 4, -1, -1, 3, -1, 2, -1, -1],
+  [-1, -1, 2, 3, -1, -1, 4, -1, -1, 3, -1, -1, 2, 1, -1, -1],
+  [-1, 3, -1, 4, -1, 3, -1, -1, 2, -1, 1, -1, -1, 2, -1, -1],
+  [-1, -1, -1, 2, -1, 4, 3, -1, -1, 1, -1, 2, -1, -1, 3, -1]
 ];
+const semitone = Math.pow(2, 1 / 12);
 
 await main();
 
@@ -64,8 +69,9 @@ async function renderMood(mood) {
 
   const stepSeconds = music.stepMs / 1000;
   const stepCount = Math.ceil(durationSeconds / stepSeconds) + 2;
+  const seed = hashText(mood.id);
   for (let step = 0; step < stepCount; step++) {
-    scheduleStep(samples, music, step, step * stepSeconds);
+    scheduleStep(samples, music, step, step * stepSeconds, seed);
   }
 
   applyFade(samples, 0.35);
@@ -82,7 +88,10 @@ async function renderMood(mood) {
     swing: music.swing,
     chordCount: music.progression.length,
     hasBrushFills: music.fillGain > 0,
-    hasTextureLayer: music.textureGain > 0
+    hasTextureLayer: music.textureGain > 0,
+    grooveGain: music.grooveGain,
+    colorGain: music.colorGain,
+    phraseGain: music.phraseGain
   };
 }
 
@@ -104,31 +113,51 @@ function addBackground(samples, mood, rng) {
   }
 }
 
-function scheduleStep(samples, settings, step, baseTime) {
+function scheduleStep(samples, settings, step, baseTime, seed) {
   const swingDelay = step % 2 === 1 ? (settings.stepMs / 1000) * settings.swing : 0.012;
   const time = baseTime + swingDelay;
   const barStep = step % 8;
+  const bar = Math.floor(step / 8);
+  const phrase = Math.floor(step / 16);
   const chordIndex = Math.floor(step / 8) % settings.progression.length;
   const chord = settings.progression[chordIndex];
   const nextChord = settings.progression[(chordIndex + 1) % settings.progression.length];
+  const chordAccent = 0.92 + stepRandom(step, seed + 1) * 0.16;
 
-  if (barStep === 0) addChord(samples, settings, chord, time, 1, 3.15);
-  if (barStep === 3 && step % 16 === 3) addChord(samples, settings, chord, time, 0.24, 0.82);
-  if (barStep === 5) addChord(samples, settings, chord, time, 0.46, 1.45);
+  if (barStep === 0) addChord(samples, settings, chord, time, chordAccent, 3.15);
+  if (barStep === 2 && settings.colorGain > 0 && stepRandom(bar, seed + 2) > 0.52) {
+    addColorAnswer(samples, settings, chord, nextChord, step, time + 0.018, 0.72);
+  }
+  if (barStep === 3 && step % 16 === 3) addChord(samples, settings, colorVoicing(chord, nextChord, step), time, 0.24, 0.82);
+  if (barStep === 5) addChord(samples, settings, colorVoicing(chord, nextChord, step), time, 0.44 + settings.colorGain * 0.08, 1.45);
+  if (barStep === 6 && settings.colorGain > 0 && phrase % 3 === 1) {
+    addColorAnswer(samples, settings, nextChord, chord, step, time + 0.035, 0.54);
+  }
   if (barStep === 7 && step % 32 === 31) addChord(samples, settings, nextChord, time, 0.22, 0.74);
 
   if (barStep % 2 === 0) addBass(samples, settings, chord, nextChord, barStep, time);
+  if (barStep === 7 && settings.grooveGain > 0 && bar % 4 !== 0) addBassPickup(samples, settings, chord, nextChord, time);
   if (barStep === 0) addThump(samples, settings, time, 1);
+  if (barStep === 2 && settings.grooveGain > 0 && (bar % 4 === 1 || stepRandom(bar, seed + 3) > 0.66)) {
+    addThump(samples, settings, time + 0.018, 0.24 * settings.grooveGain, 70);
+  }
   if (barStep === 6) addThump(samples, settings, time, 0.4);
+  if (barStep === 7 && settings.grooveGain > 0 && bar % 8 === 3) addThump(samples, settings, time + 0.025, 0.18 * settings.grooveGain, 62);
 
   if (settings.brushGain > 0) {
-    addNoiseBurst(samples, time, 0.042, settings.brushGain * (step % 2 === 0 ? 0.45 : 0.85), "hat");
+    const hatAccent = step % 2 === 0 ? 0.42 : 0.82 + settings.grooveGain * 0.1;
+    addNoiseBurst(samples, time, 0.042, settings.brushGain * hatAccent, "hat");
+    if (settings.grooveGain > 0 && barStep === 1 && stepRandom(bar, seed + 4) > 0.42) addRimClick(samples, settings, time, 0.72);
+    if (settings.grooveGain > 0 && barStep === 3 && stepRandom(step, seed + 5) > 0.72) addGhostSnare(samples, settings, time + 0.015, 0.48);
     if (barStep === 4) addNoiseBurst(samples, time, 0.12, settings.brushGain, "snare");
+    if (settings.grooveGain > 0 && barStep === 5 && stepRandom(bar, seed + 6) > 0.58) addRimClick(samples, settings, time, 0.48);
+    if (settings.grooveGain > 0 && barStep === 6 && stepRandom(step, seed + 7) > 0.74) addGhostSnare(samples, settings, time, 0.32);
     if (barStep === 7) addNoiseBurst(samples, time, 0.12, settings.brushGain * 0.32, "snare");
-    if (settings.fillGain > 0 && step % 32 === 30) addBrushFill(samples, settings, time);
+    if (settings.fillGain > 0 && step % 32 === 30) addBrushFill(samples, settings, time, settings.grooveGain > 0.65 ? 6 : 4);
+    if (settings.grooveGain > 0 && barStep === 7 && bar % 8 === 7) addNoiseBurst(samples, time + 0.035, 0.11, settings.brushGain * settings.grooveGain * 0.42, "hat");
   }
 
-  addMelody(samples, settings, chord, step, time);
+  addMelody(samples, settings, chord, nextChord, step, time, seed);
   if (settings.sparkle && step % 12 === 7) {
     addTone(samples, time, 0.38, 880, 0.006, "sine", { attack: 0.018, release: 0.2 });
     addTone(samples, time + 0.04, 0.38, 1320, 0.006, "sine", { attack: 0.018, release: 0.2 });
@@ -155,6 +184,17 @@ function addChord(samples, settings, frequencies, time, gainScale, duration) {
   }
 }
 
+function addColorAnswer(samples, settings, chord, nextChord, step, time, gainScale) {
+  const notes = colorVoicing(chord, nextChord, step).slice(2, 5);
+  notes.forEach((frequency, index) => {
+    addTone(samples, time + index * 0.021, 0.72, liftToLeadRegister(frequency), settings.colorGain * 0.009 * gainScale, index % 2 === 0 ? "triangle" : "sine", {
+      attack: 0.055,
+      release: 0.55,
+      detuneCents: index * 3 - 5
+    });
+  });
+}
+
 function addBass(samples, settings, chord, nextChord, barStep, time) {
   const root = bassRegister(chord[0]);
   const nextRoot = bassRegister(nextChord[0]);
@@ -169,32 +209,73 @@ function addBass(samples, settings, chord, nextChord, barStep, time) {
   addTone(samples, time, 0.5, frequency, settings.bassGain * 1.3, "triangle", { attack: 0.018, release: 0.24 });
 }
 
-function addMelody(samples, settings, chord, step, time) {
+function addBassPickup(samples, settings, chord, nextChord, time) {
+  const current = bassRegister(chord[0]);
+  const next = bassRegister(nextChord[0]);
+  addTone(samples, time + 0.02, 0.28, approachNote(current, next), settings.bassGain * settings.grooveGain * 0.55, "triangle", {
+    attack: 0.018,
+    release: 0.22
+  });
+}
+
+function addMelody(samples, settings, chord, nextChord, step, time, seed) {
   if (settings.melodyGain <= 0) return;
-  const phrase = melodyPhrases[Math.floor(step / 16) % melodyPhrases.length];
+  const phraseIndex = (Math.floor(step / 16) + Math.floor(step / 64) + Math.floor(stepRandom(Math.floor(step / 16), seed + 8) * 3)) % melodyPhrases.length;
+  const phrase = melodyPhrases[phraseIndex];
   const noteIndex = phrase[step % phrase.length];
   if (noteIndex < 0) return;
-  addTone(samples, time, 0.58, melodyFrequency(chord, noteIndex), settings.melodyGain * 1.5, "sine", {
+  if (settings.phraseGain > 0 && stepRandom(step, seed + 9) > 0.88 - settings.phraseGain * 0.18) return;
+  const gainScale = 0.82 + stepRandom(step, seed + 10) * 0.26;
+  const frequency = melodyFrequency(chord, noteIndex);
+  addTone(samples, time, 0.5 + settings.phraseGain * 0.14, frequency, settings.melodyGain * gainScale * 1.5, "sine", {
     attack: 0.028,
     release: 0.3,
     vibrato: 3.5
   });
+  if (settings.phraseGain > 0 && step % 8 >= 5 && stepRandom(step, seed + 11) > 0.72) {
+    const answerIndex = Math.max(1, noteIndex - (stepRandom(step, seed + 12) > 0.5 ? 1 : 2));
+    addTone(samples, time + 0.18, 0.34, melodyFrequency(nextChord, answerIndex), settings.melodyGain * settings.phraseGain * 0.86, "sine", {
+      attack: 0.028,
+      release: 0.28,
+      vibrato: 3
+    });
+  }
+  if (settings.phraseGain > 0.65 && stepRandom(step, seed + 13) > 0.84) {
+    addTone(samples, time + 0.038, 0.24, frequency / semitone, settings.melodyGain * 0.42, "sine", {
+      attack: 0.026,
+      release: 0.24,
+      vibrato: 2.2
+    });
+  }
 }
 
-function addThump(samples, settings, time, gainScale) {
+function addThump(samples, settings, time, gainScale, startFrequency = 82) {
   const start = secondsToIndex(time);
   const end = Math.min(samples.length, start + secondsToIndex(0.24));
   for (let i = start; i < end; i++) {
     const elapsed = (i - start) / sampleRate;
     const t = elapsed / 0.24;
-    const frequency = 82 * Math.pow(48 / 82, Math.min(1, elapsed / 0.16));
+    const endFrequency = Math.max(42, startFrequency * 0.58);
+    const frequency = startFrequency * Math.pow(endFrequency / startFrequency, Math.min(1, elapsed / 0.16));
     samples[i] += Math.sin(Math.PI * 2 * frequency * elapsed) * envelope(t, 0.05, 0.72) * settings.thumpGain * gainScale * 1.8;
   }
 }
 
-function addBrushFill(samples, settings, time) {
-  for (let i = 0; i < 4; i++) {
-    addNoiseBurst(samples, time + i * 0.055, 0.06, settings.fillGain * (1 - i * 0.12), i % 2 === 0 ? "snare" : "hat");
+function addGhostSnare(samples, settings, time, gainScale) {
+  addNoiseBurst(samples, time, 0.065, settings.brushGain * settings.grooveGain * gainScale, "snare");
+}
+
+function addRimClick(samples, settings, time, gainScale) {
+  addNoiseBurst(samples, time, 0.028, settings.brushGain * settings.grooveGain * gainScale * 0.72, "rim");
+  addTone(samples, time, 0.055, 760, settings.brushGain * settings.grooveGain * gainScale * 0.27, "triangle", {
+    attack: 0.11,
+    release: 0.58
+  });
+}
+
+function addBrushFill(samples, settings, time, hits) {
+  for (let i = 0; i < hits; i++) {
+    addNoiseBurst(samples, time + i * 0.046, 0.052, settings.fillGain * (1 - i * 0.08), i % 2 === 0 ? "snare" : "hat");
   }
 }
 
@@ -206,7 +287,7 @@ function addNoiseBurst(samples, time, duration, gain, color) {
   for (let i = start; i < end; i++) {
     const t = (i - start) / Math.max(1, end - start);
     const white = rng() * 2 - 1;
-    const filtered = color === "hat" ? white - last * 0.72 : white * 0.55 + last * 0.45;
+    const filtered = color === "hat" ? white - last * 0.72 : color === "rim" ? white - last * 0.45 : white * 0.55 + last * 0.45;
     last = white;
     samples[i] += filtered * envelope(t, 0.16, 0.72) * gain * 1.9;
   }
@@ -290,6 +371,30 @@ function wavBuffer(samples) {
     buffer.writeInt16LE(Math.round(value * 32767), 44 + i * 2);
   }
   return buffer;
+}
+
+function colorVoicing(chord, nextChord, step) {
+  if (chord.length < 3) return chord;
+  const root = chord[0];
+  const upper = chord.slice(1);
+  const neighbor = nextChord[(step % Math.max(1, nextChord.length - 1)) + 1] ?? nextChord[0] * 2;
+  const color = step % 16 >= 8 ? neighbor : (chord[2] ?? root) * semitone;
+  return [root, ...upper.slice(0, 3), liftToLeadRegister(color), ...(upper[3] ? [upper[3]] : [])];
+}
+
+function liftToLeadRegister(frequency) {
+  let note = frequency;
+  while (note < 360) note *= 2;
+  while (note > 980) note /= 2;
+  return note;
+}
+
+function stepRandom(step, salt) {
+  let value = Math.imul(step + 0x9e3779b9, 0x85ebca6b) ^ salt;
+  value ^= value >>> 13;
+  value = Math.imul(value, 0xc2b2ae35);
+  value ^= value >>> 16;
+  return (value >>> 0) / 4294967296;
 }
 
 function bassRegister(frequency) {

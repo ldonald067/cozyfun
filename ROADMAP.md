@@ -320,6 +320,8 @@ Guardrails:
 Started:
 
 - Generated lo-fi music now has more arrangement variation: extra comping stabs, a quiet Rhodes-like shimmer layer, and occasional brushed fills.
+- Generated music now leans further into lo-fi jazz hip-hop without adding controls: deterministic phrase variation, color voicings, soft Rhodes-like answers, rim clicks, ghost snares, pickup kicks, bass approaches, and longer brushed fills.
+- Mood presets now carry internal groove/color/phrase settings so Rain can feel more beat-forward, Window can stay softer, and Stardust can stay airier through the same three user-facing controls.
 - Painting now produces subtle native material cues through the ambience channel, throttled so drag-painting does not flood the audio graph.
 - Desk Radio now accepts regular YouTube URLs, `youtu.be` links, raw 11-character video IDs, playlists, embed/live/shorts links, `youtube-nocookie.com` links, and timestamped video links.
 - Timestamped video sources are preserved in local Desk Radio state and passed into the YouTube player.
@@ -330,6 +332,35 @@ Started:
 
 Next:
 
-- Add richer ambience variations tied to room backdrop without making the controls heavier.
 - Add reaction-driven native cues for important simulation events only when they are sparse and readable.
 - Use the audio QA references during listening review so "better sound" has a repeatable bar beyond build success.
+
+## Phase 9: Room-Linked Ambience
+
+Status: planned.
+
+Goal: make room backdrops carry richer ambience variation without making the sound controls heavier.
+
+Direction:
+
+- Keep the existing mood/provider controls; room selection may quietly bias ambience details.
+- Rain Desk should stay rain-forward with close-window texture.
+- Moonlit Garden can add night air, softer insects, or outdoor hush while preserving native ambience.
+- Stardust Hearth can use faint sparkle/ember air without becoming a synthetic pad.
+- Cozy Fireplace can lean warm room tone and subtle fire bed.
+- Forest Hut can use filtered rain, distant branch/leaf movement, and less city-room hum.
+- Snow Window can use softer damped hush, lighter drips, and colder room tone.
+- Audio QA should render enough deterministic references that room-linked ambience can be compared without relying on memory.
+
+## Phase 10: Element Variation + Identity
+
+Status: planned.
+
+Goal: give each toolbar element 1-2 unique behavior or visual identity features, and add more visible interaction variation to existing materials before adding new elements.
+
+Direction:
+
+- Build a material identity matrix covering unique sim behavior, unique visual change, player purpose, and keep/merge/remove decision.
+- Prioritize visible state changes from interactions: fungus color shifts from rot/cosmic/freeze/scorch paths, plants reacting differently to water/moonwater/oil, and hard materials showing weathering/scorch/frost without hiding sim rules in the renderer.
+- Keep renderer-only changes presentational. Any new user-visible sim rule must stay in Rust and JS fallback parity with tests.
+- Use `docs/MATERIAL_AUDIT.md` as the starting point, then tighten weak overlaps instead of adding more materials by default.
