@@ -2,13 +2,14 @@ import { mkdir, writeFile } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { PHASE_SEVEN_QA_LABEL, phaseSevenShowcaseScript } from "./phase-seven-showcase.mjs";
+import { assert, assertAppReachable, waitUntil } from "./browser-qa-helpers.mjs";
+import { MATERIAL_SHOWCASE_QA_LABEL, materialShowcaseScript } from "./material-showcase.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outputDir = path.join(root, ".tmp", "firefox-qa");
 const appPort = Number(process.env.FIREFOX_QA_APP_PORT ?? 4173);
 const remotePort = Number(process.argv[2] ?? process.env.FIREFOX_QA_REMOTE_PORT ?? 9340);
-const appUrl = `http://127.0.0.1:${appPort}/?firefoxQa=${PHASE_SEVEN_QA_LABEL}&cache=${Date.now()}`;
+const appUrl = `http://127.0.0.1:${appPort}/?firefoxQa=${MATERIAL_SHOWCASE_QA_LABEL}&cache=${Date.now()}`;
 
 async function main() {
   await assertAppReachable(appPort);
@@ -33,7 +34,9 @@ async function main() {
           `Boolean(document.querySelector('[data-testid="sandbox-tray"]')) &&
            (document.querySelector('[data-testid="status-message"]')?.textContent ?? "").includes("online")`
         )) === true,
-      "Firefox app shell"
+      "Firefox app shell",
+      15_000,
+      150
     );
 
     const state = await bidi.evaluate(
@@ -60,8 +63,8 @@ async function main() {
     const desktopPath = await capture(bidi, context, "firefox-current-desktop.png");
     await paintMaterialScene(bidi, context);
     const paintedPath = await capture(bidi, context, "firefox-painted-materials.png");
-    await loadPhaseSevenShowcase(bidi, context);
-    const phaseSevenPath = await capture(bidi, context, `firefox-${PHASE_SEVEN_QA_LABEL}.png`);
+    await loadMaterialShowcase(bidi, context);
+    const materialShowcasePath = await capture(bidi, context, `firefox-${MATERIAL_SHOWCASE_QA_LABEL}.png`);
 
     await bidi.send("browsingContext.close", { context }).catch(() => {});
     await bidi.send("session.end").catch(() => {});
@@ -69,7 +72,7 @@ async function main() {
     console.log("Firefox QA passed");
     console.log(`- ${desktopPath}`);
     console.log(`- ${paintedPath}`);
-    console.log(`- ${phaseSevenPath}`);
+    console.log(`- ${materialShowcasePath}`);
     console.log(`- ${state.styles.join(", ")}`);
     console.log(`- ${state.scripts.join(", ")}`);
   } finally {
@@ -125,11 +128,13 @@ async function capture(bidi, context, fileName) {
   return filePath;
 }
 
-async function loadPhaseSevenShowcase(bidi, context) {
-  await bidi.evaluate(context, phaseSevenShowcaseScript());
+async function loadMaterialShowcase(bidi, context) {
+  await bidi.evaluate(context, materialShowcaseScript());
   await waitUntil(
     async () => (await bidi.evaluate(context, `(document.querySelector('[data-testid="status-message"]')?.textContent ?? "").includes("browser save loaded")`)) === true,
-    "Firefox phase 7 showcase"
+    "Firefox material showcase",
+    15_000,
+    150
   );
   await bidi.evaluate(context, `new Promise((resolve) => setTimeout(resolve, 600))`);
 }
@@ -202,11 +207,6 @@ function remoteValue(value) {
   return value;
 }
 
-async function assertAppReachable(port) {
-  const response = await fetch(`http://127.0.0.1:${port}/`);
-  if (!response.ok) throw new Error(`Preview server on 127.0.0.1:${port} returned ${response.status}. Run scripts/preview-built.cmd first.`);
-}
-
 async function waitForPort(port, label) {
   await waitUntil(
     () =>
@@ -219,26 +219,9 @@ async function waitForPort(port, label) {
         socket.once("error", () => resolve(false));
       }),
     label,
-    30000
+    30000,
+    150
   );
-}
-
-async function waitUntil(check, label, timeoutMs = 15000) {
-  const deadline = Date.now() + timeoutMs;
-  let lastError;
-  while (Date.now() < deadline) {
-    try {
-      if (await check()) return;
-    } catch (error) {
-      lastError = error;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 150));
-  }
-  throw new Error(`Timed out waiting for ${label}${lastError ? `: ${lastError.message}` : ""}`);
-}
-
-function assert(condition, message) {
-  if (!condition) throw new Error(message);
 }
 
 await main();

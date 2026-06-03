@@ -56,13 +56,13 @@ A good harness improvement should include:
 ## Material Identity Targets
 
 - Keep `docs/MATERIAL_AUDIT.md` aligned with `app/src/materials.ts` when adding, removing, or specializing a material.
-- Extend `scripts/phase-seven-showcase.mjs` when renderer changes affect material readability.
+- Extend `scripts/material-showcase.mjs` when renderer changes affect material readability.
 - Run `npm run material:audit` before broader checks when editing material definitions.
 
-## Phase 7 Targets
+## Cleanup Targets
 
 - Shared browser QA helpers should keep Chrome, Firefox, smoke, and visual scripts from drifting.
-- Phase 7 material changes should extend the deterministic showcase instead of creating one-off scenes.
+- Material readability changes should extend the deterministic showcase instead of creating one-off scenes.
 - `App.tsx` should get lighter over time by moving feature surfaces into focused components or hooks.
 - Review passes should scan for stale phase labels, dead helpers, duplicate QA logic, unmirrored sim rules, and stale visual captures.
 - If Desk Radio or sharing behavior changes, the browser harness should cover both success and blocked/fallback paths.

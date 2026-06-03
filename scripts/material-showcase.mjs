@@ -1,7 +1,7 @@
-export const PHASE_SEVEN_QA_LABEL = "phase7-material-realism";
-export const PHASE_SEVEN_SHOWCASE_TITLE = "Phase 7 Material Realism Showcase";
+export const MATERIAL_SHOWCASE_QA_LABEL = "material-identity-showcase";
+export const MATERIAL_SHOWCASE_TITLE = "Material Identity Showcase";
 
-export function phaseSevenShowcaseScript() {
+export function materialShowcaseScript() {
   return `(() => {
     const width = 220;
     const height = 140;
@@ -110,7 +110,7 @@ export function phaseSevenShowcaseScript() {
       engine: "wasm",
       cells: btoa(binary),
       savedAt: new Date().toISOString(),
-      metadata: { app: "cozy-pixel-sandbox", title: "${PHASE_SEVEN_SHOWCASE_TITLE}", room: "snow-window", mood: "rain", musicProvider: "generated" }
+      metadata: { app: "cozy-pixel-sandbox", title: "${MATERIAL_SHOWCASE_TITLE}", room: "snow-window", mood: "rain", musicProvider: "generated" }
     }));
     document.querySelector('[data-testid="load-scene"]').click();
     return true;

@@ -1,37 +1,6 @@
 import { ChangeEvent, PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Brush, Eraser, FolderOpen, Pause, Play, RotateCcw, Save } from "lucide-react";
 import {
-  BrickWall,
-  Brush,
-  CloudFog,
-  Droplet,
-  Eraser,
-  Flame,
-  Flower2,
-  FolderOpen,
-  Gem,
-  Info,
-  Leaf,
-  Moon,
-  Mountain,
-  Music2,
-  Orbit,
-  Pause,
-  Play,
-  RotateCcw,
-  Save,
-  Shell,
-  Snowflake,
-  Sparkles,
-  Sprout,
-  TreePine,
-  Volume2,
-  VolumeX,
-  Waves,
-  Wind,
-  type LucideIcon
-} from "lucide-react";
-import {
-  AUDIO_CHANNELS,
   AUDIO_MOODS,
   createAudioController,
   getAudioMoodDef,
@@ -45,7 +14,9 @@ import {
   type MusicProvider
 } from "./audio";
 import { SegmentedControl, type SegmentOption } from "./components/SegmentedControl";
-import { DeskRadioPanel, type DeskRadioPlaybackState } from "./components/DeskRadioPanel";
+import { AudioPanel } from "./components/AudioPanel";
+import type { DeskRadioPlaybackState } from "./components/DeskRadioPanel";
+import { MaterialPanel } from "./components/MaterialPanel";
 import { SharePanel } from "./components/SharePanel";
 import {
   loadDeskRadioSource,
@@ -77,41 +48,6 @@ const WORLD_WIDTH = 220;
 const WORLD_HEIGHT = 140;
 const DEFAULT_SEED = 1107;
 const SIM_TICK_MS = 38;
-
-const AUDIO_CHANNEL_LABELS: Record<AudioChannel, string> = {
-  master: "Master",
-  ambience: "Ambience",
-  music: "Music"
-};
-
-const AUDIO_CHANNEL_HINTS: Record<AudioChannel, string> = {
-  master: "Overall volume for the whole soundscape.",
-  ambience: "Rain, window hush, room tone, and other environmental sounds.",
-  music: "Quiet lo-fi chords, beat, and vinyl texture."
-};
-
-const MATERIAL_ICONS: Record<MaterialId, LucideIcon> = {
-  [MATERIAL.Empty]: Eraser,
-  [MATERIAL.Wall]: BrickWall,
-  [MATERIAL.Sand]: Shell,
-  [MATERIAL.Water]: Waves,
-  [MATERIAL.Smoke]: CloudFog,
-  [MATERIAL.Soil]: Mountain,
-  [MATERIAL.Fire]: Flame,
-  [MATERIAL.Wood]: TreePine,
-  [MATERIAL.Lava]: Flame,
-  [MATERIAL.Stone]: Gem,
-  [MATERIAL.Moss]: Leaf,
-  [MATERIAL.Seed]: Sprout,
-  [MATERIAL.Fungus]: Flower2,
-  [MATERIAL.Flower]: Flower2,
-  [MATERIAL.Oil]: Droplet,
-  [MATERIAL.Ice]: Snowflake,
-  [MATERIAL.Steam]: Wind,
-  [MATERIAL.Stardust]: Sparkles,
-  [MATERIAL.Meteor]: Orbit,
-  [MATERIAL.Moonwater]: Moon
-};
 
 export function App() {
   const audio = useMemo(() => createAudioController(), []);
@@ -529,40 +465,7 @@ export function App() {
         </div>
       )}
       <section className="workspace" aria-label="Cozy pixel sandbox">
-        <aside className="tool-panel" aria-label="Materials">
-          <div className="brand-mark">
-            <Sparkles size={18} />
-            <span>Night Desk Terrarium</span>
-          </div>
-
-          {Object.entries(groupedMaterials).map(([group, materials]) => (
-            <div className="tool-group" key={group}>
-              <span className="group-label">{group}</span>
-              <div className="material-grid">
-                {materials.map((material) => {
-                  const MaterialIcon = MATERIAL_ICONS[material.id];
-                  const materialHint = `${material.label}: ${material.description} Identity: ${material.identity.join("; ")}.`;
-                  return (
-                    <button
-                      className={`material-button ${selected === material.id ? "active" : ""}`}
-                      key={material.id}
-                      type="button"
-                      aria-label={materialHint}
-                      title={materialHint}
-                      style={{ "--material-color": material.color } as React.CSSProperties}
-                      onClick={() => handleSelectMaterial(material)}
-                    >
-                      <span className="material-icon">
-                        <MaterialIcon size={17} strokeWidth={2.15} />
-                      </span>
-                      <span>{material.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </aside>
+        <MaterialPanel groupedMaterials={groupedMaterials} selected={selected} onSelect={handleSelectMaterial} />
 
         <section className="sandbox-stage">
           <div
@@ -654,93 +557,26 @@ export function App() {
             />
           </div>
 
-          <div className="audio-panel" aria-label="Audio">
-            <div className="audio-panel-header">
-              <span className="audio-panel-title">
-                <Music2 size={16} /> {activeMood.title}
-              </span>
-              <button
-                type="button"
-                className={`audio-enable-button ${audioPrefs.enabled ? "active" : ""}`}
-                data-testid="audio-toggle"
-                title={audioPrefs.enabled ? "Turn sound off" : "Enable sound"}
-                onClick={handleToggleSound}
-              >
-                {audioPrefs.enabled ? "Stop" : "Start"}
-              </button>
-            </div>
-
-            <button
-              type="button"
-              className={`audio-mute-button ${audioPrefs.muted ? "muted" : ""}`}
-              data-testid="audio-mute"
-              title={audioPrefs.muted ? "Unmute" : "Mute"}
-              onClick={handleMuteAudio}
-            >
-              {audioPrefs.muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-              {audioPrefs.muted ? "Muted" : "Mute"}
-            </button>
-
-            <SegmentedControl
-              ariaLabel="Sound mood"
-              value={audioPrefs.mood}
-              options={moodOptions}
-              className="audio-mood-control"
-              onChange={handleAudioMood}
-            />
-
-            <SegmentedControl
-              ariaLabel="Music source"
-              value={audioPrefs.provider}
-              options={providerOptions}
-              className="music-source-control"
-              onChange={handleMusicProvider}
-            />
-
-            {(deskRadioOpen || audioPrefs.provider === "external") && (
-              <DeskRadioPanel
-                inputValue={deskRadioInput}
-                playbackState={deskRadioPlayback}
-                source={deskRadioSource}
-                usingExternalProvider={audioPrefs.provider === "external"}
-                onClear={handleDeskRadioClear}
-                onEmbedBlocked={handleDeskRadioBlocked}
-                onEmbedReady={handleDeskRadioReady}
-                onInputChange={setDeskRadioInput}
-                onTune={handleDeskRadioTune}
-              />
-            )}
-
-            <div className="audio-sliders">
-              {AUDIO_CHANNELS.map((channel) => (
-                <label className="audio-slider" key={channel}>
-                  <span className="audio-slider-label">
-                    {AUDIO_CHANNEL_LABELS[channel]}
-                    <span
-                      className="audio-info"
-                      tabIndex={0}
-                      role="img"
-                      aria-label={AUDIO_CHANNEL_HINTS[channel]}
-                      title={AUDIO_CHANNEL_HINTS[channel]}
-                      data-tooltip={AUDIO_CHANNEL_HINTS[channel]}
-                    >
-                      <Info size={12} strokeWidth={2.2} />
-                    </span>
-                  </span>
-                  <output>{Math.round(audioPrefs.volumes[channel] * 100)}</output>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={audioPrefs.volumes[channel]}
-                    data-testid={`audio-volume-${channel}`}
-                    onChange={(event) => handleAudioVolume(channel, Number(event.target.value))}
-                  />
-                </label>
-              ))}
-            </div>
-          </div>
+          <AudioPanel
+            activeMoodTitle={activeMood.title}
+            audioPrefs={audioPrefs}
+            deskRadioInput={deskRadioInput}
+            deskRadioOpen={deskRadioOpen}
+            deskRadioPlayback={deskRadioPlayback}
+            deskRadioSource={deskRadioSource}
+            moodOptions={moodOptions}
+            providerOptions={providerOptions}
+            onAudioMood={handleAudioMood}
+            onAudioVolume={handleAudioVolume}
+            onDeskRadioBlocked={handleDeskRadioBlocked}
+            onDeskRadioClear={handleDeskRadioClear}
+            onDeskRadioInputChange={setDeskRadioInput}
+            onDeskRadioReady={handleDeskRadioReady}
+            onDeskRadioTune={handleDeskRadioTune}
+            onMusicProvider={handleMusicProvider}
+            onMuteAudio={handleMuteAudio}
+            onToggleSound={handleToggleSound}
+          />
           <input ref={fileInputRef} type="file" accept="application/json" data-testid="scene-file-input" hidden onChange={handleImport} />
         </aside>
       </section>

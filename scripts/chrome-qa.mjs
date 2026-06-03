@@ -1,18 +1,29 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { PHASE_SEVEN_QA_LABEL, phaseSevenShowcaseScript } from "./phase-seven-showcase.mjs";
+import {
+  assert,
+  assertAppReachable,
+  captureScreenshot,
+  clickSelector as click,
+  connectToFirstPage,
+  evaluate,
+  setText,
+  waitForStatus,
+  waitUntil
+} from "./browser-qa-helpers.mjs";
+import { MATERIAL_SHOWCASE_QA_LABEL, materialShowcaseScript } from "./material-showcase.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outputDir = path.join(root, ".tmp", "chrome-qa");
 const appPort = Number(process.env.CHROME_QA_APP_PORT ?? 4173);
 const debugPort = Number(process.argv[2] ?? process.env.CHROME_QA_REMOTE_PORT ?? 9335);
-const appUrl = `http://127.0.0.1:${appPort}/?chromeQa=${PHASE_SEVEN_QA_LABEL}&cache=${Date.now()}`;
+const appUrl = `http://127.0.0.1:${appPort}/?chromeQa=${MATERIAL_SHOWCASE_QA_LABEL}&cache=${Date.now()}`;
 
 async function main() {
   await assertAppReachable(appPort);
   await mkdir(outputDir, { recursive: true });
-  const cdp = await connectToFirstPage(debugPort);
+  const cdp = await connectToFirstPage(debugPort, "Chrome", 15_000);
 
   try {
     await cdp.send("Page.enable");
@@ -79,8 +90,8 @@ async function main() {
     const desktopPath = await capture(cdp, "chrome-current-desktop.png");
     await paintMaterialScene(cdp);
     const paintedPath = await capture(cdp, "chrome-painted-materials.png");
-    await loadPhaseSevenShowcase(cdp);
-    const phaseSevenPath = await capture(cdp, `chrome-${PHASE_SEVEN_QA_LABEL}.png`);
+    await loadMaterialShowcase(cdp);
+    const materialShowcasePath = await capture(cdp, `chrome-${MATERIAL_SHOWCASE_QA_LABEL}.png`);
     await exerciseDeskRadio(cdp);
     const deskRadioPath = await capture(cdp, "chrome-desk-radio-blocked.png");
 
@@ -90,7 +101,7 @@ async function main() {
     console.log("Chrome QA passed");
     console.log(`- ${desktopPath}`);
     console.log(`- ${paintedPath}`);
-    console.log(`- ${phaseSevenPath}`);
+    console.log(`- ${materialShowcasePath}`);
     console.log(`- ${deskRadioPath}`);
     console.log(`- ${state.styles.join(", ")}`);
     console.log(`- ${state.scripts.join(", ")}`);
@@ -99,8 +110,8 @@ async function main() {
   }
 }
 
-async function loadPhaseSevenShowcase(cdp) {
-  await evaluate(cdp, phaseSevenShowcaseScript());
+async function loadMaterialShowcase(cdp) {
+  await evaluate(cdp, materialShowcaseScript());
   await waitForStatus(cdp, "browser save loaded");
   await evaluate(cdp, `new Promise((resolve) => setTimeout(resolve, 600))`);
 }
@@ -186,154 +197,8 @@ async function paintMaterialScene(cdp) {
   );
 }
 
-async function connectToFirstPage(port) {
-  await waitUntil(async () => {
-    try {
-      await browserTargets(port);
-      return true;
-    } catch {
-      return false;
-    }
-  }, "Chrome remote debugging");
-  const targets = await browserTargets(port);
-  const target = targets.find((candidate) => candidate.type === "page" && candidate.webSocketDebuggerUrl);
-  assert(target, "no debuggable Chrome page target found");
-  return Cdp.connect(target.webSocketDebuggerUrl);
-}
-
-async function browserTargets(port) {
-  const response = await fetch(`http://127.0.0.1:${port}/json/list`);
-  if (!response.ok) throw new Error(`Chrome debugger list returned ${response.status}`);
-  return response.json();
-}
-
-class Cdp {
-  constructor(socket) {
-    this.socket = socket;
-    this.nextId = 1;
-    this.pending = new Map();
-    socket.onmessage = async (event) => {
-      const text = typeof event.data === "string" ? event.data : Buffer.from(await event.data.arrayBuffer()).toString("utf8");
-      const message = JSON.parse(text);
-      if (!message.id) return;
-      const pending = this.pending.get(message.id);
-      if (!pending) return;
-      this.pending.delete(message.id);
-      if (message.error) pending.reject(new Error(message.error.message));
-      else pending.resolve(message.result);
-    };
-    socket.onclose = () => {
-      for (const pending of this.pending.values()) pending.reject(new Error("CDP socket closed"));
-      this.pending.clear();
-    };
-  }
-
-  static async connect(url) {
-    const socket = new WebSocket(url);
-    await new Promise((resolve, reject) => {
-      socket.onopen = resolve;
-      socket.onerror = () => reject(new Error("failed to open CDP socket"));
-    });
-    return new Cdp(socket);
-  }
-
-  send(method, params = {}) {
-    const id = this.nextId++;
-    this.socket.send(JSON.stringify({ id, method, params }));
-    return new Promise((resolve, reject) => this.pending.set(id, { resolve, reject }));
-  }
-
-  async close() {
-    this.socket.close();
-  }
-}
-
-async function evaluate(cdp, expression) {
-  const result = await cdp.send("Runtime.evaluate", {
-    expression,
-    awaitPromise: true,
-    returnByValue: true,
-    userGesture: true
-  });
-  if (result.exceptionDetails) throw new Error(result.exceptionDetails.text ?? "evaluation failed");
-  return result.result.value;
-}
-
 async function capture(cdp, fileName) {
-  const screenshot = await cdp.send("Page.captureScreenshot", { format: "png", fromSurface: true });
-  const filePath = path.join(outputDir, fileName);
-  await writeFile(filePath, Buffer.from(screenshot.data, "base64"));
-  return filePath;
-}
-
-async function click(cdp, selector, options = {}) {
-  const box = await evaluate(
-    cdp,
-    `(() => {
-      const element = document.querySelector(${JSON.stringify(selector)});
-      if (!element) return null;
-      element.scrollIntoView({ block: "center", inline: "center" });
-      const rect = element.getBoundingClientRect();
-      return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
-    })()`
-  );
-  assert(box, `missing element for click: ${selector}`);
-  const x = box.left + box.width * (options.xRatio ?? 0.5);
-  const y = box.top + box.height * (options.yRatio ?? 0.5);
-  await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y, button: "none" });
-  await cdp.send("Input.dispatchMouseEvent", { type: "mousePressed", x, y, button: "left", clickCount: 1 });
-  await cdp.send("Input.dispatchMouseEvent", { type: "mouseReleased", x, y, button: "left", clickCount: 1 });
-  await sleep(80);
-}
-
-async function setText(cdp, selector, value) {
-  await evaluate(
-    cdp,
-    `(() => {
-      const input = document.querySelector(${JSON.stringify(selector)});
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
-      setter.call(input, ${JSON.stringify(value)});
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-      input.dispatchEvent(new Event("change", { bubbles: true }));
-      return input.value;
-    })()`
-  );
-  await sleep(40);
-}
-
-async function statusText(cdp) {
-  return evaluate(cdp, `document.querySelector('[data-testid="status-message"]')?.textContent ?? ""`);
-}
-
-async function waitForStatus(cdp, expected) {
-  await waitUntil(async () => (await statusText(cdp)) === expected, `status "${expected}"`);
-}
-
-async function assertAppReachable(port) {
-  const response = await fetch(`http://127.0.0.1:${port}/`);
-  if (!response.ok) throw new Error(`Preview server on 127.0.0.1:${port} returned ${response.status}. Run scripts/preview-built.cmd first.`);
-}
-
-async function waitUntil(task, label, timeout = 15000) {
-  const started = Date.now();
-  let lastError;
-  while (Date.now() - started < timeout) {
-    try {
-      if (await task()) return;
-    } catch (error) {
-      lastError = error;
-    }
-    await sleep(100);
-  }
-  throw new Error(`Timed out waiting for ${label}${lastError ? `: ${lastError.message}` : ""}`);
-}
-
-function assert(condition, message) {
-  if (!condition) throw new Error(message);
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return captureScreenshot(cdp, outputDir, fileName);
 }
 
 await main();

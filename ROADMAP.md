@@ -281,7 +281,7 @@ Phase 7 should not add a big new mode first. The sandbox needs one more groundin
 - Sim, WASM smoke, and JS fallback smoke checks cover oil density, wet-sand drying, and hard-material heat stress.
 - Wall and stone are now intentionally split: wall is a sealed construction barrier; stone is a natural weatherable hard substrate that hosts moss and condensation more readily.
 - Steam condenses on hard surfaces, smoke leaves soot/scorch marks, and moss needs extra energy to cross a soaked wall.
-- Visual, Chrome, and Firefox QA now share a deterministic Phase 7 material showcase scene instead of reusing the Phase 6 ecology showcase.
+- Visual, Chrome, and Firefox QA now share a deterministic material showcase scene instead of reusing the Phase 6 ecology showcase.
 
 ### Phase 7C: Heat + Cold Interactions
 
@@ -298,7 +298,7 @@ Phase 7 should not add a big new mode first. The sandbox needs one more groundin
 
 ### Phase 7E: Visual + QA Closeout
 
-- Added a deterministic Phase 7 showcase for oil-over-water, wet/dry sand, scorched/wet wood, cracked stone/wall, frost, ordinary water/lava steam, ordinary water/meteor shock, and moonwater cosmic outcomes.
+- Added the deterministic material showcase for oil-over-water, wet/dry sand, scorched/wet wood, cracked stone/wall, frost, ordinary water/lava steam, ordinary water/meteor shock, and moonwater cosmic outcomes.
 - Added Rust sim tests, WASM smoke checks, and JS fallback checks for the new Phase 7 rules.
 - Material audit decisions are documented in `docs/MATERIAL_AUDIT.md`, including future removal triggers for overlapping materials.
 - Phase 7 closure checks passed through the full `.\scripts\check.ps1` wrapper after the wrapper was made step-based and no longer rebuilt the sim twice.
