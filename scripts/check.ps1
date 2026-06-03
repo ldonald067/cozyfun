@@ -29,6 +29,7 @@ function Invoke-CheckStep {
 
 Push-Location $Root
 try {
+  Invoke-CheckStep "Material identity audit" { & $Npm run material:audit }
   Invoke-CheckStep "Rust simulation tests" { & $Npm run test:sim }
   Invoke-CheckStep "Production build" { & $Npm run build }
   Invoke-CheckStep "WASM smoke checks" { & (Join-Path $Root ".tools\node\node.exe") "scripts/smoke-wasm.mjs" }

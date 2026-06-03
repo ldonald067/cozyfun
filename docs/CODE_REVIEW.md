@@ -15,6 +15,7 @@ This checklist is the repo's "no slop" bar. Use it for `/review`, audit passes, 
 - Are imported scene bytes masked and validated before reaching sim state?
 - Do tests cover the new rule in Rust, WASM smoke, and JS fallback when user-visible behavior can differ?
 - Does each material keep a distinct role? For example, moss should read as damp carpet growth, fungus as decay pressure, seed as potential, oil as coating/smothering, and water as hydration/cooling.
+- If a material was added or specialized, did `npm run material:audit` pass and does `docs/MATERIAL_AUDIT.md` still match the source traits?
 - Are ordinary material reactions grounded while cosmic materials keep the special cases?
 
 ## Rendering

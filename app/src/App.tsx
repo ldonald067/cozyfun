@@ -541,13 +541,14 @@ export function App() {
               <div className="material-grid">
                 {materials.map((material) => {
                   const MaterialIcon = MATERIAL_ICONS[material.id];
+                  const materialHint = `${material.label}: ${material.description} Identity: ${material.identity.join("; ")}.`;
                   return (
                     <button
                       className={`material-button ${selected === material.id ? "active" : ""}`}
                       key={material.id}
                       type="button"
-                      aria-label={`${material.label}: ${material.description}`}
-                      title={`${material.label}: ${material.description}`}
+                      aria-label={materialHint}
+                      title={materialHint}
                       style={{ "--material-color": material.color } as React.CSSProperties}
                       onClick={() => handleSelectMaterial(material)}
                     >

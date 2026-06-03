@@ -27,12 +27,12 @@ Shape language is intentionally procedural:
 - Wall: brick-like tile structure with mortar lines, lit exposed edges, chips, and heat/wet/plant staining.
 - Stone: chunky block shading, facet shifts, dark crack marks, damp edge staining, lichen flecks, and warm heat contact.
 - Smoke/Steam: edge-softened puff clusters with age fade, plus distinct dry soot cues for smoke and wet condensation/frost cues for steam.
-- Water/Moonwater: connected surface highlights, lower shadow, heat-contact brightness, and moonwater/life shimmer.
+- Water/Moonwater: connected surface highlights, lower shadow, heat-contact brightness, ordinary water earth/oil/life contact ripples, and moonwater hard-surface/oil/life shimmer.
 - Stardust: bright twinkles, nearby star glints, and a brighter violet treatment near moonwater.
 - Fire/Lava/Meteor: heat cores, exposed flame tips, cooling crust, glowing seams, and ember-dark edges.
-- Moss/Fungus/Wood: leafy clusters, fungus cap/gill/spore marks, damp moonwater tint, char/damp contact cues, end-grain, and woodgrain lines.
+- Moss/Fungus/Wood: leafy clusters, fungus cap/gill/spore role colors, oil/heat/cosmic contact cues, damp moonwater tint, char/damp contact cues, end-grain, and woodgrain lines.
 - Nearby light: hot and cosmic materials can tint adjacent cells without changing simulation state.
-- Interaction cues: water near heat brightens toward steam, oil warms at hot edges, lava near cool liquids darkens into crust, moonwater near life becomes pearly green-violet, and newly cooled stone picks up a faint wet edge.
+- Interaction cues: water near heat brightens toward steam, ordinary water picks up earth/plant/oil contact, oil warms at hot edges, lava near cool liquids darkens into crust, moonwater near life or hard surfaces becomes pearly blue-violet, and newly cooled stone picks up a faint wet edge.
 
 Rules can inspect neighboring cells through `cells.ts`, but they should not modify simulation state. Shared edge/contact helpers such as `edgeInfo` and `contactInfo` belong in `cells.ts`; material-specific palette choices stay in `shapeLanguage.ts`.
 
@@ -77,7 +77,7 @@ Visual state polish:
 
 - Wet, rooted, frozen, scorched, and cosmic flags are intentionally visible before a cell changes kind.
 - Cosmic flags now tint soil, moss, fungus, and wood even when moonwater is no longer directly adjacent.
-- Hard and living materials use stronger renderer-only state cues where subtle contact was getting lost at play zoom: wall and stone show clearer damp rims, frost highlights, scorch cracks, plant staining, and cosmic flecks; moss, fungus, and wood show clearer wet, frozen, charred, and decomposer colors.
+- Hard and living materials use stronger renderer-only state cues where subtle contact was getting lost at play zoom: wall and stone show clearer damp rims, frost highlights, scorch cracks, plant staining, and moonwater/cosmic flecks; seeds and flowers show oil smothering separately from wet/cosmic feeding; moss, fungus, and wood show clearer wet, frozen, charred, decomposer, and cosmic colors.
 
 ## When To Add A Rule
 
@@ -119,9 +119,9 @@ Useful commands:
 
 The current baseline covers the first readability batch: sand, soil, wall, smoke, steam, seed, ice, stone, water, moonwater, and stardust all have renderer-level shape treatment. More realistic silhouettes, local lighting, and high-detail experiments belong in Phase 4 so Phase 3 can keep moving on atmosphere without destabilizing the simulation.
 
-`.\scripts\visual-qa.ps1` saves a controlled current-material capture to `.tmp/visual-qa/current-materials.png`, a deterministic Phase 7 material realism showcase to `.tmp/visual-qa/phase7-material-realism.png`, responsive layout metrics to `.tmp/visual-qa/current-layout.json`, and room backdrop captures for every scene environment.
+`.\scripts\visual-qa.ps1` saves a controlled current-material capture to `.tmp/visual-qa/current-materials.png`, a deterministic Phase 7/10 material identity showcase to `.tmp/visual-qa/phase7-material-realism.png`, responsive layout metrics to `.tmp/visual-qa/current-layout.json`, and room backdrop captures for every scene environment.
 
-The Phase 7 showcase is shared by visual, Chrome, and Firefox QA through `scripts/phase-seven-showcase.mjs`. It should cover oil-over-water, wet/dry/scorched/frozen sand, damp/frozen/scorched hard materials, wet wood steam, ordinary water/lava and water/meteor shock, and distinct life/cosmic/heat clusters.
+The Phase 7/10 showcase is shared by visual, Chrome, and Firefox QA through `scripts/phase-seven-showcase.mjs`. It should cover oil-over-water, wet/dry/scorched/frozen sand, damp/frozen/scorched hard materials, wet wood steam, ordinary water/lava and water/meteor shock, water/moonwater contact contrast, oil-smothered plants, and distinct fungus life/cosmic/heat clusters.
 
 The room captures are part of the visual QA contract. They should stay calm behind the sandbox and panels: if a photo becomes too busy, literal, or high-contrast, tune the scene metadata in `sceneEnvironments.ts` or replace the asset and update `ASSET_CREDITS.md` in the same change.
 

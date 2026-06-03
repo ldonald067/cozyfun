@@ -66,9 +66,16 @@ export function phaseSevenShowcaseScript() {
     line(43, 57, 74, material.Wood, 96, 40, flag.Wet);
     line(60, 74, 73, material.Wood, 18, 84, flag.Scorched);
     rect(46, 63, 65, 72, material.Moss, 110, 88, flag.Wet);
-    rect(64, 80, 63, 70, material.Fungus, 96, 96, flag.Wet);
+    rect(64, 75, 63, 70, material.Fungus, 96, 96, flag.Wet);
+    rect(76, 82, 58, 64, material.Fungus, 130, 116, flag.Wet | flag.Cosmic);
+    line(77, 81, 57, material.Moonwater, 140, 22, flag.Cosmic);
+    for (const [x, y] of [[75, 57], [78, 55], [81, 56]]) setCell(x, y, material.Stardust, 190, 18, 0, x);
+    line(80, 84, 65, material.Oil, 70, 20);
+    for (const [x, y] of [[73, 59], [74, 58]]) setCell(x, y, material.Fire, 220, 12);
     for (const [x, y] of [[51, 61], [53, 60], [70, 59], [72, 60]]) setCell(x, y, material.Seed, 120, 24, flag.Wet | flag.Rooted, x);
     for (const [x, y] of [[86, 58], [87, 57], [88, 58], [89, 57], [90, 58], [88, 55]]) setCell(x, y, material.Flower, 130, 48, flag.Rooted, x + y);
+    setCell(91, 57, material.Oil, 70, 20);
+    setCell(87, 54, material.Moonwater, 140, 22, flag.Cosmic);
 
     // Cosmic and heat/cold readable outcomes.
     rect(104, 118, 63, 69, material.Moonwater, 130, 24, flag.Cosmic);
@@ -85,6 +92,13 @@ export function phaseSevenShowcaseScript() {
     setCell(153, 65, material.Steam, 220, 18);
     setCell(154, 66, material.Stone, 0, 80, flag.Scorched);
     rect(160, 174, 62, 71, material.Ice, 90, 24);
+
+    // Water-type contrast: ordinary water picks up earth/oil/life contact, moonwater lights hard surfaces.
+    line(118, 127, 90, material.Moonwater, 140, 22, flag.Cosmic);
+    line(154, 166, 88, material.Moonwater, 140, 22, flag.Cosmic);
+    line(92, 103, 91, material.Water, 80, 28);
+    line(96, 104, 90, material.Oil, 70, 22);
+    line(88, 93, 92, material.Soil, 120, 28, flag.Wet);
 
     let binary = "";
     for (let i = 0; i < cells.length; i += 0x8000) binary += String.fromCharCode(...cells.slice(i, i + 0x8000));

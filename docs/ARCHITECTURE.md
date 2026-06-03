@@ -90,11 +90,12 @@ Desk Radio is user-controlled. It plays only a pasted YouTube video or playlist 
 ## Adding A Material
 
 1. Add the material id to `MATERIAL` in `app/src/materials.ts`.
-2. Add its label, slug, palette, group, and optional glow color to `MATERIALS`.
+2. Add its label, slug, palette, group, two identity traits, and optional glow color to `MATERIALS`.
 3. Add simulation behavior in Rust, and mirror only necessary fallback behavior in `app/src/engine.ts`.
 4. Add a toolbar icon in `app/src/App.tsx` when users should be able to paint it directly. Generated-only outcomes can stay in `MATERIALS` with `userSelectable: false`.
 5. Add rendering rules in `app/src/rendering/shapeLanguage.ts` only if palette variation is not enough.
-6. Extend smoke tests if the material changes common workflows.
+6. Extend `docs/MATERIAL_AUDIT.md` and run `npm run material:audit`.
+7. Extend smoke tests if the material changes common workflows.
 
 ## Testing
 

@@ -357,7 +357,7 @@ Completed:
 
 ## Phase 10: Element Variation + Identity
 
-Status: planned.
+Status: complete.
 
 Goal: give each toolbar element 1-2 unique behavior or visual identity features, and add more visible interaction variation to existing materials before adding new elements.
 
@@ -367,3 +367,16 @@ Direction:
 - Prioritize visible state changes from interactions: fungus color shifts from rot/cosmic/freeze/scorch paths, plants reacting differently to water/moonwater/oil, and hard materials showing weathering/scorch/frost without hiding sim rules in the renderer.
 - Keep renderer-only changes presentational. Any new user-visible sim rule must stay in Rust and JS fallback parity with tests.
 - Use `docs/MATERIAL_AUDIT.md` as the starting point, then tighten weak overlaps instead of adding more materials by default.
+
+Completed:
+
+- Added source-level identity traits for every material, including generated-only Flower.
+- Added `npm run material:audit` and wired it into `.\scripts\check.ps1` so future materials must keep two concrete identity features.
+- Expanded renderer-only interaction cues without adding heavier controls:
+  - Ordinary water now picks up earth, plant, and oil contact ripples.
+  - Moonwater now reads more cosmic near hard surfaces and oil.
+  - Seeds and flowers show oil smothering separately from wet/cosmic feeding.
+  - Moss darkens under oil and warms near heat before scorch/freeze states take over.
+  - Fungus has stronger role colors for seed rot, wood digestion, moss takeover, soil decomposition, moonwater/stardust charge, oil contact, heat, freeze, and scorch.
+- Extended the deterministic material showcase so visual, Chrome, and Firefox QA can capture the Phase 10 identity states.
+- Updated `docs/MATERIAL_AUDIT.md` with the Phase 10 identity matrix and current keep/merge/remove decisions.

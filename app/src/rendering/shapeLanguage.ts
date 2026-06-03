@@ -24,7 +24,10 @@ const COOL_LIQUID_KINDS = [MATERIAL.Water, MATERIAL.Moonwater, MATERIAL.Ice] as 
 const LIFE_KINDS = [MATERIAL.Moss, MATERIAL.Seed, MATERIAL.Fungus, MATERIAL.Flower, MATERIAL.Soil] as const;
 const PLANT_KINDS = [MATERIAL.Moss, MATERIAL.Seed, MATERIAL.Fungus, MATERIAL.Flower] as const;
 const MOONWATER_KINDS = [MATERIAL.Moonwater] as const;
+const STARDUST_KINDS = [MATERIAL.Stardust] as const;
 const WATER_KINDS = [MATERIAL.Water] as const;
+const OIL_KINDS = [MATERIAL.Oil] as const;
+const EARTH_CONTACT_KINDS = [MATERIAL.Sand, MATERIAL.Soil, MATERIAL.Stone, MATERIAL.Wall, MATERIAL.Wood] as const;
 
 export function emptyCellColor(cells: Uint8Array, width: number, height: number, x: number, y: number, time: number): Rgb {
   const background: Rgb = [9, 14, 20];
@@ -90,6 +93,7 @@ function wallColor({ color, variant, energy, flags, cells, width, height, x, y }
   const heatContact = contactInfo(cells, width, height, x, y, HOT_LIGHT_KINDS);
   const dampContact = contactInfo(cells, width, height, x, y, COOL_LIQUID_KINDS);
   const plantContact = contactInfo(cells, width, height, x, y, PLANT_KINDS);
+  const moonContact = contactInfo(cells, width, height, x, y, MOONWATER_KINDS);
   const frozen = Boolean(flags & CELL_FLAG.Frozen);
   const scorched = Boolean(flags & CELL_FLAG.Scorched);
   const cosmic = Boolean(flags & CELL_FLAG.Cosmic);
@@ -124,6 +128,10 @@ function wallColor({ color, variant, energy, flags, cells, width, height, x, y }
   if (cosmic) {
     out = mixRgb(out, [119, 139, 211], 0.24);
     if (hash % 17 === 0) out = mixRgb(out, [199, 188, 255], 0.44);
+  }
+  if (moonContact.count > 0) {
+    out = mixRgb(out, [93, 125, 184], 0.18);
+    if ((brickX === 0 || brickY === 0 || moonContact.top) && hash % 5 === 0) out = mixRgb(out, [184, 196, 255], 0.34);
   }
   if ((hash + x + y) % 23 === 0) out = mixRgb(out, [76, 82, 94], 0.32);
   return out;
@@ -257,6 +265,7 @@ function seedColor({ color, variant, age, energy, flags, cells, width, height, x
   const below = kindAt(cells, width, height, x, y + 1);
   const soilContact = contactInfo(cells, width, height, x, y, [MATERIAL.Soil, MATERIAL.Moss]);
   const moonContact = contactInfo(cells, width, height, x, y, MOONWATER_KINDS);
+  const oilContact = contactInfo(cells, width, height, x, y, OIL_KINDS);
   const wet = energy > 70 || Boolean(flags & CELL_FLAG.Wet);
   const rooted = Boolean(flags & CELL_FLAG.Rooted) || below === MATERIAL.Soil || soilContact.count > 0;
   const cosmic = Boolean(flags & CELL_FLAG.Cosmic) || moonContact.count > 0;
@@ -270,6 +279,10 @@ function seedColor({ color, variant, age, energy, flags, cells, width, height, x
   if (fed || hash % 3 === 0 || (age > 24 && hash % 4 === 0)) out = mixRgb(out, [95, 181, 82], rooted ? 0.82 : 0.56);
   if (below === MATERIAL.Soil && localY === 3) out = mixRgb(out, [39, 27, 18], 0.24);
   if (cosmic) out = mixRgb(out, [184, 211, 255], moonContact.bottom ? 0.3 : 0.24);
+  if (oilContact.count > 0) {
+    out = mixRgb(out, [38, 42, 27], oilContact.top ? 0.56 : 0.42);
+    if (!wet && hash % 5 === 0) out = mixRgb(out, [18, 22, 15], 0.34);
+  }
   if (scorched) out = mixRgb(out, [42, 26, 19], 0.62);
   if (frozen) out = mixRgb(out, [186, 225, 237], 0.58);
   return out;
@@ -282,6 +295,7 @@ function flowerColor({ color, variant, age, energy, flags, time, cells, width, h
   const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Flower);
   const cosmic = Boolean(flags & CELL_FLAG.Cosmic) || hasNearbyKind(cells, width, height, x, y, COSMIC_LIGHT_KINDS);
   const wet = Boolean(flags & CELL_FLAG.Wet) || energy > 70 || hasNearbyKind(cells, width, height, x, y, COOL_LIQUID_KINDS);
+  const oilContact = contactInfo(cells, width, height, x, y, OIL_KINDS);
   const frozen = Boolean(flags & CELL_FLAG.Frozen);
   const scorched = Boolean(flags & CELL_FLAG.Scorched);
   const bloom = Math.min(1, age / 28);
@@ -305,6 +319,10 @@ function flowerColor({ color, variant, age, energy, flags, time, cells, width, h
   if (cosmic) {
     const pulse = (Math.sin(time * 0.012 + hash * 0.001) + 1) * 0.5;
     out = mixRgb(out, [165, 202, 255], 0.18 + pulse * 0.16);
+  }
+  if (oilContact.count > 0) {
+    out = mixRgb(out, [45, 49, 31], oilContact.top ? 0.44 : 0.3);
+    if (edge.top && hash % 3 === 0) out = mixRgb(out, [117, 119, 70], 0.22);
   }
   if (scorched) out = mixRgb(out, [55, 37, 31], 0.62);
   if (frozen) out = mixRgb(out, [207, 236, 245], 0.56);
@@ -337,6 +355,7 @@ function stoneColor({ color, variant, energy, flags, cells, width, height, x, y 
   const dampContact = contactInfo(cells, width, height, x, y, COOL_LIQUID_KINDS);
   const plantContact = contactInfo(cells, width, height, x, y, PLANT_KINDS);
   const heatContact = contactInfo(cells, width, height, x, y, HOT_LIGHT_KINDS);
+  const moonContact = contactInfo(cells, width, height, x, y, MOONWATER_KINDS);
   const frozen = Boolean(flags & CELL_FLAG.Frozen);
   const scorched = Boolean(flags & CELL_FLAG.Scorched);
   const cosmic = Boolean(flags & CELL_FLAG.Cosmic);
@@ -373,6 +392,10 @@ function stoneColor({ color, variant, energy, flags, cells, width, height, x, y 
     out = mixRgb(out, [118, 134, 204], 0.26);
     if (facet % 17 === 0) out = mixRgb(out, [195, 184, 255], 0.42);
   }
+  if (moonContact.count > 0) {
+    out = mixRgb(out, [94, 145, 203], 0.24);
+    if (localX === localY || facet % 11 === 0 || moonContact.bottom) out = mixRgb(out, [202, 193, 255], 0.32);
+  }
   return out;
 }
 
@@ -385,6 +408,8 @@ function liquidColor({ kind, color, variant, flags, time, cells, width, height, 
   const ripple = (x + y * 2 + Math.floor(time * 0.012) + hash) % 17 === 0;
   const heatContact = contactInfo(cells, width, height, x, y, HOT_LIGHT_KINDS);
   const lifeContact = contactInfo(cells, width, height, x, y, LIFE_KINDS);
+  const earthContact = contactInfo(cells, width, height, x, y, EARTH_CONTACT_KINDS);
+  const oilContact = contactInfo(cells, width, height, x, y, OIL_KINDS);
   let out = color;
 
   if (kind === MATERIAL.Oil) {
@@ -408,6 +433,17 @@ function liquidColor({ kind, color, variant, flags, time, cells, width, height, 
     out = mixRgb(out, [226, 245, 255], kind === MATERIAL.Moonwater ? 0.34 : 0.28);
     if (top || heatContact.top) out = mixRgb(out, [255, 255, 255], 0.18);
   }
+  if (kind === MATERIAL.Water) {
+    if (earthContact.count > 0) {
+      out = mixRgb(out, [76, 116, 120], earthContact.bottom ? 0.22 : 0.14);
+      if ((top || ripple) && hash % 5 === 0) out = mixRgb(out, [139, 183, 185], 0.18);
+    }
+    if (lifeContact.count > 0) out = mixRgb(out, [89, 151, 128], lifeContact.bottom ? 0.18 : 0.12);
+    if (oilContact.count > 0) {
+      out = mixRgb(out, [68, 76, 62], oilContact.top ? 0.36 : 0.24);
+      if (top || ripple || hash % 11 === 0) out = mixRgb(out, [156, 171, 136], 0.28);
+    }
+  }
   if ((left || right) && (ripple || hash % 29 === 0)) out = adjustRgb(out, 24 + Math.sin(time * 0.005 + variant) * 10);
   if (kind === MATERIAL.Moonwater) {
     const moonPulse = (Math.sin(time * 0.006 + hash * 0.0004) + 1) * 0.5;
@@ -415,6 +451,10 @@ function liquidColor({ kind, color, variant, flags, time, cells, width, height, 
     if (crescent) out = mixRgb(out, [246, 239, 255], 0.46 + moonPulse * 0.18);
     if (hash % 19 === 0) out = mixRgb(out, [224, 199, 255], 0.5);
     if (lifeContact.count > 0) out = mixRgb(out, [180, 255, 207], lifeContact.top ? 0.32 : 0.24);
+    if (oilContact.count > 0) {
+      out = mixRgb(out, [216, 199, 255], 0.34);
+      if (top || hash % 7 === 0) out = mixRgb(out, [255, 242, 191], 0.24);
+    }
   }
   return out;
 }
@@ -423,8 +463,11 @@ function growthColor({ kind, color, variant, age, energy, flags, cells, width, h
   const hash = hashCell(x, y, variant);
   const edge = edgeInfo(cells, width, height, x, y, kind);
   const moonFed = hasNearbyKind(cells, width, height, x, y, MOONWATER_KINDS);
-  const cosmic = moonFed || Boolean(flags & CELL_FLAG.Cosmic);
+  const starFed = hasNearbyKind(cells, width, height, x, y, STARDUST_KINDS);
+  const cosmic = moonFed || starFed || Boolean(flags & CELL_FLAG.Cosmic);
   const damp = cosmic || Boolean(flags & CELL_FLAG.Wet) || energy > 70 || hasNearbyKind(cells, width, height, x, y, WATER_KINDS);
+  const oilContact = contactInfo(cells, width, height, x, y, OIL_KINDS);
+  const heatContact = contactInfo(cells, width, height, x, y, HOT_LIGHT_KINDS);
   const frozen = Boolean(flags & CELL_FLAG.Frozen);
   const scorched = Boolean(flags & CELL_FLAG.Scorched);
   let out = color;
@@ -441,6 +484,8 @@ function growthColor({ kind, color, variant, age, energy, flags, cells, width, h
       if (edge.top || hash % 11 === 0) out = mixRgb(out, [196, 236, 166], 0.34);
     }
     if (cosmic) out = mixRgb(out, [143, 238, 177], moonFed ? 0.34 : 0.22);
+    if (oilContact.count > 0) out = mixRgb(out, [32, 42, 27], oilContact.top ? 0.42 : 0.28);
+    if (heatContact.count > 0) out = mixRgb(out, [116, 68, 43], heatContact.top ? 0.34 : 0.22);
     if (scorched) out = mixRgb(out, [48, 39, 28], 0.58);
     if (frozen) {
       out = mixRgb(out, [176, 224, 232], 0.6);
@@ -463,22 +508,45 @@ function growthColor({ kind, color, variant, age, energy, flags, cells, width, h
   const gill = localY === 1 && (localX === 1 || localX === 2);
   const spore = hash % 13 === 0 || (age > 80 && hash % 9 === 0);
 
+  if (cosmic) out = mixRgb(out, moonFed ? [158, 153, 255] : [190, 147, 255], 0.22);
   if (soilDecomposer) out = mixRgb(out, [176, 126, 103], 0.2);
   if (digestingWood) out = mixRgb(out, [196, 139, 82], 0.3);
   if (overtakingMoss) out = mixRgb(out, [132, 158, 96], 0.26);
   if (rottingSeed) out = mixRgb(out, [161, 67, 117], 0.34);
+  if (oilContact.count > 0) out = mixRgb(out, [42, 42, 31], oilContact.top ? 0.42 : 0.28);
+  if (heatContact.count > 0) out = mixRgb(out, [111, 62, 50], heatContact.top ? 0.32 : 0.22);
 
   const capColor: Rgb = rottingSeed
     ? [216, 91, 151]
-    : digestingWood
-      ? [223, 160, 93]
-      : overtakingMoss
-        ? [181, 190, 104]
-        : soilDecomposer
-          ? [202, 143, 118]
-          : [230, 164, 224];
-  const gillColor: Rgb = rottingSeed ? [255, 181, 211] : digestingWood ? [252, 214, 159] : overtakingMoss ? [227, 232, 151] : [254, 218, 244];
-  const sporeColor: Rgb = rottingSeed ? [255, 194, 220] : digestingWood ? [255, 226, 178] : overtakingMoss ? [229, 240, 173] : [250, 229, 239];
+    : cosmic
+      ? moonFed
+        ? [158, 168, 255]
+        : [198, 143, 255]
+      : digestingWood
+        ? [223, 160, 93]
+        : overtakingMoss
+          ? [181, 190, 104]
+          : soilDecomposer
+            ? [202, 143, 118]
+            : [230, 164, 224];
+  const gillColor: Rgb = rottingSeed
+    ? [255, 181, 211]
+    : cosmic
+      ? [226, 215, 255]
+      : digestingWood
+        ? [252, 214, 159]
+        : overtakingMoss
+          ? [227, 232, 151]
+          : [254, 218, 244];
+  const sporeColor: Rgb = rottingSeed
+    ? [255, 194, 220]
+    : cosmic
+      ? [235, 224, 255]
+      : digestingWood
+        ? [255, 226, 178]
+        : overtakingMoss
+          ? [229, 240, 173]
+          : [250, 229, 239];
 
   if (cap) out = mixRgb(out, capColor, 0.58);
   if (gill) out = mixRgb(out, gillColor, 0.52);

@@ -5,7 +5,8 @@ Harness engineering means improving the feedback loops around the sandbox so goo
 ## Current Harnesses
 
 - `.\scripts\build.ps1`: builds Rust/WASM, copies WASM, and builds the Vite app with the repo-local Windows-safe tool path.
-- `.\scripts\check.ps1`: runs the full local gate: Rust sim tests, WASM smoke, JS fallback smoke, production build, browser smoke, audio QA renders, and visual QA.
+- `.\scripts\check.ps1`: runs the full local gate: material identity audit, Rust sim tests, WASM smoke, JS fallback smoke, production build, browser smoke, audio QA renders, and visual QA.
+- `npm run material:audit`: validates that every material definition has two concrete identity traits before a new element can pass review.
 - `.\scripts\test-sim.ps1`: validates Rust simulation behavior.
 - `.\scripts\test-wasm.ps1`: validates the WASM bridge and key sim outcomes from JavaScript.
 - `.\scripts\test-js-fallback.ps1`: validates JS fallback parity for user-visible sim behavior.
@@ -21,6 +22,7 @@ Harness engineering means improving the feedback loops around the sandbox so goo
 - Keep `AGENTS.md` as a map, not a manual. Put deeper source-of-truth detail in `docs/`.
 - Turn repeated review feedback into a script, smoke test, deterministic scene, checklist item, or architecture doc update.
 - Prefer deterministic QA scenes over ad hoc visual judgment when a material or interaction changes.
+- Treat material identity as a checked contract: a toolbar element should have a clear role before it ships.
 - Make stale state visible. Preview and QA pages should expose the served bundle badge or capture path.
 - Keep sim behavior mechanically legible: Rust, WASM smoke, and JS fallback checks should agree on user-visible rules.
 - Keep renderer rules mechanically separate from sim rules. Renderer tests can judge readability, but not encode behavior.
@@ -50,6 +52,12 @@ A good harness improvement should include:
 - Source of truth: the doc or module boundary it enforces.
 - Failure message: enough context for the next agent to fix the issue without guessing.
 - Closeout rule: where the command belongs in `docs/CODE_REVIEW.md` or phase closeout.
+
+## Material Identity Targets
+
+- Keep `docs/MATERIAL_AUDIT.md` aligned with `app/src/materials.ts` when adding, removing, or specializing a material.
+- Extend `scripts/phase-seven-showcase.mjs` when renderer changes affect material readability.
+- Run `npm run material:audit` before broader checks when editing material definitions.
 
 ## Phase 7 Targets
 
