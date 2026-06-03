@@ -162,6 +162,10 @@ export function App() {
   }, [audio, audioPrefs]);
 
   useEffect(() => {
+    audio.setRoom(sceneEnvironment);
+  }, [audio, sceneEnvironment]);
+
+  useEffect(() => {
     if (audioPrefs.provider !== "external" || deskRadioSource) return;
     setAudioPrefs((current) => ({ ...current, provider: "generated" }));
     audio.setMusicProvider("generated");
@@ -315,7 +319,7 @@ export function App() {
     }
     setSceneEnvironment(metadata.room);
     setAudioPrefs((current) => ({ ...current, mood: metadata.mood, provider: metadata.musicProvider }));
-    audio.setMood(metadata.mood);
+    audio.setMoodAndRoom(metadata.mood, metadata.room);
     audio.setMusicProvider(metadata.musicProvider);
   }
 
@@ -409,7 +413,7 @@ export function App() {
     }
 
     const nextPrefs = { ...audioPrefs, enabled: true, muted: false };
-    const ready = await audio.init(nextPrefs);
+    const ready = await audio.init(nextPrefs, sceneEnvironment);
     if (!ready) {
       setStatus("audio unavailable");
       return;
@@ -504,7 +508,7 @@ export function App() {
     const scene = getSceneEnvironment(id);
     setSceneEnvironment(id);
     setAudioPrefs((current) => ({ ...current, mood: scene.mood }));
-    audio.setMood(scene.mood);
+    audio.setMoodAndRoom(scene.mood, id);
     setStatus(scene.status);
   }
 

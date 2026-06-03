@@ -23,29 +23,47 @@ await main();
 
 async function main() {
   await mkdir(outputDir, { recursive: true });
-  const moods = await loadMoodDefs();
+  const { moods, rooms, scenes } = await loadSourceModules();
   const renders = [];
   for (const mood of moods) {
-    renders.push(await renderMood(mood));
+    renders.push(await renderMood(mood, rooms[0]));
+  }
+  const roomAmbienceRenders = [];
+  for (const scene of scenes) {
+    const mood = moods.find((candidate) => candidate.id === scene.mood) ?? moods[0];
+    const room = rooms.find((candidate) => candidate.id === scene.id) ?? rooms[0];
+    roomAmbienceRenders.push(await renderRoomAmbience(scene, mood, room));
   }
   const manifest = {
     generatedAt: new Date().toISOString(),
     sampleRate,
     durationSeconds,
-    note: "Deterministic offline reference for judging generated lo-fi direction. Browser Web Audio routing is tested separately.",
-    renders
+    note: "Deterministic offline reference for judging generated lo-fi and room ambience direction. Browser Web Audio routing is tested separately.",
+    renders,
+    roomAmbienceRenders
   };
   const manifestPath = path.join(outputDir, "audio-qa.json");
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   console.log("Audio QA renders written:");
   for (const render of renders) console.log(`- ${render.file}`);
+  for (const render of roomAmbienceRenders) console.log(`- ${render.file}`);
   console.log(`- ${manifestPath}`);
 }
 
-async function loadMoodDefs() {
+async function loadSourceModules() {
+  const moodsModule = await loadTsModule(path.join(root, "app", "src", "audio", "moods.ts"), "moods.generated.mjs");
+  const roomsModule = await loadTsModule(path.join(root, "app", "src", "audio", "rooms.ts"), "rooms.generated.mjs");
+  const scenesModule = await loadTsModule(path.join(root, "app", "src", "sceneEnvironments.ts"), "scene-environments.generated.mjs");
+  return {
+    moods: moodsModule.AUDIO_MOODS,
+    rooms: roomsModule.ROOM_AMBIENCE_DEFS,
+    scenes: scenesModule.SCENE_ENVIRONMENTS
+  };
+}
+
+async function loadTsModule(sourcePath, fileName) {
   const requireFromApp = createRequire(path.join(root, "app", "package.json"));
   const ts = requireFromApp("typescript");
-  const sourcePath = path.join(root, "app", "src", "audio", "moods.ts");
   const source = await readFile(sourcePath, "utf8");
   const transpiled = ts.transpileModule(source, {
     compilerOptions: {
@@ -54,18 +72,17 @@ async function loadMoodDefs() {
       verbatimModuleSyntax: false
     }
   }).outputText;
-  const modulePath = path.join(outputDir, "moods.generated.mjs");
+  const modulePath = path.join(outputDir, fileName);
   await writeFile(modulePath, transpiled);
   const moduleUrl = `${pathToFileURL(modulePath).href}?t=${Date.now()}`;
-  const module = await import(moduleUrl);
-  return module.AUDIO_MOODS;
+  return import(moduleUrl);
 }
 
-async function renderMood(mood) {
+async function renderMood(mood, room) {
   const samples = new Float32Array(sampleRate * durationSeconds);
   const rng = mulberry32(hashText(mood.id));
   const music = mood.music;
-  addBackground(samples, mood, rng);
+  addBackground(samples, mood, room, rng, true);
 
   const stepSeconds = music.stepMs / 1000;
   const stepCount = Math.ceil(durationSeconds / stepSeconds) + 2;
@@ -95,21 +112,72 @@ async function renderMood(mood) {
   };
 }
 
-function addBackground(samples, mood, rng) {
+async function renderRoomAmbience(scene, mood, room) {
+  const samples = new Float32Array(sampleRate * durationSeconds);
+  const rng = mulberry32(hashText(`room:${scene.id}`));
+  addBackground(samples, mood, room, rng, false);
+  addRoomAccents(samples, room, rng);
+
+  applyFade(samples, 0.35);
+  const peak = normalize(samples, 0.92);
+  const file = path.join(outputDir, `${scene.id}-ambience-reference.wav`);
+  await writeFile(file, wavBuffer(samples));
+  return {
+    room: scene.id,
+    title: scene.title,
+    mood: mood.id,
+    file,
+    peakBeforeNormalize: Number(peak.toFixed(4)),
+    rainGainScale: room.rainGainScale,
+    hushGainScale: room.hushGainScale,
+    airGain: room.airGain,
+    warmGain: room.warmGain,
+    hasSparseAccents:
+      room.gardenTickGain > 0 || room.starChimeGain > 0 || room.warmCrackleGain > 0 || room.branchRustleGain > 0 || room.snowTickGain > 0
+  };
+}
+
+function addBackground(samples, mood, room, rng, includeVinyl) {
   const { ambience, music } = mood;
   let hush = 0;
   let rainLast = 0;
+  let air = 0;
+  let warm = 0;
   for (let i = 0; i < samples.length; i++) {
     const t = i / sampleRate;
     const white = rng() * 2 - 1;
     hush = hush * 0.996 + white * 0.004;
+    air = air * 0.986 + white * 0.014;
+    warm = warm * 0.998 + white * 0.002;
     const rain = white - rainLast * 0.62;
+    const airTexture = room.airType === "highpass" ? white - air * 0.8 : white * 0.42 + air * 0.58;
     rainLast = white;
-    samples[i] += rain * ambience.rainGain * 0.12;
-    samples[i] += hush * ambience.hushGain * 0.55;
-    samples[i] += Math.sin(Math.PI * 2 * ambience.humFrequency * t) * ambience.humGain * 0.35;
-    samples[i] += (rng() * 2 - 1) * music.vinylGain * 0.025;
-    if (rng() < 0.000018) addDustPop(samples, i, music.vinylGain, rng);
+    samples[i] += rain * ambience.rainGain * room.rainGainScale * 0.12;
+    samples[i] += hush * ambience.hushGain * room.hushGainScale * 0.55;
+    samples[i] += airTexture * room.airGain * 0.48;
+    samples[i] += warm * room.warmGain * 0.82;
+    samples[i] += Math.sin(Math.PI * 2 * Math.max(32, ambience.humFrequency + room.humFrequencyOffset) * t) * ambience.humGain * room.humGainScale * 0.35;
+    if (includeVinyl) {
+      samples[i] += (rng() * 2 - 1) * music.vinylGain * 0.025;
+      if (rng() < 0.000018) addDustPop(samples, i, music.vinylGain, rng);
+    }
+  }
+}
+
+function addRoomAccents(samples, room, rng) {
+  scheduleRoomAccent(samples, room.gardenTickGain, room.gardenTickMs, rng, addGardenTick);
+  scheduleRoomAccent(samples, room.starChimeGain, room.starChimeMs, rng, addStarChime);
+  scheduleRoomAccent(samples, room.warmCrackleGain, room.warmCrackleMs, rng, addWarmCrackle);
+  scheduleRoomAccent(samples, room.branchRustleGain, room.branchRustleMs, rng, addBranchRustle);
+  scheduleRoomAccent(samples, room.snowTickGain, room.snowTickMs, rng, addSnowTick);
+}
+
+function scheduleRoomAccent(samples, gain, intervalMs, rng, addAccent) {
+  if (gain <= 0 || intervalMs <= 0) return;
+  let time = (intervalMs / 1000) * (0.45 + rng() * 0.25);
+  while (time < durationSeconds) {
+    addAccent(samples, time, gain);
+    time += (intervalMs / 1000) * (0.65 + rng() * 0.7);
   }
 }
 
@@ -277,6 +345,51 @@ function addBrushFill(samples, settings, time, hits) {
   for (let i = 0; i < hits; i++) {
     addNoiseBurst(samples, time + i * 0.046, 0.052, settings.fillGain * (1 - i * 0.08), i % 2 === 0 ? "snare" : "hat");
   }
+}
+
+function addGardenTick(samples, time, gain) {
+  addTone(samples, time, 0.18, 920, gain * 1.4, "sine", {
+    attack: 0.08,
+    release: 0.46,
+    vibrato: 1.8
+  });
+  addTone(samples, time + 0.07, 0.14, 1240, gain * 0.74, "sine", {
+    attack: 0.08,
+    release: 0.44,
+    vibrato: 1.2
+  });
+}
+
+function addStarChime(samples, time, gain) {
+  addTone(samples, time, 0.42, 1040, gain * 1.2, "sine", {
+    attack: 0.045,
+    release: 0.72,
+    vibrato: 2.4
+  });
+  addTone(samples, time + 0.09, 0.36, 1320, gain * 0.7, "sine", {
+    attack: 0.05,
+    release: 0.72,
+    vibrato: 1.6
+  });
+}
+
+function addWarmCrackle(samples, time, gain) {
+  for (let i = 0; i < 3; i++) {
+    addNoiseBurst(samples, time + i * 0.035, 0.045, gain * (1 - i * 0.16), i % 2 === 0 ? "rim" : "hat");
+  }
+}
+
+function addBranchRustle(samples, time, gain) {
+  addNoiseBurst(samples, time, 0.36, gain, "snare");
+}
+
+function addSnowTick(samples, time, gain) {
+  addTone(samples, time, 0.22, 720, gain * 1.1, "sine", {
+    attack: 0.08,
+    release: 0.64,
+    vibrato: 0.6
+  });
+  addNoiseBurst(samples, time + 0.035, 0.11, gain * 0.42, "rim");
 }
 
 function addNoiseBurst(samples, time, duration, gain, color) {

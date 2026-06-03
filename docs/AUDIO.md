@@ -11,6 +11,7 @@ Focused implementation modules live under `app/src/audio`:
 - `types.ts`: shared audio types.
 - `preferences.ts`: localStorage shape, defaults, channel list, and normalization.
 - `moods.ts`: reusable sound moods shared by the controller and UI.
+- `rooms.ts`: room-linked ambience profiles that bias native ambience without adding controls.
 - `providers.ts`: generated/external music provider definitions and availability rules.
 - `mixer.ts`: Web Audio graph for `master`, `ambience`, and `music`.
 - `ambience.ts`: rain, room hush, low room tone, and occasional window drips.
@@ -28,6 +29,7 @@ Focused implementation modules live under `app/src/audio`:
 - Mute and stop should fade through mixer gain instead of tearing down every node.
 - Music and ambience stay on separate channels so the panel remains simple but useful.
 - Mood changes should restart long-running ambience/music layers cleanly.
+- Room changes may restart the ambience layer with a backdrop-specific profile, but they should not add more visible audio controls.
 - External music must be optional. The generated music provider remains the default and fallback.
 
 ## Music Direction
@@ -54,6 +56,8 @@ Sound moods are small procedural presets, not different audio files:
 - Stardust: lighter ambience, airier chords, and occasional shimmer.
 
 Mood definitions live in `moods.ts`. Keep mood names user-facing and calm; keep implementation details inside the preset config.
+
+Room ambience profiles live in `rooms.ts`. They are not separate user-facing sound modes; they quietly bias rain, hush, room tone, warm air, outdoor air, and sparse accents when the room backdrop changes.
 
 ## Music Providers
 
@@ -84,7 +88,7 @@ Use the listening harness when generated music, ambience, or material cues chang
 .\scripts\audio-qa.ps1
 ```
 
-It writes deterministic WAV references and a manifest to `.tmp/audio-qa`. The renderer is an offline reference built from the checked-in mood settings; browser Web Audio routing, autoplay behavior, and Desk Radio embedding are still covered by browser checks.
+It writes deterministic WAV references and a manifest to `.tmp/audio-qa`. The renderer is an offline reference built from the checked-in mood and room settings; browser Web Audio routing, autoplay behavior, and Desk Radio embedding are still covered by browser checks.
 
 Reference tracks can guide taste, but do not sample, copy, scrape, or embed hidden audio from them. YouTube links remain user-provided Desk Radio sources only.
 
@@ -95,6 +99,7 @@ Add new sounds in the narrowest module:
 - long environmental loop: `ambience.ts`
 - musical pattern, rhythm, or harmonic change: `music.ts`
 - new mood preset: `moods.ts`
+- room-specific ambience balance: `rooms.ts`
 - short material cue: `cues.ts`, routed through the ambience channel and throttled by `controller.ts`.
 - provider switching or external music hooks: keep YouTube-specific parsing and persistence isolated in `deskRadio.ts`.
 - channel/routing behavior: `mixer.ts`

@@ -3,9 +3,11 @@ import { playMaterialPaintCue } from "./cues";
 import { createAudioMixer, applyMixerPreferences } from "./mixer";
 import { startRainLofiMusic } from "./music";
 import { DEFAULT_AUDIO_PREFS, normalizeAudioPrefs } from "./preferences";
+import { DEFAULT_AUDIO_ROOM } from "./rooms";
 import type { AudioChannel, AudioLayerHandle, AudioMood, AudioPrefs, MusicProvider, RunningAudio } from "./types";
 import { clamp01, getAudioContextConstructor } from "./utils";
 import type { MaterialId } from "../materials";
+import type { SceneEnvironmentId } from "../sceneEnvironments";
 
 export function createAudioController() {
   return new CozyAudioController();
@@ -14,12 +16,14 @@ export function createAudioController() {
 class CozyAudioController {
   private audio: RunningAudio | null = null;
   private prefs = DEFAULT_AUDIO_PREFS;
+  private room: SceneEnvironmentId = DEFAULT_AUDIO_ROOM;
   private ambience: AudioLayerHandle | null = null;
   private music: AudioLayerHandle | null = null;
   private lastPaintCueAt = 0;
 
-  async init(prefs: AudioPrefs) {
+  async init(prefs: AudioPrefs, room: SceneEnvironmentId = this.room) {
     this.prefs = normalizeAudioPrefs(prefs);
+    this.room = room;
     if (!this.audio) {
       const AudioContextCtor = getAudioContextConstructor();
       if (!AudioContextCtor) return false;
@@ -72,6 +76,23 @@ class CozyAudioController {
     this.restartLongRunningLayers();
   }
 
+  setRoom(room: SceneEnvironmentId) {
+    if (room === this.room) return;
+    this.room = room;
+    this.restartAmbienceLayer();
+  }
+
+  setMoodAndRoom(mood: AudioMood, room: SceneEnvironmentId) {
+    const nextPrefs = normalizeAudioPrefs({ ...this.prefs, mood });
+    const moodChanged = nextPrefs.mood !== this.prefs.mood;
+    const roomChanged = room !== this.room;
+    if (!moodChanged && !roomChanged) return;
+    this.prefs = nextPrefs;
+    this.room = room;
+    if (moodChanged) this.restartLongRunningLayers();
+    else this.restartAmbienceLayer();
+  }
+
   setMusicProvider(provider: MusicProvider) {
     const nextPrefs = normalizeAudioPrefs({ ...this.prefs, provider });
     if (nextPrefs.provider === this.prefs.provider) return;
@@ -106,7 +127,7 @@ class CozyAudioController {
 
   private startAmbience() {
     if (!this.audio || this.ambience) return;
-    this.ambience = startRainAmbience(this.audio, this.prefs.mood);
+    this.ambience = startRainAmbience(this.audio, this.prefs.mood, this.room);
   }
 
   private startMusicBed() {
@@ -123,6 +144,14 @@ class CozyAudioController {
     this.music = null;
     this.startAmbience();
     this.startMusicBed();
+    this.applyPreferences(this.prefs);
+  }
+
+  private restartAmbienceLayer() {
+    if (!this.audio) return;
+    this.ambience?.stop();
+    this.ambience = null;
+    this.startAmbience();
     this.applyPreferences(this.prefs);
   }
 }

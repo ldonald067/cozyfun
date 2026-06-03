@@ -12,6 +12,7 @@ This roadmap keeps the project focused: make the toy feel good, keep the codebas
 - Procedural Web Audio foundation with master, ambience, and music channels.
 - Audio code split into reusable modules for mixer, preferences, ambience, music, buffers, and controller lifecycle.
 - Sound moods added for Rain, Window, and Stardust variations.
+- Room-linked ambience profiles added for the six room backdrops without adding extra sound controls.
 - Non-destructive room backdrops added for Rain Desk, Moonlit Garden, Stardust Hearth, Cozy Fireplace, Forest Hut, and Snow Window.
 - Local credited room images added for those backdrops, with procedural lighting and weather still layered on top.
 - Painted scene seeds kept as internal QA/dev helpers instead of visible user-facing presets.
@@ -337,20 +338,22 @@ Next:
 
 ## Phase 9: Room-Linked Ambience
 
-Status: planned.
+Status: complete.
 
 Goal: make room backdrops carry richer ambience variation without making the sound controls heavier.
 
-Direction:
+Completed:
 
-- Keep the existing mood/provider controls; room selection may quietly bias ambience details.
-- Rain Desk should stay rain-forward with close-window texture.
-- Moonlit Garden can add night air, softer insects, or outdoor hush while preserving native ambience.
-- Stardust Hearth can use faint sparkle/ember air without becoming a synthetic pad.
-- Cozy Fireplace can lean warm room tone and subtle fire bed.
-- Forest Hut can use filtered rain, distant branch/leaf movement, and less city-room hum.
-- Snow Window can use softer damped hush, lighter drips, and colder room tone.
-- Audio QA should render enough deterministic references that room-linked ambience can be compared without relying on memory.
+- Added internal room ambience profiles for Rain Desk, Moonlit Garden, Stardust Hearth, Cozy Fireplace, Forest Hut, and Snow Window.
+- Kept the existing mood/provider controls; room selection quietly biases ambience details instead of adding another control row.
+- Rain Desk stays close-rain and window-drip forward.
+- Moonlit Garden adds cooler outdoor air, sparse night ticks, and a small cosmic chime layer.
+- Stardust Hearth adds airy shimmer, warm room tone, and restrained crackle accents without becoming a synthetic pad.
+- Cozy Fireplace leans into warm room tone and subtle crackle while keeping rain nearly out of the way.
+- Forest Hut uses filtered rain, lower room hum, outdoor air, and occasional branch/leaf movement.
+- Snow Window uses softer damped hush, lighter drips, colder room tone, and sparse frost ticks.
+- The audio controller now tracks the active room separately from saved audio preferences, so imported scenes and live room changes update ambience without changing the scene file format.
+- `.\scripts\audio-qa.ps1` now renders deterministic per-room ambience references alongside the generated lo-fi mood references.
 
 ## Phase 10: Element Variation + Identity
 
