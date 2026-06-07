@@ -98,7 +98,7 @@ export function DeskRadioPanel({
       {source && playbackState === "blocked" && (
         <div className="desk-radio-message" data-testid="desk-radio-message">
           <strong>YouTube will not embed this link.</strong>
-          <span>Generated music is selected again. Press Start if you want sound, or try a public video or playlist with embedding enabled.</span>
+          <span>Native ambience is selected again. Press Start if you want sound, or try a public video or playlist with embedding enabled.</span>
           <a href={watchUrl} target="_blank" rel="noreferrer">
             Open on YouTube
           </a>

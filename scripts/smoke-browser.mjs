@@ -68,6 +68,13 @@ async function main() {
         window.__smokeErrors.push(args.map(String).join(" "));
         originalError.apply(console, args);
       };
+      localStorage.setItem("cozy-pixel-sandbox:audio:v2", JSON.stringify({
+        enabled: true,
+        muted: false,
+        mood: "rain",
+        provider: "generated",
+        volumes: { master: 0.68, ambience: 0.72 }
+      }));
       window.__cozyYouTubeMockMode = "ready";
       window.YT = {
         Player: function Player(element, options) {
@@ -103,7 +110,10 @@ async function main() {
       materialLabels: Array.from(document.querySelectorAll(".material-button")).map((button) => button.textContent.trim()),
       audioInfos: document.querySelectorAll(".audio-info").length,
       audioMoods: document.querySelectorAll(".audio-mood-control button").length,
-      musicProviders: document.querySelectorAll(".music-source-control button").length,
+      audioProviders: document.querySelectorAll(".audio-source-control button").length,
+      providerLabels: Array.from(document.querySelectorAll(".audio-source-control button")).map((button) => button.textContent.trim()),
+      nativeProviderActive: document.querySelector('[data-testid="audio-provider-native"]')?.classList.contains("active") ?? false,
+      storedAudioProvider: JSON.parse(localStorage.getItem("cozy-pixel-sandbox:audio:v2") || "{}").provider,
       shareActions: document.querySelectorAll(".share-actions button").length,
       sceneEnvironments: document.querySelectorAll('[data-testid^="scene-environment-"]').length,
       roomImage: getComputedStyle(document.querySelector(".app-shell")).getPropertyValue("--room-image"),
@@ -112,9 +122,12 @@ async function main() {
     assert(state.title === "Cozy Pixel Sandbox", "unexpected page title");
     assert(state.materials === 19, `expected exactly 19 selectable material buttons, found ${state.materials}: ${state.materialLabels.join(", ")}`);
     assert(!state.materialLabels.includes("Flower"), "generated-only Flower should not be selectable");
-    assert(state.audioInfos === 3, `expected three audio info icons, found ${state.audioInfos}`);
+    assert(state.audioInfos === 2, `expected two audio info icons, found ${state.audioInfos}`);
     assert(state.audioMoods === 3, `expected three audio mood buttons, found ${state.audioMoods}`);
-    assert(state.musicProviders === 2, `expected two music provider buttons, found ${state.musicProviders}`);
+    assert(state.audioProviders === 2, `expected two sound source buttons, found ${state.audioProviders}`);
+    assert(state.providerLabels.join("|") === "Native|Desk Radio", `unexpected sound providers: ${state.providerLabels.join(", ")}`);
+    assert(state.nativeProviderActive, "legacy generated audio provider did not normalize to native");
+    assert(state.storedAudioProvider === "native", `legacy generated audio provider was not migrated in prefs: ${state.storedAudioProvider}`);
     assert(state.shareActions === 5, `expected five share actions, found ${state.shareActions}`);
     assert(state.sceneEnvironments === 6, `expected six room buttons, found ${state.sceneEnvironments}`);
     assert(state.roomImage.includes("rain-desk.jpg"), `default room image was not applied: ${state.roomImage}`);
@@ -129,6 +142,46 @@ async function main() {
     assert(before !== after, "canvas signature did not change after painting");
   });
 
+  await check("native ambience recordings are served and decodable", async () => {
+    const assets = await evaluate(
+      cdp,
+      `(async () => {
+        const checks = [
+          { url: "/audio/rain-thunder.ogg", minBytes: 1000000 },
+          { url: "/audio/creek-water.ogg", minBytes: 100000 },
+          { url: "/audio/fire-crackle.ogg", minBytes: 10000 }
+        ];
+        return Promise.all(checks.map(async (asset) => {
+          const response = await fetch(asset.url, { cache: "no-store" });
+          const bytes = await response.arrayBuffer();
+          let duration = 0;
+          let decodeError = "";
+          try {
+            const context = new OfflineAudioContext(1, 1, 44100);
+            const decoded = await context.decodeAudioData(bytes.slice(0));
+            duration = decoded.duration;
+          } catch (error) {
+            decodeError = String(error);
+          }
+          return {
+            url: asset.url,
+            ok: response.ok,
+            status: response.status,
+            bytes: bytes.byteLength,
+            minBytes: asset.minBytes,
+            duration,
+            decodeError
+          };
+        }));
+      })()`
+    );
+    for (const asset of assets) {
+      assert(asset.ok, `${asset.url} was not served: HTTP ${asset.status}`);
+      assert(asset.bytes >= asset.minBytes, `${asset.url} was too small: ${asset.bytes} bytes`);
+      assert(asset.duration > 0.05, `${asset.url} did not decode as browser audio: ${asset.decodeError}`);
+    }
+  });
+
   await check("clear, save, and load update scene state", async () => {
     await click(cdp, '[data-testid="save-scene"]');
     await waitForStatus(cdp, "saved in browser");
@@ -141,7 +194,7 @@ async function main() {
     assert(savedScene.metadata?.app === "cozy-pixel-sandbox", "local scene metadata app marker missing");
     assert(savedScene.metadata?.room === "rain-desk", `local scene room metadata mismatch: ${savedScene.metadata?.room}`);
     assert(savedScene.metadata?.mood === "rain", `local scene mood metadata mismatch: ${savedScene.metadata?.mood}`);
-    assert(savedScene.metadata?.musicProvider === "generated", `local scene music metadata mismatch: ${savedScene.metadata?.musicProvider}`);
+    assert(savedScene.metadata?.musicProvider === "generated", `local scene legacy provider metadata mismatch: ${savedScene.metadata?.musicProvider}`);
   });
 
   await check("export, metadata import, and invalid import produce clear feedback", async () => {
@@ -202,38 +255,38 @@ async function main() {
   await check("audio controls start, mute, adjust, and stop", async () => {
     await click(cdp, '[data-testid="scene-environment-rain-desk"]');
     await waitForStatus(cdp, "rain desk backdrop on");
-    await click(cdp, '[data-testid="music-provider-external"]');
+    await click(cdp, '[data-testid="audio-provider-external"]');
     await waitForStatus(cdp, "desk radio needs a YouTube link");
     await waitUntil(() => evaluate(cdp, `Boolean(document.querySelector('[data-testid="desk-radio-input"]'))`), "desk radio input to appear");
     await setText(cdp, '[data-testid="desk-radio-input"]', "https://example.com/radio");
     await click(cdp, '[data-testid="desk-radio-tune"]');
     await waitForStatus(cdp, "invalid YouTube link");
     await click(cdp, '[data-testid="audio-toggle"]');
-    await waitForStatus(cdp, "rain lo-fi on");
+    await waitForStatus(cdp, "rain and creek on");
     await waitUntil(() => textIncludes(cdp, '[data-testid="audio-toggle"]', "Stop"), "audio start button to become stop");
     await click(cdp, '[data-testid="audio-mood-stardust"]');
-    await waitForStatus(cdp, "stardust study on");
+    await waitForStatus(cdp, "fireplace crackle on");
     await click(cdp, '[data-testid="audio-mute"]');
     await waitForStatus(cdp, "audio muted");
     await waitUntil(() => textIncludes(cdp, '[data-testid="audio-mute"]', "Muted"), "mute button to show muted");
-    await setRange(cdp, '[data-testid="audio-volume-music"]', "0.12");
-    const musicVolume = await evaluate(cdp, `document.querySelector('[data-testid="audio-volume-music"]')?.value`);
-    assert(musicVolume === "0.12", `music volume did not update, got ${musicVolume}`);
+    await setRange(cdp, '[data-testid="audio-volume-ambience"]', "0.52");
+    const ambienceVolume = await evaluate(cdp, `document.querySelector('[data-testid="audio-volume-ambience"]')?.value`);
+    assert(ambienceVolume === "0.52", `ambience volume did not update, got ${ambienceVolume}`);
     await click(cdp, '[data-testid="audio-mute"]');
     await waitForStatus(cdp, "audio unmuted");
     await click(cdp, '[data-testid="audio-toggle"]');
-    await waitForStatus(cdp, "Stardust Study resting");
+    await waitForStatus(cdp, "Fireplace resting");
   });
 
   await check("desk radio handles playable and blocked YouTube embeds", async () => {
     await evaluate(cdp, `window.__cozyYouTubeMockMode = "ready"`);
-    await click(cdp, '[data-testid="music-provider-external"]');
+    await click(cdp, '[data-testid="audio-provider-external"]');
     await waitForStatus(cdp, "desk radio needs a YouTube link");
     await setText(cdp, '[data-testid="desk-radio-input"]', "https://youtu.be/dQw4w9WgXcQ?t=1m12s");
     await click(cdp, '[data-testid="desk-radio-tune"]');
     await waitForStatus(cdp, "desk radio ready");
     const readyState = await evaluate(cdp, `(() => ({
-      externalActive: document.querySelector('[data-testid="music-provider-external"]')?.classList.contains("active"),
+      externalActive: document.querySelector('[data-testid="audio-provider-external"]')?.classList.contains("active"),
       iframeSrc: document.querySelector('[data-testid="desk-radio-frame"] iframe')?.getAttribute("src") ?? "",
       nowPlaying: document.querySelector('[data-testid="desk-radio-now"]')?.textContent ?? "",
       storedSource: JSON.parse(localStorage.getItem("cozy-pixel-sandbox:desk-radio:v1") || "null")
@@ -245,9 +298,9 @@ async function main() {
     assert(readyState.storedSource?.id === "dQw4w9WgXcQ", "Playable Desk Radio source was not saved");
     assert(readyState.storedSource?.startSeconds === 72, "Playable Desk Radio start time was not saved");
     await click(cdp, '[data-testid="desk-radio-clear"]');
-    await waitForStatus(cdp, "generated music selected");
+    await waitForStatus(cdp, "native ambience selected");
 
-    await click(cdp, '[data-testid="music-provider-external"]');
+    await click(cdp, '[data-testid="audio-provider-external"]');
     await waitForStatus(cdp, "desk radio needs a YouTube link");
     await setText(cdp, '[data-testid="desk-radio-input"]', "https://www.youtube.com/watch?v=-rRFxzRCHKI&list=RD-rRFxzRCHKI&start_radio=1");
     await click(cdp, '[data-testid="desk-radio-tune"]');
@@ -262,30 +315,30 @@ async function main() {
     assert(playlistState.storedSource?.kind === "playlist", "Playlist Desk Radio source was not saved as a playlist");
     assert(playlistState.storedSource?.id === "RD-rRFxzRCHKI", `Playlist Desk Radio source ID was wrong: ${playlistState.storedSource?.id}`);
     await click(cdp, '[data-testid="desk-radio-clear"]');
-    await waitForStatus(cdp, "generated music selected");
+    await waitForStatus(cdp, "native ambience selected");
 
     await evaluate(cdp, `window.__cozyYouTubeMockMode = "blocked"`);
-    await click(cdp, '[data-testid="music-provider-external"]');
+    await click(cdp, '[data-testid="audio-provider-external"]');
     await waitForStatus(cdp, "desk radio needs a YouTube link");
     await setText(cdp, '[data-testid="desk-radio-input"]', "https://www.youtube.com/watch?v=jfKfPfyJRdk");
     await click(cdp, '[data-testid="desk-radio-tune"]');
-    await waitForStatus(cdp, "YouTube blocked embed; generated music restored");
+    await waitForStatus(cdp, "YouTube blocked embed; native ambience restored");
     const blockedState = await evaluate(cdp, `(() => ({
-      generatedActive: document.querySelector('[data-testid="music-provider-generated"]')?.classList.contains("active"),
+      nativeActive: document.querySelector('[data-testid="audio-provider-native"]')?.classList.contains("active"),
       message: document.querySelector('[data-testid="desk-radio-message"]')?.textContent ?? "",
       storedSource: localStorage.getItem("cozy-pixel-sandbox:desk-radio:v1"),
       shareSummary: document.querySelector(".share-summary")?.textContent ?? ""
     }))()`);
-    assert(blockedState.generatedActive, "Blocked Desk Radio did not return to generated music");
+    assert(blockedState.nativeActive, "Blocked Desk Radio did not return to native ambience");
     assert(blockedState.message.includes("will not embed"), `Blocked embed message was unclear: ${blockedState.message}`);
     assert(
-      blockedState.message.includes("Generated music is selected again"),
+      blockedState.message.includes("Native ambience is selected again"),
       `Blocked embed fallback was unclear: ${blockedState.message}`
     );
     assert(blockedState.storedSource === null, "Blocked Desk Radio source was saved locally");
-    assert(blockedState.shareSummary.includes("Generated"), "Blocked Desk Radio still appeared in the share summary");
+    assert(blockedState.shareSummary.includes("Native"), "Blocked Desk Radio still appeared in the share summary");
     await click(cdp, '[data-testid="desk-radio-clear"]');
-    await waitForStatus(cdp, "generated music selected");
+    await waitForStatus(cdp, "native ambience selected");
   });
 
   await check("room scenes change the backdrop without loading starter worlds", async () => {
@@ -295,7 +348,7 @@ async function main() {
     const moonImage = await evaluate(cdp, `getComputedStyle(document.querySelector(".app-shell")).getPropertyValue("--room-image")`);
     assert(moonClass, "moonwater room class was not applied");
     assert(moonImage.includes("moonwater-garden.jpg"), `moonwater room image was not applied: ${moonImage}`);
-    await waitUntil(() => textIncludes(cdp, '[data-testid="audio-mood-window"]', "Window"), "window mood control to stay visible");
+    await waitUntil(() => textIncludes(cdp, '[data-testid="audio-mood-window"]', "Thunder"), "thunder mood control to stay visible");
     await click(cdp, '[data-testid="scene-environment-stardust-hearth"]');
     await waitForStatus(cdp, "stardust hearth backdrop on");
     const hearthClass = await evaluate(cdp, `document.querySelector(".app-shell")?.classList.contains("scene-stardust-hearth")`);

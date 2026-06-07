@@ -1,10 +1,10 @@
 import { startRainAmbience } from "./ambience";
-import { playMaterialPaintCue } from "./cues";
+import { playMaterialPaintCue, playReactionCue } from "./cues";
 import { createAudioMixer, applyMixerPreferences } from "./mixer";
-import { startRainLofiMusic } from "./music";
 import { DEFAULT_AUDIO_PREFS, normalizeAudioPrefs } from "./preferences";
+import type { ReactionCue } from "./reactions";
 import { DEFAULT_AUDIO_ROOM } from "./rooms";
-import type { AudioChannel, AudioLayerHandle, AudioMood, AudioPrefs, MusicProvider, RunningAudio } from "./types";
+import type { AudioChannel, AudioLayerHandle, AudioMood, AudioPrefs, AudioProvider, RunningAudio } from "./types";
 import { clamp01, getAudioContextConstructor } from "./utils";
 import type { MaterialId } from "../materials";
 import type { SceneEnvironmentId } from "../sceneEnvironments";
@@ -18,8 +18,15 @@ class CozyAudioController {
   private prefs = DEFAULT_AUDIO_PREFS;
   private room: SceneEnvironmentId = DEFAULT_AUDIO_ROOM;
   private ambience: AudioLayerHandle | null = null;
-  private music: AudioLayerHandle | null = null;
   private lastPaintCueAt = 0;
+  private lastReactionCueAt = Number.NEGATIVE_INFINITY;
+  private lastReactionCueByKind: Record<ReactionCue, number> = {
+    "impact-burst": Number.NEGATIVE_INFINITY,
+    cleanse: Number.NEGATIVE_INFINITY,
+    "cosmic-charge": Number.NEGATIVE_INFINITY,
+    bloom: Number.NEGATIVE_INFINITY,
+    "steam-flash": Number.NEGATIVE_INFINITY
+  };
 
   async init(prefs: AudioPrefs, room: SceneEnvironmentId = this.room) {
     this.prefs = normalizeAudioPrefs(prefs);
@@ -31,7 +38,6 @@ class CozyAudioController {
         const context = new AudioContextCtor();
         this.audio = createAudioMixer(context);
         this.startAmbience();
-        this.startMusicBed();
       } catch {
         this.dispose();
         return false;
@@ -73,7 +79,7 @@ class CozyAudioController {
     const nextPrefs = normalizeAudioPrefs({ ...this.prefs, mood });
     if (nextPrefs.mood === this.prefs.mood) return;
     this.prefs = nextPrefs;
-    this.restartLongRunningLayers();
+    this.restartAmbienceLayer();
   }
 
   setRoom(room: SceneEnvironmentId) {
@@ -89,15 +95,15 @@ class CozyAudioController {
     if (!moodChanged && !roomChanged) return;
     this.prefs = nextPrefs;
     this.room = room;
-    if (moodChanged) this.restartLongRunningLayers();
+    if (moodChanged) this.restartAmbienceLayer();
     else this.restartAmbienceLayer();
   }
 
-  setMusicProvider(provider: MusicProvider) {
+  setAudioProvider(provider: AudioProvider) {
     const nextPrefs = normalizeAudioPrefs({ ...this.prefs, provider });
     if (nextPrefs.provider === this.prefs.provider) return;
     this.prefs = nextPrefs;
-    this.restartLongRunningLayers();
+    this.applyPreferences(this.prefs);
   }
 
   playPaintCue(material: MaterialId) {
@@ -108,6 +114,21 @@ class CozyAudioController {
     playMaterialPaintCue(this.audio, material, now + 0.005);
   }
 
+  canPlayReactionCues() {
+    return Boolean(this.audio && this.prefs.enabled && !this.prefs.muted);
+  }
+
+  playReactionCues(cues: readonly ReactionCue[]) {
+    if (!this.audio || !this.prefs.enabled || this.prefs.muted || cues.length === 0) return;
+    const now = this.audio.context.currentTime;
+    if (now - this.lastReactionCueAt < 0.28) return;
+    const cue = this.pickReactionCue(cues, now);
+    if (!cue) return;
+    this.lastReactionCueAt = now;
+    this.lastReactionCueByKind[cue] = now;
+    playReactionCue(this.audio, cue, now + 0.006);
+  }
+
   applyPreferences(prefs: AudioPrefs) {
     this.prefs = normalizeAudioPrefs(prefs);
     if (!this.audio) return;
@@ -116,9 +137,7 @@ class CozyAudioController {
 
   dispose() {
     this.ambience?.stop();
-    this.music?.stop();
     this.ambience = null;
-    this.music = null;
     if (this.audio) {
       void this.audio.context.close();
       this.audio = null;
@@ -130,23 +149,6 @@ class CozyAudioController {
     this.ambience = startRainAmbience(this.audio, this.prefs.mood, this.room);
   }
 
-  private startMusicBed() {
-    if (!this.audio || this.music) return;
-    if (this.prefs.provider !== "generated") return;
-    this.music = startRainLofiMusic(this.audio, this.prefs.mood);
-  }
-
-  private restartLongRunningLayers() {
-    if (!this.audio) return;
-    this.ambience?.stop();
-    this.music?.stop();
-    this.ambience = null;
-    this.music = null;
-    this.startAmbience();
-    this.startMusicBed();
-    this.applyPreferences(this.prefs);
-  }
-
   private restartAmbienceLayer() {
     if (!this.audio) return;
     this.ambience?.stop();
@@ -154,4 +156,23 @@ class CozyAudioController {
     this.startAmbience();
     this.applyPreferences(this.prefs);
   }
+
+  private pickReactionCue(cues: readonly ReactionCue[], now: number) {
+    for (const cue of REACTION_CUE_PRIORITY) {
+      if (!cues.includes(cue)) continue;
+      if (now - this.lastReactionCueByKind[cue] < REACTION_CUE_COOLDOWNS[cue]) continue;
+      return cue;
+    }
+    return null;
+  }
 }
+
+const REACTION_CUE_PRIORITY: ReactionCue[] = ["impact-burst", "cleanse", "cosmic-charge", "bloom", "steam-flash"];
+
+const REACTION_CUE_COOLDOWNS: Record<ReactionCue, number> = {
+  "impact-burst": 0.9,
+  cleanse: 1.2,
+  "cosmic-charge": 1.15,
+  bloom: 1.4,
+  "steam-flash": 1.1
+};

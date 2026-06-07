@@ -67,12 +67,12 @@ npm --prefix app run dev -- --host 127.0.0.1
 - Use the brush slider to change brush size.
 - Pause/play the simulation from the control panel.
 - Change the room backdrop without replacing your sandbox, including rainy, moonlit, hearth, fireplace, forest, and snow scenes.
-- Enable optional procedural audio, pick a sound mood, choose generated lo-fi jazz or a visible YouTube Desk Radio, and tune master, ambience, and music volume.
+- Enable optional local audio, pick a sound mood for rain/creek, light thunder, or fireplace crackle, choose native ambience or a visible YouTube Desk Radio, and tune master and ambience volume.
 - Clear, save/load in the browser, download/import a scene JSON file, export a postcard PNG, export a short WebM clip, or copy a share note from the right controls.
 
-Generated music is a local procedural lo-fi jazz bed, not a streamed track. Painting also adds subtle native material cues when sound is enabled. Desk Radio is user-controlled: paste a YouTube video, playlist, timestamped URL, or raw video ID and the visible player embeds that source when YouTube allows embedded playback. If YouTube blocks a link from playing in the sandbox, the app returns to generated music, keeps the URL available to edit, and asks for another embeddable link. The app does not search YouTube, pick playlists, use an API key, or play hidden audio.
+Native ambience is local: credited OGG recordings provide the rain/thunder, creek water, and fireplace crackle beds, while generated Web Audio remains for room tone, fallback layers, and subtle material cues. Desk Radio is user-controlled: paste a YouTube video, playlist, timestamped URL, or raw video ID and the visible player embeds that source when YouTube allows embedded playback. If YouTube blocks a link from playing in the sandbox, the app returns to native ambience, keeps the URL available to edit, and asks for another embeddable link. The app does not search YouTube, pick playlists, use an API key, or play hidden audio.
 
-Saves and scene JSON files preserve the selected room backdrop, sound mood, and safe music source metadata. Desk Radio sources are preserved only when they came from a validated user-provided YouTube video or playlist link that loaded as an embeddable player.
+Saves and scene JSON files preserve the selected room backdrop, sound mood, and safe sound source metadata. Desk Radio sources are preserved only when they came from a validated user-provided YouTube video or playlist link that loaded as an embeddable player.
 
 Save/load is browser-local for quick return visits. Scene JSON is the portable format for sharing or backing up a world. Postcards are polished still images with room, sound, sim source, tick, and date context.
 
@@ -111,10 +111,10 @@ Some key reactions:
 
 ## Architecture
 
-- `app` contains the React/Vite UI, renderer, procedural audio, input handling, local saves, and JS fallback engine.
+- `app` contains the React/Vite UI, renderer, local audio, input handling, local saves, and JS fallback engine.
 - `sim` contains the Rust simulation compiled to WASM.
 - `app/src/sceneEnvironments.ts` contains non-destructive room/backdrop definitions.
-- `app/src/deskRadio.ts` validates user-provided YouTube Desk Radio sources and keeps generated music as the default fallback when a link cannot embed.
+- `app/src/deskRadio.ts` validates user-provided YouTube Desk Radio sources and keeps native ambience as the default fallback when a link cannot embed.
 - `app/public/rooms` contains local room backdrop images used by those scene definitions.
 - `app/src/devSceneSeeds.ts` contains internal painted seeds for QA experiments.
 - `scripts/build.ps1` builds the Rust sim, copies the generated WASM into `app/public/sim`, then builds the Vite app.
@@ -122,13 +122,13 @@ Some key reactions:
 - `scripts/preview-current.ps1` rebuilds and serves `app/dist` directly so local previews cannot show a stale dev bundle.
 - `scripts/preview-built.cmd` serves the existing `app/dist` build, accepts an optional port, and keeps a visible window open while the preview is running.
 - `scripts/test-sim.ps1` runs the Rust simulation tests with the checked-in local tool paths.
-- `scripts/audio-qa.ps1` renders deterministic generated-sound WAV references into `.tmp/audio-qa`.
+- `scripts/audio-qa.ps1` renders deterministic generated/fallback audio WAV references into `.tmp/audio-qa`.
 - `scripts/visual-qa.ps1` captures the current controlled material scene, room backdrops, and responsive layout metrics into `.tmp/visual-qa`.
 - `scripts/check.ps1` runs the full local gate with the checked-in local tool paths.
 
 The app is static after build. There is no backend, account system, database, cloud save, hidden streaming dependency, or paid API dependency. Desk Radio is an optional visible YouTube player supplied by the user.
 
-See `AGENTS.md` for repo-level agent guidance, `docs/CODE_REVIEW.md` for the review checklist, `docs/HARNESS.md` for build/test/visual feedback loops, `docs/ARCHITECTURE.md` for module boundaries, `docs/VISUAL_PIPELINE.md` for renderer and shape-language notes, `docs/AUDIO.md` for the procedural sound foundation, and `ASSET_CREDITS.md` for third-party room backdrop sources.
+See `AGENTS.md` for repo-level agent guidance, `docs/CODE_REVIEW.md` for the review checklist, `docs/HARNESS.md` for build/test/visual feedback loops, `docs/ARCHITECTURE.md` for module boundaries, `docs/VISUAL_PIPELINE.md` for renderer and shape-language notes, `docs/AUDIO.md` for the sound foundation, and `ASSET_CREDITS.md` for third-party room and audio sources.
 
 ## Scene format
 
@@ -139,10 +139,10 @@ Scene export files are JSON snapshots with:
 - simulation tick
 - source engine label
 - base64-encoded cell bytes
-- share metadata for room, sound mood, safe music source, and optional user-provided Desk Radio source
+- share metadata for room, sound mood, safe sound source, and optional user-provided Desk Radio source
 - save timestamp
 
-Imports are validated before loading. A scene must match the current world size. Older `CXS1` scene files still import, but they do not carry room or sound metadata.
+Imports are validated before loading. A scene must match the current world size. Older `CXS1` scene files still import, but they do not carry room or sound metadata. Current `CXS2` metadata keeps the field name `musicProvider` for compatibility; the app maps its legacy `"generated"` value to native ambience internally.
 
 ## Deployment
 
@@ -199,7 +199,7 @@ See `ROADMAP.md` for the completed phase history and upcoming product polish not
 
 ## License
 
-MIT. See `LICENSE`. Third-party room images are credited in `ASSET_CREDITS.md`.
+MIT. See `LICENSE`. Third-party room images and ambience recordings are credited in `ASSET_CREDITS.md`.
 
 ## Troubleshooting
 

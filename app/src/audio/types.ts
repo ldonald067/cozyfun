@@ -1,12 +1,12 @@
-export type AudioChannel = "master" | "ambience" | "music";
+export type AudioChannel = "master" | "ambience";
 export type AudioMood = "rain" | "window" | "stardust";
-export type MusicProvider = "generated" | "external";
+export type AudioProvider = "native" | "external";
 
 export type AudioPrefs = {
   enabled: boolean;
   muted: boolean;
   mood: AudioMood;
-  provider: MusicProvider;
+  provider: AudioProvider;
   volumes: Record<AudioChannel, number>;
 };
 
@@ -29,6 +29,15 @@ export type AudioMoodDef = {
   ambience: {
     rainGain: number;
     rainFilter: number;
+    creekGain: number;
+    creekFilter: number;
+    creekBurbleGain: number;
+    creekBurbleMs: number;
+    thunderGain: number;
+    thunderMs: number;
+    fireGain: number;
+    fireCrackleGain: number;
+    fireCrackleMs: number;
     hushGain: number;
     hushFilter: number;
     humFrequency: number;
@@ -36,29 +45,10 @@ export type AudioMoodDef = {
     dripGain: number;
     dripMs: number;
   };
-  music: {
-    stepMs: number;
-    chordGain: number;
-    chordFilterStart: number;
-    chordFilterEnd: number;
-    thumpGain: number;
-    bassGain: number;
-    melodyGain: number;
-    brushGain: number;
-    vinylGain: number;
-    textureGain: number;
-    fillGain: number;
-    grooveGain: number;
-    colorGain: number;
-    phraseGain: number;
-    swing: number;
-    sparkle: boolean;
-    progression: number[][];
-  };
 };
 
-export type MusicProviderDef = {
-  id: MusicProvider;
+export type AudioProviderDef = {
+  id: AudioProvider;
   label: string;
   title: string;
   status: string;

@@ -3,7 +3,7 @@ import { Clapperboard, Copy, FileJson, FolderOpen, ImageDown, Share2 } from "luc
 type SharePanelProps = {
   sceneTitle: string;
   moodTitle: string;
-  musicSource: string;
+  soundSource: string;
   onCopyNote(): void;
   onExportClip(): void;
   onExportPostcard(): void;
@@ -14,7 +14,7 @@ type SharePanelProps = {
 export function SharePanel({
   sceneTitle,
   moodTitle,
-  musicSource,
+  soundSource,
   onCopyNote,
   onExportClip,
   onExportPostcard,
@@ -30,7 +30,7 @@ export function SharePanel({
       </div>
       <div className="share-summary">
         <span>{sceneTitle}</span>
-        <small>{moodTitle} / {musicSource}</small>
+        <small>{moodTitle} / {soundSource}</small>
       </div>
       <div className="share-actions">
         <button type="button" title="Download scene JSON" data-testid="export-scene" onClick={onExportScene}>

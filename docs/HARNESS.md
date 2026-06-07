@@ -10,9 +10,9 @@ Harness engineering means improving the feedback loops around the sandbox so goo
 - `.\scripts\test-sim.ps1`: validates Rust simulation behavior.
 - `.\scripts\test-wasm.ps1`: validates the WASM bridge and key sim outcomes from JavaScript.
 - `.\scripts\test-js-fallback.ps1`: validates JS fallback parity for user-visible sim behavior.
-- `.\scripts\test-browser.ps1`: drives the built app through core UI, sharing, import/export, and Desk Radio paths.
+- `.\scripts\test-browser.ps1`: drives the built app through core UI, local ambience asset decoding, sharing, import/export, and Desk Radio paths.
 - `.\scripts\visual-qa.ps1`: captures deterministic material scenes, room backdrops, and responsive layout metrics.
-- `.\scripts\audio-qa.ps1`: renders deterministic WAV references for generated sound review into `.tmp/audio-qa`.
+- `.\scripts\audio-qa.ps1`: renders deterministic WAV references for generated support layers, fallback ambience, and cue review into `.tmp/audio-qa`.
 - `.\scripts\test-chrome.ps1 -AppPort 4181`: verifies the current preview in Chrome or Edge when an actual browser path matters.
 - `.\scripts\test-firefox.ps1 -AppPort 4181`: verifies Firefox when supported by the local environment.
 - `.\scripts\preview-current.ps1 -Port 4181`: rebuilds and serves `app/dist` directly with bundle badges so stale browser sessions are obvious.
@@ -26,7 +26,7 @@ Harness engineering means improving the feedback loops around the sandbox so goo
 - Make stale state visible. Preview and QA pages should expose the served bundle badge or capture path.
 - Keep sim behavior mechanically legible: Rust, WASM smoke, and JS fallback checks should agree on user-visible rules.
 - Keep renderer rules mechanically separate from sim rules. Renderer tests can judge readability, but not encode behavior.
-- Validate data at boundaries. Scene imports, shared metadata, and external music sources should be parsed before trusted.
+- Validate data at boundaries. Scene imports, shared metadata, and external playback sources should be parsed before trusted.
 - Clean small drifts continuously. Dead exports, stale phase labels, duplicated QA helpers, and speculative abstractions should not wait for a giant cleanup phase.
 
 ## When To Add Harness
@@ -38,7 +38,7 @@ Add or improve harness when one of these happens:
 - A sim rule changed in Rust but needed a separate reminder to update the JS fallback.
 - A review comment caught the same category of issue twice.
 - A visual improvement cannot be checked without staring at a hand-painted scene.
-- A generated sound change cannot be evaluated from code shape alone.
+- A native sound change cannot be evaluated from code shape alone.
 - A script failure message does not tell the next agent what to fix.
 - A docs rule is important enough that violating it should be caught mechanically.
 

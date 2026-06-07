@@ -4,15 +4,16 @@ import {
   AUDIO_MOODS,
   createAudioController,
   getAudioMoodDef,
-  getMusicProviderDef,
+  getAudioProviderDef,
   loadAudioPrefs,
-  MUSIC_PROVIDERS,
+  AUDIO_PROVIDERS,
   saveAudioPrefs,
   type AudioChannel,
   type AudioMood,
   type AudioPrefs,
-  type MusicProvider
+  type AudioProvider
 } from "./audio";
+import { detectReactionCues } from "./audio/reactions";
 import { SegmentedControl, type SegmentOption } from "./components/SegmentedControl";
 import { AudioPanel } from "./components/AudioPanel";
 import type { DeskRadioPlaybackState } from "./components/DeskRadioPanel";
@@ -58,8 +59,8 @@ export function App() {
   const [deskRadioPlayback, setDeskRadioPlayback] = useState<DeskRadioPlaybackState>("idle");
   const [audioPrefs, setAudioPrefs] = useState<AudioPrefs>(() => loadAudioPrefs());
   const activeMood = getAudioMoodDef(audioPrefs.mood);
-  const activeMusicProvider = getMusicProviderDef(audioPrefs.provider);
-  const musicSourceLabel = audioPrefs.provider === "external" && deskRadioSource ? deskRadioSource.label : activeMusicProvider.label;
+  const activeAudioProvider = getAudioProviderDef(audioPrefs.provider);
+  const soundSourceLabel = audioPrefs.provider === "external" && deskRadioSource ? deskRadioSource.label : activeAudioProvider.label;
   const [engine, setEngine] = useState<SandboxEngine | null>(null);
   const [selected, setSelected] = useState<MaterialId>(MATERIAL.Sand);
   const [sceneEnvironment, setSceneEnvironment] = useState<SceneEnvironmentId>(() => loadSceneEnvironmentId());
@@ -103,8 +104,8 @@ export function App() {
 
   useEffect(() => {
     if (audioPrefs.provider !== "external" || deskRadioSource) return;
-    setAudioPrefs((current) => ({ ...current, provider: "generated" }));
-    audio.setMusicProvider("generated");
+    setAudioPrefs((current) => ({ ...current, provider: "native" }));
+    audio.setAudioProvider("native");
     setDeskRadioPlayback("idle");
   }, [audio, audioPrefs.provider, deskRadioSource]);
 
@@ -125,7 +126,11 @@ export function App() {
 
     const loop = (time: number) => {
       if (!paused && time - lastSimTick >= SIM_TICK_MS) {
+        const reactionCellsBefore = audio.canPlayReactionCues() ? engine.getCellBytes() : null;
         engine.tick();
+        if (reactionCellsBefore) {
+          audio.playReactionCues(detectReactionCues(reactionCellsBefore, engine.getCellBytes()));
+        }
         lastSimTick = time;
       }
       const base = baseCanvasRef.current;
@@ -167,14 +172,14 @@ export function App() {
     []
   );
 
-  const providerOptions = useMemo<SegmentOption<MusicProvider>[]>(
+  const providerOptions = useMemo<SegmentOption<AudioProvider>[]>(
     () =>
-      MUSIC_PROVIDERS.map((provider) => ({
+      AUDIO_PROVIDERS.map((provider) => ({
         value: provider.id,
         label: provider.label,
         title: provider.title,
         badge: provider.badge,
-        testId: `music-provider-${provider.id}`
+        testId: `audio-provider-${provider.id}`
       })),
     []
   );
@@ -209,7 +214,7 @@ export function App() {
       title: activeSceneEnvironment.title,
       room: sceneEnvironment,
       mood: audioPrefs.mood,
-      musicProvider: audioPrefs.provider,
+      audioProvider: audioPrefs.provider,
       deskRadio: deskRadioSource
     }),
     [activeSceneEnvironment.title, audioPrefs.mood, audioPrefs.provider, deskRadioSource, sceneEnvironment]
@@ -251,6 +256,7 @@ export function App() {
   function applySnapshotMetadata(metadata: SceneSnapshotMetadata | null) {
     if (!metadata) return;
     const deskRadio = metadata.musicProvider === "external" ? (metadata.deskRadio ?? null) : null;
+    const audioProvider: AudioProvider = metadata.musicProvider === "external" ? "external" : "native";
     if (deskRadio) {
       setDeskRadioSource(deskRadio);
       setDeskRadioOpen(true);
@@ -262,9 +268,9 @@ export function App() {
       saveDeskRadioSource(null);
     }
     setSceneEnvironment(metadata.room);
-    setAudioPrefs((current) => ({ ...current, mood: metadata.mood, provider: metadata.musicProvider }));
+    setAudioPrefs((current) => ({ ...current, mood: metadata.mood, provider: audioProvider }));
     audio.setMoodAndRoom(metadata.mood, metadata.room);
-    audio.setMusicProvider(metadata.musicProvider);
+    audio.setAudioProvider(audioProvider);
   }
 
   function handleClear() {
@@ -310,7 +316,7 @@ export function App() {
     await exportPostcard(engine, baseCanvasRef.current, glowCanvasRef.current, {
       sceneTitle: activeSceneEnvironment.title,
       moodTitle: activeMood.title,
-      musicSource: musicSourceLabel
+      soundSource: soundSourceLabel
     });
     setStatus("postcard PNG exported");
   }
@@ -321,7 +327,7 @@ export function App() {
     const exported = await exportClip(engine, baseCanvasRef.current, glowCanvasRef.current, {
       sceneTitle: activeSceneEnvironment.title,
       moodTitle: activeMood.title,
-      musicSource: musicSourceLabel
+      soundSource: soundSourceLabel
     });
     setStatus(exported ? "clip WebM exported" : "clip unavailable");
   }
@@ -335,7 +341,7 @@ export function App() {
     const shareSummary = [
       "Night Desk Terrarium scene",
       `Room: ${activeSceneEnvironment.title}`,
-      `Sound: ${activeMood.title} / ${musicSourceLabel}`,
+      `Sound: ${activeMood.title} / ${soundSourceLabel}`,
       `Sim: ${engine.source.toUpperCase()}, tick ${engine.tickCount()}`
     ].join("\n");
 
@@ -391,8 +397,8 @@ export function App() {
     setStatus(audioPrefs.enabled ? moodDef.status : `${moodDef.title} ready`);
   }
 
-  function handleMusicProvider(provider: MusicProvider) {
-    const providerDef = getMusicProviderDef(provider);
+  function handleAudioProvider(provider: AudioProvider) {
+    const providerDef = getAudioProviderDef(provider);
     if (provider === "external" && !deskRadioSource) {
       setStatus("desk radio needs a YouTube link");
       setDeskRadioOpen(true);
@@ -404,7 +410,7 @@ export function App() {
       setDeskRadioPlayback("idle");
     }
     setAudioPrefs((current) => ({ ...current, provider }));
-    audio.setMusicProvider(provider);
+    audio.setAudioProvider(provider);
     setStatus(providerDef.status);
   }
 
@@ -418,7 +424,7 @@ export function App() {
     setDeskRadioOpen(true);
     setDeskRadioPlayback("loading");
     setAudioPrefs((current) => ({ ...current, provider: "external" }));
-    audio.setMusicProvider("external");
+    audio.setAudioProvider("external");
     setStatus("checking desk radio");
   }
 
@@ -428,9 +434,9 @@ export function App() {
     setDeskRadioOpen(false);
     setDeskRadioPlayback("idle");
     saveDeskRadioSource(null);
-    setAudioPrefs((current) => ({ ...current, provider: "generated" }));
-    audio.setMusicProvider("generated");
-    setStatus("generated music selected");
+    setAudioPrefs((current) => ({ ...current, provider: "native" }));
+    audio.setAudioProvider("native");
+    setStatus("native ambience selected");
   }
 
   function handleDeskRadioReady(source: DeskRadioSource) {
@@ -443,9 +449,9 @@ export function App() {
   function handleDeskRadioBlocked(code: number) {
     setDeskRadioPlayback("blocked");
     saveDeskRadioSource(null);
-    setAudioPrefs((current) => (current.provider === "external" ? { ...current, provider: "generated" } : current));
-    audio.setMusicProvider("generated");
-    setStatus(code === 101 || code === 150 ? "YouTube blocked embed; generated music restored" : "YouTube player unavailable; generated music restored");
+    setAudioPrefs((current) => (current.provider === "external" ? { ...current, provider: "native" } : current));
+    audio.setAudioProvider("native");
+    setStatus(code === 101 || code === 150 ? "YouTube blocked embed; native ambience restored" : "YouTube player unavailable; native ambience restored");
   }
 
   function handleSceneEnvironment(id: SceneEnvironmentId) {
@@ -548,7 +554,7 @@ export function App() {
             <SharePanel
               sceneTitle={activeSceneEnvironment.title}
               moodTitle={activeMood.title}
-              musicSource={musicSourceLabel}
+              soundSource={soundSourceLabel}
               onCopyNote={handleCopyShareNote}
               onExportClip={handleClip}
               onExportPostcard={handlePostcard}
@@ -573,7 +579,7 @@ export function App() {
             onDeskRadioInputChange={setDeskRadioInput}
             onDeskRadioReady={handleDeskRadioReady}
             onDeskRadioTune={handleDeskRadioTune}
-            onMusicProvider={handleMusicProvider}
+            onAudioProvider={handleAudioProvider}
             onMuteAudio={handleMuteAudio}
             onToggleSound={handleToggleSound}
           />

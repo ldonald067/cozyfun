@@ -1,4 +1,5 @@
 import { createNoiseBuffer } from "./buffers";
+import type { ReactionCue } from "./reactions";
 import type { RunningAudio } from "./types";
 import { disconnectAfterEnded } from "./utils";
 import { MATERIAL, type MaterialId } from "../materials";
@@ -63,6 +64,33 @@ export function playMaterialPaintCue(audio: RunningAudio, material: MaterialId, 
     case MATERIAL.Stardust:
       playTone(audio, time, { duration: 0.09, frequency: 1040, endFrequency: 1560, gain: 0.004, type: "sine" });
       playTone(audio, time + 0.025, { duration: 0.08, frequency: 1390, gain: 0.0026, type: "sine" });
+      return;
+  }
+}
+
+export function playReactionCue(audio: RunningAudio, cue: ReactionCue, time: number) {
+  switch (cue) {
+    case "steam-flash":
+      playNoise(audio, time, { duration: 0.16, frequency: 1850, gain: 0.0048, type: "bandpass", q: 0.28 });
+      playNoise(audio, time + 0.025, { duration: 0.12, frequency: 900, gain: 0.0026, type: "highpass", q: 0.2 });
+      return;
+    case "bloom":
+      playTone(audio, time, { duration: 0.14, frequency: 520, endFrequency: 650, gain: 0.0036, type: "sine" });
+      playTone(audio, time + 0.055, { duration: 0.16, frequency: 780, endFrequency: 980, gain: 0.0028, type: "triangle" });
+      return;
+    case "cosmic-charge":
+      playTone(audio, time, { duration: 0.12, frequency: 820, endFrequency: 1230, gain: 0.0032, type: "sine" });
+      playTone(audio, time + 0.04, { duration: 0.15, frequency: 1320, endFrequency: 1760, gain: 0.0022, type: "sine" });
+      playNoise(audio, time + 0.02, { duration: 0.11, frequency: 2600, gain: 0.0018, type: "highpass", q: 0.5 });
+      return;
+    case "cleanse":
+      playNoise(audio, time, { duration: 0.13, frequency: 540, gain: 0.0036, type: "lowpass", q: 0.35 });
+      playTone(audio, time + 0.035, { duration: 0.12, frequency: 960, endFrequency: 1440, gain: 0.0028, type: "sine" });
+      return;
+    case "impact-burst":
+      playTone(audio, time, { duration: 0.08, frequency: 82, gain: 0.004, type: "sine" });
+      playNoise(audio, time + 0.008, { duration: 0.12, frequency: 1280, gain: 0.0042, type: "bandpass", q: 0.55 });
+      playTone(audio, time + 0.035, { duration: 0.09, frequency: 1380, endFrequency: 980, gain: 0.0025, type: "triangle" });
       return;
   }
 }

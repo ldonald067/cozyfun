@@ -9,14 +9,14 @@ This roadmap keeps the project focused: make the toy feel good, keep the codebas
 - 18 V0 materials, including cozy/cosmic materials: Stardust, Meteor, and Moonwater.
 - Manual painting, brush size, pause/play, clear, local save/load, JSON export/import, and postcard export.
 - Soft reaction style: fire/water becomes glowing steam, lava cools near water, fire burns flammables over time, and watering life/soil produces visible growth.
-- Procedural Web Audio foundation with master, ambience, and music channels.
-- Audio code split into reusable modules for mixer, preferences, ambience, music, buffers, and controller lifecycle.
+- Procedural Web Audio foundation with master and ambience channels.
+- Audio code split into reusable modules for mixer, preferences, ambience, buffers, cues, reactions, and controller lifecycle.
 - Sound moods added for Rain, Window, and Stardust variations.
 - Room-linked ambience profiles added for the six room backdrops without adding extra sound controls.
 - Non-destructive room backdrops added for Rain Desk, Moonlit Garden, Stardust Hearth, Cozy Fireplace, Forest Hut, and Snow Window.
 - Local credited room images added for those backdrops, with procedural lighting and weather still layered on top.
 - Painted scene seeds kept as internal QA/dev helpers instead of visible user-facing presets.
-- External music provider boundary completed with generated music as the default and Desk Radio as an optional visible YouTube player.
+- Desk Radio is available as an optional visible YouTube player while native ambience stays the default fallback.
 - Renderer contact cues added for steam, cooling lava, life growth, and cosmic shimmer moments.
 - Prototype synthetic one-shot effects removed after listening review because they felt too arcade-like for the cozy direction.
 - Phase 3 leftovers resolved: dormant synthetic effect hooks were removed, room photos received a visual pass, and control density is covered by visual QA.
@@ -102,19 +102,19 @@ Status: done.
 
 Done:
 
-- Procedural Web Audio foundation with master, ambience, and music channels.
+- Procedural Web Audio foundation with master and ambience channels.
 - Optional sound enable flow that respects browser autoplay rules.
-- Procedural lo-fi jazz bed with swung comping chords, brushed percussion, walking bass, small melodic phrases, low thump, and vinyl dust.
-- Reusable audio module boundaries for mixer, preferences, ambience, music, buffers, and controller lifecycle.
+- Procedural lo-fi jazz bed was prototyped, then removed later after listening review.
+- Reusable audio module boundaries for mixer, preferences, ambience, buffers, cues, reactions, and controller lifecycle.
 - Simple sound mood controls for Rain, Window, and Stardust.
 - Prototype material paint sounds and basic UI cues implemented, then removed after listening review.
 - Rain/window ambience polish with room hush and occasional window drip accents.
 - Reaction event hooks beyond paint cues: steam, lava cooling, growth, and cosmic sparkle.
-- Sound mood tuning toward rainy lo-fi jazz rather than dramatic ambient pads.
-- External music provider foundation:
-  - Generated music remains the live provider.
+- Sound mood tuning moved toward concrete rain, creek, thunder, and fire ambience.
+- External source provider foundation:
+  - Native ambience remains the live fallback.
   - Desk Radio uses a visible user-provided YouTube video or playlist player without requiring accounts, API keys, or a backend.
-  - Procedural ambience remains native and separate from the music source.
+  - Procedural ambience remains native and separate from Desk Radio.
 - Softer UI control treatment through reusable segmented controls, focus states, panel scrolling, and compact room controls.
 - Better postcard export composition with contextual scene, sound, and simulation metadata.
 - Room/backdrop switching that changes atmosphere and audio mood without replacing the sandbox.
@@ -181,16 +181,16 @@ Status: done.
 
 Completed in this phase:
 
-- Exported and locally saved scene files now use the `CXS2` marker with share metadata for room, sound mood, and safe music source.
+- Exported and locally saved scene files now use the `CXS2` marker with share metadata for room, sound mood, and safe sound source.
 - Imports still accept legacy `CXS1` files, while `CXS2` imports restore room and mood context when metadata is present.
 - Added a compact Share control group for scene JSON export/import, postcard export, short clip export, and share-note copy.
-- Postcards now include scene title, room, mood, music source, sim source, tick, and save context.
+- Postcards now include scene title, room, mood, sound source, sim source, tick, and save context.
 - Short WebM clip export records the rendered sandbox layers for quick sharing when the browser supports `MediaRecorder`.
 - Desk Radio is available as an optional visible YouTube mini-player for user-provided video or playlist links.
-- Generated music stays the default and fallback when Desk Radio has no validated source, the user clears it, or YouTube blocks in-game playback.
-- The app does not use YouTube search, Data API keys, scraping, hidden playback, server-side music handling, accounts, or a backend.
+- Native ambience stays the default and fallback when Desk Radio has no validated source, the user clears it, or YouTube blocks in-game playback.
+- The app does not use YouTube search, Data API keys, scraping, hidden playback, server-side playback handling, accounts, or a backend.
 - Shared scenes preserve the Desk Radio source only when it comes from validated user-controlled metadata that loads as an embeddable player.
-- Blocked Desk Radio links now keep the attempted URL editable while generated music resumes, making YouTube embed limits clearer.
+- Blocked Desk Radio links now keep the attempted URL editable while native ambience resumes, making YouTube embed limits clearer.
 - Water and moonwater now hydrate seeds, moss, fungus, and soil so basic life interactions feel more responsive.
 - Browser smoke coverage checks the share controls, Desk Radio validation path, blocked-embed fallback, and scene metadata round-trips through import.
 - Browser QA captures the current built UI and a painted material scene from a running preview server so stale-preview issues are easier to diagnose.
@@ -313,28 +313,31 @@ Goal: make the sandbox sound more intentional while letting users play their own
 
 Guardrails:
 
-- Generated music stays local, procedural, and default.
+- Native ambience stays local, procedural, and default.
+- There is no generated lo-fi music bed.
 - Desk Radio remains user-controlled and visible.
 - The app must not search YouTube, auto-pick playlists, scrape pages, hide playback, add accounts, add API keys, or add a backend.
-- If YouTube blocks embedded playback, generated music resumes and the user can edit the attempted link.
+- If YouTube blocks embedded playback, native ambience resumes and the user can edit the attempted link.
 
 Started:
 
-- Generated lo-fi music now has more arrangement variation: extra comping stabs, a quiet Rhodes-like shimmer layer, and occasional brushed fills.
-- Generated music now leans further into lo-fi jazz hip-hop without adding controls: deterministic phrase variation, color voicings, soft Rhodes-like answers, rim clicks, ghost snares, pickup kicks, bass approaches, and longer brushed fills.
-- Mood presets now carry internal groove/color/phrase settings so Rain can feel more beat-forward, Window can stay softer, and Stardust can stay airier through the same three user-facing controls.
+- The generated lo-fi music experiment was removed after listening review because it stayed too boring for the toy.
+- Mood presets now focus on concrete ambience: Rain + Creek, Light Thunder, and Fireplace.
+- Native ambience now uses local credited OGG recordings for rain/thunder, creek water, and chimney/fire crackle, with generated room tone, fallback layers, and sparse drips.
 - Painting now produces subtle native material cues through the ambience channel, throttled so drag-painting does not flood the audio graph.
 - Desk Radio now accepts regular YouTube URLs, `youtu.be` links, raw 11-character video IDs, playlists, embed/live/shorts links, `youtube-nocookie.com` links, and timestamped video links.
 - Timestamped video sources are preserved in local Desk Radio state and passed into the YouTube player.
 - Desk Radio shows a compact ready row for the current embeddable source, including timestamp labels and a clear open-on-YouTube action.
-- Browser smoke coverage now checks timestamped YouTube embed parsing, radio playlist links, player start time, saved metadata, blocked-embed fallback, and generated-music restore.
-- `.\scripts\audio-qa.ps1` renders deterministic WAV references for generated music listening review.
+- Browser smoke coverage now checks timestamped YouTube embed parsing, radio playlist links, player start time, saved metadata, blocked-embed fallback, and native ambience restore.
+- Browser smoke coverage now verifies the local ambience recordings are served from `dist` and decode in Chromium.
+- `.\scripts\audio-qa.ps1` renders deterministic WAV references for native ambience listening review.
+- Reaction-driven native cues now observe visible post-tick transitions for steam flashes, blooms, cosmic charges, moonwater/oil cleaning, and meteor bursts without changing sim behavior.
+- Audio reaction smoke coverage now checks detector priority, duplicate collapse, and false-positive avoidance for ordinary steam movement.
 - Renderer-only visual cues for damp, frozen, scorched, cosmic, and plant contact states are stronger on wall, stone, moss, fungus, and wood.
 
 Next:
 
-- Add reaction-driven native cues for important simulation events only when they are sparse and readable.
-- Use the audio QA references during listening review so "better sound" has a repeatable bar beyond build success.
+- Listen through the audio QA references and live ambience so "better sound" has a repeatable bar beyond build success.
 
 ## Phase 9: Room-Linked Ambience
 
@@ -353,7 +356,7 @@ Completed:
 - Forest Hut uses filtered rain, lower room hum, outdoor air, and occasional branch/leaf movement.
 - Snow Window uses softer damped hush, lighter drips, colder room tone, and sparse frost ticks.
 - The audio controller now tracks the active room separately from saved audio preferences, so imported scenes and live room changes update ambience without changing the scene file format.
-- `.\scripts\audio-qa.ps1` now renders deterministic per-room ambience references alongside the generated lo-fi mood references.
+- `.\scripts\audio-qa.ps1` now renders deterministic per-room ambience references.
 
 ## Phase 10: Element Variation + Identity
 

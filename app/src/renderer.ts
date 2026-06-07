@@ -60,7 +60,7 @@ export function renderSandbox(engine: SandboxEngine, targets: RenderTargets, tim
 export type PostcardOptions = {
   sceneTitle: string;
   moodTitle: string;
-  musicSource: string;
+  soundSource: string;
 };
 
 export async function exportPostcard(engine: SandboxEngine, base: HTMLCanvasElement, glow: HTMLCanvasElement, options: PostcardOptions) {
@@ -97,7 +97,7 @@ export async function exportPostcard(engine: SandboxEngine, base: HTMLCanvasElem
   drawFittedText(ctx, options.sceneTitle, margin, footerY, width);
   ctx.fillStyle = "#99b8c8";
   ctx.font = "18px system-ui, sans-serif";
-  drawFittedText(ctx, `${options.moodTitle} / ${options.musicSource}`, margin, footerY + 32, width);
+  drawFittedText(ctx, `${options.moodTitle} / ${options.soundSource}`, margin, footerY + 32, width);
   ctx.fillStyle = "rgba(153, 184, 200, 0.82)";
   ctx.font = "15px system-ui, sans-serif";
   drawFittedText(ctx, `${engine.source.toUpperCase()} sim  |  tick ${engine.tickCount()}  |  ${dateStamp()}`, margin, footerY + 60, width);
@@ -208,7 +208,7 @@ function drawClipFrame(
   drawFittedText(ctx, options.sceneTitle, 24, sceneHeight + 31, canvas.width - 48);
   ctx.fillStyle = "#99b8c8";
   ctx.font = "15px system-ui, sans-serif";
-  drawFittedText(ctx, `${options.moodTitle} - ${options.musicSource} - ${engine.source.toUpperCase()} sim - tick ${engine.tickCount()}`, 24, sceneHeight + 56, canvas.width - 48);
+  drawFittedText(ctx, `${options.moodTitle} - ${options.soundSource} - ${engine.source.toUpperCase()} sim - tick ${engine.tickCount()}`, 24, sceneHeight + 56, canvas.width - 48);
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {

@@ -1,11 +1,11 @@
-import type { MusicProvider, MusicProviderDef } from "./types";
+import type { AudioProvider, AudioProviderDef } from "./types";
 
-export const MUSIC_PROVIDERS: MusicProviderDef[] = [
+export const AUDIO_PROVIDERS: AudioProviderDef[] = [
   {
-    id: "generated",
-    label: "Generated",
-    title: "Generated lo-fi jazz",
-    status: "generated music selected",
+    id: "native",
+    label: "Native",
+    title: "Native ambience",
+    status: "native ambience selected",
     available: true
   },
   {
@@ -17,16 +17,21 @@ export const MUSIC_PROVIDERS: MusicProviderDef[] = [
   }
 ];
 
-export const DEFAULT_MUSIC_PROVIDER: MusicProvider = "generated";
+export const DEFAULT_AUDIO_PROVIDER: AudioProvider = "native";
 
-export function getMusicProviderDef(provider: MusicProvider) {
-  return MUSIC_PROVIDERS.find((candidate) => candidate.id === provider) ?? MUSIC_PROVIDERS[0];
+export function getAudioProviderDef(provider: AudioProvider) {
+  return AUDIO_PROVIDERS.find((candidate) => candidate.id === provider) ?? AUDIO_PROVIDERS[0];
 }
 
-export function isMusicProvider(value: unknown): value is MusicProvider {
-  return typeof value === "string" && MUSIC_PROVIDERS.some((candidate) => candidate.id === value);
+export function isAudioProvider(value: unknown): value is AudioProvider {
+  return typeof value === "string" && AUDIO_PROVIDERS.some((candidate) => candidate.id === value);
 }
 
-export function isAvailableMusicProvider(value: unknown): value is MusicProvider {
-  return typeof value === "string" && MUSIC_PROVIDERS.some((candidate) => candidate.id === value && candidate.available);
+export function isAvailableAudioProvider(value: unknown): value is AudioProvider {
+  return typeof value === "string" && AUDIO_PROVIDERS.some((candidate) => candidate.id === value && candidate.available);
+}
+
+export function normalizeAudioProvider(value: unknown): AudioProvider {
+  if (value === "generated") return "native";
+  return isAvailableAudioProvider(value) ? value : DEFAULT_AUDIO_PROVIDER;
 }

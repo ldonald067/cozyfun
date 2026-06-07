@@ -13,11 +13,12 @@
     "test:sim": "node scripts/test-sim.mjs",
     "test:wasm": "npm run build:sim && node scripts/smoke-wasm.mjs",
     "test:js-fallback": "node scripts/smoke-js-fallback.mjs",
+    "test:audio-reactions": "node scripts/smoke-audio-reactions.mjs",
     "test:browser": "node scripts/smoke-browser.mjs",
     "test:chrome": "powershell -ExecutionPolicy Bypass -File scripts/test-chrome.ps1",
     "test:firefox": "powershell -ExecutionPolicy Bypass -File scripts/test-firefox.ps1",
     "visual:qa": "node scripts/visual-qa.mjs",
     "audio:qa": "node scripts/audio-qa.mjs",
-    "check": "npm run material:audit && npm run test:sim && npm run build && node scripts/smoke-wasm.mjs && npm run test:js-fallback && npm run test:browser && npm run audio:qa && npm run visual:qa"
+    "check": "npm run material:audit && npm run test:sim && npm run build && node scripts/smoke-wasm.mjs && npm run test:js-fallback && npm run test:audio-reactions && npm run test:browser && npm run audio:qa && npm run visual:qa"
   }
 }

@@ -1,10 +1,10 @@
-import { Info, Music2, Volume2, VolumeX } from "lucide-react";
+import { CloudRain, Info, Volume2, VolumeX } from "lucide-react";
 import {
   AUDIO_CHANNELS,
   type AudioChannel,
   type AudioMood,
   type AudioPrefs,
-  type MusicProvider
+  type AudioProvider
 } from "../audio";
 import type { DeskRadioSource } from "../deskRadio";
 import { DeskRadioPanel, type DeskRadioPlaybackState } from "./DeskRadioPanel";
@@ -12,14 +12,12 @@ import { SegmentedControl, type SegmentOption } from "./SegmentedControl";
 
 const AUDIO_CHANNEL_LABELS: Record<AudioChannel, string> = {
   master: "Master",
-  ambience: "Ambience",
-  music: "Music"
+  ambience: "Ambience"
 };
 
 const AUDIO_CHANNEL_HINTS: Record<AudioChannel, string> = {
   master: "Overall volume for the whole soundscape.",
-  ambience: "Rain, window hush, room tone, and other environmental sounds.",
-  music: "Quiet lo-fi chords, beat, and vinyl texture."
+  ambience: "Rain, creek, light thunder, fire crackle, room tone, and material cues."
 };
 
 type AudioPanelProps = {
@@ -30,15 +28,15 @@ type AudioPanelProps = {
   deskRadioPlayback: DeskRadioPlaybackState;
   deskRadioSource: DeskRadioSource | null;
   moodOptions: SegmentOption<AudioMood>[];
-  providerOptions: SegmentOption<MusicProvider>[];
+  providerOptions: SegmentOption<AudioProvider>[];
   onAudioMood(mood: AudioMood): void;
+  onAudioProvider(provider: AudioProvider): void;
   onAudioVolume(channel: AudioChannel, value: number): void;
   onDeskRadioBlocked(code: number): void;
   onDeskRadioClear(): void;
   onDeskRadioInputChange(value: string): void;
   onDeskRadioReady(source: DeskRadioSource): void;
   onDeskRadioTune(): void;
-  onMusicProvider(provider: MusicProvider): void;
   onMuteAudio(): void;
   onToggleSound(): void | Promise<void>;
 };
@@ -53,13 +51,13 @@ export function AudioPanel({
   moodOptions,
   providerOptions,
   onAudioMood,
+  onAudioProvider,
   onAudioVolume,
   onDeskRadioBlocked,
   onDeskRadioClear,
   onDeskRadioInputChange,
   onDeskRadioReady,
   onDeskRadioTune,
-  onMusicProvider,
   onMuteAudio,
   onToggleSound
 }: AudioPanelProps) {
@@ -67,7 +65,7 @@ export function AudioPanel({
     <div className="audio-panel" aria-label="Audio">
       <div className="audio-panel-header">
         <span className="audio-panel-title">
-          <Music2 size={16} /> {activeMoodTitle}
+          <CloudRain size={16} /> {activeMoodTitle}
         </span>
         <button
           type="button"
@@ -100,11 +98,11 @@ export function AudioPanel({
       />
 
       <SegmentedControl
-        ariaLabel="Music source"
+        ariaLabel="Sound source"
         value={audioPrefs.provider}
         options={providerOptions}
-        className="music-source-control"
-        onChange={onMusicProvider}
+        className="audio-source-control"
+        onChange={onAudioProvider}
       />
 
       {(deskRadioOpen || audioPrefs.provider === "external") && (

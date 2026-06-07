@@ -1,7 +1,6 @@
 import type { SandboxEngine } from "./engine";
 import { isAudioMood } from "./audio/moods";
-import { isAvailableMusicProvider } from "./audio/providers";
-import type { AudioMood, MusicProvider } from "./audio/types";
+import type { AudioMood, AudioProvider } from "./audio/types";
 import { validateDeskRadioSource, type DeskRadioSource } from "./deskRadio";
 import { CELL_STRIDE } from "./materials";
 import { isSceneEnvironmentId, type SceneEnvironmentId } from "./sceneEnvironments";
@@ -14,17 +13,23 @@ const MAX_SCENE_CELLS = 512 * 512;
 const MAX_SCENE_CELL_BYTES = MAX_SCENE_CELLS * CELL_STRIDE;
 const MAX_SCENE_JSON_BYTES = base64LengthForBytes(MAX_SCENE_CELL_BYTES) + 16_384;
 const COMPACT_BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
+type SceneMetadataAudioProvider = "generated" | "external";
 
 export type SceneSnapshotContext = {
   title: string;
   room: SceneEnvironmentId;
   mood: AudioMood;
-  musicProvider: MusicProvider;
+  audioProvider: AudioProvider;
   deskRadio?: DeskRadioSource | null;
 };
 
-export type SceneSnapshotMetadata = SceneSnapshotContext & {
+export type SceneSnapshotMetadata = {
   app: typeof APP_NAME;
+  title: string;
+  room: SceneEnvironmentId;
+  mood: AudioMood;
+  musicProvider: SceneMetadataAudioProvider;
+  deskRadio?: DeskRadioSource | null;
 };
 
 export type SceneSnapshot = {
@@ -142,8 +147,8 @@ function createSnapshotMetadata(context: SceneSnapshotContext): SceneSnapshotMet
     title: context.title.trim() || "Cozy Pixel Sandbox",
     room: context.room,
     mood: context.mood,
-    musicProvider: context.musicProvider === "external" && context.deskRadio ? "external" : "generated",
-    deskRadio: context.musicProvider === "external" && context.deskRadio ? context.deskRadio : undefined
+    musicProvider: context.audioProvider === "external" && context.deskRadio ? "external" : "generated",
+    deskRadio: context.audioProvider === "external" && context.deskRadio ? context.deskRadio : undefined
   };
 }
 
@@ -155,7 +160,7 @@ function validateSnapshotMetadata(value: unknown): SceneSnapshotMetadata | null 
   if (!isSceneEnvironmentId(candidate.room)) return null;
   if (!isAudioMood(candidate.mood)) return null;
   const deskRadio = validateDeskRadioSource(candidate.deskRadio);
-  const musicProvider = isAvailableMusicProvider(candidate.musicProvider) && (candidate.musicProvider !== "external" || deskRadio) ? candidate.musicProvider : "generated";
+  const musicProvider = candidate.musicProvider === "external" && deskRadio ? "external" : "generated";
   return {
     app: APP_NAME,
     title: candidate.title.trim(),

@@ -75,7 +75,7 @@ async function main() {
         scripts: Array.from(document.scripts).map((script) => script.src).filter(Boolean),
         share: document.querySelector(".share-panel")?.textContent ?? "",
         rooms: Array.from(document.querySelectorAll('[data-testid^="scene-environment-"]')).map((button) => button.textContent.trim()),
-        providers: Array.from(document.querySelectorAll(".music-source-control button")).map((button) => button.textContent.trim()),
+        providers: Array.from(document.querySelectorAll(".audio-source-control button")).map((button) => button.textContent.trim()),
         hasOverflow: document.documentElement.scrollWidth > window.innerWidth + 1
       }))()`
     );
@@ -84,7 +84,7 @@ async function main() {
     assert(state.styles.some((href) => href.includes("/assets/index-")), `Chrome did not load built CSS asset: ${state.styles.join(", ")}`);
     assert(state.scripts.some((src) => src.includes("/assets/index-")), `Chrome did not load built JS asset: ${state.scripts.join(", ")}`);
     assert(state.rooms.length === 6, `Chrome room controls mismatch: ${state.rooms.join(", ")}`);
-    assert(state.providers.join("|") === "Generated|Desk Radio", `Chrome music providers mismatch: ${state.providers.join(", ")}`);
+    assert(state.providers.join("|") === "Native|Desk Radio", `Chrome sound providers mismatch: ${state.providers.join(", ")}`);
     assert(!state.hasOverflow, "Chrome desktop layout has horizontal overflow");
 
     const desktopPath = await capture(cdp, "chrome-current-desktop.png");
@@ -118,22 +118,22 @@ async function loadMaterialShowcase(cdp) {
 
 async function exerciseDeskRadio(cdp) {
   await evaluate(cdp, `window.__cozyYouTubeMockMode = "blocked"`);
-  await click(cdp, '[data-testid="music-provider-external"]');
+  await click(cdp, '[data-testid="audio-provider-external"]');
   await waitForStatus(cdp, "desk radio needs a YouTube link");
   await setText(cdp, '[data-testid="desk-radio-input"]', "https://www.youtube.com/watch?v=jfKfPfyJRdk");
   await click(cdp, '[data-testid="desk-radio-tune"]');
-  await waitForStatus(cdp, "YouTube blocked embed; generated music restored");
+  await waitForStatus(cdp, "YouTube blocked embed; native ambience restored");
   const state = await evaluate(
     cdp,
     `(() => ({
-      generatedActive: document.querySelector('[data-testid="music-provider-generated"]')?.classList.contains("active"),
+      nativeActive: document.querySelector('[data-testid="audio-provider-native"]')?.classList.contains("active"),
       message: document.querySelector('[data-testid="desk-radio-message"]')?.textContent ?? "",
       storedSource: localStorage.getItem("cozy-pixel-sandbox:desk-radio:v1")
     }))()`
   );
-  assert(state.generatedActive, "Blocked Desk Radio did not return to generated music");
+  assert(state.nativeActive, "Blocked Desk Radio did not return to native ambience");
   assert(state.message.includes("will not embed"), `Blocked Desk Radio message was unclear: ${state.message}`);
-  assert(state.message.includes("Generated music is selected again"), `Blocked Desk Radio fallback was unclear: ${state.message}`);
+  assert(state.message.includes("Native ambience is selected again"), `Blocked Desk Radio fallback was unclear: ${state.message}`);
   assert(state.storedSource === null, "Blocked Desk Radio source was persisted");
 }
 

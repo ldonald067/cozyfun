@@ -32,15 +32,15 @@ This checklist is the repo's "no slop" bar. Use it for `/review`, audit passes, 
 - Do controls fit on desktop and mobile without overlap or hidden essential actions?
 - Do save, import, export, postcard, and clip flows leave the user with clear success or failure feedback?
 - Does Desk Radio stay visible, user-provided, and editable when YouTube blocks embedding?
-- Does generated music remain the default and fallback path?
-- If generated sound changed, did `.\scripts\audio-qa.ps1` produce fresh `.tmp/audio-qa` references for listening review?
+- Does native ambience remain the default and fallback path?
+- If native sound changed, did `.\scripts\audio-qa.ps1` produce fresh `.tmp/audio-qa` references for listening review?
 
 ## Security And Privacy
 
-- No hidden YouTube playback, scraping, automatic playlist picking, API keys, backend music proxy, or account dependency.
+- No hidden YouTube playback, scraping, automatic playlist picking, API keys, backend playback proxy, or account dependency.
 - Scene import rejects malformed, oversized, wrong-version, or wrong-size input before loading.
 - Export metadata stores only safe room, sound, sim, and validated user-provided source details.
-- Third-party image asset changes update `ASSET_CREDITS.md` in the same change.
+- Third-party visual or audio asset changes update `ASSET_CREDITS.md` in the same change.
 
 ## Maintainability
 
@@ -57,7 +57,7 @@ Use the smallest honest gate for the change:
 
 - Docs only: `git diff --check`.
 - Sim behavior: `.\scripts\test-sim.ps1`, `.\scripts\test-wasm.ps1`, and `.\scripts\test-js-fallback.ps1`.
-- Generated audio direction: `.\scripts\audio-qa.ps1`.
+- Native audio direction: `.\scripts\audio-qa.ps1`.
 - UI, browser, visual, audio, export, or cross-boundary work: `.\scripts\check.ps1`.
 - Stale-preview or visual concern: `.\scripts\preview-current.ps1 -Port 4181`, then browser or script-based visual QA against that URL.
 

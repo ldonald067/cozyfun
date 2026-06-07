@@ -48,7 +48,7 @@ async function main() {
         scripts: Array.from(document.scripts).map((script) => script.src).filter(Boolean),
         share: document.querySelector(".share-panel")?.textContent ?? "",
         rooms: Array.from(document.querySelectorAll('[data-testid^="scene-environment-"]')).map((button) => button.textContent.trim()),
-        providers: Array.from(document.querySelectorAll(".music-source-control button")).map((button) => button.textContent.trim()),
+        providers: Array.from(document.querySelectorAll(".audio-source-control button")).map((button) => button.textContent.trim()),
         hasOverflow: document.documentElement.scrollWidth > window.innerWidth + 1
       }))()`
     );
@@ -57,7 +57,7 @@ async function main() {
     assert(state.styles.some((href) => href.includes("/assets/index-")), `Firefox did not load built CSS asset: ${state.styles.join(", ")}`);
     assert(state.scripts.some((src) => src.includes("/assets/index-")), `Firefox did not load built JS asset: ${state.scripts.join(", ")}`);
     assert(state.rooms.length === 6, `Firefox room controls mismatch: ${state.rooms.join(", ")}`);
-    assert(state.providers.join("|") === "Generated|Desk Radio", `Firefox music providers mismatch: ${state.providers.join(", ")}`);
+    assert(state.providers.join("|") === "Native|Desk Radio", `Firefox sound providers mismatch: ${state.providers.join(", ")}`);
     assert(!state.hasOverflow, "Firefox desktop layout has horizontal overflow");
 
     const desktopPath = await capture(bidi, context, "firefox-current-desktop.png");

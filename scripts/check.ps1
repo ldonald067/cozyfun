@@ -34,6 +34,7 @@ try {
   Invoke-CheckStep "Production build" { & $Npm run build }
   Invoke-CheckStep "WASM smoke checks" { & (Join-Path $Root ".tools\node\node.exe") "scripts/smoke-wasm.mjs" }
   Invoke-CheckStep "JavaScript fallback smoke checks" { & $Npm run test:js-fallback }
+  Invoke-CheckStep "Audio reaction smoke checks" { & $Npm run test:audio-reactions }
   Invoke-CheckStep "Browser smoke checks" { & $Npm run test:browser }
   Invoke-CheckStep "Audio QA renders" { & $Npm run audio:qa }
   Invoke-CheckStep "Visual QA captures" { & $Npm run visual:qa }

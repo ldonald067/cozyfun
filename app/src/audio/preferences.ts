@@ -1,21 +1,20 @@
 import { DEFAULT_AUDIO_MOOD, isAudioMood } from "./moods";
-import { DEFAULT_MUSIC_PROVIDER, isAvailableMusicProvider } from "./providers";
+import { DEFAULT_AUDIO_PROVIDER, normalizeAudioProvider } from "./providers";
 import type { AudioChannel, AudioPrefs } from "./types";
 import { clamp01 } from "./utils";
 
 const AUDIO_PREFS_KEY = "cozy-pixel-sandbox:audio:v2";
 
-export const AUDIO_CHANNELS: AudioChannel[] = ["master", "ambience", "music"];
+export const AUDIO_CHANNELS: AudioChannel[] = ["master", "ambience"];
 
 export const DEFAULT_AUDIO_PREFS: AudioPrefs = {
   enabled: false,
   muted: false,
   mood: DEFAULT_AUDIO_MOOD,
-  provider: DEFAULT_MUSIC_PROVIDER,
+  provider: DEFAULT_AUDIO_PROVIDER,
   volumes: {
     master: 0.68,
-    ambience: 0.62,
-    music: 0.24
+    ambience: 0.72
   }
 };
 
@@ -44,11 +43,10 @@ export function normalizeAudioPrefs(value: unknown): AudioPrefs {
     enabled: typeof candidate.enabled === "boolean" ? candidate.enabled : DEFAULT_AUDIO_PREFS.enabled,
     muted: typeof candidate.muted === "boolean" ? candidate.muted : DEFAULT_AUDIO_PREFS.muted,
     mood: isAudioMood(candidate.mood) ? candidate.mood : DEFAULT_AUDIO_PREFS.mood,
-    provider: isAvailableMusicProvider(candidate.provider) ? candidate.provider : DEFAULT_AUDIO_PREFS.provider,
+    provider: normalizeAudioProvider(candidate.provider),
     volumes: {
       master: readVolume(candidate.volumes?.master, DEFAULT_AUDIO_PREFS.volumes.master),
-      ambience: readVolume(candidate.volumes?.ambience, DEFAULT_AUDIO_PREFS.volumes.ambience),
-      music: readVolume(candidate.volumes?.music, DEFAULT_AUDIO_PREFS.volumes.music)
+      ambience: readVolume(candidate.volumes?.ambience, DEFAULT_AUDIO_PREFS.volumes.ambience)
     }
   };
 }

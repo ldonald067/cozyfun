@@ -9,11 +9,11 @@ This project is a static browser toy: React owns the interface, Rust/WASM owns t
 3. `sim` contains the Rust cellular automata rules.
 4. `app/src/renderer.ts` converts the engine cell bytes into base, glow, and atmosphere canvas layers.
 5. `app/src/storage.ts` handles browser-local saves and JSON scene import/export.
-6. `app/src/audio.ts` exposes the optional procedural Web Audio controller.
+6. `app/src/audio.ts` exposes the optional local native audio controller.
 7. `app/src/deskRadio.ts` validates user-provided YouTube Desk Radio sources and creates visible watch/embed URLs.
 8. `app/src/sceneEnvironments.ts` provides non-destructive room/backdrop definitions and their local image metadata.
 
-The built app is static. There is no server, account system, database, cloud save, hidden streaming dependency, or paid API in the current architecture. Desk Radio is an optional browser-side YouTube player selected by the user; generated music remains the default and fallback.
+The built app is static. There is no server, account system, database, cloud save, hidden streaming dependency, or paid API in the current architecture. Native ambience is the default sound path; Desk Radio is an optional browser-side YouTube player selected by the user.
 
 ## Simulation Boundary
 
@@ -56,18 +56,19 @@ This split keeps visual work expandable without turning the renderer into a pile
 - `controller.ts`: lifecycle, user-gesture initialization, and app-facing methods.
 - `mixer.ts`: channel graph and gain changes.
 - `preferences.ts`: persistent audio settings.
-- `moods.ts`: reusable sound mood definitions.
-- `providers.ts`: generated/external music provider definitions.
-- `ambience.ts`: long-running environment layers.
-- `music.ts`: procedural rainy lo-fi bed.
+- `moods.ts`: native ambience mood definitions.
+- `providers.ts`: native/Desk Radio source definitions.
+- `assets.ts`: local ambience recording metadata and decode cache.
+- `ambience.ts`: long-running rain, creek, fire, and room layers with generated fallback support.
+- `cues.ts` and `reactions.ts`: short material and reaction feedback.
 
-This keeps Phase 3 music work reusable without burying composition and mixer state in one file.
+This keeps sound work reusable without burying lifecycle, room balance, and cue logic in one file.
 
-External music enters through the provider boundary rather than replacing this audio system. Generated music remains the default. Desk Radio parsing is isolated in `deskRadio.ts` and playback is shown as a visible mini-player, while ambience stays native.
+External playback enters only through Desk Radio. Desk Radio parsing is isolated in `deskRadio.ts` and playback is shown as a visible mini-player, while ambience stays native and local.
 
 ## UI Boundary
 
-Keep reusable controls in `app/src/components` when they remove real top-level UI weight. `SegmentedControl` is shared by sound moods, music source selection, and room backdrops. `SharePanel` and `DeskRadioPanel` keep Phase 5 controls out of the main app orchestration without inventing a larger UI framework.
+Keep reusable controls in `app/src/components` when they remove real top-level UI weight. `SegmentedControl` is shared by sound moods, sound source selection, and room backdrops. `SharePanel` and `DeskRadioPanel` keep Phase 5 controls out of the main app orchestration without inventing a larger UI framework.
 
 The app should favor compact controls over explanatory panels. Tooltips and titles are acceptable for details like channel meaning; the first screen should remain the toy itself.
 
@@ -81,11 +82,11 @@ Room images are served from `app/public/rooms` and referenced through scene meta
 
 ## Sharing Boundary
 
-`app/src/storage.ts` owns scene snapshots. `CXS2` files include validated share metadata for room, sound mood, generated/external music provider, and an optional Desk Radio source. Imports still accept legacy `CXS1` files, but only `CXS2` can restore atmosphere and music context.
+`app/src/storage.ts` owns scene snapshots. `CXS2` files include validated share metadata for room, sound mood, native/external source marker, and an optional Desk Radio source. Imports still accept legacy `CXS1` files, but only `CXS2` can restore atmosphere and Desk Radio context. The metadata field is still named `musicProvider` so existing exported scenes stay compatible; app code maps its legacy `"generated"` value to the internal native audio provider.
 
 Sharing state belongs in `App.tsx`, the visible controls live in `SharePanel`, and image/clip generation stays in `renderer.ts`. This keeps export buttons thin and keeps canvas capture details out of React state.
 
-Desk Radio is user-controlled. It plays only a pasted YouTube video or playlist source through the visible YouTube player; it does not search, auto-pick playlists, use an API key, or hide playback. If YouTube reports that a link cannot be embedded, `App.tsx` switches back to generated music and keeps the drawer open for another link.
+Desk Radio is user-controlled. It plays only a pasted YouTube video or playlist source through the visible YouTube player; it does not search, auto-pick playlists, use an API key, or hide playback. If YouTube reports that a link cannot be embedded, `App.tsx` switches back to native ambience and keeps the drawer open for another link.
 
 ## Adding A Material
 

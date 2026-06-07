@@ -4,15 +4,13 @@ import type { AudioChannel, AudioPrefs, RunningAudio } from "./types";
 export function createAudioMixer(context: AudioContext): RunningAudio {
   const master = context.createGain();
   const ambience = context.createGain();
-  const music = context.createGain();
 
   ambience.connect(master);
-  music.connect(master);
   master.connect(context.destination);
 
   return {
     context,
-    channels: { master, ambience, music }
+    channels: { master, ambience }
   };
 }
 
