@@ -42,6 +42,7 @@ Use `.\scripts\app-npm.ps1` for app-level npm commands when needed:
 
 - Keep changes scoped to the active phase or bug. Do not slip in broad refactors or cosmetic churn.
 - Preserve user work in a dirty tree. Never reset, checkout, or revert unrelated files unless explicitly asked.
+- Treat each coherent implementation batch as an atomic pass: implement, run the required browser/check path, commit, and push before starting the next pass.
 - Prefer existing module boundaries over new abstractions. Add an abstraction only when it removes real duplication or makes a risky path easier to test.
 - Use concrete names that describe behavior, not phase labels or vague helper names.
 - Keep generated screenshots, browser captures, and temporary exports under `.tmp/` unless the user explicitly asks to commit them.
@@ -54,8 +55,8 @@ Use `.\scripts\app-npm.ps1` for app-level npm commands when needed:
 ## Done Criteria
 
 - Simulation changes: run `.\scripts\test-sim.ps1`, `.\scripts\test-wasm.ps1`, and `.\scripts\test-js-fallback.ps1` or `.\scripts\check.ps1`.
-- UI, export, audio, or rendering changes: run a build plus browser/visual QA when practical. Use `.\scripts\check.ps1` for full closure.
-- Documentation-only changes: run `git diff --check`.
+- UI, export, audio, rendering, workflow, QA, or preview-related changes must include browser testing. Minimum browser gate is `.\scripts\test-browser.ps1`; use `.\scripts\check.ps1` for full closure.
+- Documentation-only changes: run `git diff --check`; also run browser testing when the doc change affects workflow, QA, UI, audio, rendering, or preview expectations.
 - After browser QA, report the exact local URL or capture path and the served JS/CSS bundle badge if the task involved stale-preview risk.
 - If a check cannot run, say which check failed or was skipped and why.
 
