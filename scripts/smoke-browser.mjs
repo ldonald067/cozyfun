@@ -68,6 +68,49 @@ async function main() {
         window.__smokeErrors.push(args.map(String).join(" "));
         originalError.apply(console, args);
       };
+      window.__cozyAudioProbe = { fetches: [], longBuffers: [], sources: [] };
+      const originalFetch = window.fetch.bind(window);
+      window.fetch = (input, init) => {
+        const url = typeof input === "string" ? input : input?.url ?? "";
+        const path = new URL(url, window.location.href).pathname;
+        if (path.startsWith("/audio/")) window.__cozyAudioProbe.fetches.push(path);
+        return originalFetch(input, init);
+      };
+      const installAudioProbe = () => {
+        const baseProto = window.BaseAudioContext?.prototype;
+        if (!baseProto || baseProto.__cozyProbeInstalled) return;
+        baseProto.__cozyProbeInstalled = true;
+
+        const originalCreateBuffer = baseProto.createBuffer;
+        baseProto.createBuffer = function createBuffer(numberOfChannels, length, sampleRate) {
+          const buffer = originalCreateBuffer.call(this, numberOfChannels, length, sampleRate);
+          if (buffer.duration >= 80) {
+            window.__cozyAudioProbe.longBuffers.push({
+              duration: buffer.duration,
+              numberOfChannels: buffer.numberOfChannels,
+              sampleRate: buffer.sampleRate
+            });
+          }
+          return buffer;
+        };
+
+        const originalCreateBufferSource = baseProto.createBufferSource;
+        baseProto.createBufferSource = function createBufferSource() {
+          const source = originalCreateBufferSource.call(this);
+          const record = { started: false, loop: false, duration: 0, startTime: 0 };
+          window.__cozyAudioProbe.sources.push(record);
+          const originalStart = source.start.bind(source);
+          source.start = (...args) => {
+            record.started = true;
+            record.loop = Boolean(source.loop);
+            record.duration = source.buffer?.duration ?? 0;
+            record.startTime = args[0] ?? 0;
+            return originalStart(...args);
+          };
+          return source;
+        };
+      };
+      installAudioProbe();
       localStorage.setItem("cozy-pixel-sandbox:audio:v2", JSON.stringify({
         enabled: true,
         muted: false,
@@ -261,9 +304,31 @@ async function main() {
     await setText(cdp, '[data-testid="desk-radio-input"]', "https://example.com/radio");
     await click(cdp, '[data-testid="desk-radio-tune"]');
     await waitForStatus(cdp, "invalid YouTube link");
+    await evaluate(cdp, `window.__cozyAudioProbe = { fetches: [], longBuffers: [], sources: [] }`);
     await click(cdp, '[data-testid="audio-toggle"]');
     await waitForStatus(cdp, "rain and creek on");
     await waitUntil(() => textIncludes(cdp, '[data-testid="audio-toggle"]', "Stop"), "audio start button to become stop");
+    await waitUntil(
+      () => evaluate(
+        cdp,
+        `(() => (window.__cozyAudioProbe?.sources ?? []).filter((source) => source.started && source.loop && source.duration >= 80).length >= 3)()`
+      ),
+      "native ambience loop sources to start"
+    );
+    const nativeAmbience = await evaluate(cdp, `(() => ({
+      fetches: window.__cozyAudioProbe?.fetches ?? [],
+      longBuffers: window.__cozyAudioProbe?.longBuffers ?? [],
+      loopSources: (window.__cozyAudioProbe?.sources ?? []).filter((source) => source.started && source.loop).map((source) => ({
+        duration: source.duration,
+        startTime: source.startTime
+      }))
+    }))()`);
+    for (const path of ["/audio/rain-thunder.ogg", "/audio/creek-water.ogg", "/audio/fire-crackle.ogg"]) {
+      assert(nativeAmbience.fetches.includes(path), `native ambience did not fetch ${path}: ${nativeAmbience.fetches.join(", ")}`);
+    }
+    assertLoopSource(nativeAmbience.loopSources, "rain/thunder", 150);
+    assertLoopSource(nativeAmbience.loopSources, "creek/rain-water", 90);
+    assertLoopSource(nativeAmbience.loopSources, "fire crackle", 120);
     await click(cdp, '[data-testid="audio-mood-stardust"]');
     await waitForStatus(cdp, "fireplace crackle on");
     await click(cdp, '[data-testid="audio-mute"]');
@@ -432,6 +497,12 @@ async function canvasSignature(cdp) {
 
 async function textIncludes(cdp, selector, expected) {
   return evaluate(cdp, `document.querySelector(${JSON.stringify(selector)})?.textContent?.includes(${JSON.stringify(expected)}) ?? false`);
+}
+
+function assertLoopSource(sources, label, minimumDuration) {
+  const tolerance = 1;
+  const source = sources.find((candidate) => candidate.duration >= minimumDuration - tolerance);
+  assert(source, `${label} native ambience loop did not reach ${minimumDuration}s: ${sources.map((candidate) => candidate.duration.toFixed(2)).join(", ")}`);
 }
 
 async function check(name, task) {
