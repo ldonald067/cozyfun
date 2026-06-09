@@ -109,6 +109,7 @@ function wallColor({ color, variant, energy, flags, cells, width, height, x, y }
   if (dampContact.count > 0 || flags & CELL_FLAG.Wet || energy > 30) {
     out = mixRgb(out, [83, 105, 114], dampContact.bottom ? 0.34 : 0.26);
     if (brickX === 0 || brickY === 0 || dampContact.top) out = mixRgb(out, [129, 164, 173], 0.18);
+    if ((brickX === 1 || brickY === 3) && hash % 4 === 0) out = mixRgb(out, [154, 184, 188], 0.18);
   }
   if (plantContact.count > 0 && (brickY === 3 || plantContact.bottom)) {
     out = mixRgb(out, [70, 112, 70], 0.28);
@@ -121,14 +122,17 @@ function wallColor({ color, variant, energy, flags, cells, width, height, x, y }
   if (scorched) {
     out = mixRgb(out, [38, 31, 29], 0.46);
     if ((brickX === 0 || brickY === 0) && hash % 3 === 0) out = mixRgb(out, [16, 15, 16], 0.42);
+    if (brickY === 3 && hash % 5 === 0) out = mixRgb(out, [82, 52, 38], 0.22);
   }
   if (frozen) {
     out = mixRgb(out, [172, 215, 228], edge.top ? 0.52 : 0.36);
     if (brickY === 0 || (brickX === 1 && hash % 2 === 0)) out = mixRgb(out, [235, 252, 255], 0.3);
+    if (brickY === 3 && hash % 4 === 0) out = mixRgb(out, [122, 190, 211], 0.18);
   }
   if (cosmic) {
     out = mixRgb(out, [119, 139, 211], 0.24);
     if (hash % 17 === 0) out = mixRgb(out, [199, 188, 255], 0.44);
+    if (brickX === 1 && hash % 13 === 0) out = mixRgb(out, [236, 222, 255], 0.34);
   }
   if (moonContact.count > 0) {
     out = mixRgb(out, [93, 125, 184], 0.18);
@@ -157,11 +161,21 @@ function sandColor({ color, variant, energy, flags, cells, width, height, x, y }
   if (damp) {
     out = mixRgb(out, [111, 91, 69], 0.32);
     if ((localX === 2 || edge.bottom) && hash % 3 !== 0) out = mixRgb(out, [77, 65, 52], 0.24);
+    if (surface || edge.top) out = mixRgb(out, [94, 113, 110], 0.16);
   }
   if (warm) out = mixRgb(out, [225, 137, 75], 0.18);
-  if (scorched) out = mixRgb(out, [91, 63, 45], 0.36);
-  if (frozen) out = mixRgb(out, [194, 225, 229], surface ? 0.48 : 0.32);
-  if (cosmic) out = mixRgb(out, [142, 154, 215], 0.16);
+  if (scorched) {
+    out = mixRgb(out, [91, 63, 45], 0.36);
+    if (surface || hash % 5 === 0) out = mixRgb(out, [42, 30, 23], 0.28);
+  }
+  if (frozen) {
+    out = mixRgb(out, [194, 225, 229], surface ? 0.48 : 0.32);
+    if (surface || localY === 0) out = mixRgb(out, [239, 252, 255], 0.22);
+  }
+  if (cosmic) {
+    out = mixRgb(out, [142, 154, 215], 0.18);
+    if (hash % 23 === 0) out = mixRgb(out, [219, 209, 255], 0.32);
+  }
   return out;
 }
 
@@ -184,13 +198,25 @@ function soilColor({ color, variant, energy, flags, cells, width, height, x, y }
   if (looseEdge || hash % 11 === 0) out = mixRgb(out, [43, 27, 21], 0.34);
   if ((localX === 1 && hash % 5 === 0) || rootContact.count > 0) out = mixRgb(out, [83, 61, 39], rootContact.count > 0 ? 0.24 : 0.16);
   if (localY === 2 && rootContact.count > 0) out = mixRgb(out, [39, 30, 23], 0.24);
-  if (wet) out = mixRgb(out, [48, 43, 38], waterContact.top ? 0.32 : 0.24);
+  if (wet) {
+    out = mixRgb(out, [48, 43, 38], waterContact.top ? 0.32 : 0.24);
+    if (surface || waterContact.top) out = mixRgb(out, [73, 87, 74], 0.22);
+  }
   if (hash % 19 === 0 || (kindAt(cells, width, height, x, y - 1) === MATERIAL.Moss && hash % 5 === 0)) {
     out = mixRgb(out, [89, 126, 70], wet ? 0.44 : 0.32);
   }
-  if (cosmic) out = mixRgb(out, [132, 151, 215], 0.22);
-  if (scorched) out = mixRgb(out, [34, 25, 22], 0.46);
-  if (frozen) out = mixRgb(out, [172, 214, 230], surface ? 0.52 : 0.38);
+  if (cosmic) {
+    out = mixRgb(out, [132, 151, 215], 0.24);
+    if (hash % 17 === 0) out = mixRgb(out, [213, 203, 255], 0.34);
+  }
+  if (scorched) {
+    out = mixRgb(out, [34, 25, 22], 0.46);
+    if (looseEdge || hash % 7 === 0) out = mixRgb(out, [17, 16, 15], 0.28);
+  }
+  if (frozen) {
+    out = mixRgb(out, [172, 214, 230], surface ? 0.52 : 0.38);
+    if (surface || localY === 0) out = mixRgb(out, [233, 252, 255], 0.22);
+  }
   return out;
 }
 
@@ -285,9 +311,12 @@ function seedColor({ color, variant, age, energy, flags, cells, width, height, x
   if (wet) out = mixRgb(out, [168, 117, 58], 0.34);
   if (fed || hash % 3 === 0 || (age > 24 && hash % 4 === 0)) out = mixRgb(out, [95, 181, 82], rooted ? 0.82 : 0.56);
   if (below === MATERIAL.Soil && localY === 3) out = mixRgb(out, [39, 27, 18], 0.24);
+  if (rooted && (localY === 3 || soilContact.bottom)) out = mixRgb(out, [35, 73, 32], 0.46);
+  if (rooted && localY === 0 && hash % 4 === 0) out = mixRgb(out, [174, 227, 115], 0.32);
   if (cosmic) out = mixRgb(out, [184, 211, 255], moonContact.bottom ? 0.3 : 0.24);
   if (oilContact.count > 0) {
     out = mixRgb(out, [38, 42, 27], oilContact.top ? 0.56 : 0.42);
+    if (edge || localY === 0 || hash % 6 === 0) out = mixRgb(out, [88, 86, 48], 0.22);
     if (!wet && hash % 5 === 0) out = mixRgb(out, [18, 22, 15], 0.34);
   }
   if (scorched) out = mixRgb(out, [42, 26, 19], 0.62);
@@ -329,7 +358,7 @@ function flowerColor({ color, variant, age, energy, flags, time, cells, width, h
   }
   if (oilContact.count > 0) {
     out = mixRgb(out, [45, 49, 31], oilContact.top ? 0.44 : 0.3);
-    if (edge.top && hash % 3 === 0) out = mixRgb(out, [117, 119, 70], 0.22);
+    if ((edge.top || localY === 0) && hash % 3 === 0) out = mixRgb(out, [126, 121, 64], 0.28);
   }
   if (scorched) out = mixRgb(out, [55, 37, 31], 0.62);
   if (frozen) out = mixRgb(out, [207, 236, 245], 0.56);
@@ -379,6 +408,7 @@ function stoneColor({ color, variant, energy, flags, cells, width, height, x, y 
   if (dampContact.count > 0 || flags & CELL_FLAG.Wet || energy > 30) {
     out = mixRgb(out, [86, 111, 122], dampContact.top ? 0.36 : 0.26);
     if (edge.top || localY === 0 || dampContact.bottom) out = mixRgb(out, [128, 166, 179], 0.22);
+    if ((localX === 1 || localY === 0) && facet % 4 === 0) out = mixRgb(out, [150, 181, 185], 0.18);
   }
   if (plantContact.count > 0 && (edge.top || edge.left || plantContact.bottom)) {
     out = mixRgb(out, [78, 105, 75], 0.24);
@@ -391,14 +421,17 @@ function stoneColor({ color, variant, energy, flags, cells, width, height, x, y 
   if (scorched) {
     out = mixRgb(out, [63, 46, 41], 0.48);
     if (localX === localY || facet % 11 === 0) out = mixRgb(out, [22, 20, 22], 0.44);
+    if (edge.top && facet % 5 === 0) out = mixRgb(out, [119, 72, 50], 0.22);
   }
   if (frozen) {
     out = mixRgb(out, [179, 220, 232], edge.top || localY === 0 ? 0.54 : 0.38);
     if (localX + localY === 3 || facet % 13 === 0) out = mixRgb(out, [237, 253, 255], 0.3);
+    if (edge.left || localX === 0) out = mixRgb(out, [123, 190, 211], 0.16);
   }
   if (cosmic) {
     out = mixRgb(out, [118, 134, 204], 0.26);
     if (facet % 17 === 0) out = mixRgb(out, [195, 184, 255], 0.42);
+    if (localX === 2 && facet % 19 === 0) out = mixRgb(out, [237, 224, 255], 0.32);
   }
   if (moonContact.count > 0) {
     out = mixRgb(out, [94, 145, 203], 0.24);
@@ -495,12 +528,15 @@ function growthColor({ kind, color, variant, age, energy, flags, cells, width, h
       if (edge.top || hash % 11 === 0) out = mixRgb(out, [207, 241, 153], 0.38);
     }
     if (cosmic) out = mixRgb(out, [143, 238, 177], moonFed ? 0.34 : 0.22);
-    if (oilContact.count > 0) out = mixRgb(out, [32, 42, 27], oilContact.top ? 0.42 : 0.28);
+    if (oilContact.count > 0) {
+      out = mixRgb(out, [32, 42, 27], oilContact.top ? 0.42 : 0.28);
+      if (edge.top || hash % 4 === 0) out = mixRgb(out, [86, 88, 47], 0.24);
+    }
     if (heatContact.count > 0) out = mixRgb(out, [116, 68, 43], heatContact.top ? 0.34 : 0.22);
     if (scorched) out = mixRgb(out, [48, 39, 28], 0.58);
     if (frozen) {
       out = mixRgb(out, [176, 224, 232], 0.6);
-      if (edge.top || localY === 0) out = mixRgb(out, [239, 252, 255], 0.28);
+      if (edge.top || localY === 0) out = mixRgb(out, [239, 252, 255], 0.34);
     }
     return out;
   }
@@ -525,7 +561,10 @@ function growthColor({ kind, color, variant, age, energy, flags, cells, width, h
   if (digestingWood) out = mixRgb(out, [196, 139, 82], 0.3);
   if (overtakingMoss) out = mixRgb(out, [132, 158, 96], 0.26);
   if (rottingSeed) out = mixRgb(out, [161, 67, 117], 0.34);
-  if (oilContact.count > 0) out = mixRgb(out, [42, 42, 31], oilContact.top ? 0.42 : 0.28);
+  if (oilContact.count > 0) {
+    out = mixRgb(out, [42, 42, 31], oilContact.top ? 0.42 : 0.28);
+    if (cap || hash % 5 === 0) out = mixRgb(out, [99, 90, 49], 0.22);
+  }
   if (heatContact.count > 0) out = mixRgb(out, [111, 62, 50], heatContact.top ? 0.32 : 0.22);
 
   const capColor: Rgb = rottingSeed
@@ -566,8 +605,14 @@ function growthColor({ kind, color, variant, age, energy, flags, cells, width, h
   if (spore) out = mixRgb(out, sporeColor, 0.72);
   if (damp) out = mixRgb(out, cosmic ? [195, 190, 255] : [168, 216, 190], cosmic ? 0.36 : 0.22);
   if (age > 110 && !damp) out = mixRgb(out, [93, 68, 84], 0.24);
-  if (scorched) out = mixRgb(out, [50, 34, 38], 0.58);
-  if (frozen) out = mixRgb(out, [188, 222, 240], 0.5);
+  if (scorched) {
+    out = mixRgb(out, [50, 34, 38], 0.58);
+    if (cap || hash % 7 === 0) out = mixRgb(out, [24, 20, 22], 0.26);
+  }
+  if (frozen) {
+    out = mixRgb(out, [188, 222, 240], 0.5);
+    if (cap || gill) out = mixRgb(out, [238, 251, 255], 0.22);
+  }
   return out;
 }
 
@@ -593,19 +638,22 @@ function woodColor({ color, variant, energy, flags, cells, width, height, x, y }
   if (charred || scorched) {
     out = mixRgb(out, heatContact.top || scorched ? [42, 23, 18] : [63, 34, 24], heatContact.top || scorched ? 0.54 : 0.4);
     if (ring || hash % 9 === 0) out = mixRgb(out, [16, 12, 11], 0.36);
+    if (edge.top && hash % 5 === 0) out = mixRgb(out, [101, 51, 32], 0.2);
   }
   if (damp) {
     out = mixRgb(out, [66, 60, 47], dampContact.bottom ? 0.32 : 0.24);
-    if (edge.bottom || dampContact.top) out = mixRgb(out, [86, 108, 83], 0.22);
+    if (edge.bottom || dampContact.top) out = mixRgb(out, [86, 108, 83], 0.24);
+    if (edge.top || endGrain) out = mixRgb(out, [112, 132, 104], 0.16);
   }
   if (plantContact.count > 0 && hash % 5 === 0) out = mixRgb(out, [74, 113, 64], 0.28);
   if (cosmic) {
     out = mixRgb(out, [116, 138, 201], 0.28);
     if (hash % 19 === 0) out = mixRgb(out, [182, 189, 255], 0.34);
+    if (ring && hash % 5 === 0) out = mixRgb(out, [221, 212, 255], 0.24);
   }
   if (frozen) {
     out = mixRgb(out, [166, 205, 216], 0.48);
-    if (edge.top || endGrain) out = mixRgb(out, [228, 248, 255], 0.24);
+    if (edge.top || endGrain) out = mixRgb(out, [228, 248, 255], 0.3);
   }
   return out;
 }
