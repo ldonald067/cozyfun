@@ -99,11 +99,12 @@ function wallColor({ color, variant, energy, flags, cells, width, height, x, y }
   const cosmic = Boolean(flags & CELL_FLAG.Cosmic);
   const chipped = edge.count > 0 && ((hash + x * 3 + y * 5) % 37 === 0 || (brickX === 6 && brickY === 2));
 
-  let out = adjustRgb(color, (hash % 5) * 4 - 8);
-  if (brickX === 0 || brickY === 0) out = mixRgb(out, [31, 36, 45], 0.58);
-  if (brickX === 1 || brickY === 1) out = mixRgb(out, [216, 223, 235], 0.24);
-  if (edge.top || edge.left) out = mixRgb(out, [232, 238, 247], 0.26);
-  if (edge.right || edge.bottom) out = mixRgb(out, [35, 39, 48], 0.2);
+  let out = adjustRgb(color, (hash % 5) * 3 - 6);
+  if (brickX === 0 || brickY === 0) out = mixRgb(out, [24, 30, 39], 0.68);
+  if (brickX === 1 || brickY === 1) out = mixRgb(out, [225, 232, 241], 0.22);
+  if (brickX === 4 && brickY === 2 && hash % 3 === 0) out = mixRgb(out, [132, 142, 156], 0.22);
+  if (edge.top || edge.left) out = mixRgb(out, [236, 241, 248], 0.3);
+  if (edge.right || edge.bottom) out = mixRgb(out, [28, 32, 41], 0.24);
   if (chipped) out = mixRgb(out, [20, 24, 31], 0.48);
   if (dampContact.count > 0 || flags & CELL_FLAG.Wet || energy > 30) {
     out = mixRgb(out, [83, 105, 114], dampContact.bottom ? 0.34 : 0.26);
@@ -133,7 +134,7 @@ function wallColor({ color, variant, energy, flags, cells, width, height, x, y }
     out = mixRgb(out, [93, 125, 184], 0.18);
     if ((brickX === 0 || brickY === 0 || moonContact.top) && hash % 5 === 0) out = mixRgb(out, [184, 196, 255], 0.34);
   }
-  if ((hash + x + y) % 23 === 0) out = mixRgb(out, [76, 82, 94], 0.32);
+  if ((hash + x + y) % 23 === 0) out = mixRgb(out, [70, 78, 91], 0.26);
   return out;
 }
 
@@ -204,20 +205,22 @@ function heatColor({ kind, color, variant, age, energy, time, cells, width, heig
     const localY = (y + ((hash >> 2) & 1)) & 3;
     const seam = localX === 0 || localY === 0 || ((x + y + hash) % 11 === 0 && localX !== 3);
     const crust = !seam && (hash % 5 === 0 || edge.count >= 2 || cooling);
-    let out = mixRgb(color, [91, 27, 22], crust ? 0.58 : 0.24);
-    if (seam && !cooling) out = mixRgb(out, [255, 205, 88], 0.58 + pulse * 0.2);
+    let out = mixRgb(color, [68, 22, 22], crust ? 0.66 : 0.28);
+    if (seam && !cooling) out = mixRgb(out, [255, 219, 96], 0.64 + pulse * 0.2);
     if (seam && cooling) out = mixRgb(out, [255, 183, 101], 0.36 + pulse * 0.08);
-    if (cooling) out = mixRgb(out, [39, 45, 51], 0.3);
-    if (localX === 3 || localY === 3 || edge.bottom) out = mixRgb(out, [35, 20, 19], 0.34);
-    if (edge.top) out = mixRgb(out, [255, 147, 54], 0.28);
+    if (cooling) out = mixRgb(out, [35, 42, 50], 0.34);
+    if (localX === 3 || localY === 3 || edge.bottom) out = mixRgb(out, [24, 17, 19], 0.4);
+    if (edge.top) out = mixRgb(out, [255, 160, 58], 0.32);
     return out;
   }
 
   if (kind === MATERIAL.Meteor) {
     const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Meteor);
-    let out = mixRgb(color, [255, 196, 91], 0.28 + pulse * 0.22);
-    if (edge.top || edge.left) out = mixRgb(out, [255, 238, 168], 0.34);
-    if (edge.bottom || edge.right || hash % 7 === 0) out = mixRgb(out, [65, 47, 45], 0.48);
+    const rocky = edge.bottom || edge.right || hash % 7 === 0;
+    let out = mixRgb(color, [255, 183, 80], 0.3 + pulse * 0.2);
+    if (edge.top || edge.left) out = mixRgb(out, [255, 238, 158], 0.4);
+    if (rocky) out = mixRgb(out, [45, 38, 43], 0.58);
+    if (hash % 11 === 0 && !rocky) out = mixRgb(out, [255, 229, 124], 0.36);
     return out;
   }
 
@@ -247,13 +250,17 @@ function vaporColor({ kind, color, variant, age, cells, width, height, x, y }: S
   const warm = hotContact.count > 0;
   const cosmic = cosmicContact.count > 0;
 
-  let out = edge ? mixRgb(color, [9, 14, 20], kind === MATERIAL.Steam ? 0.28 : 0.42) : adjustRgb(color, 12);
-  if (rim) out = mixRgb(out, [9, 14, 20], kind === MATERIAL.Steam ? 0.14 : 0.28);
-  if (!rim && hash % 5 === 0) out = mixRgb(out, [226, 236, 242], kind === MATERIAL.Steam ? 0.42 : 0.24);
-  if (localY === 3 || hash % 7 === 0) out = mixRgb(out, [63, 70, 78], kind === MATERIAL.Steam ? 0.1 : 0.26);
-  if (warm) out = mixRgb(out, [255, 183, 116], kind === MATERIAL.Steam ? (hotContact.bottom ? 0.24 : 0.18) : 0.12);
-  if (cosmic) out = mixRgb(out, [178, 186, 255], kind === MATERIAL.Steam ? (cosmicContact.bottom ? 0.26 : 0.2) : 0.14);
-  return mixRgb([9, 14, 20], out, 0.52 + fade * 0.42);
+  const steam = kind === MATERIAL.Steam;
+  let out = steam ? mixRgb(color, [222, 241, 248], 0.34) : mixRgb(color, [86, 88, 92], 0.34);
+  if (edge) out = mixRgb(out, [9, 14, 20], steam ? 0.22 : 0.44);
+  else out = adjustRgb(out, steam ? 16 : 4);
+  if (rim) out = mixRgb(out, [9, 14, 20], steam ? 0.1 : 0.32);
+  if (!rim && hash % 5 === 0) out = mixRgb(out, steam ? [239, 250, 253] : [169, 173, 174], steam ? 0.5 : 0.28);
+  if (localY === 3 || hash % 7 === 0) out = mixRgb(out, steam ? [126, 167, 184] : [54, 53, 50], steam ? 0.16 : 0.34);
+  if (!steam && hash % 11 === 0) out = mixRgb(out, [42, 38, 35], 0.28);
+  if (warm) out = mixRgb(out, [255, 183, 116], steam ? (hotContact.bottom ? 0.24 : 0.18) : 0.1);
+  if (cosmic) out = mixRgb(out, [178, 186, 255], steam ? (cosmicContact.bottom ? 0.28 : 0.22) : 0.12);
+  return mixRgb([9, 14, 20], out, steam ? 0.58 + fade * 0.38 : 0.44 + fade * 0.34);
 }
 
 function seedColor({ color, variant, age, energy, flags, cells, width, height, x, y }: ShapeContext) {
@@ -361,13 +368,14 @@ function stoneColor({ color, variant, energy, flags, cells, width, height, x, y 
   const cosmic = Boolean(flags & CELL_FLAG.Cosmic);
   const localX = (x + (facet & 1)) & 3;
   const localY = (y + ((facet >> 2) & 1)) & 3;
-  let out = adjustRgb(color, (blockHash % 7) * 5 - 15);
-  if (localX === 0 || localY === 0 || edge.top || edge.left) out = mixRgb(out, [157, 164, 174], 0.24);
-  if (localX === 3 || localY === 3 || edge.right || edge.bottom) out = mixRgb(out, [35, 38, 46], 0.32);
+  let out = mixRgb(adjustRgb(color, (blockHash % 7) * 5 - 15), [82, 81, 76], 0.16);
+  if (localX === 0 || localY === 0 || edge.top || edge.left) out = mixRgb(out, [171, 172, 168], 0.3);
+  if (localX === 3 || localY === 3 || edge.right || edge.bottom) out = mixRgb(out, [28, 31, 37], 0.38);
   if ((localX === 1 && localY === 2 && facet % 3 === 0) || (x + y + blockHash) % 13 === 0) {
-    out = mixRgb(out, [31, 33, 39], 0.56);
+    out = mixRgb(out, [24, 26, 31], 0.62);
   }
-  if (((x ^ y ^ blockHash) & 31) === 3) out = mixRgb(out, [194, 198, 205], 0.18);
+  if (localX + localY === 2 && facet % 5 === 0) out = mixRgb(out, [121, 118, 104], 0.22);
+  if (((x ^ y ^ blockHash) & 31) === 3) out = mixRgb(out, [192, 187, 169], 0.22);
   if (dampContact.count > 0 || flags & CELL_FLAG.Wet || energy > 30) {
     out = mixRgb(out, [86, 111, 122], dampContact.top ? 0.36 : 0.26);
     if (edge.top || localY === 0 || dampContact.bottom) out = mixRgb(out, [128, 166, 179], 0.22);
@@ -416,17 +424,19 @@ function liquidColor({ kind, color, variant, flags, time, cells, width, height, 
     const nearHeat = heatContact.count > 0;
     const frozen = Boolean(flags & CELL_FLAG.Frozen);
     const sheen = top || ((left || right) && (hash % 13 === 0 || ripple));
-    if (top) out = mixRgb(out, [88, 105, 80], 0.22);
-    if (!bottom) out = mixRgb(out, [8, 12, 10], 0.38);
-    if (sheen) out = mixRgb(out, nearHeat ? [211, 130, 82] : [118, 128, 98], nearHeat ? 0.34 : 0.28);
+    out = mixRgb(out, [8, 13, 12], 0.18);
+    if (top) out = mixRgb(out, [73, 88, 62], 0.3);
+    if (!bottom) out = mixRgb(out, [3, 7, 7], 0.48);
+    if (sheen) out = mixRgb(out, nearHeat ? [218, 132, 78] : [166, 158, 93], nearHeat ? 0.36 : 0.34);
+    if (hash % 17 === 0 && (top || left || right)) out = mixRgb(out, [214, 192, 116], 0.24);
     if (nearHeat) out = mixRgb(out, heatContact.top ? [240, 158, 82] : [95, 49, 30], heatContact.top ? 0.42 : 0.28);
     if (lifeContact.count > 0) out = mixRgb(out, [19, 24, 18], lifeContact.bottom ? 0.38 : 0.24);
     if (frozen) out = mixRgb(out, [158, 190, 190], 0.44);
     return out;
   }
 
-  if (left || right) out = mixRgb(out, [99, 167, 220], kind === MATERIAL.Moonwater ? 0.24 : 0.16);
-  if (top) out = mixRgb(out, kind === MATERIAL.Moonwater ? [229, 252, 255] : [151, 212, 246], 0.42);
+  if (left || right) out = mixRgb(out, kind === MATERIAL.Moonwater ? [126, 164, 244] : [72, 148, 218], kind === MATERIAL.Moonwater ? 0.28 : 0.2);
+  if (top) out = mixRgb(out, kind === MATERIAL.Moonwater ? [238, 250, 255] : [166, 226, 255], kind === MATERIAL.Moonwater ? 0.54 : 0.44);
   if (!bottom) out = mixRgb(out, [24, 58, 106], kind === MATERIAL.Moonwater ? 0.1 : 0.2);
   if (!left || !right) out = mixRgb(out, [20, 56, 96], kind === MATERIAL.Moonwater ? 0.08 : 0.12);
   if (heatContact.count > 0) {
@@ -448,8 +458,9 @@ function liquidColor({ kind, color, variant, flags, time, cells, width, height, 
   if (kind === MATERIAL.Moonwater) {
     const moonPulse = (Math.sin(time * 0.006 + hash * 0.0004) + 1) * 0.5;
     const crescent = (top && (x + hash) % 5 <= 1) || (!left && y % 3 === 0) || (!right && y % 4 === 0);
-    if (crescent) out = mixRgb(out, [246, 239, 255], 0.46 + moonPulse * 0.18);
-    if (hash % 19 === 0) out = mixRgb(out, [224, 199, 255], 0.5);
+    out = mixRgb(out, [141, 143, 255], 0.12);
+    if (crescent) out = mixRgb(out, [250, 243, 255], 0.56 + moonPulse * 0.16);
+    if (hash % 19 === 0) out = mixRgb(out, [229, 203, 255], 0.56);
     if (lifeContact.count > 0) out = mixRgb(out, [180, 255, 207], lifeContact.top ? 0.32 : 0.24);
     if (oilContact.count > 0) {
       out = mixRgb(out, [216, 199, 255], 0.34);
@@ -476,12 +487,12 @@ function growthColor({ kind, color, variant, age, energy, flags, cells, width, h
     const localX = (x + (hash & 1)) & 3;
     const localY = (y + ((hash >> 2) & 1)) & 3;
     const leafy = localY === 0 || localX === 1 || hash % 7 === 0 || age > 90;
-    if (edge.top || edge.left || leafy) out = mixRgb(out, damp ? [142, 218, 118] : [112, 174, 92], leafy ? 0.38 : 0.3);
-    if (edge.bottom || localY === 3 || hash % 9 === 0) out = mixRgb(out, [30, 77, 40], 0.34);
-    if (hash % 13 === 0) out = mixRgb(out, [198, 225, 128], 0.32);
+    if (edge.top || edge.left || leafy) out = mixRgb(out, damp ? [153, 230, 108] : [124, 187, 78], leafy ? 0.44 : 0.34);
+    if (edge.bottom || localY === 3 || hash % 9 === 0) out = mixRgb(out, [21, 68, 36], 0.38);
+    if (hash % 13 === 0) out = mixRgb(out, [214, 235, 112], 0.38);
     if (damp) {
-      out = mixRgb(out, [103, 171, 90], 0.2);
-      if (edge.top || hash % 11 === 0) out = mixRgb(out, [196, 236, 166], 0.34);
+      out = mixRgb(out, [102, 180, 83], 0.22);
+      if (edge.top || hash % 11 === 0) out = mixRgb(out, [207, 241, 153], 0.38);
     }
     if (cosmic) out = mixRgb(out, [143, 238, 177], moonFed ? 0.34 : 0.22);
     if (oilContact.count > 0) out = mixRgb(out, [32, 42, 27], oilContact.top ? 0.42 : 0.28);
@@ -508,6 +519,7 @@ function growthColor({ kind, color, variant, age, energy, flags, cells, width, h
   const gill = localY === 1 && (localX === 1 || localX === 2);
   const spore = hash % 13 === 0 || (age > 80 && hash % 9 === 0);
 
+  out = mixRgb(out, [108, 61, 128], 0.16);
   if (cosmic) out = mixRgb(out, moonFed ? [158, 153, 255] : [190, 147, 255], 0.22);
   if (soilDecomposer) out = mixRgb(out, [176, 126, 103], 0.2);
   if (digestingWood) out = mixRgb(out, [196, 139, 82], 0.3);
@@ -548,10 +560,10 @@ function growthColor({ kind, color, variant, age, energy, flags, cells, width, h
           ? [229, 240, 173]
           : [250, 229, 239];
 
-  if (cap) out = mixRgb(out, capColor, 0.58);
-  if (gill) out = mixRgb(out, gillColor, 0.52);
+  if (cap) out = mixRgb(out, capColor, 0.66);
+  if (gill) out = mixRgb(out, gillColor, 0.6);
   if (edge.bottom || localY === 3 || hash % 11 === 0) out = mixRgb(out, rottingSeed ? [86, 33, 65] : digestingWood ? [98, 58, 42] : [83, 45, 104], 0.42);
-  if (spore) out = mixRgb(out, sporeColor, 0.68);
+  if (spore) out = mixRgb(out, sporeColor, 0.72);
   if (damp) out = mixRgb(out, cosmic ? [195, 190, 255] : [168, 216, 190], cosmic ? 0.36 : 0.22);
   if (age > 110 && !damp) out = mixRgb(out, [93, 68, 84], 0.24);
   if (scorched) out = mixRgb(out, [50, 34, 38], 0.58);
