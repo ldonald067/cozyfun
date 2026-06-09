@@ -31,19 +31,7 @@ export type AudioMoodDef = {
     rainFilter: number;
     creekGain: number;
     creekFilter: number;
-    creekBurbleGain: number;
-    creekBurbleMs: number;
-    thunderGain: number;
-    thunderMs: number;
     fireGain: number;
-    fireCrackleGain: number;
-    fireCrackleMs: number;
-    hushGain: number;
-    hushFilter: number;
-    humFrequency: number;
-    humGain: number;
-    dripGain: number;
-    dripMs: number;
   };
 };
 

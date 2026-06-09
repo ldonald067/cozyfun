@@ -59,7 +59,7 @@ This split keeps visual work expandable without turning the renderer into a pile
 - `moods.ts`: native ambience mood definitions.
 - `providers.ts`: native/Desk Radio source definitions.
 - `assets.ts`: local ambience recording metadata and decode cache.
-- `ambience.ts`: long-running rain, creek, fire, and room layers with generated fallback support.
+- `ambience.ts`: long-running native rain/thunder, creek, and fire layers with in-memory loop extension.
 - `cues.ts` and `reactions.ts`: short material and reaction feedback.
 
 This keeps sound work reusable without burying lifecycle, room balance, and cue logic in one file.

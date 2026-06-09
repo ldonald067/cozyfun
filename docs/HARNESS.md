@@ -5,14 +5,14 @@ Harness engineering means improving the feedback loops around the sandbox so goo
 ## Current Harnesses
 
 - `.\scripts\build.ps1`: builds Rust/WASM, copies WASM, and builds the Vite app with the repo-local Windows-safe tool path.
-- `.\scripts\check.ps1`: runs the full local gate: material identity audit, Rust sim tests, WASM smoke, JS fallback smoke, production build, browser smoke, audio QA renders, and visual QA.
+- `.\scripts\check.ps1`: runs the full local gate: material identity audit, Rust sim tests, WASM smoke, JS fallback smoke, production build, browser smoke, audio QA, and visual QA.
 - `npm run material:audit`: validates that every material definition has two concrete identity traits before a new element can pass review.
 - `.\scripts\test-sim.ps1`: validates Rust simulation behavior.
 - `.\scripts\test-wasm.ps1`: validates the WASM bridge and key sim outcomes from JavaScript.
 - `.\scripts\test-js-fallback.ps1`: validates JS fallback parity for user-visible sim behavior.
 - `.\scripts\test-browser.ps1`: drives the built app through core UI, local ambience asset decoding, sharing, import/export, and Desk Radio paths.
 - `.\scripts\visual-qa.ps1`: captures deterministic material scenes, room backdrops, and responsive layout metrics.
-- `.\scripts\audio-qa.ps1`: renders deterministic WAV references for generated support layers, fallback ambience, and cue review into `.tmp/audio-qa`.
+- `.\scripts\audio-qa.ps1`: writes a native ambience manifest for local OGG asset size, target loop length, and mood/room balance review into `.tmp/audio-qa`.
 - `.\scripts\test-chrome.ps1 -AppPort 4181`: verifies the current preview in Chrome or Edge when an actual browser path matters.
 - `.\scripts\test-firefox.ps1 -AppPort 4181`: verifies Firefox when supported by the local environment.
 - `.\scripts\preview-current.ps1 -Port 4181`: rebuilds and serves `app/dist` directly with bundle badges so stale browser sessions are obvious.

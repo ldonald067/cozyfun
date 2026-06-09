@@ -1,6 +1,6 @@
 # Audio Foundation
 
-Audio is part of the product feel, not a decoration. The native direction is local and ambience-first: credited rain/thunder, creek water, and fireplace crackle recordings, generated room tone and fallback layers, and sparse material cues. There is no generated lo-fi music bed.
+Audio is part of the product feel, not a decoration. The native direction is local and ambience-first: credited rain/thunder, creek water, and fireplace crackle recordings for long-running beds, plus sparse generated material cues. There is no generated lo-fi music bed or generated ambience fallback.
 
 Desk Radio is the one optional external playback path. It stays visible, user-provided, and replaceable by native ambience when YouTube will not embed a link.
 
@@ -17,8 +17,8 @@ Focused implementation modules live under `app/src/audio`:
 - `providers.ts`: native/Desk Radio source definitions and compatibility rules.
 - `mixer.ts`: Web Audio graph for `master` and `ambience`.
 - `assets.ts`: local ambience recording metadata and browser decode cache.
-- `ambience.ts`: recorded rain, creek, and fire loops plus generated room hush, hum, drips, and fallback layers.
-- `cues.ts`: short native paint and reaction cues for material feedback.
+- `ambience.ts`: recorded rain/thunder, creek, and fire loops, including in-memory loop extension for short local recordings.
+- `cues.ts`: short paint and reaction cues for material feedback.
 - `reactions.ts`: post-tick reaction detector for sparse audio cues.
 - `buffers.ts`: reusable generated noise buffers.
 - `utils.ts`: small shared helpers.
@@ -37,15 +37,15 @@ Focused implementation modules live under `app/src/audio`:
 
 ## Sound Moods
 
-Sound moods are small balance presets over local ambience recordings and generated support layers:
+Sound moods are small balance presets over local ambience recordings:
 
-- Rain: recorded rain/thunder and creek forward, with window drips and restrained room tone.
-- Thunder: recorded rain/thunder and hush forward, with creek lower in the room.
-- Fire: recorded chimney/fireplace crackle forward, with warm room tone and light weather still present.
+- Rain: recorded rain/thunder and creek forward.
+- Thunder: recorded rain/thunder forward, with creek and fire lower in the room.
+- Fire: recorded fireplace crackle forward, with light weather still present.
 
 Mood definitions live in `moods.ts`. Keep mood names user-facing and calm; keep implementation details inside the preset config.
 
-Room ambience profiles live in `rooms.ts`. They quietly bias rain, creek, thunder, and fire crackle when the room backdrop changes.
+Room ambience profiles live in `rooms.ts`. They quietly bias rain/thunder, creek, and fire crackle when the room backdrop changes.
 
 ## Desk Radio
 
@@ -61,7 +61,7 @@ Use the listening harness when native ambience or material cues change:
 .\scripts\audio-qa.ps1
 ```
 
-It writes deterministic WAV references and a manifest to `.tmp/audio-qa`. The offline renderer covers generated support layers, fallback layers, and material cues from the checked-in mood and room settings; browser smoke checks verify that local OGG ambience assets are served and decodable. Browser Web Audio routing, autoplay behavior, and Desk Radio embedding are still covered by browser checks.
+It writes a native ambience manifest to `.tmp/audio-qa`. The manifest covers local OGG asset presence, minimum byte checks, target loop length, and the checked-in mood and room balances; browser smoke checks verify that the assets are served and decodable. Browser Web Audio routing, autoplay behavior, and Desk Radio embedding are still covered by browser checks.
 
 Reference tracks can guide taste, but do not sample, copy, scrape, or embed hidden audio from them. YouTube links remain user-provided Desk Radio sources only.
 
@@ -69,8 +69,7 @@ Reference tracks can guide taste, but do not sample, copy, scrape, or embed hidd
 
 Add new sounds in the narrowest module:
 
-- local ambience recording: `assets.ts`, `ambience.ts`, and `ASSET_CREDITS.md`
-- long generated fallback loop: `ambience.ts`
+- recorded ambience loop: `assets.ts`, `ambience.ts`, and `ASSET_CREDITS.md`
 - new mood preset: `moods.ts`
 - room-specific ambience balance: `rooms.ts`
 - short material cue: `cues.ts`, routed through the ambience channel and throttled by `controller.ts`

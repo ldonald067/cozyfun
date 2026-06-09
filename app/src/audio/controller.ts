@@ -1,4 +1,4 @@
-import { startRainAmbience } from "./ambience";
+import { startNativeAmbience } from "./ambience";
 import { playMaterialPaintCue, playReactionCue } from "./cues";
 import { createAudioMixer, applyMixerPreferences } from "./mixer";
 import { DEFAULT_AUDIO_PREFS, normalizeAudioPrefs } from "./preferences";
@@ -146,7 +146,7 @@ class CozyAudioController {
 
   private startAmbience() {
     if (!this.audio || this.ambience) return;
-    this.ambience = startRainAmbience(this.audio, this.prefs.mood, this.room);
+    this.ambience = startNativeAmbience(this.audio, this.prefs.mood, this.room);
   }
 
   private restartAmbienceLayer() {

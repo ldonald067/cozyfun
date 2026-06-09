@@ -1,136 +1,50 @@
-import { loadAmbientAudioBuffer, type AmbientAudioAssetId } from "./assets";
-import { createNoiseBuffer } from "./buffers";
+import { AMBIENT_AUDIO_ASSETS, loadAmbientAudioBuffer, type AmbientAudioAssetId } from "./assets";
 import { getAudioMoodDef } from "./moods";
 import { DEFAULT_AUDIO_ROOM, getRoomAmbienceDef } from "./rooms";
 import type { AudioLayerHandle, AudioMood, RunningAudio } from "./types";
-import { disconnectAfterEnded, disconnectAudioNodes, stopSources } from "./utils";
+import { disconnectAudioNodes, stopSources } from "./utils";
 import type { SceneEnvironmentId } from "../sceneEnvironments";
 
-export function startRainAmbience(audio: RunningAudio, mood: AudioMood, room: SceneEnvironmentId = DEFAULT_AUDIO_ROOM): AudioLayerHandle {
-  const { context, channels } = audio;
+export function startNativeAmbience(audio: RunningAudio, mood: AudioMood, room: SceneEnvironmentId = DEFAULT_AUDIO_ROOM): AudioLayerHandle {
   const settings = getAudioMoodDef(mood).ambience;
   const roomSettings = getRoomAmbienceDef(room);
   const registry: AudioNodeRegistry = { sources: [], nodes: [] };
-  const timers: number[] = [];
   const pendingLoads: Array<() => void> = [];
 
   startRecordedLoop(audio, registry, pendingLoads, "rainThunder", {
     gain: settings.rainGain * roomSettings.rainGainScale,
-    filter: settings.rainFilter * roomSettings.rainFilterScale,
-    type: "bandpass",
-    q: 0.62,
-    fallbackDuration: 2.5,
-    onFallback: scheduleThunder
+    filter: {
+      frequency: settings.rainFilter * roomSettings.rainFilterScale,
+      type: "lowpass",
+      q: 0.4
+    }
   });
 
   startRecordedLoop(audio, registry, pendingLoads, "creekWater", {
     gain: settings.creekGain * roomSettings.creekGainScale,
-    filter: settings.creekFilter * roomSettings.creekFilterScale,
-    type: "bandpass",
-    q: 0.28,
-    fallbackDuration: 3.2,
-    onFallback: scheduleCreekBurble
+    filter: {
+      frequency: settings.creekFilter * roomSettings.creekFilterScale,
+      type: "bandpass",
+      q: 0.32
+    }
   });
 
   startRecordedLoop(audio, registry, pendingLoads, "fireCrackle", {
-    gain: Math.max(settings.fireGain * roomSettings.fireGainScale, settings.fireCrackleGain * roomSettings.fireCrackleGainScale),
-    filter: 760,
-    type: "lowpass",
-    q: 0.18,
-    fallbackDuration: 2.1,
-    onFallback: scheduleFireCrackle
+    gain: settings.fireGain * roomSettings.fireGainScale,
+    filter: {
+      frequency: 120,
+      type: "highpass",
+      q: 0.28
+    }
   });
-
-  addLoopingNoiseLayer(audio, registry, {
-    gain: settings.hushGain * roomSettings.hushGainScale,
-    filter: settings.hushFilter * roomSettings.hushFilterScale,
-    type: "lowpass",
-    q: 0.2,
-    duration: 3
-  });
-
-  addLoopingNoiseLayer(audio, registry, {
-    gain: roomSettings.airGain,
-    filter: roomSettings.airFilter,
-    type: roomSettings.airType,
-    q: 0.42,
-    duration: 3.4
-  });
-
-  addLoopingNoiseLayer(audio, registry, {
-    gain: roomSettings.warmGain,
-    filter: roomSettings.warmFilter,
-    type: "lowpass",
-    q: 0.24,
-    duration: 4.1
-  });
-
-  const hum = context.createOscillator();
-  hum.type = "sine";
-  hum.frequency.value = Math.max(32, settings.humFrequency + roomSettings.humFrequencyOffset);
-  const humGain = context.createGain();
-  humGain.gain.value = settings.humGain * roomSettings.humGainScale;
-  hum.connect(humGain);
-  humGain.connect(channels.ambience);
-  hum.start();
-  registry.sources.push(hum);
-  registry.nodes.push(hum, humGain);
-
-  scheduleDrip();
 
   return {
     stop() {
       for (const cancelLoad of pendingLoads) cancelLoad();
       stopSources(registry.sources);
-      for (const timer of timers) window.clearTimeout(timer);
       disconnectAudioNodes(...registry.nodes);
     }
   };
-
-  function scheduleDrip() {
-    const dripGain = settings.dripGain * roomSettings.dripGainScale;
-    if (dripGain <= 0) return;
-    const interval = settings.dripMs * roomSettings.dripMsScale;
-    scheduleAccent(interval, () => {
-      playWindowDrip(audio, dripGain);
-      scheduleDrip();
-    });
-  }
-
-  function scheduleCreekBurble() {
-    const gain = settings.creekBurbleGain * roomSettings.creekBurbleGainScale;
-    if (gain <= 0) return;
-    const interval = settings.creekBurbleMs * roomSettings.creekBurbleMsScale;
-    scheduleAccent(interval, () => {
-      playCreekBurble(audio, gain);
-      scheduleCreekBurble();
-    });
-  }
-
-  function scheduleThunder() {
-    const gain = settings.thunderGain * roomSettings.thunderGainScale;
-    if (gain <= 0) return;
-    const interval = settings.thunderMs * roomSettings.thunderMsScale;
-    scheduleAccent(interval, () => {
-      playLightThunder(audio, gain);
-      scheduleThunder();
-    });
-  }
-
-  function scheduleFireCrackle() {
-    const gain = settings.fireCrackleGain * roomSettings.fireCrackleGainScale;
-    if (gain <= 0) return;
-    const interval = settings.fireCrackleMs * roomSettings.fireCrackleMsScale;
-    scheduleAccent(interval, () => {
-      playFireCrackle(audio, gain);
-      scheduleFireCrackle();
-    });
-  }
-
-  function scheduleAccent(intervalMs: number, play: () => void) {
-    const jitter = Math.max(180, intervalMs * (0.62 + Math.random() * 0.76));
-    timers.push(window.setTimeout(play, jitter));
-  }
 }
 
 type AudioNodeRegistry = {
@@ -138,11 +52,13 @@ type AudioNodeRegistry = {
   nodes: AudioNode[];
 };
 
-type NoiseLayerOptions = {
+type RecordedLoopOptions = {
   gain: number;
-  filter: number;
-  type: BiquadFilterType;
-  q: number;
+  filter: {
+    frequency: number;
+    type: BiquadFilterType;
+    q: number;
+  };
 };
 
 function startRecordedLoop(
@@ -150,7 +66,7 @@ function startRecordedLoop(
   registry: AudioNodeRegistry,
   pendingLoads: Array<() => void>,
   id: AmbientAudioAssetId,
-  options: NoiseLayerOptions & { fallbackDuration: number; onFallback?: () => void }
+  options: RecordedLoopOptions
 ) {
   if (options.gain <= 0) return;
   let cancelled = false;
@@ -158,189 +74,77 @@ function startRecordedLoop(
     cancelled = true;
   });
 
-  void loadAmbientAudioBuffer(audio.context, id).then((buffer) => {
-    if (cancelled) return;
-    if (!buffer) {
-      addLoopingNoiseLayer(audio, registry, { ...options, duration: options.fallbackDuration });
-      options.onFallback?.();
-      return;
-    }
+  void loadAmbientAudioBuffer(audio.context, id).then((decodedBuffer) => {
+    if (cancelled || !decodedBuffer) return;
 
     const source = audio.context.createBufferSource();
-    source.buffer = buffer;
+    source.buffer = createLongLoopBuffer(audio.context, decodedBuffer, AMBIENT_AUDIO_ASSETS[id].minLoopSeconds);
     source.loop = true;
+
     const filter = audio.context.createBiquadFilter();
-    filter.type = options.type;
-    filter.frequency.value = options.filter;
-    filter.Q.value = options.q;
+    filter.type = options.filter.type;
+    filter.frequency.value = options.filter.frequency;
+    filter.Q.value = options.filter.q;
+
     const gain = audio.context.createGain();
     gain.gain.value = options.gain;
+
     source.connect(filter);
     filter.connect(gain);
     gain.connect(audio.channels.ambience);
     source.start();
+
     registry.sources.push(source);
     registry.nodes.push(source, filter, gain);
   });
 }
 
-function addLoopingNoiseLayer(
-  audio: RunningAudio,
-  registry: AudioNodeRegistry,
-  options: NoiseLayerOptions & { duration: number }
-) {
-  if (options.gain <= 0) return;
-  const source = audio.context.createBufferSource();
-  source.buffer = createNoiseBuffer(audio.context, options.duration);
-  source.loop = true;
-  const filter = audio.context.createBiquadFilter();
-  filter.type = options.type;
-  filter.frequency.value = options.filter;
-  filter.Q.value = options.q;
-  const gain = audio.context.createGain();
-  gain.gain.value = options.gain;
-  source.connect(filter);
-  filter.connect(gain);
-  gain.connect(audio.channels.ambience);
-  source.start();
-  registry.sources.push(source);
-  registry.nodes.push(source, filter, gain);
-}
+function createLongLoopBuffer(context: BaseAudioContext, source: AudioBuffer, minDurationSeconds: number) {
+  if (source.duration >= minDurationSeconds) return source;
 
-function playWindowDrip(audio: RunningAudio, gainValue: number) {
-  const now = audio.context.currentTime;
-  [880, 660].forEach((frequency, index) => {
-    playAccentTone(audio, now + index * 0.035, {
-      frequency,
-      endFrequency: frequency * 0.82,
-      gain: gainValue / (index + 1.4),
-      duration: 0.24,
-      type: "sine"
-    });
-  });
-}
+  const targetLength = Math.max(source.length, Math.ceil(minDurationSeconds * source.sampleRate));
+  const output = context.createBuffer(source.numberOfChannels, targetLength, source.sampleRate);
+  const fadeLength = Math.min(
+    Math.floor(source.sampleRate * 0.28),
+    Math.floor(source.length / 4),
+    Math.floor(targetLength / 24)
+  );
+  const stride = Math.max(1, source.length - fadeLength);
 
-function playCreekBurble(audio: RunningAudio, gainValue: number) {
-  const now = audio.context.currentTime;
-  playAccentNoise(audio, now, {
-    duration: 0.24,
-    gain: gainValue * 0.74,
-    filter: 620,
-    type: "bandpass",
-    q: 0.32
-  });
-  playAccentTone(audio, now + 0.03, {
-    frequency: 420,
-    endFrequency: 560,
-    gain: gainValue * 0.62,
-    duration: 0.16,
-    type: "sine"
-  });
-  playAccentTone(audio, now + 0.11, {
-    frequency: 690,
-    endFrequency: 520,
-    gain: gainValue * 0.42,
-    duration: 0.14,
-    type: "triangle"
-  });
-}
+  for (let channel = 0; channel < source.numberOfChannels; channel++) {
+    const input = source.getChannelData(channel);
+    const data = output.getChannelData(channel);
+    let writeAt = 0;
 
-function playLightThunder(audio: RunningAudio, gainValue: number) {
-  const { context, channels } = audio;
-  const now = context.currentTime;
-  const source = context.createBufferSource();
-  source.buffer = createNoiseBuffer(context, 1.9);
-  const filter = context.createBiquadFilter();
-  filter.type = "lowpass";
-  filter.frequency.setValueAtTime(180, now);
-  filter.frequency.exponentialRampToValueAtTime(64, now + 1.55);
-  const gain = context.createGain();
-  gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(gainValue, now + 0.16);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.8);
-  source.connect(filter);
-  filter.connect(gain);
-  gain.connect(channels.ambience);
-  disconnectAfterEnded(source, filter, gain);
-  source.start(now);
-  source.stop(now + 1.9);
+    while (writeAt < targetLength) {
+      const remaining = targetLength - writeAt;
+      const readable = Math.min(source.length, remaining);
+      if (writeAt === 0 || fadeLength <= 0) {
+        data.set(input.subarray(0, readable), writeAt);
+      } else {
+        const overlap = Math.min(fadeLength, readable);
+        for (let i = 0; i < overlap; i++) {
+          const amount = (i + 1) / (overlap + 1);
+          data[writeAt + i] = data[writeAt + i] * (1 - amount) + input[i] * amount;
+        }
+        if (readable > overlap) {
+          data.set(input.subarray(overlap, readable), writeAt + overlap);
+        }
+      }
+      writeAt += stride;
+    }
 
-  playAccentTone(audio, now + 0.04, {
-    frequency: 48,
-    endFrequency: 34,
-    gain: gainValue * 0.38,
-    duration: 1.55,
-    type: "sine",
-    attack: 0.18,
-    release: 1.1
-  });
-}
-
-function playFireCrackle(audio: RunningAudio, gainValue: number) {
-  const now = audio.context.currentTime;
-  const hits = 2 + Math.floor(Math.random() * 3);
-  for (let i = 0; i < hits; i++) {
-    playAccentNoise(audio, now + i * (0.028 + Math.random() * 0.018), {
-      duration: 0.035 + Math.random() * 0.04,
-      gain: gainValue * (1 - i * 0.12),
-      filter: 1450 + Math.random() * 1600,
-      type: Math.random() > 0.45 ? "bandpass" : "highpass",
-      q: 0.58 + Math.random() * 0.32
-    });
+    smoothLoopBoundary(data, fadeLength);
   }
+
+  return output;
 }
 
-function playAccentTone(
-  audio: RunningAudio,
-  time: number,
-  options: {
-    frequency: number;
-    endFrequency: number;
-    gain: number;
-    duration: number;
-    type: OscillatorType;
-    attack?: number;
-    release?: number;
+function smoothLoopBoundary(data: Float32Array, fadeLength: number) {
+  if (fadeLength <= 0 || data.length <= fadeLength) return;
+  const endStart = data.length - fadeLength;
+  for (let i = 0; i < fadeLength; i++) {
+    const amount = (i + 1) / (fadeLength + 1);
+    data[endStart + i] = data[endStart + i] * (1 - amount) + data[i] * amount;
   }
-) {
-  const { context, channels } = audio;
-  const oscillator = context.createOscillator();
-  oscillator.type = options.type;
-  oscillator.frequency.setValueAtTime(options.frequency, time);
-  oscillator.frequency.exponentialRampToValueAtTime(options.endFrequency, time + options.duration);
-  const gain = context.createGain();
-  const attack = options.attack ?? 0.018;
-  const release = options.release ?? 0;
-  gain.gain.setValueAtTime(0.0001, time);
-  gain.gain.exponentialRampToValueAtTime(options.gain, time + attack);
-  gain.gain.exponentialRampToValueAtTime(0.0001, time + options.duration + release);
-  oscillator.connect(gain);
-  gain.connect(channels.ambience);
-  disconnectAfterEnded(oscillator, gain);
-  oscillator.start(time);
-  oscillator.stop(time + options.duration + release + 0.02);
-}
-
-function playAccentNoise(
-  audio: RunningAudio,
-  time: number,
-  options: { duration: number; gain: number; filter: number; type: BiquadFilterType; q: number }
-) {
-  const { context, channels } = audio;
-  const source = context.createBufferSource();
-  source.buffer = createNoiseBuffer(context, options.duration);
-  const filter = context.createBiquadFilter();
-  filter.type = options.type;
-  filter.frequency.value = options.filter;
-  filter.Q.value = options.q;
-  const gain = context.createGain();
-  gain.gain.setValueAtTime(0.0001, time);
-  gain.gain.exponentialRampToValueAtTime(options.gain, time + 0.01);
-  gain.gain.exponentialRampToValueAtTime(0.0001, time + options.duration);
-  source.connect(filter);
-  filter.connect(gain);
-  gain.connect(channels.ambience);
-  disconnectAfterEnded(source, filter, gain);
-  source.start(time);
-  source.stop(time + options.duration + 0.01);
 }

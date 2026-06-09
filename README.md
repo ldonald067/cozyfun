@@ -70,7 +70,7 @@ npm --prefix app run dev -- --host 127.0.0.1
 - Enable optional local audio, pick a sound mood for rain/creek, light thunder, or fireplace crackle, choose native ambience or a visible YouTube Desk Radio, and tune master and ambience volume.
 - Clear, save/load in the browser, download/import a scene JSON file, export a postcard PNG, export a short WebM clip, or copy a share note from the right controls.
 
-Native ambience is local: credited OGG recordings provide the rain/thunder, creek water, and fireplace crackle beds, while generated Web Audio remains for room tone, fallback layers, and subtle material cues. Desk Radio is user-controlled: paste a YouTube video, playlist, timestamped URL, or raw video ID and the visible player embeds that source when YouTube allows embedded playback. If YouTube blocks a link from playing in the sandbox, the app returns to native ambience, keeps the URL available to edit, and asks for another embeddable link. The app does not search YouTube, pick playlists, use an API key, or play hidden audio.
+Native ambience is local: credited OGG recordings provide the rain/thunder, creek water, and fireplace crackle beds. Short material cues still use Web Audio, but long-running ambience is recorded audio only. Desk Radio is user-controlled: paste a YouTube video, playlist, timestamped URL, or raw video ID and the visible player embeds that source when YouTube allows embedded playback. If YouTube blocks a link from playing in the sandbox, the app returns to native ambience, keeps the URL available to edit, and asks for another embeddable link. The app does not search YouTube, pick playlists, use an API key, or play hidden audio.
 
 Saves and scene JSON files preserve the selected room backdrop, sound mood, and safe sound source metadata. Desk Radio sources are preserved only when they came from a validated user-provided YouTube video or playlist link that loaded as an embeddable player.
 
@@ -122,7 +122,7 @@ Some key reactions:
 - `scripts/preview-current.ps1` rebuilds and serves `app/dist` directly so local previews cannot show a stale dev bundle.
 - `scripts/preview-built.cmd` serves the existing `app/dist` build, accepts an optional port, and keeps a visible window open while the preview is running.
 - `scripts/test-sim.ps1` runs the Rust simulation tests with the checked-in local tool paths.
-- `scripts/audio-qa.ps1` renders deterministic generated/fallback audio WAV references into `.tmp/audio-qa`.
+- `scripts/audio-qa.ps1` writes a native ambience asset manifest into `.tmp/audio-qa`.
 - `scripts/visual-qa.ps1` captures the current controlled material scene, room backdrops, and responsive layout metrics into `.tmp/visual-qa`.
 - `scripts/check.ps1` runs the full local gate with the checked-in local tool paths.
 

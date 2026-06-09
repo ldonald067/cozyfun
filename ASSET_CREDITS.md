@@ -4,7 +4,7 @@ This project keeps external visuals local at runtime and tracks source pages her
 
 Room images are used as subtle atmosphere behind the sandbox, not as standalone redistributed image packs. Pixabay images were downloaded on May 24, 2026; generated images are tracked separately below.
 
-Audio ambience files are also kept local at runtime. They support the native ambience bed; short material cues and fallback tones remain generated in Web Audio.
+Audio ambience files are also kept local at runtime. They provide the native rain, thunder, creek, and fire beds; short material cues remain generated in Web Audio.
 
 ## Pixabay Room Backdrops
 

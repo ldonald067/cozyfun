@@ -1,17 +1,20 @@
 export type AmbientAudioAssetId = "rainThunder" | "creekWater" | "fireCrackle";
 
-export const AMBIENT_AUDIO_ASSETS: Record<AmbientAudioAssetId, { url: string; label: string }> = {
+export const AMBIENT_AUDIO_ASSETS: Record<AmbientAudioAssetId, { url: string; label: string; minLoopSeconds: number }> = {
   rainThunder: {
     url: "/audio/rain-thunder.ogg",
-    label: "rain and thunder"
+    label: "rain and thunder",
+    minLoopSeconds: 150
   },
   creekWater: {
     url: "/audio/creek-water.ogg",
-    label: "creek water"
+    label: "creek water",
+    minLoopSeconds: 90
   },
   fireCrackle: {
     url: "/audio/fire-crackle.ogg",
-    label: "fire crackle"
+    label: "fire crackle",
+    minLoopSeconds: 120
   }
 };
 
