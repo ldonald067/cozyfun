@@ -1,6 +1,6 @@
 # Material Audit
 
-Phase 7 treated every toolbar material as a product choice. Phase 10 turns that into a maintained identity contract: each material in `app/src/materials.ts` now carries exactly two identity traits, and `npm run material:audit` fails when a material is missing them. A material stays only when it has a distinct behavior, interaction, visual identity, or player purpose. Generated-only outcomes can stay in the simulation without becoming toolbar materials.
+Every toolbar material is a product choice. Each material in `app/src/materials.ts` carries exactly two compact identity traits, and this doc keeps one to three concrete interaction roles for each material. `npm run material:audit` fails when material definitions or this matrix drift. A material stays only when it has a distinct behavior, interaction, visual identity, or player purpose. Generated-only outcomes can stay in the simulation without becoming toolbar materials.
 
 ## Decisions
 
@@ -27,30 +27,30 @@ Phase 7 treated every toolbar material as a product choice. Phase 10 turns that 
 | Stardust | Keep | Cosmic powder. Charges water, energizes life/soil/fungus, and produces visual sparkle. |
 | Meteor | Keep | Falling cosmic heat. Impacts into stone/stardust/fire and reacts with moonwater. |
 
-## Phase 10 Identity Matrix
+## Interaction Matrix
 
-| Material | Identity features | Distinction check |
+| Material | Interaction roles | Coverage |
 | --- | --- | --- |
-| Eraser | Tool action; clears cells. | It is a brush mode, not a simulation material. |
-| Wall | Sealed construction barrier; brick pattern stains slowly. | Built barrier that resists casual moss and absorbs less than stone. |
-| Stone | Natural weatherable hard block; condenses and hosts moss readily. | Natural hard substrate produced by cooling and impacts. |
-| Sand | Falling loose powder; wet clumps dry loose again. | Powder motion changes when wet instead of becoming a generic solid. |
-| Water | Practical hydration and cooling; earthy and oily contact ripples. | Ordinary liquid that oil can block and heat can flash into steam. |
-| Moonwater | Cosmic growth liquid; cleans oil into stardust. | Water-like movement, but cosmic outcomes and stronger growth. |
-| Smoke | Dry rising vapor; soots hard surfaces. | Dry fire residue, visually darker and behaviorally different from steam. |
-| Steam | Wet rising vapor; condenses or frosts. | Wet heat vapor that leaves moisture or ice-side frost. |
-| Soil | Moisture-storing substrate; greens into moss. | Organic powder that stores water and can become surface life. |
-| Wood | Soft fuel substrate; wet wood vents steam. | Fuel plus life substrate, with visible damp and char states. |
-| Fire | Short-lived heat; dries before ignition. | Temporary heat source that creates smoke/steam and burns only after wet buffers. |
-| Lava | Slow hot liquid; cools into scorched stone. | Heavy heat liquid with crust/seams and cooling outcomes. |
-| Ice | Cold solid; freezes liquid and pauses life. | Temperature material that freezes cells instead of hydrating or burning them. |
-| Moss | Damp surface carpet; leafy patches spread over substrate. | Carpet growth that spreads over damp surfaces but does not bloom. |
-| Seed | Rooting potential; blooms only when fed and grounded. | A potential state that needs soil and water before it becomes Flower. |
-| Flower | Generated bloom outcome; petals react to wet and cosmic states. | Success outcome only, never a toolbar choice. |
-| Fungus | Decay pressure; contact-colored caps and spores. | Rot/decomposition role with different colors near seed, moss, wood, soil, oil, heat, or cosmic contact. |
-| Oil | Floating coating liquid; smothers water-fed growth. | Liquid coating that rises over water, blocks hydration, and burns readily. |
-| Stardust | Cosmic drifting powder; charges water and life. | Powder with twinkle visuals and cosmic energy/transformation paths. |
-| Meteor | Falling cosmic impact; crashes into fire, stone, or stardust. | Impact object, not just hot lava or a static rock. |
+| Eraser | Clears cells without adding state. | Brush mode, not a simulation material. |
+| Wall | Blocks flow; resists casual moss; takes damp/soot/frost states. | Rust, WASM, JS fallback, and visual QA cover hard-surface differences. |
+| Stone | Blocks flow; weathers and condenses harder than wall; receives cooled lava or meteor. | Rust, WASM, JS fallback, and visual QA cover natural hard-surface behavior. |
+| Sand | Falls as powder; clumps when wet; dries loose again. | Rust and JS fallback cover falling, wet clumping, and drying. |
+| Water | Flows and spreads; hydrates life/soil/sand; cools heat into steam or stone. | Rust, WASM, and JS fallback cover hydration, oil blocking, lava, meteor, and spread. |
+| Moonwater | Moves like water; supercharges growth; cleans oil or meteor into stardust. | Rust, WASM, JS fallback, audio reactions, and visual QA cover cosmic outcomes. |
+| Smoke | Rises and fades; soots hard surfaces. | Rust and JS fallback cover soot distinct from condensation. |
+| Steam | Rises and fades; condenses on hard surfaces; frosts near ice. | Rust and JS fallback cover condensation and frost. |
+| Soil | Falls as substrate; stores water; greens into moss. | Rust and JS fallback cover wet soil greening and substrate behavior. |
+| Wood | Burns as fuel; wet wood vents steam; feeds moss and fungus. | Rust and JS fallback cover wet-wood heat behavior; visual QA covers damp/char states. |
+| Fire | Short-lived heat; dries before burning; makes smoke or steam. | Rust and JS fallback cover wet buffering, steam, smoke, and scorch states. |
+| Lava | Moves as slow hot liquid; ignites fuel; cools into scorched stone. | Rust and JS fallback cover moonwater cooling and water quenching. |
+| Ice | Freezes water; pauses life; frost-stresses damp hard cells. | Rust and JS fallback cover frozen seeds, trapped water, and hard-surface frost. |
+| Moss | Spreads over damp substrate; crosses walls only when strongly fed; stays carpet instead of bloom. | Rust and JS fallback cover damp stone, wall resistance, and heat drying. |
+| Seed | Roots in soil; blooms when wet; waits when frozen. | Rust and JS fallback cover rooted bloom and frozen dormancy. |
+| Flower | Marks successful seeded growth; reacts visually to wet and cosmic states. | Generated-only outcome covered by seed tests and visual QA. |
+| Fungus | Rots wet seeds; overtakes old or wet moss; feeds on wood or soil. | Rust and JS fallback cover wet seed rot; visual QA covers contact-colored states. |
+| Oil | Floats over water; blocks hydration; burns readily. | Rust, WASM, and JS fallback cover float, hydration block, and moonwater cleanup. |
+| Stardust | Drifts as cosmic powder; charges water into moonwater; marks life/soil/fungus cosmic. | Rust, JS fallback, audio reactions, and visual QA cover cosmic charge. |
+| Meteor | Falls as impact heat; becomes stone/fire on impact; bursts with moonwater to stardust. | Rust and JS fallback cover water shock and moonwater burst. |
 
 ## Current Cuts
 

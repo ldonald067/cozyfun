@@ -6,7 +6,7 @@ Harness engineering means improving the feedback loops around the sandbox so goo
 
 - `.\scripts\build.ps1`: builds Rust/WASM, copies WASM, and builds the Vite app with the repo-local Windows-safe tool path.
 - `.\scripts\check.ps1`: runs the full local gate: material identity audit, Rust sim tests, WASM smoke, JS fallback smoke, production build, browser smoke, audio QA, and visual QA.
-- `npm run material:audit`: validates that every material definition has two concrete identity traits before a new element can pass review.
+- `npm run material:audit`: validates that every material definition has two concrete identity traits and one to three documented interaction roles before a new element can pass review.
 - `.\scripts\test-sim.ps1`: validates Rust simulation behavior.
 - `.\scripts\test-wasm.ps1`: validates the WASM bridge and key sim outcomes from JavaScript.
 - `.\scripts\test-js-fallback.ps1`: validates JS fallback parity for user-visible sim behavior.
@@ -55,7 +55,7 @@ A good harness improvement should include:
 
 ## Material Identity Targets
 
-- Keep `docs/MATERIAL_AUDIT.md` aligned with `app/src/materials.ts` when adding, removing, or specializing a material.
+- Keep `docs/MATERIAL_AUDIT.md` aligned with `app/src/materials.ts` when adding, removing, or specializing a material. Each material should keep one to three concrete interaction roles.
 - Extend `scripts/material-showcase.mjs` when renderer changes affect material readability.
 - Run `npm run material:audit` before broader checks when editing material definitions.
 
