@@ -5,11 +5,19 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outputDir = path.join(root, ".tmp", "audio-qa");
+const ambienceSourcePath = path.join(root, "app", "src", "audio", "ambience.ts");
 const minimumAssetBytes = {
   rainThunder: 1_000_000,
   creekWater: 100_000,
   fireCrackle: 10_000
 };
+const generatedAmbiencePatterns = [
+  { pattern: /\bcreateNoiseBuffer\b/, label: "createNoiseBuffer" },
+  { pattern: /\bcreateOscillator\s*\(/, label: "createOscillator" },
+  { pattern: /\bOscillatorNode\b/, label: "OscillatorNode" },
+  { pattern: /\bPeriodicWave\b/, label: "PeriodicWave" },
+  { pattern: /\bMath\.random\s*\(/, label: "Math.random" }
+];
 
 await main();
 
@@ -18,6 +26,7 @@ async function main() {
   await mkdir(outputDir, { recursive: true });
 
   const { assets, moods, rooms, scenes } = await loadSourceModules();
+  const ambienceGuard = await assertNativeAmbienceOnly();
   const assetChecks = await Promise.all(
     Object.entries(assets).map(async ([id, asset]) => {
       const filePath = path.join(root, "app", "public", asset.url.replace(/^\//, ""));
@@ -38,6 +47,7 @@ async function main() {
   const manifest = {
     generatedAt: new Date().toISOString(),
     note: "Native ambience QA manifest. Long-running rain, thunder, creek, and fire ambience comes from local OGG recordings; the browser extends short recordings into longer in-memory loops.",
+    ambienceGuard,
     assetChecks,
     moods: moods.map((mood) => ({
       id: mood.id,
@@ -70,6 +80,19 @@ async function main() {
   if (failed.length > 0) {
     throw new Error(`Audio asset check failed: ${failed.map((asset) => asset.id).join(", ")}`);
   }
+}
+
+async function assertNativeAmbienceOnly() {
+  const source = await readFile(ambienceSourcePath, "utf8");
+  const forbidden = generatedAmbiencePatterns.filter(({ pattern }) => pattern.test(source)).map(({ label }) => label);
+  if (forbidden.length > 0) {
+    throw new Error(`Generated ambience fallback found in ambience.ts: ${forbidden.join(", ")}`);
+  }
+  return {
+    file: ambienceSourcePath,
+    nativeOnly: true,
+    forbiddenPatterns: generatedAmbiencePatterns.map(({ label }) => label)
+  };
 }
 
 async function loadSourceModules() {

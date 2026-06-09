@@ -23,47 +23,47 @@ type ToneCue = {
 export function playMaterialPaintCue(audio: RunningAudio, material: MaterialId, time: number) {
   switch (material) {
     case MATERIAL.Empty:
-      playNoise(audio, time, { duration: 0.035, frequency: 2600, gain: 0.004, type: "highpass" });
+      playNoise(audio, time, { duration: 0.028, frequency: 2300, gain: 0.0026, type: "highpass", q: 0.35 });
       return;
     case MATERIAL.Sand:
     case MATERIAL.Soil:
-      playNoise(audio, time, { duration: 0.055, frequency: 980, gain: 0.009, type: "bandpass", q: 0.9 });
+      playNoise(audio, time, { duration: 0.045, frequency: 880, gain: 0.0064, type: "bandpass", q: 0.65 });
       return;
     case MATERIAL.Wall:
     case MATERIAL.Stone:
-      playTone(audio, time, { duration: 0.045, frequency: material === MATERIAL.Stone ? 190 : 150, gain: 0.006, type: "triangle" });
-      playNoise(audio, time, { duration: 0.03, frequency: 720, gain: 0.003, type: "bandpass" });
+      playTone(audio, time, { duration: 0.04, frequency: material === MATERIAL.Stone ? 190 : 150, gain: 0.0048, type: "triangle" });
+      playNoise(audio, time, { duration: 0.024, frequency: 680, gain: 0.0018, type: "bandpass", q: 0.35 });
       return;
     case MATERIAL.Water:
     case MATERIAL.Moonwater:
       playDroplet(audio, time, material === MATERIAL.Moonwater);
       return;
     case MATERIAL.Oil:
-      playNoise(audio, time, { duration: 0.08, frequency: 420, gain: 0.006, type: "lowpass" });
+      playNoise(audio, time, { duration: 0.062, frequency: 360, gain: 0.0046, type: "lowpass", q: 0.3 });
       return;
     case MATERIAL.Ice:
-      playTone(audio, time, { duration: 0.08, frequency: 760, endFrequency: 1040, gain: 0.0045, type: "sine" });
+      playTone(audio, time, { duration: 0.07, frequency: 760, endFrequency: 1040, gain: 0.0036, type: "sine" });
       return;
     case MATERIAL.Seed:
     case MATERIAL.Moss:
     case MATERIAL.Fungus:
     case MATERIAL.Wood:
-      playTone(audio, time, { duration: 0.06, frequency: material === MATERIAL.Wood ? 180 : 310, gain: 0.0048, type: "triangle" });
-      playNoise(audio, time, { duration: 0.04, frequency: 1350, gain: 0.0025, type: "bandpass" });
+      playTone(audio, time, { duration: 0.052, frequency: material === MATERIAL.Wood ? 180 : 310, gain: 0.0038, type: "triangle" });
+      playNoise(audio, time, { duration: 0.028, frequency: 1180, gain: 0.0015, type: "bandpass", q: 0.35 });
       return;
     case MATERIAL.Fire:
     case MATERIAL.Lava:
     case MATERIAL.Meteor:
-      playNoise(audio, time, { duration: 0.06, frequency: material === MATERIAL.Fire ? 2200 : 1450, gain: 0.007, type: "bandpass", q: 0.7 });
-      playTone(audio, time, { duration: 0.04, frequency: material === MATERIAL.Meteor ? 92 : 120, gain: 0.0045, type: "sine" });
+      playNoise(audio, time, { duration: 0.044, frequency: material === MATERIAL.Fire ? 1700 : 1250, gain: 0.0042, type: "bandpass", q: 0.42 });
+      playTone(audio, time, { duration: 0.036, frequency: material === MATERIAL.Meteor ? 92 : 120, gain: 0.0035, type: "sine" });
       return;
     case MATERIAL.Smoke:
     case MATERIAL.Steam:
-      playNoise(audio, time, { duration: 0.09, frequency: material === MATERIAL.Steam ? 1700 : 820, gain: 0.004, type: "bandpass", q: 0.35 });
+      playNoise(audio, time, { duration: 0.068, frequency: material === MATERIAL.Steam ? 1450 : 700, gain: 0.0027, type: "bandpass", q: 0.24 });
       return;
     case MATERIAL.Stardust:
-      playTone(audio, time, { duration: 0.09, frequency: 1040, endFrequency: 1560, gain: 0.004, type: "sine" });
-      playTone(audio, time + 0.025, { duration: 0.08, frequency: 1390, gain: 0.0026, type: "sine" });
+      playTone(audio, time, { duration: 0.078, frequency: 1040, endFrequency: 1560, gain: 0.0032, type: "sine" });
+      playTone(audio, time + 0.025, { duration: 0.066, frequency: 1390, gain: 0.002, type: "sine" });
       return;
   }
 }
@@ -71,33 +71,33 @@ export function playMaterialPaintCue(audio: RunningAudio, material: MaterialId, 
 export function playReactionCue(audio: RunningAudio, cue: ReactionCue, time: number) {
   switch (cue) {
     case "steam-flash":
-      playNoise(audio, time, { duration: 0.16, frequency: 1850, gain: 0.0048, type: "bandpass", q: 0.28 });
-      playNoise(audio, time + 0.025, { duration: 0.12, frequency: 900, gain: 0.0026, type: "highpass", q: 0.2 });
+      playNoise(audio, time, { duration: 0.12, frequency: 1500, gain: 0.0032, type: "bandpass", q: 0.22 });
+      playNoise(audio, time + 0.025, { duration: 0.078, frequency: 820, gain: 0.0013, type: "bandpass", q: 0.18 });
       return;
     case "bloom":
-      playTone(audio, time, { duration: 0.14, frequency: 520, endFrequency: 650, gain: 0.0036, type: "sine" });
-      playTone(audio, time + 0.055, { duration: 0.16, frequency: 780, endFrequency: 980, gain: 0.0028, type: "triangle" });
+      playTone(audio, time, { duration: 0.12, frequency: 520, endFrequency: 650, gain: 0.0029, type: "sine" });
+      playTone(audio, time + 0.05, { duration: 0.13, frequency: 780, endFrequency: 980, gain: 0.0021, type: "triangle" });
       return;
     case "cosmic-charge":
-      playTone(audio, time, { duration: 0.12, frequency: 820, endFrequency: 1230, gain: 0.0032, type: "sine" });
-      playTone(audio, time + 0.04, { duration: 0.15, frequency: 1320, endFrequency: 1760, gain: 0.0022, type: "sine" });
-      playNoise(audio, time + 0.02, { duration: 0.11, frequency: 2600, gain: 0.0018, type: "highpass", q: 0.5 });
+      playTone(audio, time, { duration: 0.1, frequency: 820, endFrequency: 1230, gain: 0.0026, type: "sine" });
+      playTone(audio, time + 0.038, { duration: 0.12, frequency: 1320, endFrequency: 1760, gain: 0.0016, type: "sine" });
+      playNoise(audio, time + 0.02, { duration: 0.072, frequency: 2200, gain: 0.0009, type: "bandpass", q: 0.35 });
       return;
     case "cleanse":
-      playNoise(audio, time, { duration: 0.13, frequency: 540, gain: 0.0036, type: "lowpass", q: 0.35 });
-      playTone(audio, time + 0.035, { duration: 0.12, frequency: 960, endFrequency: 1440, gain: 0.0028, type: "sine" });
+      playNoise(audio, time, { duration: 0.1, frequency: 500, gain: 0.0026, type: "lowpass", q: 0.25 });
+      playTone(audio, time + 0.032, { duration: 0.1, frequency: 960, endFrequency: 1440, gain: 0.0022, type: "sine" });
       return;
     case "impact-burst":
-      playTone(audio, time, { duration: 0.08, frequency: 82, gain: 0.004, type: "sine" });
-      playNoise(audio, time + 0.008, { duration: 0.12, frequency: 1280, gain: 0.0042, type: "bandpass", q: 0.55 });
-      playTone(audio, time + 0.035, { duration: 0.09, frequency: 1380, endFrequency: 980, gain: 0.0025, type: "triangle" });
+      playTone(audio, time, { duration: 0.068, frequency: 82, gain: 0.0034, type: "sine" });
+      playNoise(audio, time + 0.008, { duration: 0.084, frequency: 1040, gain: 0.0026, type: "bandpass", q: 0.42 });
+      playTone(audio, time + 0.032, { duration: 0.07, frequency: 1380, endFrequency: 980, gain: 0.0018, type: "triangle" });
       return;
   }
 }
 
 function playDroplet(audio: RunningAudio, time: number, cosmic: boolean) {
-  playTone(audio, time, { duration: 0.12, frequency: cosmic ? 660 : 520, endFrequency: cosmic ? 920 : 380, gain: cosmic ? 0.005 : 0.006, type: "sine" });
-  playTone(audio, time + 0.035, { duration: 0.08, frequency: cosmic ? 990 : 740, endFrequency: cosmic ? 1320 : 610, gain: cosmic ? 0.003 : 0.0026, type: "sine" });
+  playTone(audio, time, { duration: 0.1, frequency: cosmic ? 660 : 520, endFrequency: cosmic ? 920 : 380, gain: cosmic ? 0.004 : 0.0046, type: "sine" });
+  playTone(audio, time + 0.032, { duration: 0.064, frequency: cosmic ? 990 : 740, endFrequency: cosmic ? 1320 : 610, gain: cosmic ? 0.0022 : 0.0019, type: "sine" });
 }
 
 function playTone(audio: RunningAudio, time: number, options: ToneCue) {

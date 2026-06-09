@@ -7,11 +7,11 @@ export const AUDIO_MOODS: AudioMoodDef[] = [
     title: "Rain + Creek",
     status: "rain and creek on",
     ambience: {
-      rainGain: 0.105,
-      rainFilter: 4200,
-      creekGain: 0.054,
-      creekFilter: 820,
-      fireGain: 0.0025
+      rainGain: 0.096,
+      rainFilter: 3800,
+      creekGain: 0.048,
+      creekFilter: 760,
+      fireGain: 0.0018
     }
   },
   {
@@ -20,11 +20,11 @@ export const AUDIO_MOODS: AudioMoodDef[] = [
     title: "Light Thunder",
     status: "light thunder on",
     ambience: {
-      rainGain: 0.13,
-      rainFilter: 3600,
-      creekGain: 0.018,
-      creekFilter: 700,
-      fireGain: 0.0018
+      rainGain: 0.118,
+      rainFilter: 3300,
+      creekGain: 0.014,
+      creekFilter: 660,
+      fireGain: 0.0014
     }
   },
   {
@@ -33,11 +33,11 @@ export const AUDIO_MOODS: AudioMoodDef[] = [
     title: "Fireplace",
     status: "fireplace crackle on",
     ambience: {
-      rainGain: 0.012,
-      rainFilter: 4800,
-      creekGain: 0.006,
-      creekFilter: 860,
-      fireGain: 0.06
+      rainGain: 0.008,
+      rainFilter: 4200,
+      creekGain: 0.004,
+      creekFilter: 780,
+      fireGain: 0.052
     }
   }
 ];
