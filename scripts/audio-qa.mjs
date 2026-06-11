@@ -9,7 +9,7 @@ const ambienceSourcePath = path.join(root, "app", "src", "audio", "ambience.ts")
 const minimumAssetBytes = {
   rainThunder: 1_000_000,
   creekWater: 100_000,
-  fireCrackle: 10_000
+  fireCrackle: 1_000_000
 };
 const generatedAmbiencePatterns = [
   { pattern: /\bcreateNoiseBuffer\b/, label: "createNoiseBuffer" },
@@ -46,7 +46,7 @@ async function main() {
 
   const manifest = {
     generatedAt: new Date().toISOString(),
-    note: "Native ambience QA manifest. Long-running rain, thunder, creek, and fire ambience comes from local OGG recordings; the browser extends short recordings into longer in-memory loops.",
+    note: "Native ambience QA manifest. Long-running rain, thunder, creek, and fire ambience comes from local recordings; the browser extends shorter recordings into longer in-memory loops.",
     ambienceGuard,
     assetChecks,
     moods: moods.map((mood) => ({

@@ -192,7 +192,7 @@ async function main() {
         const checks = [
           { url: "/audio/rain-thunder.ogg", minBytes: 1000000 },
           { url: "/audio/creek-water.ogg", minBytes: 100000 },
-          { url: "/audio/fire-crackle.ogg", minBytes: 10000 }
+          { url: "/audio/fire-crackle.wav", minBytes: 1000000 }
         ];
         return Promise.all(checks.map(async (asset) => {
           const response = await fetch(asset.url, { cache: "no-store" });
@@ -323,7 +323,7 @@ async function main() {
         startTime: source.startTime
       }))
     }))()`);
-    for (const path of ["/audio/rain-thunder.ogg", "/audio/creek-water.ogg", "/audio/fire-crackle.ogg"]) {
+    for (const path of ["/audio/rain-thunder.ogg", "/audio/creek-water.ogg", "/audio/fire-crackle.wav"]) {
       assert(nativeAmbience.fetches.includes(path), `native ambience did not fetch ${path}: ${nativeAmbience.fetches.join(", ")}`);
     }
     assertLoopSource(nativeAmbience.loopSources, "rain/thunder", 150);

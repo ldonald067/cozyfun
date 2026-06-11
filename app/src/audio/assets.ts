@@ -12,7 +12,7 @@ export const AMBIENT_AUDIO_ASSETS: Record<AmbientAudioAssetId, { url: string; la
     minLoopSeconds: 90
   },
   fireCrackle: {
-    url: "/audio/fire-crackle.ogg",
+    url: "/audio/fire-crackle.wav",
     label: "fire crackle",
     minLoopSeconds: 120
   }

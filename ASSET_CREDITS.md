@@ -24,18 +24,18 @@ These images were generated for this project on May 26, 2026 using OpenAI image 
 | Forest Hut | `app/public/rooms/forest-hut.jpg` | OpenAI image generation | Night forest clearing with a small warm hut/window glow, dark UI-safe edges, no people or text. |
 | Snow Window | `app/public/rooms/snow-window.jpg` | OpenAI image generation | Snowy winter night viewed from a warm cabin window, dark UI-safe edges, no people or text. |
 
-## OpenGameArt Audio Ambience
+## Audio Ambience
 
 | App sound | Local file | Source | Creator | License |
 | --- | --- | --- | --- | --- |
-| Fire crackle | `app/public/audio/fire-crackle.ogg` | [Fire Crackling](https://opengameart.org/content/fire-crackling) | bart | CC0 |
+| Fire crackle | `app/public/audio/fire-crackle.wav` | [Fireplace with crackling sounds 2 min. RK](https://pixabay.com/sound-effects/film-special-effects-fireplace-with-crackling-sounds-2-min-rk-178392/) | RonKoster2023 | [Pixabay Content License](https://pixabay.com/service/license-summary/) |
 | Rain and thunder | `app/public/audio/rain-thunder.ogg` | [Rain and Thunders](https://opengameart.org/content/rain-and-thunders) | dklon | CC0 |
 | Creek water | `app/public/audio/creek-water.ogg` | [Water](https://opengameart.org/content/water) | Michel Baradari | [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
 
 ## Usage Notes
 
 - The app serves these images from `app/public/rooms`; there are no runtime requests to Pixabay.
-- The app serves ambience recordings from `app/public/audio`; there are no runtime requests to OpenGameArt.
+- The app serves ambience recordings from `app/public/audio`; there are no runtime requests to Pixabay or OpenGameArt.
 - Attribution is kept here for traceability even when the source license does not require visible in-app credit.
 - If a room image is replaced, update this file in the same change as the asset and scene metadata.
 - If an audio ambience file is replaced, update this file in the same change as the asset and native ambience loader.

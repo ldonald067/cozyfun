@@ -61,7 +61,7 @@ Use the listening harness when native ambience or material cues change:
 .\scripts\audio-qa.ps1
 ```
 
-It writes a native ambience manifest to `.tmp/audio-qa`. The manifest covers local OGG asset presence, minimum byte checks, target loop length, the checked-in mood and room balances, and a guard that fails if `ambience.ts` reintroduces generated noise or oscillator ambience. Browser smoke checks verify that the assets are served and decodable. Browser Web Audio routing, autoplay behavior, and Desk Radio embedding are still covered by browser checks.
+It writes a native ambience manifest to `.tmp/audio-qa`. The manifest covers local audio asset presence, minimum byte checks, target loop length, the checked-in mood and room balances, and a guard that fails if `ambience.ts` reintroduces generated noise or oscillator ambience. Browser smoke checks verify that the assets are served and decodable. Browser Web Audio routing, autoplay behavior, and Desk Radio embedding are still covered by browser checks.
 
 Reference tracks can guide taste, but do not sample, copy, scrape, or embed hidden audio from them. YouTube links remain user-provided Desk Radio sources only.
 

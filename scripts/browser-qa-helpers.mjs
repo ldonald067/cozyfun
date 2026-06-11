@@ -13,8 +13,10 @@ const mimeTypes = new Map([
   [".jpg", "image/jpeg"],
   [".js", "text/javascript"],
   [".json", "application/json"],
+  [".mp3", "audio/mpeg"],
   [".png", "image/png"],
   [".svg", "image/svg+xml"],
+  [".wav", "audio/wav"],
   [".wasm", "application/wasm"],
   [".webp", "image/webp"]
 ]);

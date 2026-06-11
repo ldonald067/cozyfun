@@ -12,7 +12,7 @@ Harness engineering means improving the feedback loops around the sandbox so goo
 - `.\scripts\test-js-fallback.ps1`: validates JS fallback parity for user-visible sim behavior.
 - `.\scripts\test-browser.ps1`: drives the built app through core UI, local ambience asset decoding, sharing, import/export, and Desk Radio paths.
 - `.\scripts\visual-qa.ps1`: captures deterministic material scenes, room backdrops, and responsive layout metrics.
-- `.\scripts\audio-qa.ps1`: writes a native ambience manifest for local OGG asset size, target loop length, and mood/room balance review into `.tmp/audio-qa`.
+- `.\scripts\audio-qa.ps1`: writes a native ambience manifest for local audio asset size, target loop length, and mood/room balance review into `.tmp/audio-qa`.
 - `.\scripts\test-chrome.ps1 -AppPort 4181`: verifies the current preview in Chrome or Edge when an actual browser path matters.
 - `.\scripts\test-firefox.ps1 -AppPort 4181`: verifies Firefox when supported by the local environment.
 - `.\scripts\preview-current.ps1 -Port 4181`: rebuilds and serves `app/dist` directly with bundle badges so stale browser sessions are obvious.
