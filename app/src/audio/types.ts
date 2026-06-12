@@ -27,10 +27,10 @@ export type AudioMoodDef = {
   title: string;
   status: string;
   ambience: {
+    purrGain: number;
+    purrFilter: number;
     rainGain: number;
     rainFilter: number;
-    creekGain: number;
-    creekFilter: number;
     fireGain: number;
   };
 };

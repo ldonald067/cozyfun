@@ -32,14 +32,5 @@ jobs:
       - name: Install app dependencies
         run: npm --prefix app ci
 
-      - name: Run sim tests
-        run: npm run test:sim
-
-      - name: Build app
-        run: npm run build
-
-      - name: Run browser smoke tests
-        run: npm run test:browser
-
-      - name: Run visual QA capture
-        run: npm run visual:qa
+      - name: Run full local gate
+        run: npm run check

@@ -1,6 +1,6 @@
 # Audio Foundation
 
-Audio is part of the product feel, not a decoration. The native direction is local and ambience-first: credited rain/thunder, creek water, and fireplace crackle recordings for long-running beds, plus sparse generated material cues. There is no generated lo-fi music bed or generated ambience fallback.
+Audio is part of the product feel, not a decoration. The native direction is local and ambience-first: credited rain, cat purr, and fireplace crackle recordings for long-running beds, plus sparse generated material cues. There is no generated lo-fi music bed or generated ambience fallback.
 
 Desk Radio is the one optional external playback path. It stays visible, user-provided, and replaceable by native ambience when YouTube will not embed a link.
 
@@ -12,12 +12,12 @@ Focused implementation modules live under `app/src/audio`:
 
 - `types.ts`: shared audio types.
 - `preferences.ts`: localStorage shape, defaults, channel list, and normalization.
-- `moods.ts`: native ambience moods for Rain + Creek, Light Thunder, and Fireplace.
+- `moods.ts`: native ambience moods for Rain, Cat Purr, and Fireplace.
 - `rooms.ts`: room-linked ambience profiles that bias native ambience without adding controls.
 - `providers.ts`: native/Desk Radio source definitions and compatibility rules.
 - `mixer.ts`: Web Audio graph for `master` and `ambience`.
 - `assets.ts`: local ambience recording metadata and browser decode cache.
-- `ambience.ts`: recorded rain/thunder, creek, and fire loops, including in-memory loop extension for short local recordings.
+- `ambience.ts`: recorded rain, cat purr, and fire loops, including in-memory loop extension for short local recordings.
 - `cues.ts`: short paint and reaction cues for material feedback.
 - `reactions.ts`: post-tick reaction detector for sparse audio cues.
 - `buffers.ts`: reusable generated noise buffers.
@@ -39,13 +39,13 @@ Focused implementation modules live under `app/src/audio`:
 
 Sound moods are small balance presets over local ambience recordings:
 
-- Rain: recorded rain/thunder and creek forward.
-- Thunder: recorded rain/thunder forward, with creek and fire lower in the room.
+- Rain: recorded rain forward, with cat purr and fire lower in the room.
+- Purr: recorded cat purr forward, with rain and fire lower in the room.
 - Fire: recorded fireplace crackle forward, with light weather still present.
 
 Mood definitions live in `moods.ts`. Keep mood names user-facing and calm; keep implementation details inside the preset config.
 
-Room ambience profiles live in `rooms.ts`. They quietly bias rain/thunder, creek, and fire crackle when the room backdrop changes.
+Room ambience profiles live in `rooms.ts`. They quietly bias rain, cat purr, and fire crackle when the room backdrop changes.
 
 ## Desk Radio
 

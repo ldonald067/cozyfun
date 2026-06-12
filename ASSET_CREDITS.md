@@ -4,7 +4,7 @@ This project keeps external visuals local at runtime and tracks source pages her
 
 Room images are used as subtle atmosphere behind the sandbox, not as standalone redistributed image packs. Pixabay images were downloaded on May 24, 2026; generated images are tracked separately below.
 
-Audio ambience files are also kept local at runtime. They provide the native rain, thunder, creek, and fire beds; short material cues remain generated in Web Audio.
+Audio ambience files are also kept local at runtime. They provide the native rain, cat purr, and fire beds; short material cues remain generated in Web Audio.
 
 ## Pixabay Room Backdrops
 
@@ -29,8 +29,12 @@ These images were generated for this project on May 26, 2026 using OpenAI image 
 | App sound | Local file | Source | Creator | License |
 | --- | --- | --- | --- | --- |
 | Fire crackle | `app/public/audio/fire-crackle.wav` | [Fireplace with crackling sounds 2 min. RK](https://pixabay.com/sound-effects/film-special-effects-fireplace-with-crackling-sounds-2-min-rk-178392/) | RonKoster2023 | [Pixabay Content License](https://pixabay.com/service/license-summary/) |
-| Rain and thunder | `app/public/audio/rain-thunder.ogg` | [Rain and Thunders](https://opengameart.org/content/rain-and-thunders) | dklon | CC0 |
-| Creek water | `app/public/audio/creek-water.ogg` | [Water](https://opengameart.org/content/water) | Michel Baradari | [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
+| Cat purr | `app/public/audio/cat-purr.mp3` | User-provided local audio `catpurr.mp3` | User-provided | User-supplied |
+| Rain | `app/public/audio/rain.mp3` | User-provided local audio `rain.mp3` | User-provided | User-supplied |
+
+Fire crackle processing notes: downloaded on June 10, 2026 as `ronkoster2023-fireplace-with-crackling-sounds-2-min-rk-178392.mp3`, converted locally into a mono 32 kHz WAV, lightly leveled, and smoothed at the loop boundary. The output is about 119.95 seconds. The previous CC0 fire crackle file was not mixed into this asset.
+
+Cat purr and rain processing notes: copied from user-provided local MP3 files on June 12, 2026 without mixing, scraping, or runtime network requests.
 
 ## Usage Notes
 

@@ -31,26 +31,26 @@ Every toolbar material is a product choice. Each material in `app/src/materials.
 
 | Material | Interaction roles | Coverage |
 | --- | --- | --- |
-| Eraser | Clears cells without adding state. | Brush mode, not a simulation material. |
-| Wall | Blocks flow; resists casual moss; takes damp/soot/frost states. | Rust, WASM, JS fallback, and visual QA cover hard-surface differences. |
-| Stone | Blocks flow; weathers and condenses harder than wall; receives cooled lava or meteor. | Rust, WASM, JS fallback, and visual QA cover natural hard-surface behavior. |
-| Sand | Falls as powder; clumps when wet; dries loose again. | Rust and JS fallback cover falling, wet clumping, and drying. |
-| Water | Flows and spreads; hydrates life/soil/sand; cools heat into steam or stone. | Rust, WASM, and JS fallback cover hydration, oil blocking, lava, meteor, and spread. |
-| Moonwater | Moves like water; supercharges growth; cleans oil or meteor into stardust. | Rust, WASM, JS fallback, audio reactions, and visual QA cover cosmic outcomes. |
-| Smoke | Rises and fades; soots hard surfaces. | Rust and JS fallback cover soot distinct from condensation. |
-| Steam | Rises and fades; condenses on hard surfaces; frosts near ice. | Rust and JS fallback cover condensation and frost. |
-| Soil | Falls as substrate; stores water; greens into moss. | Rust and JS fallback cover wet soil greening and substrate behavior. |
-| Wood | Burns as fuel; wet wood vents steam; feeds moss and fungus. | Rust and JS fallback cover wet-wood heat behavior; visual QA covers damp/char states. |
-| Fire | Short-lived heat; dries before burning; makes smoke or steam. | Rust and JS fallback cover wet buffering, steam, smoke, and scorch states. |
-| Lava | Moves as slow hot liquid; ignites fuel; cools into scorched stone. | Rust and JS fallback cover moonwater cooling and water quenching. |
-| Ice | Freezes water; pauses life; frost-stresses damp hard cells. | Rust and JS fallback cover frozen seeds, trapped water, and hard-surface frost. |
-| Moss | Spreads over damp substrate; crosses walls only when strongly fed; stays carpet instead of bloom. | Rust and JS fallback cover damp stone, wall resistance, and heat drying. |
-| Seed | Roots in soil; blooms when wet; waits when frozen. | Rust and JS fallback cover rooted bloom and frozen dormancy. |
-| Flower | Marks successful seeded growth; reacts visually to wet and cosmic states. | Generated-only outcome covered by seed tests and visual QA. |
-| Fungus | Rots wet seeds; overtakes old or wet moss; feeds on wood or soil. | Rust and JS fallback cover wet seed rot; visual QA covers contact-colored states. |
-| Oil | Floats over water; blocks hydration; burns readily. | Rust, WASM, and JS fallback cover float, hydration block, and moonwater cleanup. |
-| Stardust | Drifts as cosmic powder; charges water into moonwater; marks life/soil/fungus cosmic. | Rust, JS fallback, audio reactions, and visual QA cover cosmic charge. |
-| Meteor | Falls as impact heat; becomes stone/fire on impact; bursts with moonwater to stardust. | Rust and JS fallback cover water shock and moonwater burst. |
+| Eraser | Clears cells without adding state. | Browser smoke: `clear, save, and load update scene state`; not a simulation material. |
+| Wall | Blocks flow; resists casual moss; takes damp/soot/frost states. | Tests: `water_weathers_stone_more_than_sealed_wall`, `moss_needs_extra_energy_to_cross_wall`, `smoke_leaves_soot_instead_of_condensation`, `ice_frost_stresses_damp_hard_materials`. |
+| Stone | Blocks flow; weathers and condenses harder than wall; receives cooled lava or meteor. | Tests: `water_weathers_stone_more_than_sealed_wall`, `steam_condenses_on_hard_surfaces`, `moss_colonizes_damp_stone`, `water_quenches_lava_into_steam_and_stone`, `water_shocks_meteor_into_steam_and_stone`. |
+| Sand | Falls as powder; clumps when wet; dries loose again. | Tests: `sand_falls`, `water_wets_sand_into_clumps`, `wet_sand_drains_back_to_loose_sand`. |
+| Water | Flows and spreads; hydrates life/soil/sand; cools heat into steam or stone. | Tests: `water_spreads_when_blocked`, `wet_seed_on_soil_blooms`, `watered_soil_greens_up`, `water_fire_creates_steam_glow_instead_of_instant_delete`, `water_quenches_lava_into_steam_and_stone`. |
+| Moonwater | Moves like water; supercharges growth; cleans oil or meteor into stardust. | Tests: `moonwater_cleans_oil_into_stardust`, `meteor_moonwater_contact_bursts_to_stardust`, `lava_cools_near_moonwater`; visual QA: `material-identity-showcase`. |
+| Smoke | Rises and fades; soots hard surfaces. | Tests: `smoke_leaves_soot_instead_of_condensation`; source: `update_gas` owns rise/fade. |
+| Steam | Rises and fades; condenses on hard surfaces; frosts near ice. | Tests: `steam_condenses_on_hard_surfaces`, `steam_frosts_against_ice`, `water_fire_creates_steam_glow_instead_of_instant_delete`; source: `update_gas` owns rise/fade. |
+| Soil | Falls as substrate; stores water; greens into moss. | Tests: `watered_soil_greens_up`, `wet_seed_on_soil_blooms`; source: `update_soil` and `density` own substrate behavior. |
+| Wood | Burns as fuel; wet wood vents steam; feeds moss and fungus. | Tests: `heat_steams_wet_wood_before_burning`; source: `update_moss` and `update_fungus` handle organic contact; visual QA: damp/char states. |
+| Fire | Short-lived heat; dries before burning; makes smoke or steam. | Tests: `heat_dries_wet_growth_before_burning`, `water_fire_creates_steam_glow_instead_of_instant_delete`, `heat_steams_wet_wood_before_burning`; source: `update_fire`. |
+| Lava | Moves as slow hot liquid; ignites fuel; cools into scorched stone. | Tests: `lava_cools_near_moonwater`, `water_quenches_lava_into_steam_and_stone`; source: `update_lava` owns movement and ignition. |
+| Ice | Freezes water; pauses life; frost-stresses damp hard cells. | Tests: `ice_freezes_trapped_water`, `frozen_seed_waits_instead_of_blooming`, `ice_frost_stresses_damp_hard_materials`, `steam_frosts_against_ice`. |
+| Moss | Spreads over damp substrate; crosses walls only when strongly fed; stays carpet instead of bloom. | Tests: `moss_colonizes_damp_stone`, `moss_needs_extra_energy_to_cross_wall`, `heat_dries_wet_growth_before_burning`; source: `update_moss` keeps moss distinct from seed bloom. |
+| Seed | Roots in soil; blooms when wet; waits when frozen. | Tests: `wet_seed_on_soil_blooms`, `frozen_seed_waits_instead_of_blooming`, `fungus_can_rot_wet_seed`. |
+| Flower | Marks successful seeded growth; reacts visually to wet and cosmic states. | Tests: `wet_seed_on_soil_blooms`; visual QA: `material-identity-showcase`; generated-only outcome. |
+| Fungus | Rots wet seeds; overtakes old or wet moss; feeds on wood or soil. | Tests: `fungus_can_rot_wet_seed`; source: `update_fungus` handles moss/wood/soil contact; visual QA: contact-colored states. |
+| Oil | Floats over water; blocks hydration; burns readily. | Tests: `oil_rises_above_water`, `oil_blocks_plain_water_hydration`, `moonwater_cleans_oil_into_stardust`; source: `update_oil` owns burn readiness. |
+| Stardust | Drifts as cosmic powder; charges water into moonwater; marks life/soil/fungus cosmic. | Tests: `stardust_charges_water_into_moonwater`; source: `update_stardust` handles drift and cosmic marking; visual QA: sparkle/cosmic states. |
+| Meteor | Falls as impact heat; becomes stone/fire on impact; bursts with moonwater to stardust. | Tests: `water_shocks_meteor_into_steam_and_stone`, `meteor_moonwater_contact_bursts_to_stardust`; source: `update_meteor` owns fall and impact heat. |
 
 ## Current Cuts
 

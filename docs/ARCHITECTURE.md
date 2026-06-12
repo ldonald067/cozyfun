@@ -59,7 +59,7 @@ This split keeps visual work expandable without turning the renderer into a pile
 - `moods.ts`: native ambience mood definitions.
 - `providers.ts`: native/Desk Radio source definitions.
 - `assets.ts`: local ambience recording metadata and decode cache.
-- `ambience.ts`: long-running native rain/thunder, creek, and fire layers with in-memory loop extension.
+- `ambience.ts`: long-running native rain, cat purr, and fire layers with in-memory loop extension.
 - `cues.ts` and `reactions.ts`: short material and reaction feedback.
 
 This keeps sound work reusable without burying lifecycle, room balance, and cue logic in one file.
@@ -108,7 +108,7 @@ Local checks:
 .\scripts\test-browser.ps1
 ```
 
-CI runs Rust tests, the production build, and browser smoke checks on every push and pull request to `main`.
+CI runs the same full `npm run check` gate expected locally on every push and pull request to `main`.
 
 ## Design Rules
 

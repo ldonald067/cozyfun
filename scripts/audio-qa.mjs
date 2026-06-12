@@ -7,8 +7,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outputDir = path.join(root, ".tmp", "audio-qa");
 const ambienceSourcePath = path.join(root, "app", "src", "audio", "ambience.ts");
 const minimumAssetBytes = {
-  rainThunder: 1_000_000,
-  creekWater: 100_000,
+  catPurr: 1_000_000,
+  rainFall: 1_000_000,
   fireCrackle: 1_000_000
 };
 const generatedAmbiencePatterns = [
@@ -46,14 +46,14 @@ async function main() {
 
   const manifest = {
     generatedAt: new Date().toISOString(),
-    note: "Native ambience QA manifest. Long-running rain, thunder, creek, and fire ambience comes from local recordings; the browser extends shorter recordings into longer in-memory loops.",
+    note: "Native ambience QA manifest. Long-running cat purr, rain, and fire ambience comes from local recordings; the browser extends shorter recordings into longer in-memory loops.",
     ambienceGuard,
     assetChecks,
     moods: moods.map((mood) => ({
       id: mood.id,
       title: mood.title,
+      purrGain: mood.ambience.purrGain,
       rainGain: mood.ambience.rainGain,
-      creekGain: mood.ambience.creekGain,
       fireGain: mood.ambience.fireGain
     })),
     roomBalances: scenes.map((scene) => {
@@ -62,8 +62,8 @@ async function main() {
         room: scene.id,
         title: scene.title,
         mood: scene.mood,
+        purrGainScale: room.purrGainScale,
         rainGainScale: room.rainGainScale,
-        creekGainScale: room.creekGainScale,
         fireGainScale: room.fireGainScale
       };
     })

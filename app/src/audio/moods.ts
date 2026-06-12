@@ -4,26 +4,26 @@ export const AUDIO_MOODS: AudioMoodDef[] = [
   {
     id: "rain",
     label: "Rain",
-    title: "Rain + Creek",
-    status: "rain and creek on",
+    title: "Rain",
+    status: "rain on",
     ambience: {
+      purrGain: 0.01,
+      purrFilter: 520,
       rainGain: 0.096,
       rainFilter: 3800,
-      creekGain: 0.048,
-      creekFilter: 760,
       fireGain: 0.0018
     }
   },
   {
     id: "window",
-    label: "Thunder",
-    title: "Light Thunder",
-    status: "light thunder on",
+    label: "Purr",
+    title: "Cat Purr",
+    status: "cat purr on",
     ambience: {
-      rainGain: 0.118,
+      purrGain: 0.052,
+      purrFilter: 480,
+      rainGain: 0.018,
       rainFilter: 3300,
-      creekGain: 0.014,
-      creekFilter: 660,
       fireGain: 0.0014
     }
   },
@@ -33,10 +33,10 @@ export const AUDIO_MOODS: AudioMoodDef[] = [
     title: "Fireplace",
     status: "fireplace crackle on",
     ambience: {
-      rainGain: 0.008,
+      purrGain: 0.006,
+      purrFilter: 540,
+      rainGain: 0.006,
       rainFilter: 4200,
-      creekGain: 0.004,
-      creekFilter: 780,
       fireGain: 0.052
     }
   }

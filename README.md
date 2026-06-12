@@ -67,10 +67,10 @@ npm --prefix app run dev -- --host 127.0.0.1
 - Use the brush slider to change brush size.
 - Pause/play the simulation from the control panel.
 - Change the room backdrop without replacing your sandbox, including rainy, moonlit, hearth, fireplace, forest, and snow scenes.
-- Enable optional local audio, pick a sound mood for rain/creek, light thunder, or fireplace crackle, choose native ambience or a visible YouTube Desk Radio, and tune master and ambience volume.
+- Enable optional local audio, pick a sound mood for rain, cat purr, or fireplace crackle, choose native ambience or a visible YouTube Desk Radio, and tune master and ambience volume.
 - Clear, save/load in the browser, download/import a scene JSON file, export a postcard PNG, export a short WebM clip, or copy a share note from the right controls.
 
-Native ambience is local: credited OGG recordings provide the rain/thunder, creek water, and fireplace crackle beds. Short material cues still use Web Audio, but long-running ambience is recorded audio only. Desk Radio is user-controlled: paste a YouTube video, playlist, timestamped URL, or raw video ID and the visible player embeds that source when YouTube allows embedded playback. If YouTube blocks a link from playing in the sandbox, the app returns to native ambience, keeps the URL available to edit, and asks for another embeddable link. The app does not search YouTube, pick playlists, use an API key, or play hidden audio.
+Native ambience is local: credited recordings provide the rain, cat purr, and fireplace crackle beds. Short material cues still use Web Audio, but long-running ambience is recorded audio only. Desk Radio is user-controlled: paste a YouTube video, playlist, timestamped URL, or raw video ID and the visible player embeds that source when YouTube allows embedded playback. If YouTube blocks a link from playing in the sandbox, the app returns to native ambience, keeps the URL available to edit, and asks for another embeddable link. The app does not search YouTube, pick playlists, use an API key, or play hidden audio.
 
 Saves and scene JSON files preserve the selected room backdrop, sound mood, and safe sound source metadata. Desk Radio sources are preserved only when they came from a validated user-provided YouTube video or playlist link that loaded as an embeddable player.
 
@@ -173,7 +173,7 @@ Useful local commands:
 .\scripts\app-npm.ps1 audit --audit-level=moderate
 ```
 
-CI runs simulation tests, build, browser smoke checks, and visual QA on pushes and pull requests to `main`. Browser and visual checks use an installed Chrome or Edge browser; set `BROWSER_BINARY` if your browser is in a custom location.
+CI runs the full `npm run check` gate on pushes and pull requests to `main`: material audit, Rust sim tests, build, WASM smoke, JS fallback smoke, audio reaction smoke, browser smoke, audio QA, and visual QA. Browser and visual checks use an installed Chrome or Edge browser; set `BROWSER_BINARY` if your browser is in a custom location.
 
 Firefox QA expects a running preview server. If the preview is on a non-default port, pass it explicitly:
 

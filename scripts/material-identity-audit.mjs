@@ -91,6 +91,9 @@ function auditInteractionMatrix(markdown, materialLabels, failures) {
       if (/^(todo|tbd|unique|special)$/i.test(role)) failures.push(`${material} has placeholder interaction role text: "${role}"`);
     }
     if (coverage.length < 8 || /^(todo|tbd)$/i.test(coverage)) failures.push(`${material} needs concrete audit coverage notes`);
+    if (!/\b(Tests?|Browser smoke|Visual QA|Source|Brush mode):/i.test(coverage)) {
+      failures.push(`${material} coverage must cite concrete tests, source hooks, or harnesses`);
+    }
   }
 
   for (const label of materialLabels.values()) {

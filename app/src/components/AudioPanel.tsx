@@ -17,7 +17,7 @@ const AUDIO_CHANNEL_LABELS: Record<AudioChannel, string> = {
 
 const AUDIO_CHANNEL_HINTS: Record<AudioChannel, string> = {
   master: "Overall volume for the whole soundscape.",
-  ambience: "Native rain, thunder, creek, fire crackle, and material cues."
+  ambience: "Native rain, cat purr, fire crackle, and material cues."
 };
 
 type AudioPanelProps = {

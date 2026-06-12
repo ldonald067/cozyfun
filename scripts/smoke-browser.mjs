@@ -69,6 +69,7 @@ async function main() {
         originalError.apply(console, args);
       };
       window.__cozyAudioProbe = { fetches: [], longBuffers: [], sources: [] };
+      window.__cozyNativeAmbienceProbe = { starts: [] };
       const originalFetch = window.fetch.bind(window);
       window.fetch = (input, init) => {
         const url = typeof input === "string" ? input : input?.url ?? "";
@@ -190,8 +191,8 @@ async function main() {
       cdp,
       `(async () => {
         const checks = [
-          { url: "/audio/rain-thunder.ogg", minBytes: 1000000 },
-          { url: "/audio/creek-water.ogg", minBytes: 100000 },
+          { url: "/audio/cat-purr.mp3", minBytes: 1000000 },
+          { url: "/audio/rain.mp3", minBytes: 1000000 },
           { url: "/audio/fire-crackle.wav", minBytes: 1000000 }
         ];
         return Promise.all(checks.map(async (asset) => {
@@ -304,9 +305,9 @@ async function main() {
     await setText(cdp, '[data-testid="desk-radio-input"]', "https://example.com/radio");
     await click(cdp, '[data-testid="desk-radio-tune"]');
     await waitForStatus(cdp, "invalid YouTube link");
-    await evaluate(cdp, `window.__cozyAudioProbe = { fetches: [], longBuffers: [], sources: [] }`);
+    await evaluate(cdp, `window.__cozyAudioProbe = { fetches: [], longBuffers: [], sources: [] }; window.__cozyNativeAmbienceProbe = { starts: [] }`);
     await click(cdp, '[data-testid="audio-toggle"]');
-    await waitForStatus(cdp, "rain and creek on");
+    await waitForStatus(cdp, "rain on");
     await waitUntil(() => textIncludes(cdp, '[data-testid="audio-toggle"]', "Stop"), "audio start button to become stop");
     await waitUntil(
       () => evaluate(
@@ -321,14 +322,31 @@ async function main() {
       loopSources: (window.__cozyAudioProbe?.sources ?? []).filter((source) => source.started && source.loop).map((source) => ({
         duration: source.duration,
         startTime: source.startTime
-      }))
+      })),
+      nativeStarts: window.__cozyNativeAmbienceProbe?.starts ?? []
     }))()`);
-    for (const path of ["/audio/rain-thunder.ogg", "/audio/creek-water.ogg", "/audio/fire-crackle.wav"]) {
+    for (const path of ["/audio/cat-purr.mp3", "/audio/rain.mp3", "/audio/fire-crackle.wav"]) {
       assert(nativeAmbience.fetches.includes(path), `native ambience did not fetch ${path}: ${nativeAmbience.fetches.join(", ")}`);
     }
-    assertLoopSource(nativeAmbience.loopSources, "rain/thunder", 150);
-    assertLoopSource(nativeAmbience.loopSources, "creek/rain-water", 90);
+    assertLoopSource(nativeAmbience.loopSources, "cat purr", 120);
+    assertLoopSource(nativeAmbience.loopSources, "rain", 150);
     assertLoopSource(nativeAmbience.loopSources, "fire crackle", 120);
+    assertNativeStart(nativeAmbience.nativeStarts, "catPurr", "/audio/cat-purr.mp3", 120, { minGain: 0.001 });
+    assertNativeStart(nativeAmbience.nativeStarts, "rainFall", "/audio/rain.mp3", 150, { minGain: 0.01 });
+    assertNativeStart(nativeAmbience.nativeStarts, "fireCrackle", "/audio/fire-crackle.wav", 120, { minGain: 0.0001 });
+
+    await evaluate(cdp, `window.__cozyNativeAmbienceProbe = { starts: [] }`);
+    await click(cdp, '[data-testid="scene-environment-stardust-hearth"]');
+    await waitForStatus(cdp, "stardust hearth backdrop on");
+    await waitUntil(
+      () => evaluate(
+        cdp,
+        `(() => (window.__cozyNativeAmbienceProbe?.starts ?? []).some((start) => start.id === "fireCrackle" && start.url === "/audio/fire-crackle.wav" && start.duration >= 119 && start.gain >= 0.05))()`
+      ),
+      "hearth fire crackle native loop to start"
+    );
+    const hearthAmbience = await evaluate(cdp, `window.__cozyNativeAmbienceProbe?.starts ?? []`);
+    assertNativeStart(hearthAmbience, "fireCrackle", "/audio/fire-crackle.wav", 120, { minGain: 0.05 });
     await click(cdp, '[data-testid="audio-mood-stardust"]');
     await waitForStatus(cdp, "fireplace crackle on");
     await click(cdp, '[data-testid="audio-mute"]');
@@ -413,7 +431,7 @@ async function main() {
     const moonImage = await evaluate(cdp, `getComputedStyle(document.querySelector(".app-shell")).getPropertyValue("--room-image")`);
     assert(moonClass, "moonwater room class was not applied");
     assert(moonImage.includes("moonwater-garden.jpg"), `moonwater room image was not applied: ${moonImage}`);
-    await waitUntil(() => textIncludes(cdp, '[data-testid="audio-mood-window"]', "Thunder"), "thunder mood control to stay visible");
+    await waitUntil(() => textIncludes(cdp, '[data-testid="audio-mood-window"]', "Purr"), "purr mood control to stay visible");
     await click(cdp, '[data-testid="scene-environment-stardust-hearth"]');
     await waitForStatus(cdp, "stardust hearth backdrop on");
     const hearthClass = await evaluate(cdp, `document.querySelector(".app-shell")?.classList.contains("scene-stardust-hearth")`);
@@ -503,6 +521,19 @@ function assertLoopSource(sources, label, minimumDuration) {
   const tolerance = 1;
   const source = sources.find((candidate) => candidate.duration >= minimumDuration - tolerance);
   assert(source, `${label} native ambience loop did not reach ${minimumDuration}s: ${sources.map((candidate) => candidate.duration.toFixed(2)).join(", ")}`);
+}
+
+function assertNativeStart(starts, id, url, minimumDuration, options = {}) {
+  const tolerance = 1;
+  const start = starts.find((candidate) => candidate.id === id && candidate.url === url && candidate.duration >= minimumDuration - tolerance);
+  assert(
+    start,
+    `${id} did not start from ${url} at ${minimumDuration}s: ${starts.map((candidate) => `${candidate.id}:${candidate.url}:${candidate.duration?.toFixed?.(2) ?? candidate.duration}`).join(", ")}`
+  );
+  assert(start.loop, `${id} native ambience did not start as a loop`);
+  const minGain = options.minGain ?? 0;
+  const maxGain = options.maxGain ?? Number.POSITIVE_INFINITY;
+  assert(start.gain >= minGain && start.gain <= maxGain, `${id} gain ${start.gain} outside expected range ${minGain}-${maxGain}`);
 }
 
 async function check(name, task) {

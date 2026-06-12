@@ -11,21 +11,21 @@ export function startNativeAmbience(audio: RunningAudio, mood: AudioMood, room: 
   const registry: AudioNodeRegistry = { sources: [], nodes: [] };
   const pendingLoads: Array<() => void> = [];
 
-  startRecordedLoop(audio, registry, pendingLoads, "rainThunder", {
+  startRecordedLoop(audio, registry, pendingLoads, "catPurr", {
+    gain: settings.purrGain * roomSettings.purrGainScale,
+    filter: {
+      frequency: settings.purrFilter * roomSettings.purrFilterScale,
+      type: "lowpass",
+      q: 0.34
+    }
+  });
+
+  startRecordedLoop(audio, registry, pendingLoads, "rainFall", {
     gain: settings.rainGain * roomSettings.rainGainScale,
     filter: {
       frequency: settings.rainFilter * roomSettings.rainFilterScale,
       type: "lowpass",
-      q: 0.4
-    }
-  });
-
-  startRecordedLoop(audio, registry, pendingLoads, "creekWater", {
-    gain: settings.creekGain * roomSettings.creekGainScale,
-    filter: {
-      frequency: settings.creekFilter * roomSettings.creekFilterScale,
-      type: "bandpass",
-      q: 0.32
+      q: 0.38
     }
   });
 
@@ -61,6 +61,18 @@ type RecordedLoopOptions = {
   };
 };
 
+type NativeAmbienceProbe = {
+  starts?: Array<{
+    id: AmbientAudioAssetId;
+    url: string;
+    duration: number;
+    gain: number;
+    loop: boolean;
+    filterType: BiquadFilterType;
+    filterFrequency: number;
+  }>;
+};
+
 function startRecordedLoop(
   audio: RunningAudio,
   registry: AudioNodeRegistry,
@@ -93,9 +105,25 @@ function startRecordedLoop(
     filter.connect(gain);
     gain.connect(audio.channels.ambience);
     source.start();
+    recordNativeAmbienceStart(id, source, gain, filter);
 
     registry.sources.push(source);
     registry.nodes.push(source, filter, gain);
+  });
+}
+
+function recordNativeAmbienceStart(id: AmbientAudioAssetId, source: AudioBufferSourceNode, gain: GainNode, filter: BiquadFilterNode) {
+  const probe = (globalThis as { __cozyNativeAmbienceProbe?: NativeAmbienceProbe }).__cozyNativeAmbienceProbe;
+  if (!probe) return;
+  if (!probe.starts) probe.starts = [];
+  probe.starts.push({
+    id,
+    url: AMBIENT_AUDIO_ASSETS[id].url,
+    duration: source.buffer?.duration ?? 0,
+    gain: gain.gain.value,
+    loop: source.loop,
+    filterType: filter.type,
+    filterFrequency: filter.frequency.value
   });
 }
 
