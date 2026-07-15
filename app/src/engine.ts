@@ -169,7 +169,7 @@ class JsSandboxEngine implements SandboxEngine {
         if (kind === MATERIAL.Soil) this.soil(idx, x, y, cell, old, next);
         if (kind === MATERIAL.Water || kind === MATERIAL.Moonwater) this.liquid(idx, x, y, cell, old, next, 1);
         if (kind === MATERIAL.Oil) this.oil(idx, x, y, cell, old, next);
-        if (kind === MATERIAL.Lava) this.liquid(idx, x, y, cell, old, next, 4);
+        if (kind === MATERIAL.Lava) this.liquid(idx, x, y, cell, old, next, 2);
         if (kind === MATERIAL.Stardust) this.stardust(idx, x, y, cell, old, next);
         if (kind === MATERIAL.Meteor) this.meteor(idx, x, y, cell, old, next);
       }
@@ -304,7 +304,7 @@ class JsSandboxEngine implements SandboxEngine {
             }
             continue;
           }
-          if (other === MATERIAL.Sand && readU16(old, idx + 4) > 190 && this.chance(9)) {
+          if (other === MATERIAL.Sand && readU16(old, idx + 4) > 190 && this.chance(7)) {
             writeCellBytes(next, nidx, MATERIAL.Glass, old[nidx + 1]);
             continue;
           }
@@ -325,7 +325,7 @@ class JsSandboxEngine implements SandboxEngine {
             }
             continue;
           }
-          if (other === MATERIAL.Sand && this.chance(6)) {
+          if (other === MATERIAL.Sand && this.chance(4)) {
             writeCellBytes(next, nidx, MATERIAL.Glass, old[nidx + 1]);
             continue;
           }
@@ -371,10 +371,10 @@ class JsSandboxEngine implements SandboxEngine {
           writeU16(next, nidx + 4, Math.min(255, readU16(next, nidx + 4) + 18));
           writeU16(next, nidx + 6, readU16(next, nidx + 6) | CELL_FLAG.Cosmic);
         }
-        if (kind === MATERIAL.Stardust && other === MATERIAL.Fire && this.chance(3)) {
+        if (kind === MATERIAL.Stardust && other === MATERIAL.Fire && this.chance(2)) {
           writeCellBytes(next, nidx, MATERIAL.Stardust, old[nidx + 1], 140, 0, CELL_FLAG.Cosmic);
         }
-        if (kind === MATERIAL.Stardust && (other === MATERIAL.Stone || other === MATERIAL.Wall) && this.chance(16)) {
+        if (kind === MATERIAL.Stardust && (other === MATERIAL.Stone || other === MATERIAL.Wall) && this.chance(12)) {
           writeU16(next, nidx + 4, Math.max(36, readU16(next, nidx + 4)));
           writeU16(next, nidx + 6, readU16(next, nidx + 6) | CELL_FLAG.Cosmic);
         }
@@ -452,7 +452,7 @@ class JsSandboxEngine implements SandboxEngine {
             writeU16(next, idx + 6, readU16(next, idx + 6) & ~CELL_FLAG.Wet);
             continue;
           }
-          if (emberEnergy > 90 && flammable(other) && this.chance(burnChance(other) * 2)) {
+          if (emberEnergy > 90 && flammable(other) && this.chance(Math.floor((burnChance(other) * 3) / 2))) {
             writeIgnitedCell(next, nidx, other, old[nidx + 1], 210);
           }
         }

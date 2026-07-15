@@ -193,7 +193,7 @@ impl Universe {
                     self.update_liquid(idx, cell, &old, &mut next, 1)
                 }
                 x if x == Material::Oil as u8 => self.update_oil(idx, cell, &old, &mut next),
-                x if x == Material::Lava as u8 => self.update_liquid(idx, cell, &old, &mut next, 4),
+                x if x == Material::Lava as u8 => self.update_liquid(idx, cell, &old, &mut next, 2),
                 _ => {}
             }
         }
@@ -449,7 +449,7 @@ impl Universe {
                             }
                             continue;
                         }
-                        if other.kind == Material::Sand as u8 && cell.energy > 190 && self.chance(9) {
+                        if other.kind == Material::Sand as u8 && cell.energy > 190 && self.chance(7) {
                             next[nidx] = Cell::new(Material::Glass as u8, other.variant, 0);
                             continue;
                         }
@@ -480,7 +480,7 @@ impl Universe {
                             }
                             continue;
                         }
-                        if other.kind == Material::Sand as u8 && self.chance(6) {
+                        if other.kind == Material::Sand as u8 && self.chance(4) {
                             next[nidx] = Cell::new(Material::Glass as u8, other.variant, 0);
                             continue;
                         }
@@ -516,12 +516,12 @@ impl Universe {
                             next[nidx].energy = next[nidx].energy.saturating_add(18).min(255);
                             next[nidx].flags |= FLAG_COSMIC;
                         }
-                        if other.kind == Material::Fire as u8 && self.chance(3) {
+                        if other.kind == Material::Fire as u8 && self.chance(2) {
                             next[nidx] = Cell::new(Material::Stardust as u8, other.variant, 140);
                             next[nidx].flags = FLAG_COSMIC;
                         }
                         if (other.kind == Material::Stone as u8 || other.kind == Material::Wall as u8)
-                            && self.chance(16)
+                            && self.chance(12)
                         {
                             next[nidx].flags |= FLAG_COSMIC;
                             next[nidx].energy = next[nidx].energy.max(36);
@@ -690,7 +690,7 @@ impl Universe {
                         }
                         if cell.energy > 90
                             && is_flammable(other.kind)
-                            && self.chance(burn_chance(other.kind) * 2)
+                            && self.chance(burn_chance(other.kind) * 3 / 2)
                         {
                             next[nidx] = ignited_cell(other, 210);
                         }

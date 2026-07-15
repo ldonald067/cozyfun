@@ -408,11 +408,11 @@ function emberColor({ variant, energy, flags, time, x, y }: ShapeContext) {
 function glassColor({ color, variant, age, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x >> 1, y >> 1, variant);
   const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Glass);
-  let out = mixRgb(color, [222, 247, 244], 0.28);
-  out = mixRgb(out, [9, 14, 20], 0.34);
-  if (((x + y * 2 + (hash & 3)) & 7) === 0) out = mixRgb(out, [235, 255, 252], 0.4);
-  if (edge.top || edge.left) out = mixRgb(out, [244, 255, 253], 0.5);
-  if (edge.bottom || edge.right) out = mixRgb(out, [58, 96, 104], 0.42);
+  let out = mixRgb(color, [205, 244, 250], 0.3);
+  out = mixRgb(out, [9, 14, 20], 0.24);
+  if (((x + y * 2 + (hash & 3)) & 7) === 0) out = mixRgb(out, [226, 252, 255], 0.44);
+  if (edge.top || edge.left) out = mixRgb(out, [238, 254, 255], 0.52);
+  if (edge.bottom || edge.right) out = mixRgb(out, [44, 92, 110], 0.44);
   if ((hash & 31) === 5) out = mixRgb(out, [255, 255, 255], 0.6);
   if (age < 70) out = mixRgb(out, [255, 176, 96], 0.36 * (1 - age / 70));
   return out;

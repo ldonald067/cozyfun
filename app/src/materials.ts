@@ -215,8 +215,8 @@ export const MATERIALS: MaterialDef[] = [
     slug: "glass",
     description: "Generated pane fused where strong heat vitrifies dry sand.",
     identity: ["Heat-fused sand pane", "Translucent glints over warm seams"],
-    color: "#bfe3dd",
-    palette: ["#9fc9c6", "#b7ded9", "#d5f0ec", "#8fb6b8"],
+    color: "#8fd4dc",
+    palette: ["#7fc4cf", "#9adfe6", "#c2f2f7", "#68a9bd"],
     group: "basic",
     userSelectable: false
   },
