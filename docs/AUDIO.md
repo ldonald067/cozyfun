@@ -57,9 +57,11 @@ Desk Radio is optional and user-controlled. It accepts regular YouTube watch lin
 
 Use the listening harness when native ambience or material cues change:
 
-```powershell
-.\scripts\audio-qa.ps1
+```sh
+npm run audio:qa
 ```
+
+(Windows wrapper: `.\scripts\audio-qa.ps1`.)
 
 It writes a native ambience manifest to `.tmp/audio-qa`. The manifest covers local audio asset presence, minimum byte checks, target loop length, the checked-in mood and room balances, and a guard that fails if `ambience.ts` reintroduces generated noise or oscillator ambience. Browser smoke checks verify that the assets are served and decodable. Browser Web Audio routing, autoplay behavior, and Desk Radio embedding are still covered by browser checks.
 

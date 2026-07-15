@@ -4,6 +4,8 @@ Harness engineering means improving the feedback loops around the sandbox so goo
 
 ## Current Harnesses
 
+The `.ps1` wrappers below are the Windows entrypoints; on macOS/Linux each has a direct npm equivalent (`npm run build`, `npm run check`, `npm run test:sim`, `npm run test:wasm`, `npm run test:js-fallback`, `npm run test:browser`, `npm run visual:qa`, `npm run audio:qa`).
+
 - `.\scripts\build.ps1`: builds Rust/WASM, copies WASM, and builds the Vite app with the repo-local Windows-safe tool path.
 - `.\scripts\check.ps1`: runs the full local gate: material identity audit, Rust sim tests, WASM smoke, JS fallback smoke, production build, browser smoke, audio QA, and visual QA.
 - `npm run material:audit`: validates that every material definition has two concrete identity traits and one to three documented interaction roles before a new element can pass review.

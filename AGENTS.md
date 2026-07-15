@@ -15,7 +15,9 @@ Use this file as the repo-level operating guide for Codex or any other coding ag
 
 ## Commands
 
-Prefer the checked-in PowerShell wrappers on Windows. Direct `npm --prefix app run build` can still hit the known Windows/Vite access-denied path issue.
+On macOS/Linux, use the root npm scripts directly: `npm run check`, `npm run build`, `npm run test:sim`, `npm run test:wasm`, `npm run test:js-fallback`, `npm run test:browser`, `npm run material:audit`, `npm run audio:qa`, `npm run visual:qa`. Rust lives in `~/.cargo` (run `source "$HOME/.cargo/env"` if cargo is not on PATH).
+
+On Windows, prefer the checked-in PowerShell wrappers. Direct `npm --prefix app run build` can still hit the known Windows/Vite access-denied path issue.
 
 ```powershell
 .\scripts\build.ps1
@@ -54,8 +56,8 @@ Use `.\scripts\app-npm.ps1` for app-level npm commands when needed:
 
 ## Done Criteria
 
-- Simulation changes: run `.\scripts\test-sim.ps1`, `.\scripts\test-wasm.ps1`, and `.\scripts\test-js-fallback.ps1` or `.\scripts\check.ps1`.
-- UI, export, audio, rendering, workflow, QA, or preview-related changes must include browser testing. Minimum browser gate is `.\scripts\test-browser.ps1`; use `.\scripts\check.ps1` for full closure.
+- Simulation changes: run `npm run test:sim`, `npm run test:wasm`, and `npm run test:js-fallback`, or the full `npm run check` (Windows: the matching `.ps1` wrappers).
+- UI, export, audio, rendering, workflow, QA, or preview-related changes must include browser testing. Minimum browser gate is `npm run test:browser`; use `npm run check` for full closure.
 - Documentation-only changes: run `git diff --check`; also run browser testing when the doc change affects workflow, QA, UI, audio, rendering, or preview expectations.
 - After browser QA, report the exact local URL or capture path and the served JS/CSS bundle badge if the task involved stale-preview risk.
 - If a check cannot run, say which check failed or was skipped and why.

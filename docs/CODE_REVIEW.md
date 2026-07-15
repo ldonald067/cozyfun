@@ -33,7 +33,7 @@ This checklist is the repo's "no slop" bar. Use it for `/review`, audit passes, 
 - Do save, import, export, postcard, and clip flows leave the user with clear success or failure feedback?
 - Does Desk Radio stay visible, user-provided, and editable when YouTube blocks embedding?
 - Does native ambience remain the default and fallback path?
-- If native sound changed, did `.\scripts\audio-qa.ps1` produce fresh `.tmp/audio-qa` references for listening review?
+- If native sound changed, did `npm run audio:qa` produce fresh `.tmp/audio-qa` references for listening review?
 
 ## Security And Privacy
 
@@ -56,9 +56,9 @@ This checklist is the repo's "no slop" bar. Use it for `/review`, audit passes, 
 Use the smallest honest gate for the change:
 
 - Docs only: `git diff --check`.
-- Sim behavior: `.\scripts\test-sim.ps1`, `.\scripts\test-wasm.ps1`, and `.\scripts\test-js-fallback.ps1`.
-- Native audio direction: `.\scripts\audio-qa.ps1`.
-- UI, browser, visual, audio, export, or cross-boundary work: `.\scripts\check.ps1`.
-- Stale-preview or visual concern: `.\scripts\preview-current.ps1 -Port 4181`, then browser or script-based visual QA against that URL.
+- Sim behavior: `npm run test:sim`, `npm run test:wasm`, and `npm run test:js-fallback`.
+- Native audio direction: `npm run audio:qa`.
+- UI, browser, visual, audio, export, or cross-boundary work: `npm run check`.
+- Stale-preview or visual concern: `.\scripts\preview-current.ps1 -Port 4181` on Windows (or rebuild and serve `app/dist` with `node scripts/preview-dist.mjs`), then browser or script-based visual QA against that URL.
 
 See `docs/HARNESS.md` when a missing check, stale preview, duplicated QA helper, or repeated cleanup issue should become part of the repo's feedback loop.

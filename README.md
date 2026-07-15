@@ -12,7 +12,16 @@ Requirements:
 - Rust stable
 - Rust target: `wasm32-unknown-unknown`
 
-After cloning:
+After cloning, on macOS/Linux:
+
+```sh
+rustup target add wasm32-unknown-unknown
+npm --prefix app ci
+npm run build
+npm run dev
+```
+
+On Windows, prefer the checked-in PowerShell wrappers (they work around known Windows path issues):
 
 ```powershell
 rustup target add wasm32-unknown-unknown
@@ -116,7 +125,6 @@ Some key reactions:
 - `app/src/sceneEnvironments.ts` contains non-destructive room/backdrop definitions.
 - `app/src/deskRadio.ts` validates user-provided YouTube Desk Radio sources and keeps native ambience as the default fallback when a link cannot embed.
 - `app/public/rooms` contains local room backdrop images used by those scene definitions.
-- `app/src/devSceneSeeds.ts` contains internal painted seeds for QA experiments.
 - `scripts/build.ps1` builds the Rust sim, copies the generated WASM into `app/public/sim`, then builds the Vite app.
 - `scripts/dev.ps1` builds the sim first, then starts Vite.
 - `scripts/preview-current.ps1` rebuilds and serves `app/dist` directly so local previews cannot show a stale dev bundle.
@@ -155,7 +163,20 @@ The generated WASM file is created during the build and is not committed.
 
 ## Checks
 
-Useful local commands:
+On macOS/Linux the root npm scripts run everything directly:
+
+```sh
+npm run check
+npm run test:sim
+npm run test:wasm
+npm run test:js-fallback
+npm run test:browser
+npm run material:audit
+npm run audio:qa
+npm run visual:qa
+```
+
+On Windows, the equivalent PowerShell wrappers:
 
 ```powershell
 .\scripts\build.ps1

@@ -2,6 +2,8 @@
 
 Every toolbar material is a product choice. Each material in `app/src/materials.ts` carries exactly two compact identity traits, and this doc keeps one to three concrete interaction roles for each material. `npm run material:audit` fails when material definitions or this matrix drift. A material stays only when it has a distinct behavior, interaction, visual identity, or player purpose. Generated-only outcomes can stay in the simulation without becoming toolbar materials.
 
+Planned direction (see the element depth plan in `ROADMAP.md`): the bar rises to 4 special interactions per toolbar material, Smoke and Steam are demoted to generated-only vapors, and Sand/Stardust/Wall/Wood gain new interactions to reach the bar. The audit script's role count moves from 1-3 to 4 once those interactions land.
+
 ## Decisions
 
 | Material | Decision | Reason |

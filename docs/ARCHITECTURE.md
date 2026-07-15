@@ -23,7 +23,7 @@ The simulation stores each cell in an 8-byte record:
 - visual variant
 - age
 - energy
-- reserved bytes for future state
+- state flags (wet, rooted, cosmic, frozen, scorched) shared by sim, fallback, and renderer
 
 Rendering is allowed to inspect these bytes, but it should not mutate them. Visual polish belongs in the renderer unless a real behavior change is needed.
 
@@ -78,8 +78,6 @@ Visible room controls change CSS atmosphere, local backdrop images, and the defa
 
 Room images are served from `app/public/rooms` and referenced through scene metadata, then softened by CSS lighting, weather, and darkening layers. This keeps the source of truth in one small data file and prevents image paths from spreading across the UI. Third-party sources belong in `ASSET_CREDITS.md` and should be updated in the same change as any asset replacement.
 
-`app/src/devSceneSeeds.ts` keeps painted starter worlds for internal QA and future experiments. They are not part of the main UI until the visuals are strong enough to justify replacing a user's canvas.
-
 ## Sharing Boundary
 
 `app/src/storage.ts` owns scene snapshots. `CXS2` files include validated share metadata for room, sound mood, native/external source marker, and an optional Desk Radio source. Imports still accept legacy `CXS1` files, but only `CXS2` can restore atmosphere and Desk Radio context. The metadata field is still named `musicProvider` so existing exported scenes stay compatible; app code maps its legacy `"generated"` value to the internal native audio provider.
@@ -100,12 +98,12 @@ Desk Radio is user-controlled. It plays only a pasted YouTube video or playlist 
 
 ## Testing
 
-Local checks:
+Local checks (macOS/Linux; Windows uses the matching `scripts\*.ps1` wrappers):
 
-```powershell
-.\scripts\build.ps1
-.\scripts\test-wasm.ps1
-.\scripts\test-browser.ps1
+```sh
+npm run build
+npm run test:wasm
+npm run test:browser
 ```
 
 CI runs the same full `npm run check` gate expected locally on every push and pull request to `main`.

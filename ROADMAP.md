@@ -2,31 +2,9 @@
 
 This roadmap keeps the project focused: make the toy feel good, keep the codebase stable, and add atmosphere without turning the project into a giant platform too early.
 
-## Done So Far
+## Status Snapshot
 
-- Playable browser sandbox with React/Vite UI and Rust/WASM simulation.
-- JavaScript fallback engine for local resilience while developing.
-- 18 V0 materials, including cozy/cosmic materials: Stardust, Meteor, and Moonwater.
-- Manual painting, brush size, pause/play, clear, local save/load, JSON export/import, and postcard export.
-- Soft reaction style: fire/water becomes glowing steam, lava cools near water, fire burns flammables over time, and watering life/soil produces visible growth.
-- Procedural Web Audio foundation with master and ambience channels.
-- Audio code split into reusable modules for mixer, preferences, ambience, buffers, cues, reactions, and controller lifecycle.
-- Sound moods added for Rain, Window, and Stardust variations.
-- Room-linked ambience profiles added for the six room backdrops without adding extra sound controls.
-- Non-destructive room backdrops added for Rain Desk, Moonlit Garden, Stardust Hearth, Cozy Fireplace, Forest Hut, and Snow Window.
-- Local credited room images added for those backdrops, with procedural lighting and weather still layered on top.
-- Painted scene seeds kept as internal QA/dev helpers instead of visible user-facing presets.
-- Desk Radio is available as an optional visible YouTube player while native ambience stays the default fallback.
-- Renderer contact cues added for steam, cooling lava, life growth, and cosmic shimmer moments.
-- Prototype synthetic one-shot effects removed after listening review because they felt too arcade-like for the cozy direction.
-- Phase 3 leftovers resolved: dormant synthetic effect hooks were removed, room photos received a visual pass, and control density is covered by visual QA.
-- Sharing export now includes scene files, postcards, short clips, copied notes, and safe room/sound metadata.
-- Browser, build, and WASM smoke checks wired into local scripts and GitHub CI.
-- Renderer cleanup: canvas orchestration is separate from reusable material color, glow, and shape-language helpers.
-- Phase 4 material visuals completed with stronger texture identity, contact cues, local lighting, and repeatable visual QA captures.
-- Phase 6 living ecology interactions completed with generated flowers, wet/rooted/cosmic/frozen/scorched state flags, substrate dampness, oil smothering, cosmic outcomes, and visible state polish.
-- Architecture and visual pipeline docs added under `docs/`.
-- MIT license added for simple sharing and remixing.
+Phases 0-7, 9, and 10 are complete; Phase 8 is in progress. The sandbox is a playable browser toy: React/Vite UI, Rust/WASM sim with a JS fallback, 19 toolbar materials plus generated flowers, six credited room backdrops with room-linked native ambience, optional YouTube Desk Radio, local save/share/postcard/clip export, and deterministic sim/browser/visual/audio QA wired into local scripts and CI. Details live in the phase sections below.
 
 ## Phase 0: Playable V0
 
@@ -110,7 +88,7 @@ Done:
 - Prototype material paint sounds and basic UI cues implemented, then removed after listening review.
 - Rain/window ambience polish with room hush and occasional window drip accents.
 - Reaction event hooks beyond paint cues: steam, lava cooling, growth, and cosmic sparkle.
-- Sound mood tuning moved toward concrete rain, creek, thunder, and fire ambience.
+- Sound mood tuning moved toward concrete recorded ambience instead of synthetic pads (the moods later settled as Rain, Purr, and Fire in Phase 8).
 - External source provider foundation:
   - Native ambience remains the live fallback.
   - Desk Radio uses a visible user-provided YouTube video or playlist player without requiring accounts, API keys, or a backend.
@@ -322,8 +300,8 @@ Guardrails:
 Started:
 
 - The generated lo-fi music experiment was removed after listening review because it stayed too boring for the toy.
-- Mood presets now focus on concrete ambience: Rain + Creek, Light Thunder, and Fireplace.
-- Native ambience now uses local credited OGG recordings for rain/thunder, creek water, and chimney/fire crackle, with generated room tone, fallback layers, and sparse drips.
+- Mood presets now focus on concrete ambience: Rain, Purr, and Fire.
+- Native ambience now uses local credited recordings (`rain.mp3`, `cat-purr.mp3`, `fire-crackle.wav`) with generated room tone, fallback layers, and sparse drips.
 - Painting now produces subtle native material cues through the ambience channel, throttled so drag-painting does not flood the audio graph.
 - Desk Radio now accepts regular YouTube URLs, `youtu.be` links, raw 11-character video IDs, playlists, embed/live/shorts links, `youtube-nocookie.com` links, and timestamped video links.
 - Timestamped video sources are preserved in local Desk Radio state and passed into the YouTube player.
@@ -383,3 +361,49 @@ Completed:
   - Fungus has stronger role colors for seed rot, wood digestion, moss takeover, soil decomposition, moonwater/stardust charge, oil contact, heat, freeze, and scorch.
 - Extended the deterministic material showcase so visual, Chrome, and Firefox QA can capture the Phase 10 identity states.
 - Updated `docs/MATERIAL_AUDIT.md` with the Phase 10 identity matrix and current keep/merge/remove decisions.
+
+## Phase 11: Element Depth + Visual Payoff
+
+Status: planned.
+
+Goal: every toolbar element earns its slot with at least 4 special interactions, each landing with a distinct visible moment. Elements that stay too similar get combined or removed instead of padded.
+
+A "special interaction" is a distinct, player-visible sim reaction with another material or state. Movement style alone does not count, and a shared flag treatment (generic wet/frozen/scorched tinting) counts once, not once per flag.
+
+Current interaction counts from `sim/src/lib.rs`:
+
+| Passes the bar (4+) | Count | Below the bar | Count |
+| --- | --- | --- | --- |
+| Water | 8 | Wood | 3 |
+| Seed | 6 | Wall | 3 |
+| Ice, Fire, Moonwater, Oil | 5 | Steam | 2 |
+| Meteor, Moss, Fungus, Soil, Stone, Lava | 4 | Sand | 2 |
+| | | Stardust | 2 |
+| | | Smoke | 1 |
+
+### Phase 11A: Combine/Remove Pass
+
+- Demote Smoke and Steam from the toolbar to generated-only vapors, like Flower. All sim rules stay (rise/fade, soot, condensation, frost); players keep creating them through fire and water play, they just stop being paint choices with near-identical movement and 1-2 interactions each. Toolbar goes 19 to 17.
+  - Fallback option if painting vapor turns out to be missed: one combined "Vapor" toolbar entry that paints steam.
+- Wall stays for now as the deliberate construction material, on the condition that Phase 11B gives it real weathering. If it still reads as "stone minus interactions" afterward, the existing removal trigger in `docs/MATERIAL_AUDIT.md` fires.
+
+### Phase 11B: New Interactions To Reach the Bar
+
+One material per atomic pass, each with Rust + JS fallback parity, tests, and a showcase update:
+
+- Sand: strong heat (lava, meteor, dense fire) vitrifies sand into Glass, a new generated-only material with translucent pane rendering and heat-shimmer edges. Sand then holds: wet clumping, drying, vitrify, frost. Glass stays out of the toolbar.
+- Stardust: fire contact becomes a starfire flare that transmutes the fire cell into a brief harmless sparkle burst (cosmic fire suppression); resting stardust etches constellation glitter veins onto stone and wall via the cosmic flag. Stardust then holds: charge water to moonwater, energize life/soil/fungus, starfire, etching.
+- Wall: freeze-thaw weathering. A frozen wall cell that later thaws near heat gains crack stages and can eventually crumble into stone, so sealed construction has a slow natural decay arc. Wall then holds: sealed blocking, soot staining, freeze-thaw crumble, moss resistance.
+- Wood: burned wood leaves glowing Ember cells that cool through char instead of vanishing, giving fire an afterglow state. Wood then holds: the wet, dry, char, ember arc; steam venting; moss host; fungus food.
+
+### Phase 11C: Visual Payoff Pass
+
+- No interaction ships without its visible moment: each 11B rule lands with a renderer cue (transformation flash, texture change, or contact accent) in the same pass as the sim rule.
+- State readability audit: capture every toolbar material in wet, frozen, scorched, and cosmic states in the deterministic showcase, and rework any state that reads as only a palette tint.
+
+### Phase 11D: Bar Enforcement
+
+- Raise `npm run material:audit` to require 4 documented interaction roles per toolbar material (generated-only materials exempt) once 11A-11B land.
+- Update `docs/MATERIAL_AUDIT.md` with the new matrix, the Smoke/Steam demotion, and the Glass/Ember generated-only entries.
+
+Order: 11A first (smallest diff, immediate toolbar clarity), then 11B one material at a time with 11C riding along, and 11D last so the audit never blocks mid-phase work.
