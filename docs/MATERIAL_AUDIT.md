@@ -14,8 +14,8 @@ Planned direction (see the element depth plan in `ROADMAP.md`): the bar rises to
 | Sand | Keep | Falling powder with wet clumping and drying behavior. |
 | Water | Keep | Ordinary flowing hydration/cooling liquid. Blocked by oil. |
 | Moonwater | Keep | Cosmic liquid. Stronger growth, cosmic flags, oil cleaning into stardust, and moonwater/meteor outcomes. |
-| Smoke | Specialize | Dry fire vapor. Rises, fades, and leaves soot/scorch flags on wall, stone, and wood. |
-| Steam | Specialize | Wet heat vapor. Rises, condenses on hard surfaces, and frosts near ice. |
+| Smoke | Generated only | Dry fire vapor. Rises, fades, and soots wall, stone, and wood. Produced by fire; no longer a paint choice because its movement duplicates steam and it has one interaction. |
+| Steam | Generated only | Wet heat vapor. Rises, condenses on hard surfaces, and frosts near ice. Produced by water/heat play; no longer a paint choice for the same overlap reason. |
 | Soil | Keep | Organic falling substrate that stores moisture and can green into moss. |
 | Wood | Keep | Soft flammable substrate for moss/fungus, with damp and char states. |
 | Fire | Keep | Short-lived heat source for drying, burning, steam, and smoke. |
@@ -56,10 +56,10 @@ Planned direction (see the element depth plan in `ROADMAP.md`): the bar rises to
 
 ## Current Cuts
 
-No toolbar material was removed in this pass. The audit found overlap, but the better fix was specialization and clearer interaction visuals:
+Smoke and Steam left the toolbar in the element depth pass: they share the same gas movement, each had only one or two interactions, and both appear naturally from fire and water play. They remain full simulation materials and generated outcomes, like Flower. Earlier passes preferred specialization:
 
 - Wall and stone are no longer equal hard blocks. Wall is sealed construction; stone is natural, weatherable substrate.
-- Smoke and steam are no longer just two gas colors. Smoke soots; steam condenses and frosts.
+- Smoke and steam stayed distinct as sim materials. Smoke soots; steam condenses and frosts.
 - Moss and seed remain separate. Moss is surface spread; seed is rooted bloom.
 - Water and moonwater remain separate. Water is practical hydration/cooling; moonwater is cosmic transformation.
 - Fungus remains separate from moss because it is decay pressure, not carpet growth, and now has explicit contact-colored role states.
@@ -76,5 +76,4 @@ Remove or merge a material when one of these becomes true:
 Likely future review targets:
 
 - Meteor: keep only if falling impact remains fun and readable.
-- Steam or Smoke: merge only if condensation/soot rules are removed.
-- Wall: downgrade to a build mode only if stone becomes the sole hard material.
+- Wall: downgrade to a build mode only if stone becomes the sole hard material after the freeze-thaw weathering work.

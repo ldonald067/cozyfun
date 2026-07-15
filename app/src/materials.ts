@@ -98,7 +98,8 @@ export const MATERIALS: MaterialDef[] = [
     identity: ["Dry rising vapor", "Soots hard surfaces"],
     color: "#d3d9e1",
     palette: ["#7d848c", "#969da6", "#b0b6be", "#c7ccd2"],
-    group: "heat"
+    group: "heat",
+    userSelectable: false
   },
   {
     id: MATERIAL.Soil,
@@ -223,7 +224,8 @@ export const MATERIALS: MaterialDef[] = [
     color: "#d9e9ef",
     palette: ["#aac6d1", "#cee2ea", "#eff8fb", "#9fb9c4"],
     glow: "#9dd8ff",
-    group: "heat"
+    group: "heat",
+    userSelectable: false
   },
   {
     id: MATERIAL.Stardust,

@@ -123,7 +123,7 @@ async function paintCurrentVisualScene(cdp) {
       const materials = {};
       for (const title of [
         "Sand", "Soil", "Seed", "Moss", "Fungus", "Oil", "Wood", "Ice",
-        "Water", "Moonwater", "Lava", "Fire", "Smoke", "Steam", "Stardust"
+        "Water", "Moonwater", "Lava", "Fire", "Stardust"
       ]) {
         const button = Array.from(document.querySelectorAll(".material-button")).find((candidate) => candidate.textContent.trim() === title);
         const rect = button?.getBoundingClientRect();
@@ -166,8 +166,9 @@ async function paintCurrentVisualScene(cdp) {
   await paint("Ice", 0.72, 0.32, 14, 0.005, 4);
   await paint("Wood", 0.82, 0.54, 14, 0.004, 2);
   await paint("Fire", 0.82, 0.39, 12, 0.005, 4);
-  await paint("Smoke", 0.86, 0.24, 16, 0.005, 4);
-  await paint("Steam", 0.63, 0.29, 14, 0.005, 4);
+  // Smoke and steam are generated-only vapors: fire produces smoke on its own,
+  // and pouring water onto the lava band flashes visible steam for the capture.
+  await paint("Water", 0.68, 0.44, 14, 0.005, 4);
   await sleep(900);
 }
 

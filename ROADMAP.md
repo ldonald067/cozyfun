@@ -364,7 +364,7 @@ Completed:
 
 ## Phase 11: Element Depth + Visual Payoff
 
-Status: planned.
+Status: 11A complete; 11B in progress.
 
 Goal: every toolbar element earns its slot with at least 4 special interactions, each landing with a distinct visible moment. Elements that stay too similar get combined or removed instead of padded.
 

@@ -87,17 +87,17 @@ Save/load is browser-local for quick return visits. Scene JSON is the portable f
 
 ## Materials
 
-Current V0 materials:
+Current toolbar materials:
 
 ```txt
-Eraser, Wall, Sand, Water, Smoke, Soil, Fire, Wood, Lava, Stone,
-Moss, Seed, Fungus, Oil, Ice, Steam, Stardust, Meteor, Moonwater
+Eraser, Wall, Sand, Water, Soil, Fire, Wood, Lava, Stone,
+Moss, Seed, Fungus, Oil, Ice, Stardust, Meteor, Moonwater
 ```
 
-Generated outcomes:
+Generated outcomes (created by play, not painted directly):
 
 ```txt
-Flower
+Flower, Smoke, Steam
 ```
 
 Some key reactions:
