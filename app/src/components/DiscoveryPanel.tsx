@@ -1,13 +1,14 @@
 import { ChevronDown, ChevronUp, Sparkle } from "lucide-react";
-import { DISCOVERIES, type DiscoveryId } from "../discoveries";
+import { DISCOVERIES, formatDiscoveredAt, type DiscoveryLog } from "../discoveries";
 
 type DiscoveryPanelProps = {
-  discovered: ReadonlySet<DiscoveryId>;
+  discovered: DiscoveryLog;
+  unseen: number;
   open: boolean;
   onToggle(): void;
 };
 
-export function DiscoveryPanel({ discovered, open, onToggle }: DiscoveryPanelProps) {
+export function DiscoveryPanel({ discovered, unseen, open, onToggle }: DiscoveryPanelProps) {
   return (
     <div className="discovery-panel" aria-label="Discoveries">
       <button
@@ -21,6 +22,11 @@ export function DiscoveryPanel({ discovered, open, onToggle }: DiscoveryPanelPro
         <span>
           <Sparkle size={16} /> Discoveries
         </span>
+        {unseen > 0 && (
+          <span className="discovery-new" data-testid="discovery-new">
+            +{unseen} new
+          </span>
+        )}
         <span className="discovery-count" data-testid="discovery-count">
           {discovered.size}/{DISCOVERIES.length}
         </span>
@@ -32,7 +38,10 @@ export function DiscoveryPanel({ discovered, open, onToggle }: DiscoveryPanelPro
             const seen = discovered.has(discovery.id);
             return (
               <li key={discovery.id} className={seen ? "discovery-item seen" : "discovery-item"}>
-                <span className="discovery-title">{seen ? discovery.title : "???"}</span>
+                <span className="discovery-head">
+                  <span className="discovery-title">{seen ? discovery.title : "???"}</span>
+                  {seen && <span className="discovery-when">{formatDiscoveredAt(discovered.get(discovery.id) ?? null)}</span>}
+                </span>
                 <small>{seen ? discovery.description : discovery.hint}</small>
               </li>
             );

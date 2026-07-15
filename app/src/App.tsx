@@ -24,9 +24,10 @@ import {
   detectDiscoveries,
   DISCOVERIES,
   DISCOVERY_BY_ID,
-  loadDiscoveredIds,
-  saveDiscoveredIds,
-  type DiscoveryId
+  loadDiscoveries,
+  saveDiscoveries,
+  type DiscoveryId,
+  type DiscoveryLog
 } from "./discoveries";
 import {
   loadDeskRadioSource,
@@ -72,11 +73,15 @@ export function App() {
   const soundSourceLabel = audioPrefs.provider === "external" && deskRadioSource ? deskRadioSource.label : activeAudioProvider.label;
   const [engine, setEngine] = useState<SandboxEngine | null>(null);
   const [selected, setSelected] = useState<MaterialId>(MATERIAL.Sand);
-  const [discovered, setDiscovered] = useState<ReadonlySet<DiscoveryId>>(() => loadDiscoveredIds());
+  const [discovered, setDiscovered] = useState<DiscoveryLog>(() => loadDiscoveries());
   const [discoveryOpen, setDiscoveryOpen] = useState(false);
   const [discoveryToast, setDiscoveryToast] = useState<string | null>(null);
+  const [discoveryToastQueue, setDiscoveryToastQueue] = useState<string[]>([]);
+  const [unseenDiscoveries, setUnseenDiscoveries] = useState(0);
   const discoveredRef = useRef(discovered);
   discoveredRef.current = discovered;
+  const discoveryOpenRef = useRef(discoveryOpen);
+  discoveryOpenRef.current = discoveryOpen;
   const toastTimerRef = useRef<number | null>(null);
   const [sceneEnvironment, setSceneEnvironment] = useState<SceneEnvironmentId>(() => loadSceneEnvironmentId());
   const activeSceneEnvironment = getSceneEnvironment(sceneEnvironment);
@@ -133,25 +138,41 @@ export function App() {
   }, [audio]);
 
   const recordDiscoveries = useCallback((found: DiscoveryId[]) => {
+    const stamp = Date.now();
     setDiscovered((current) => {
-      const next = new Set(current);
-      for (const id of found) next.add(id);
-      saveDiscoveredIds(next);
+      const next = new Map(current);
+      for (const id of found) next.set(id, stamp);
+      saveDiscoveries(next);
       return next;
     });
-    const first = DISCOVERY_BY_ID.get(found[0]);
-    if (first) {
-      setDiscoveryToast(`Discovery: ${first.title}`);
-      if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = window.setTimeout(() => setDiscoveryToast(null), 4600);
+    if (!discoveryOpenRef.current) {
+      setUnseenDiscoveries((count) => count + found.length);
     }
+    const titles = found
+      .map((id) => DISCOVERY_BY_ID.get(id)?.title)
+      .filter((title): title is string => Boolean(title));
+    setDiscoveryToastQueue((queue) => [...queue, ...titles]);
   }, []);
+
+  useEffect(() => {
+    if (discoveryToast !== null || discoveryToastQueue.length === 0) return;
+    setDiscoveryToast(`Discovery: ${discoveryToastQueue[0]}`);
+    setDiscoveryToastQueue((queue) => queue.slice(1));
+    toastTimerRef.current = window.setTimeout(() => setDiscoveryToast(null), 3400);
+  }, [discoveryToast, discoveryToastQueue]);
 
   useEffect(() => {
     return () => {
       if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
     };
   }, []);
+
+  function handleDiscoveryToggle() {
+    setDiscoveryOpen((open) => {
+      if (!open) setUnseenDiscoveries(0);
+      return !open;
+    });
+  }
 
   useEffect(() => {
     if (!engine) return;
@@ -172,7 +193,7 @@ export function App() {
             audio.playReactionCues(detectReactionCues(cellsBefore, cellsAfter));
           }
           if (wantDiscoveries) {
-            const found = detectDiscoveries(cellsBefore, cellsAfter, discoveredRef.current);
+            const found = detectDiscoveries(cellsBefore, cellsAfter, new Set(discoveredRef.current.keys()));
             if (found.length > 0) recordDiscoveries(found);
           }
         }
@@ -614,8 +635,9 @@ export function App() {
             />
             <DiscoveryPanel
               discovered={discovered}
+              unseen={unseenDiscoveries}
               open={discoveryOpen}
-              onToggle={() => setDiscoveryOpen((value) => !value)}
+              onToggle={handleDiscoveryToggle}
             />
           </div>
 

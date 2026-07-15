@@ -225,14 +225,18 @@ async function main() {
 
     await waitUntil(
       async () => {
-        const stored = await evaluate(cdp, `localStorage.getItem("cozy-pixel-sandbox:discoveries:v1") ?? "[]"`);
+        const stored = await evaluate(cdp, `localStorage.getItem("cozy-pixel-sandbox:discoveries:v1") ?? "{}"`);
         return stored.includes("first-bloom");
       },
       "first bloom discovery to persist",
       15_000
     );
+    const record = await evaluate(cdp, `JSON.parse(localStorage.getItem("cozy-pixel-sandbox:discoveries:v1"))`);
+    assert(typeof record["first-bloom"] === "number", "first bloom discovery should store a timestamp");
     const updated = await evaluate(cdp, `document.querySelector('[data-testid="discovery-count"]')?.textContent ?? ""`);
     assert(!updated.startsWith("0/"), `discovery count did not advance: ${updated}`);
+    const whenText = await evaluate(cdp, `Array.from(document.querySelectorAll(".discovery-when")).map((el) => el.textContent).join("|")`);
+    assert(whenText.includes("found today"), `journal should show when a discovery was found: ${whenText}`);
     await click(cdp, '[data-testid="discovery-toggle"]');
   });
 
@@ -555,7 +559,8 @@ async function canvasSignature(cdp) {
       if (!canvas || !context || canvas.width === 0 || canvas.height === 0) return 0;
       const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
       let signature = 0;
-      for (let i = 0; i < data.length; i += 97) {
+      // Sample every pixel: a small falling blob can slip entirely between sparser samples.
+      for (let i = 0; i < data.length; i += 4) {
         signature = (signature + data[i] + data[i + 1] * 3 + data[i + 2] * 7 + data[i + 3] * 11) % 1000000007;
       }
       return signature;

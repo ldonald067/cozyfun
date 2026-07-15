@@ -511,7 +511,15 @@ class JsSandboxEngine implements SandboxEngine {
   private sand(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
     const wet = Boolean(readU16(old, idx + 6) & CELL_FLAG.Wet) || readU16(old, idx + 4) > 35;
     if (wet && this.ticks % 2 !== 0) return;
-    this.powder(idx, x, y, cell, old, next);
+    if (wet) {
+      this.powder(idx, x, y, cell, old, next);
+    } else if (this.move(idx, x, y + 1, cell, old, next)) {
+      this.move(this.index(x, y + 1), x, y + 2, cell, old, next);
+    } else {
+      for (const [dx, dy] of this.ticks % 2 === 0 ? [[-1, 1], [1, 1]] : [[1, 1], [-1, 1]]) {
+        if (this.move(idx, x + dx, y + dy, cell, old, next)) break;
+      }
+    }
     const energy = readU16(next, idx + 4);
     if (wet && next[idx] === MATERIAL.Sand && energy > 0) writeU16(next, idx + 6, readU16(next, idx + 6) | CELL_FLAG.Wet);
     else if (next[idx] === MATERIAL.Sand && energy === 0) writeU16(next, idx + 6, readU16(next, idx + 6) & ~CELL_FLAG.Wet);

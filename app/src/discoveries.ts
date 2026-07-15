@@ -114,24 +114,48 @@ export const DISCOVERY_BY_ID = new Map(DISCOVERIES.map((discovery) => [discovery
 
 const STORAGE_KEY = "cozy-pixel-sandbox:discoveries:v1";
 
-export function loadDiscoveredIds(): Set<DiscoveryId> {
+export type DiscoveryLog = ReadonlyMap<DiscoveryId, number | null>;
+
+export function loadDiscoveries(): Map<DiscoveryId, number | null> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return new Set();
+    if (!raw) return new Map();
     const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return new Set();
-    return new Set(parsed.filter((id): id is DiscoveryId => DISCOVERY_BY_ID.has(id as DiscoveryId)));
+    const log = new Map<DiscoveryId, number | null>();
+    if (Array.isArray(parsed)) {
+      for (const id of parsed) {
+        if (DISCOVERY_BY_ID.has(id as DiscoveryId)) log.set(id as DiscoveryId, null);
+      }
+      return log;
+    }
+    if (parsed && typeof parsed === "object") {
+      for (const [id, stamp] of Object.entries(parsed)) {
+        if (!DISCOVERY_BY_ID.has(id as DiscoveryId)) continue;
+        log.set(id as DiscoveryId, typeof stamp === "number" && Number.isFinite(stamp) ? stamp : null);
+      }
+    }
+    return log;
   } catch {
-    return new Set();
+    return new Map();
   }
 }
 
-export function saveDiscoveredIds(ids: ReadonlySet<DiscoveryId>) {
+export function saveDiscoveries(log: DiscoveryLog) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([...ids]));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.fromEntries(log)));
   } catch {
     // Storage can be unavailable (private mode); discoveries then last for the session only.
   }
+}
+
+export function formatDiscoveredAt(timestamp: number | null): string {
+  if (timestamp === null) return "found earlier";
+  const date = new Date(timestamp);
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) {
+    return `found today ${date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+  }
+  return `found ${date.toLocaleDateString([], { month: "short", day: "numeric" })}`;
 }
 
 export function detectDiscoveries(

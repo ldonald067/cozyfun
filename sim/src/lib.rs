@@ -743,7 +743,21 @@ impl Universe {
 
     fn update_sand(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
         let wet = cell.flags & FLAG_WET != 0 || cell.energy > 35;
-        self.update_powder(idx, cell, old, next, if wet { 2 } else { 1 });
+        if wet {
+            self.update_powder(idx, cell, old, next, 2);
+        } else {
+            let (x, y) = self.xy(idx);
+            if self.try_move(idx, x, y + 1, cell, old, next, true) {
+                let dropped = self.idx(x as u32, (y + 1) as u32);
+                self.try_move(dropped, x, y + 2, cell, old, next, true);
+            } else {
+                for (dx, dy) in self.fall_dirs() {
+                    if dx != 0 && self.try_move(idx, x + dx, y + dy, cell, old, next, true) {
+                        break;
+                    }
+                }
+            }
+        }
         if wet && next[idx].kind == Material::Sand as u8 && next[idx].energy > 0 {
             next[idx].flags |= FLAG_WET;
         } else if next[idx].kind == Material::Sand as u8 && next[idx].energy == 0 {
@@ -1288,6 +1302,25 @@ mod tests {
         u.paint(8, 2, 1, Material::Sand as u8);
         u.tick();
         assert_eq!(kind_at(&u, 8, 3), Material::Sand as u8);
+    }
+
+    #[test]
+    fn dry_sand_falls_two_cells_when_clear() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 8, 2, Material::Sand);
+        u.tick();
+        assert_eq!(kind_at(&u, 8, 4), Material::Sand as u8);
+        assert_eq!(kind_at(&u, 8, 3), Material::Empty as u8);
+    }
+
+    #[test]
+    fn wet_sand_still_falls_slowly() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell_state(&mut u, 8, 2, Material::Sand, 4, 90, FLAG_WET);
+        u.tick();
+        u.tick();
+        assert!(kind_at(&u, 8, 3) == Material::Sand as u8 || kind_at(&u, 8, 4) == Material::Sand as u8);
+        assert_ne!(kind_at(&u, 8, 6), Material::Sand as u8);
     }
 
     #[test]
