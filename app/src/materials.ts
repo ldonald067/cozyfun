@@ -119,9 +119,9 @@ export const MATERIALS: MaterialDef[] = [
     slug: "fire",
     description: "Short-lived heat that dries, scorches, burns fuel, and makes smoke or steam.",
     identity: ["Short-lived heat", "Dries before ignition"],
-    color: "#ff7a2d",
-    palette: ["#ffd36a", "#ff9b3d", "#ff6d24", "#d9361f", "#fff0a3"],
-    glow: "#ff8b3d",
+    color: "#ffb03a",
+    palette: ["#fff3b0", "#ffd76a", "#ffb03a", "#ff8a2d", "#ffe995"],
+    glow: "#ffc063",
     group: "heat"
   },
   {
@@ -140,9 +140,9 @@ export const MATERIALS: MaterialDef[] = [
     slug: "lava",
     description: "Slow hot liquid that ignites fuel and cools into natural stone.",
     identity: ["Slow hot liquid", "Cools into scorched stone"],
-    color: "#ff4d1f",
-    palette: ["#ffcf58", "#ff812e", "#f0441f", "#9b1f1c", "#ffd98a"],
-    glow: "#ff5b25",
+    color: "#c9331a",
+    palette: ["#8f1f12", "#b32c15", "#d84418", "#6e1810", "#3a1210"],
+    glow: "#ff4a1c",
     group: "heat"
   },
   {
@@ -280,9 +280,9 @@ export const MATERIALS: MaterialDef[] = [
     slug: "moonwater",
     description: "Cosmic liquid that supercharges growth and cleans oil into stardust.",
     identity: ["Cosmic growth liquid", "Cleans oil into stardust"],
-    color: "#92d9ff",
-    palette: ["#5e8fe6", "#7fc8ff", "#a7e7ff", "#d6f7ff", "#bca8ff"],
-    glow: "#8bdcff",
+    color: "#aab4f2",
+    palette: ["#7284e0", "#96a8f2", "#c2c8ff", "#e9e5ff", "#c9aefc"],
+    glow: "#a9a4ff",
     group: "cosmic"
   }
 ];

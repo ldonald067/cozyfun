@@ -31,6 +31,13 @@ const EARTH_CONTACT_KINDS = [MATERIAL.Sand, MATERIAL.Soil, MATERIAL.Stone, MATER
 
 export function emptyCellColor(cells: Uint8Array, width: number, height: number, x: number, y: number, time: number): Rgb {
   const background: Rgb = [9, 14, 20];
+  if (kindAt(cells, width, height, x, y + 1) === MATERIAL.Meteor) {
+    const flicker = (Math.sin(time * 0.02 + x * 1.3) + 1) * 0.5;
+    return mixRgb(background, [255, 170, 80], 0.2 + flicker * 0.14);
+  }
+  if (kindAt(cells, width, height, x, y + 2) === MATERIAL.Meteor) {
+    return mixRgb(background, [255, 150, 70], 0.1);
+  }
   const directions = [
     [0, -1],
     [1, 0],
@@ -55,7 +62,9 @@ export function applyShapeLanguage(context: ShapeContext): Rgb {
   if (kind === MATERIAL.Wall) out = wallColor(context);
   else if (kind === MATERIAL.Sand) out = sandColor(context);
   else if (kind === MATERIAL.Soil) out = soilColor(context);
-  else if (kind === MATERIAL.Fire || kind === MATERIAL.Lava || kind === MATERIAL.Meteor) out = heatColor(context);
+  else if (kind === MATERIAL.Fire) out = fireColor(context);
+  else if (kind === MATERIAL.Lava) out = lavaColor(context);
+  else if (kind === MATERIAL.Meteor) out = meteorColor(context);
   else if (kind === MATERIAL.Smoke || kind === MATERIAL.Steam) out = vaporColor(context);
   else if (kind === MATERIAL.Seed) out = seedColor(context);
   else if (kind === MATERIAL.Flower) out = flowerColor(context);
@@ -226,46 +235,56 @@ function soilColor({ color, variant, energy, flags, cells, width, height, x, y }
   return out;
 }
 
-function heatColor({ kind, color, variant, age, energy, time, cells, width, height, x, y }: ShapeContext) {
+function fireColor({ color, variant, age, energy, time, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
-  const pulse = (Math.sin(time * 0.018 + age * 0.19 + hash * 0.0003) + 1) * 0.5;
-
-  if (kind === MATERIAL.Lava) {
-    const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Lava);
-    const cooling = hasNearbyKind(cells, width, height, x, y, COOL_LIQUID_KINDS);
-    const localX = (x + (hash & 1)) & 3;
-    const localY = (y + ((hash >> 2) & 1)) & 3;
-    const seam = localX === 0 || localY === 0 || ((x + y + hash) % 11 === 0 && localX !== 3);
-    const crust = !seam && (hash % 5 === 0 || edge.count >= 2 || cooling);
-    let out = mixRgb(color, [68, 22, 22], crust ? 0.66 : 0.28);
-    if (seam && !cooling) out = mixRgb(out, [255, 219, 96], 0.64 + pulse * 0.2);
-    if (seam && cooling) out = mixRgb(out, [255, 183, 101], 0.36 + pulse * 0.08);
-    if (cooling) out = mixRgb(out, [35, 42, 50], 0.34);
-    if (localX === 3 || localY === 3 || edge.bottom) out = mixRgb(out, [24, 17, 19], 0.4);
-    if (edge.top) out = mixRgb(out, [255, 160, 58], 0.32);
-    return out;
-  }
-
-  if (kind === MATERIAL.Meteor) {
-    const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Meteor);
-    const rocky = edge.bottom || edge.right || hash % 7 === 0;
-    let out = mixRgb(color, [255, 183, 80], 0.3 + pulse * 0.2);
-    if (edge.top || edge.left) out = mixRgb(out, [255, 238, 158], 0.4);
-    if (rocky) out = mixRgb(out, [45, 38, 43], 0.58);
-    if (hash % 11 === 0 && !rocky) out = mixRgb(out, [255, 229, 124], 0.36);
-    return out;
-  }
-
   const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Fire);
   const wetContact = contactInfo(cells, width, height, x, y, COOL_LIQUID_KINDS);
-  const wetEdge = wetContact.count > 0;
-  const flameTip = edge.top || (hash + y + Math.floor(time * 0.02)) % 13 === 0;
-  let out = mixRgb(color, [255, 75, 30], edge.bottom ? 0.36 : 0.12);
-  if (flameTip) out = mixRgb(out, [255, 232, 142], 0.52 + pulse * 0.18);
-  if (edge.left || edge.right) out = mixRgb(out, [210, 38, 25], 0.24);
-  if (wetEdge) out = mixRgb(out, [196, 231, 255], wetContact.top ? 0.34 : 0.26);
-  if (hash % 17 === 0) out = [255, 246, 189];
-  if (energy && energy > 180) out = mixRgb(out, [255, 240, 160], 0.18);
+  const flicker = Math.sin(time * 0.024 + hash * 1.1 + y * 0.8);
+  const tongue = (x + (hash & 3) + Math.floor(time * 0.02)) % 3;
+  let out = mixRgb(color, [255, 240, 168], 0.2 + Math.max(0, flicker) * 0.2);
+  if (age < 12 || energy > 200) out = mixRgb(out, [255, 250, 214], 0.45);
+  if (edge.top) out = tongue === 0 ? mixRgb(out, [9, 14, 20], 0.6) : mixRgb(out, [255, 238, 150], 0.5);
+  if ((edge.left || edge.right) && tongue === 2) out = mixRgb(out, [9, 14, 20], 0.3);
+  if (edge.bottom) out = mixRgb(out, [255, 118, 36], 0.4);
+  if (wetContact.count > 0) out = mixRgb(out, [196, 231, 255], wetContact.top ? 0.34 : 0.26);
+  if (hash % 17 === 0) out = [255, 248, 205];
+  return out;
+}
+
+function lavaColor({ color, variant, energy, time, cells, width, height, x, y }: ShapeContext) {
+  const hash = hashCell(x >> 1, y >> 1, variant);
+  const fine = hashCell(x, y, variant);
+  const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Lava);
+  const cooling = hasNearbyKind(cells, width, height, x, y, COOL_LIQUID_KINDS);
+  const pulse = (Math.sin(time * 0.004 + hash * 0.7) + 1) * 0.5;
+  const crusted = edge.top || cooling || (fine % 6 === 0 && edge.count > 0);
+  const seam = ((x + (hash & 3)) & 3) === 0 || ((x ^ y) + fine) % 9 === 0;
+  let out = mixRgb(color, [40, 13, 11], 0.4);
+  out = mixRgb(out, [255, 96, 26], (0.1 + pulse * 0.14) * (energy > 0 ? energy / 255 : 1));
+  if (crusted) {
+    out = mixRgb(out, [24, 16, 18], cooling ? 0.72 : 0.58);
+    if (seam && !cooling) out = mixRgb(out, [255, 158, 54], 0.7 + pulse * 0.15);
+    if (seam && cooling) out = mixRgb(out, [214, 120, 70], 0.4);
+  } else if (seam) {
+    out = mixRgb(out, [255, 190, 80], 0.42 + pulse * 0.2);
+  }
+  if (edge.bottom || edge.left || edge.right) out = mixRgb(out, [30, 12, 12], 0.35);
+  return out;
+}
+
+function meteorColor({ color, variant, time, cells, width, height, x, y }: ShapeContext) {
+  const hash = hashCell(x, y, variant);
+  const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Meteor);
+  const falling = kindAt(cells, width, height, x, y + 1) === MATERIAL.Empty;
+  let out = mixRgb(color, [255, 214, 120], 0.35);
+  if (falling) {
+    out = mixRgb(out, [255, 246, 200], 0.5);
+    if (edge.top) out = mixRgb(out, [255, 150, 60], 0.35);
+  } else {
+    if (edge.bottom || edge.right || hash % 7 === 0) out = mixRgb(out, [45, 38, 43], 0.58);
+    if (edge.top || edge.left) out = mixRgb(out, [255, 238, 158], 0.4);
+  }
+  if (hash % 11 === 0) out = mixRgb(out, [255, 229, 124], 0.36 + (Math.sin(time * 0.02 + x) + 1) * 0.1);
   return out;
 }
 

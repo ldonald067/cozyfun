@@ -93,6 +93,13 @@ export function materialShowcaseScript() {
     setCell(154, 66, material.Stone, 0, 80, flag.Scorched);
     rect(160, 174, 62, 71, material.Ice, 90, 24);
 
+    // Heat family lineup: airy fire, crusted lava, glowing ember, and a streaking meteor side by side.
+    line(26, 62, 32, material.Stone, 0, 40);
+    rect(27, 33, 27, 31, material.Fire, 230, 6);
+    rect(39, 49, 28, 31, material.Lava, 250, 20);
+    line(54, 61, 31, material.Ember, 220, 20);
+    setCell(67, 23, material.Meteor, 255, 4, 0, 2);
+
     // Ember arc: hot embers on a burning log end, cooled char, and a quenched wet char row.
     line(60, 66, 76, material.Ember, 220, 20);
     line(68, 74, 76, material.Ember, 0, 200);

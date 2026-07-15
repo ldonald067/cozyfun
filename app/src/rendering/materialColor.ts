@@ -23,7 +23,19 @@ export function colorForCell(options: {
   const hex = material.palette[variant % material.palette.length] ?? material.color;
   let [r, g, b] = hexToRgb(hex);
 
-  if (kind === MATERIAL.Fire || kind === MATERIAL.Lava || kind === MATERIAL.Meteor) {
+  if (kind === MATERIAL.Fire) {
+    const pulse = Math.sin(time * 0.022 + variant + age * 0.3) * 22;
+    r = clampColor(r + pulse + energy * 0.08);
+    g = clampColor(g + pulse * 0.6);
+  }
+
+  if (kind === MATERIAL.Lava) {
+    const pulse = Math.sin(time * 0.005 + variant + age * 0.05) * 10;
+    r = clampColor(r + pulse + energy * 0.06);
+    g = clampColor(g + pulse * 0.3);
+  }
+
+  if (kind === MATERIAL.Meteor) {
     const pulse = Math.sin(time * 0.012 + variant + age * 0.2) * 18;
     r = clampColor(r + pulse + energy * 0.08);
     g = clampColor(g + pulse * 0.5);
