@@ -514,6 +514,16 @@ impl Universe {
                             next[nidx].energy = next[nidx].energy.saturating_add(18).min(255);
                             next[nidx].flags |= FLAG_COSMIC;
                         }
+                        if other.kind == Material::Fire as u8 && self.chance(3) {
+                            next[nidx] = Cell::new(Material::Stardust as u8, other.variant, 140);
+                            next[nidx].flags = FLAG_COSMIC;
+                        }
+                        if (other.kind == Material::Stone as u8 || other.kind == Material::Wall as u8)
+                            && self.chance(16)
+                        {
+                            next[nidx].flags |= FLAG_COSMIC;
+                            next[nidx].energy = next[nidx].energy.max(36);
+                        }
                     }
                 }
                 x if x == Material::Water as u8 || x == Material::Moonwater as u8 => {
@@ -1570,6 +1580,41 @@ mod tests {
         set_cell(&mut u, 9, 9, Material::Stone);
         u.tick();
         assert_eq!(kind_at(&u, 7, 8), Material::Stardust as u8);
+    }
+
+    #[test]
+    fn stardust_snuffs_fire_into_sparkle() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 7, 8, Material::Stardust);
+        set_cell(&mut u, 8, 8, Material::Fire);
+        for (x, y) in [(6, 9), (7, 9), (8, 9), (9, 9), (6, 8), (9, 8)] {
+            set_cell(&mut u, x, y, Material::Stone);
+        }
+        let mut sparkled = false;
+        for _ in 0..12 {
+            u.tick();
+            let stardust = u.cells.iter().filter(|cell| cell.kind == Material::Stardust as u8).count();
+            if stardust >= 2 {
+                sparkled = true;
+                break;
+            }
+        }
+        assert!(sparkled, "stardust should transmute adjacent fire into a sparkle burst");
+    }
+
+    #[test]
+    fn stardust_etches_constellations_on_stone() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 7, 8, Material::Stardust);
+        set_cell(&mut u, 8, 8, Material::Stone);
+        for (x, y) in [(6, 9), (7, 9), (8, 9), (6, 8), (9, 8), (6, 7), (7, 7), (8, 7)] {
+            set_cell(&mut u, x, y, Material::Wall);
+        }
+        for _ in 0..64 {
+            u.tick();
+        }
+        assert_eq!(kind_at(&u, 8, 8), Material::Stone as u8);
+        assert!(flags_at(&u, 8, 8) & FLAG_COSMIC != 0, "resting stardust should etch stone cosmic");
     }
 
     #[test]

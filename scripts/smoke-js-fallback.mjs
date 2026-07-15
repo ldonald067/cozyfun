@@ -378,4 +378,25 @@ withEngine(7, (engine) => {
   assert(glassCells > 0, "lava should vitrify dry sand into glass");
 });
 
+withEngine(7, (engine) => {
+  const cells = new Uint8Array(16 * 16 * CELL_STRIDE);
+  setCell(cells, 16, 7, 8, MATERIAL.Stardust, { energy: 190 });
+  setCell(cells, 16, 8, 8, MATERIAL.Fire, { energy: 240 });
+  for (const [x, y] of [[6, 9], [7, 9], [8, 9], [9, 9], [6, 8], [9, 8]]) {
+    setCell(cells, 16, x, y, MATERIAL.Stone);
+  }
+  loadCells(engine, cells, "starfire cells should load");
+  let sparkled = false;
+  for (let tick = 0; tick < 12 && !sparkled; tick++) {
+    engine.tick();
+    const updated = engine.getCellBytes();
+    let stardust = 0;
+    for (let offset = 0; offset < updated.byteLength; offset += CELL_STRIDE) {
+      if (updated[offset] === MATERIAL.Stardust) stardust++;
+    }
+    sparkled = stardust >= 2;
+  }
+  assert(sparkled, "stardust should transmute adjacent fire into a sparkle burst");
+});
+
 console.log("JS fallback smoke checks passed");

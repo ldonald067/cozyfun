@@ -425,4 +425,20 @@ withUniverse(16, 16, 7, (universe) => {
   assert(countKind(updated, MATERIAL.Glass) > 0, "lava should vitrify dry sand into glass");
 });
 
+withUniverse(16, 16, 7, (universe) => {
+  const cells = new Uint8Array(16 * 16 * 8);
+  setCell(cells, 16, 7, 8, MATERIAL.Stardust, { energy: 190 });
+  setCell(cells, 16, 8, 8, MATERIAL.Stone);
+  for (const [x, y] of [[6, 9], [7, 9], [8, 9], [6, 8], [9, 8], [6, 7], [7, 7], [8, 7]]) setCell(cells, 16, x, y, MATERIAL.Wall);
+  const ptr = wasm.alloc(cells.byteLength);
+  new Uint8Array(wasm.memory.buffer, ptr, cells.byteLength).set(cells);
+  assert(wasm.universe_load_cells(universe, ptr, cells.byteLength) === 1, "constellation etch cells should load");
+  wasm.dealloc(ptr, cells.byteLength);
+  for (let tick = 0; tick < 64; tick++) wasm.universe_tick(universe);
+  const updated = readCells(universe);
+  const stoneFlags = readU16(updated, (8 * 16 + 8) * 8 + 6);
+  assert(kindAt(updated, 16, 8, 8) === MATERIAL.Stone, "etched stone should stay stone");
+  assert((stoneFlags & 4) !== 0, "resting stardust should etch stone with a cosmic mark");
+});
+
 console.log("WASM smoke checks passed");

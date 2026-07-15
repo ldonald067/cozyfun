@@ -93,6 +93,11 @@ export function materialShowcaseScript() {
     setCell(154, 66, material.Stone, 0, 80, flag.Scorched);
     rect(160, 174, 62, 71, material.Ice, 90, 24);
 
+    // Constellation etching: stardust resting on stone/wall leaves cosmic glitter veins.
+    rect(184, 196, 100, 106, material.Stone, 36, 90, flag.Cosmic);
+    rect(198, 206, 98, 106, material.Wall, 36, 90, flag.Cosmic);
+    for (const [x, y] of [[186, 98], [191, 97], [200, 96]]) setCell(x, y, material.Stardust, 190, 30, 0, x);
+
     // Vitrified glass: fresh warm pane beside the lava pool and a cooled pane over sand.
     rect(139, 151, 74, 75, material.Glass, 0, 12);
     rect(96, 110, 106, 108, material.Glass, 0, 220);

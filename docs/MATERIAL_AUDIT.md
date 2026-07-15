@@ -53,7 +53,7 @@ Planned direction (see the element depth plan in `ROADMAP.md`): the bar rises to
 | Glass | Marks where strong heat fused dry sand; stays as an inert translucent pane. | Tests: `lava_vitrifies_dry_sand_into_glass`, `meteor_impact_vitrifies_nearby_sand`, `wet_sand_takes_scorch_before_vitrifying`; visual QA: `material-identity-showcase`. |
 | Fungus | Rots wet seeds; overtakes old or wet moss; feeds on wood or soil. | Tests: `fungus_can_rot_wet_seed`; source: `update_fungus` handles moss/wood/soil contact; visual QA: contact-colored states. |
 | Oil | Floats over water; blocks hydration; burns readily. | Tests: `oil_rises_above_water`, `oil_blocks_plain_water_hydration`, `moonwater_cleans_oil_into_stardust`; source: `update_oil` owns burn readiness. |
-| Stardust | Drifts as cosmic powder; charges water into moonwater; marks life/soil/fungus cosmic. | Tests: `stardust_charges_water_into_moonwater`; source: `update_stardust` handles drift and cosmic marking; visual QA: sparkle/cosmic states. |
+| Stardust | Charges water into moonwater and energizes life/soil/fungus; snuffs fire into sparkle bursts; etches constellation marks onto stone and wall. | Tests: `stardust_charges_water_into_moonwater`, `stardust_snuffs_fire_into_sparkle`, `stardust_etches_constellations_on_stone`; visual QA: `material-identity-showcase`. |
 | Meteor | Falls as impact heat; becomes stone/fire on impact; bursts with moonwater to stardust. | Tests: `water_shocks_meteor_into_steam_and_stone`, `meteor_moonwater_contact_bursts_to_stardust`; source: `update_meteor` owns fall and impact heat. |
 
 ## Current Cuts

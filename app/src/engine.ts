@@ -371,6 +371,13 @@ class JsSandboxEngine implements SandboxEngine {
           writeU16(next, nidx + 4, Math.min(255, readU16(next, nidx + 4) + 18));
           writeU16(next, nidx + 6, readU16(next, nidx + 6) | CELL_FLAG.Cosmic);
         }
+        if (kind === MATERIAL.Stardust && other === MATERIAL.Fire && this.chance(3)) {
+          writeCellBytes(next, nidx, MATERIAL.Stardust, old[nidx + 1], 140, 0, CELL_FLAG.Cosmic);
+        }
+        if (kind === MATERIAL.Stardust && (other === MATERIAL.Stone || other === MATERIAL.Wall) && this.chance(16)) {
+          writeU16(next, nidx + 4, Math.max(36, readU16(next, nidx + 4)));
+          writeU16(next, nidx + 6, readU16(next, nidx + 6) | CELL_FLAG.Cosmic);
+        }
         if (kind === MATERIAL.Water || kind === MATERIAL.Moonwater) {
           const vigor = kind === MATERIAL.Moonwater ? 96 : 56;
           if (kind === MATERIAL.Moonwater && other === MATERIAL.Oil && this.chance(4)) {
