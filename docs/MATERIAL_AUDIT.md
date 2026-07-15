@@ -35,7 +35,7 @@ Planned direction (see the element depth plan in `ROADMAP.md`): the bar rises to
 | Material | Interaction roles | Coverage |
 | --- | --- | --- |
 | Eraser | Clears cells without adding state. | Browser smoke: `clear, save, and load update scene state`; not a simulation material. |
-| Wall | Blocks flow; resists casual moss; takes damp/soot/frost states. | Tests: `water_weathers_stone_more_than_sealed_wall`, `moss_needs_extra_energy_to_cross_wall`, `smoke_leaves_soot_instead_of_condensation`, `ice_frost_stresses_damp_hard_materials`. |
+| Wall | Blocks flow and resists casual moss; takes damp/soot/frost states; accumulated freeze-thaw stress cracks and crumbles it into stone. | Tests: `water_weathers_stone_more_than_sealed_wall`, `moss_needs_extra_energy_to_cross_wall`, `ice_frost_stresses_damp_hard_materials`, `accumulated_freeze_thaw_crumbles_wall_into_stone`, `first_thaw_keeps_wall_standing`. |
 | Stone | Blocks flow; weathers and condenses harder than wall; receives cooled lava or meteor. | Tests: `water_weathers_stone_more_than_sealed_wall`, `steam_condenses_on_hard_surfaces`, `moss_colonizes_damp_stone`, `water_quenches_lava_into_steam_and_stone`, `water_shocks_meteor_into_steam_and_stone`. |
 | Sand | Falls as powder; clumps when wet; dries loose again, and strong heat fuses dry grains into glass. | Tests: `sand_falls`, `water_wets_sand_into_clumps`, `wet_sand_drains_back_to_loose_sand`, `lava_vitrifies_dry_sand_into_glass`. |
 | Water | Flows and spreads; hydrates life/soil/sand; cools heat into steam or stone. | Tests: `water_spreads_when_blocked`, `wet_seed_on_soil_blooms`, `watered_soil_greens_up`, `water_fire_creates_steam_glow_instead_of_instant_delete`, `water_quenches_lava_into_steam_and_stone`. |

@@ -828,6 +828,10 @@ function heatSoftens(next: Uint8Array, idx: number, old: Uint8Array, heat: numbe
   const flags = readU16(old, idx + 6);
   if (!freezable(kind) && !scorchable(kind)) return false;
   if (flags & CELL_FLAG.Frozen) {
+    if (kind === MATERIAL.Wall && readU16(next, idx + 4) + heat > 200) {
+      writeCellBytes(next, idx, MATERIAL.Stone, old[idx + 1], 40);
+      return true;
+    }
     writeU16(next, idx + 4, Math.min(255, readU16(next, idx + 4) + heat));
     writeU16(next, idx + 6, thawedFlags(kind, readU16(next, idx + 6)));
     return true;

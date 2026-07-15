@@ -93,6 +93,11 @@ export function materialShowcaseScript() {
     setCell(154, 66, material.Stone, 0, 80, flag.Scorched);
     rect(160, 174, 62, 71, material.Ice, 90, 24);
 
+    // Freeze-thaw weathering: frost-stressed wall with visible stress cracks beside ice and fire.
+    rect(24, 32, 62, 71, material.Wall, 170, 80, flag.Frozen);
+    for (const [x, y] of [[22, 63], [22, 66], [22, 69]]) setCell(x, y, material.Ice, 90, 28);
+    for (const [x, y] of [[34, 68], [34, 69]]) setCell(x, y, material.Fire, 230, 10);
+
     // Constellation etching: stardust resting on stone/wall leaves cosmic glitter veins.
     rect(184, 196, 100, 106, material.Stone, 36, 90, flag.Cosmic);
     rect(198, 206, 98, 106, material.Wall, 36, 90, flag.Cosmic);

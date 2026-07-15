@@ -399,4 +399,14 @@ withEngine(7, (engine) => {
   assert(sparkled, "stardust should transmute adjacent fire into a sparkle burst");
 });
 
+withEngine(7, (engine) => {
+  const cells = new Uint8Array(16 * 16 * CELL_STRIDE);
+  setCell(cells, 16, 7, 8, MATERIAL.Fire, { energy: 240 });
+  setCell(cells, 16, 8, 8, MATERIAL.Wall, { age: 30, energy: 190, flags: CELL_FLAG.Frozen });
+  loadCells(engine, cells, "freeze-thaw wall cells should load");
+  engine.tick();
+  const updated = engine.getCellBytes();
+  assert(kindAt(updated, 16, 8, 8) === MATERIAL.Stone, "accumulated freeze-thaw stress should crumble wall into stone");
+});
+
 console.log("JS fallback smoke checks passed");

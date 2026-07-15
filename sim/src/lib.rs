@@ -1169,6 +1169,10 @@ fn heat_softens_cell(next: &mut [Cell], idx: usize, other: Cell, heat: u16) -> b
         return false;
     }
     if other.flags & FLAG_FROZEN != 0 {
+        if other.kind == Material::Wall as u8 && next[idx].energy as u32 + heat as u32 > 200 {
+            next[idx] = Cell::new(Material::Stone as u8, other.variant, 40);
+            return true;
+        }
         next[idx].flags = thawed_flags(other.kind, next[idx].flags);
         next[idx].energy = next[idx].energy.saturating_add(heat).min(255);
         return true;
@@ -1580,6 +1584,26 @@ mod tests {
         set_cell(&mut u, 9, 9, Material::Stone);
         u.tick();
         assert_eq!(kind_at(&u, 7, 8), Material::Stardust as u8);
+    }
+
+    #[test]
+    fn accumulated_freeze_thaw_crumbles_wall_into_stone() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 7, 8, Material::Fire);
+        set_cell_state(&mut u, 8, 8, Material::Wall, 30, 190, FLAG_FROZEN);
+        u.tick();
+        assert_eq!(kind_at(&u, 8, 8), Material::Stone as u8);
+    }
+
+    #[test]
+    fn first_thaw_keeps_wall_standing() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 7, 8, Material::Fire);
+        set_cell_state(&mut u, 8, 8, Material::Wall, 30, 88, FLAG_FROZEN);
+        u.tick();
+        assert_eq!(kind_at(&u, 8, 8), Material::Wall as u8);
+        assert_eq!(flags_at(&u, 8, 8) & FLAG_FROZEN, 0);
+        assert!(flags_at(&u, 8, 8) & FLAG_WET != 0, "thawed wall should keep melt dampness");
     }
 
     #[test]

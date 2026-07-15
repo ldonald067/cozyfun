@@ -130,6 +130,10 @@ function wallColor({ color, variant, energy, flags, cells, width, height, x, y }
     if (brickY === 0 || (brickX === 1 && hash % 2 === 0)) out = mixRgb(out, [235, 252, 255], 0.3);
     if (brickY === 3 && hash % 4 === 0) out = mixRgb(out, [122, 190, 211], 0.18);
   }
+  if (energy > 130) {
+    if ((hash + brickX * 5 + brickY * 3) % 6 === 0) out = mixRgb(out, [15, 18, 24], 0.5);
+    if ((brickX === 2 || brickY === 2) && hash % 7 === 0) out = mixRgb(out, [11, 13, 18], 0.42);
+  }
   if (cosmic) {
     out = mixRgb(out, [119, 139, 211], 0.24);
     if (hash % 17 === 0) out = mixRgb(out, [199, 188, 255], 0.44);

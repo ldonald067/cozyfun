@@ -441,4 +441,17 @@ withUniverse(16, 16, 7, (universe) => {
   assert((stoneFlags & 4) !== 0, "resting stardust should etch stone with a cosmic mark");
 });
 
+withUniverse(16, 16, 7, (universe) => {
+  const cells = new Uint8Array(16 * 16 * 8);
+  setCell(cells, 16, 7, 8, MATERIAL.Fire, { energy: 240 });
+  setCell(cells, 16, 8, 8, MATERIAL.Wall, { age: 30, energy: 190, flags: CELL_FLAG.Frozen });
+  const ptr = wasm.alloc(cells.byteLength);
+  new Uint8Array(wasm.memory.buffer, ptr, cells.byteLength).set(cells);
+  assert(wasm.universe_load_cells(universe, ptr, cells.byteLength) === 1, "freeze-thaw wall cells should load");
+  wasm.dealloc(ptr, cells.byteLength);
+  wasm.universe_tick(universe);
+  const updated = readCells(universe);
+  assert(kindAt(updated, 16, 8, 8) === MATERIAL.Stone, "accumulated freeze-thaw stress should crumble wall into stone");
+});
+
 console.log("WASM smoke checks passed");
