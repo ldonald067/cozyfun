@@ -374,3 +374,42 @@ Completed:
 - 11D: `npm run material:audit` now requires 4-6 documented interaction roles per toolbar material (generated-only outcomes and the Eraser stay at 1-3), and the audit matrix documents the new bar for all 17 toolbar materials.
 
 The bar this phase established: a "special interaction" is a distinct, player-visible sim reaction with another material or state. Movement style alone does not count, and a shared flag treatment counts once, not once per flag. Elements that fall below 4 interactions get combined, demoted to generated-only, or removed instead of padded; `docs/MATERIAL_AUDIT.md` is the enforcement point.
+
+## Phase 12: Heat Identity + Discovery Moments
+
+Status: planned.
+
+Goal: make every element recognizable at a glance, starting with the heat family, then turn the interaction web itself into visible, celebrated gameplay.
+
+### Phase 12A: Heat Family Visual Split
+
+Fire, lava, and meteor currently share one `heatColor` renderer path and neighboring orange palettes, so the two most-painted heat materials read as the same thing.
+
+- Fire reads as burning air: flame-tongue silhouettes on top edges, a white-yellow core while young, stronger flicker, and more transparency toward the backdrop. Light, vertical, bodiless.
+- Lava reads as molten rock: exposed surface cells grow a dark basalt crust with bright cracking seams, the interior stays deep red-black with a slow pulse, and flowing edges get a heavy meniscus. Dark, horizontal, weighty.
+- Meteor reads as a streak: bright head plus a short shimmering trail while falling, so impacts feel aimed rather than dropped.
+- Ember stays the family's settled state: charcoal body with a breathing glow (already distinct).
+- Similar-element watchlist handled in the same pass: Ice vs Glass (frosted facets vs smooth specular pane), Water vs Moonwater (push moonwater silver-lavender), Seed vs Moss greens.
+- The deterministic showcase gains a heat-family lineup so fire, lava, ember, and meteor are captured side by side in visual QA.
+
+### Phase 12B: Transformation Moments
+
+Interactions should pop at the instant they happen instead of quietly swapping pixels.
+
+- One-shot renderer flashes (3-6 ticks, keyed off young cell age after a kind transition) for vitrify, starfire, quench, wall crumble, bloom, and moonwater oil-cleaning.
+- Matching sparse native audio cues through the existing post-tick reaction detector: glass ting, quench hiss, starfire chime, crumble grumble, bloom note. Audio stays optional, throttled, and recorded/generated-cue based per the Phase 8 guardrails.
+
+### Phase 12C: Discovery Journal
+
+The sandbox now has dozens of distinct interactions, but nothing tells the player the web exists. Make discovering it the game.
+
+- A local discoveries list (localStorage, no accounts, no backend): first time a session triggers vitrify, starfire, char relight, freeze-thaw crumble, flower bloom, moss-on-stone, fungus takeover, moonwater cleaning, meteor stardust burst, or steam frost, it lights up.
+- A quiet toast plus journal entry on first trigger; postcards can carry a discovery-count stamp.
+- Reuses the same post-tick transition detector as audio reactions, so simulation rules stay untouched.
+
+### Phase 12D: Room Weather Play
+
+- An optional, off-by-default "open window" toggle lets the backdrop weather lean into the tray: light rain drizzle in Rain Desk, snow specks in Snow Window, rare meteor streaks in Stardust Hearth.
+- Strictly opt-in so room backdrops stay non-destructive; painting remains the core verb.
+
+Order: 12A first (it answers the live-session feedback directly), 12B alongside it since flashes reuse the same transition detection, 12C as the headline gameplay feature, and 12D last as the atmosphere bonus.
