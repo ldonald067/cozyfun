@@ -188,6 +188,54 @@ async function main() {
     assert(before !== after, "canvas signature did not change after painting");
   });
 
+  await check("discovery journal records first-time interactions", async () => {
+    const count = await evaluate(cdp, `document.querySelector('[data-testid="discovery-count"]')?.textContent ?? ""`);
+    assert(/^\d+\/14$/.test(count), `unexpected discovery count format: ${count}`);
+    await click(cdp, '[data-testid="discovery-toggle"]');
+    await sleep(160);
+    const entries = await evaluate(cdp, `document.querySelectorAll('[data-testid="discovery-list"] li').length`);
+    assert(entries === 14, `expected 14 journal entries, found ${entries}`);
+
+    await evaluate(
+      cdp,
+      `(async () => {
+        const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+        const tray = document.querySelector('[data-testid="sandbox-tray"]');
+        const rect = tray.getBoundingClientRect();
+        const point = (x, y) => ({ clientX: rect.left + rect.width * x, clientY: rect.top + rect.height * y });
+        const buttons = Array.from(document.querySelectorAll(".material-button"));
+        const paint = async (title, points) => {
+          buttons.find((button) => button.textContent.trim() === title)?.click();
+          await wait(40);
+          const pointer = { bubbles: true, button: 0, buttons: 1, pointerId: 1, pointerType: "mouse", isPrimary: true };
+          tray.dispatchEvent(new PointerEvent("pointerdown", { ...point(points[0][0], points[0][1]), ...pointer }));
+          for (const [x, y] of points) {
+            tray.dispatchEvent(new PointerEvent("pointermove", { ...point(x, y), ...pointer }));
+            await wait(16);
+          }
+          tray.dispatchEvent(new PointerEvent("pointerup", { ...point(points.at(-1)[0], points.at(-1)[1]), ...pointer, buttons: 0 }));
+          await wait(60);
+        };
+        await paint("Soil", [[0.28, 0.62], [0.32, 0.62], [0.36, 0.62], [0.4, 0.62]]);
+        await paint("Seed", [[0.32, 0.56], [0.35, 0.56]]);
+        await paint("Water", [[0.3, 0.5], [0.34, 0.5], [0.38, 0.5], [0.34, 0.48]]);
+        return true;
+      })()`
+    );
+
+    await waitUntil(
+      async () => {
+        const stored = await evaluate(cdp, `localStorage.getItem("cozy-pixel-sandbox:discoveries:v1") ?? "[]"`);
+        return stored.includes("first-bloom");
+      },
+      "first bloom discovery to persist",
+      15_000
+    );
+    const updated = await evaluate(cdp, `document.querySelector('[data-testid="discovery-count"]')?.textContent ?? ""`);
+    assert(!updated.startsWith("0/"), `discovery count did not advance: ${updated}`);
+    await click(cdp, '[data-testid="discovery-toggle"]');
+  });
+
   await check("native ambience recordings are served and decodable", async () => {
     const assets = await evaluate(
       cdp,

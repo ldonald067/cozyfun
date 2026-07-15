@@ -17,8 +17,17 @@ import { detectReactionCues } from "./audio/reactions";
 import { SegmentedControl, type SegmentOption } from "./components/SegmentedControl";
 import { AudioPanel } from "./components/AudioPanel";
 import type { DeskRadioPlaybackState } from "./components/DeskRadioPanel";
+import { DiscoveryPanel } from "./components/DiscoveryPanel";
 import { MaterialPanel } from "./components/MaterialPanel";
 import { SharePanel } from "./components/SharePanel";
+import {
+  detectDiscoveries,
+  DISCOVERIES,
+  DISCOVERY_BY_ID,
+  loadDiscoveredIds,
+  saveDiscoveredIds,
+  type DiscoveryId
+} from "./discoveries";
 import {
   loadDeskRadioSource,
   parseDeskRadioUrl,
@@ -63,6 +72,12 @@ export function App() {
   const soundSourceLabel = audioPrefs.provider === "external" && deskRadioSource ? deskRadioSource.label : activeAudioProvider.label;
   const [engine, setEngine] = useState<SandboxEngine | null>(null);
   const [selected, setSelected] = useState<MaterialId>(MATERIAL.Sand);
+  const [discovered, setDiscovered] = useState<ReadonlySet<DiscoveryId>>(() => loadDiscoveredIds());
+  const [discoveryOpen, setDiscoveryOpen] = useState(false);
+  const [discoveryToast, setDiscoveryToast] = useState<string | null>(null);
+  const discoveredRef = useRef(discovered);
+  discoveredRef.current = discovered;
+  const toastTimerRef = useRef<number | null>(null);
   const [sceneEnvironment, setSceneEnvironment] = useState<SceneEnvironmentId>(() => loadSceneEnvironmentId());
   const activeSceneEnvironment = getSceneEnvironment(sceneEnvironment);
   const [brushSize, setBrushSize] = useState(4);
@@ -117,6 +132,27 @@ export function App() {
     return () => audio.dispose();
   }, [audio]);
 
+  const recordDiscoveries = useCallback((found: DiscoveryId[]) => {
+    setDiscovered((current) => {
+      const next = new Set(current);
+      for (const id of found) next.add(id);
+      saveDiscoveredIds(next);
+      return next;
+    });
+    const first = DISCOVERY_BY_ID.get(found[0]);
+    if (first) {
+      setDiscoveryToast(`Discovery: ${first.title}`);
+      if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = window.setTimeout(() => setDiscoveryToast(null), 4600);
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
   useEffect(() => {
     if (!engine) return;
     let frame = 0;
@@ -126,10 +162,19 @@ export function App() {
 
     const loop = (time: number) => {
       if (!paused && time - lastSimTick >= SIM_TICK_MS) {
-        const reactionCellsBefore = audio.canPlayReactionCues() ? engine.getCellBytes() : null;
+        const wantCues = audio.canPlayReactionCues();
+        const wantDiscoveries = discoveredRef.current.size < DISCOVERIES.length;
+        const cellsBefore = wantCues || wantDiscoveries ? engine.getCellBytes() : null;
         engine.tick();
-        if (reactionCellsBefore) {
-          audio.playReactionCues(detectReactionCues(reactionCellsBefore, engine.getCellBytes()));
+        if (cellsBefore) {
+          const cellsAfter = engine.getCellBytes();
+          if (wantCues) {
+            audio.playReactionCues(detectReactionCues(cellsBefore, cellsAfter));
+          }
+          if (wantDiscoveries) {
+            const found = detectDiscoveries(cellsBefore, cellsAfter, discoveredRef.current);
+            if (found.length > 0) recordDiscoveries(found);
+          }
         }
         lastSimTick = time;
       }
@@ -149,7 +194,7 @@ export function App() {
 
     frame = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frame);
-  }, [engine, paused]);
+  }, [audio, engine, paused, recordDiscoveries]);
 
   const groupedMaterials = useMemo<Record<string, MaterialDef[]>>(
     () => ({
@@ -316,7 +361,8 @@ export function App() {
     await exportPostcard(engine, baseCanvasRef.current, glowCanvasRef.current, {
       sceneTitle: activeSceneEnvironment.title,
       moodTitle: activeMood.title,
-      soundSource: soundSourceLabel
+      soundSource: soundSourceLabel,
+      discoveries: discovered.size > 0 ? `${discovered.size}/${DISCOVERIES.length} discoveries` : undefined
     });
     setStatus("postcard PNG exported");
   }
@@ -485,6 +531,11 @@ export function App() {
             <canvas ref={glowCanvasRef} className="sandbox-canvas glow-canvas" />
             <canvas ref={baseCanvasRef} className="sandbox-canvas base-canvas" />
             <div className="glass-sheen" aria-hidden="true" />
+            {discoveryToast && (
+              <div className="discovery-toast" data-testid="discovery-toast" role="status">
+                ✦ {discoveryToast}
+              </div>
+            )}
           </div>
           <div className="status-bar">
             <span data-testid="status-message">{status}</span>
@@ -560,6 +611,11 @@ export function App() {
               onExportPostcard={handlePostcard}
               onExportScene={handleExport}
               onImportScene={() => fileInputRef.current?.click()}
+            />
+            <DiscoveryPanel
+              discovered={discovered}
+              open={discoveryOpen}
+              onToggle={() => setDiscoveryOpen((value) => !value)}
             />
           </div>
 
