@@ -60,7 +60,8 @@ const MATERIAL = {
   Stardust: 16,
   Meteor: 17,
   Moonwater: 18,
-  Flower: 19
+  Flower: 19,
+  Glass: 20
 };
 
 const CELL_FLAG = {
@@ -358,6 +359,23 @@ withEngine(13, (engine) => {
   engine.tick();
   const updated = engine.getCellBytes();
   assert(kindAt(updated, 16, 8, 8) === MATERIAL.Moonwater, "stardust should charge water into moonwater");
+});
+
+withEngine(7, (engine) => {
+  const cells = new Uint8Array(16 * 16 * CELL_STRIDE);
+  setCell(cells, 16, 7, 8, MATERIAL.Lava, { energy: 255 });
+  setCell(cells, 16, 8, 8, MATERIAL.Sand);
+  for (const [x, y] of [[7, 9], [8, 9], [9, 9], [9, 8], [6, 8], [5, 8], [6, 9]]) {
+    setCell(cells, 16, x, y, MATERIAL.Stone);
+  }
+  loadCells(engine, cells, "vitrification cells should load");
+  for (let tick = 0; tick < 48; tick++) engine.tick();
+  const updated = engine.getCellBytes();
+  let glassCells = 0;
+  for (let offset = 0; offset < updated.byteLength; offset += CELL_STRIDE) {
+    if (updated[offset] === MATERIAL.Glass) glassCells++;
+  }
+  assert(glassCells > 0, "lava should vitrify dry sand into glass");
 });
 
 console.log("JS fallback smoke checks passed");

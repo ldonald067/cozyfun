@@ -24,6 +24,7 @@ pub enum Material {
     Meteor = 17,
     Moonwater = 18,
     Flower = 19,
+    Glass = 20,
 }
 
 const FLAG_WET: u16 = 1 << 0;
@@ -135,7 +136,7 @@ impl Universe {
                     continue;
                 }
                 let idx = self.idx(px as u32, py as u32);
-                let kind = material.min(Material::Flower as u8);
+                let kind = material.min(Material::Glass as u8);
                 self.cells[idx] = if kind == Material::Empty as u8 {
                     Cell::empty()
                 } else {
@@ -151,7 +152,7 @@ impl Universe {
             return false;
         }
         for (idx, chunk) in data.chunks_exact(size_of::<Cell>()).enumerate() {
-            let kind = chunk[0].min(Material::Flower as u8);
+            let kind = chunk[0].min(Material::Glass as u8);
             self.cells[idx] = if kind == Material::Empty as u8 {
                 Cell::empty()
             } else {
@@ -446,6 +447,10 @@ impl Universe {
                             }
                             continue;
                         }
+                        if other.kind == Material::Sand as u8 && cell.energy > 190 && self.chance(9) {
+                            next[nidx] = Cell::new(Material::Glass as u8, other.variant, 0);
+                            continue;
+                        }
                         if is_flammable(other.kind) && self.chance(burn_chance(other.kind)) {
                             next[nidx] = Cell::new(Material::Fire as u8, other.variant, 220);
                         }
@@ -471,6 +476,10 @@ impl Universe {
                             if other.flags & FLAG_WET != 0 {
                                 self.emit_vapor_from(nidx, old, next, Material::Steam as u8, other.variant, 180);
                             }
+                            continue;
+                        }
+                        if other.kind == Material::Sand as u8 && self.chance(6) {
+                            next[nidx] = Cell::new(Material::Glass as u8, other.variant, 0);
                             continue;
                         }
                         if is_flammable(other.kind) && self.chance(3) {
@@ -995,6 +1004,8 @@ impl Universe {
                 next[nidx] = Cell::new(Material::Fire as u8, cell.variant, 190);
             } else if heat_softens_cell(next, nidx, old[nidx], 72) {
                 continue;
+            } else if old[nidx].kind == Material::Sand as u8 && self.chance(2) {
+                next[nidx] = Cell::new(Material::Glass as u8, old[nidx].variant, 0);
             } else if is_flammable(old[nidx].kind) {
                 next[nidx] = Cell::new(Material::Fire as u8, old[nidx].variant, 230);
             }
@@ -1559,6 +1570,46 @@ mod tests {
         set_cell(&mut u, 9, 9, Material::Stone);
         u.tick();
         assert_eq!(kind_at(&u, 7, 8), Material::Stardust as u8);
+    }
+
+    #[test]
+    fn lava_vitrifies_dry_sand_into_glass() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 7, 8, Material::Lava);
+        set_cell(&mut u, 8, 8, Material::Sand);
+        for (x, y) in [(7, 9), (8, 9), (9, 9), (9, 8), (6, 8), (5, 8), (6, 9)] {
+            set_cell(&mut u, x, y, Material::Stone);
+        }
+        for _ in 0..24 {
+            u.tick();
+        }
+        assert!(u.cells.iter().any(|cell| cell.kind == Material::Glass as u8));
+    }
+
+    #[test]
+    fn meteor_impact_vitrifies_nearby_sand() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 8, 8, Material::Meteor);
+        set_cell(&mut u, 8, 9, Material::Stone);
+        set_cell(&mut u, 7, 8, Material::Sand);
+        set_cell(&mut u, 7, 9, Material::Stone);
+        set_cell(&mut u, 9, 8, Material::Sand);
+        set_cell(&mut u, 9, 9, Material::Stone);
+        for _ in 0..4 {
+            u.tick();
+        }
+        assert!(u.cells.iter().any(|cell| cell.kind == Material::Glass as u8));
+    }
+
+    #[test]
+    fn wet_sand_takes_scorch_before_vitrifying() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 7, 8, Material::Fire);
+        set_cell_state(&mut u, 8, 8, Material::Sand, 12, 90, FLAG_WET);
+        set_cell(&mut u, 8, 9, Material::Stone);
+        u.tick();
+        assert_eq!(kind_at(&u, 8, 8), Material::Sand as u8);
+        assert!(flags_at(&u, 8, 8) & FLAG_SCORCHED != 0);
     }
 
     #[test]

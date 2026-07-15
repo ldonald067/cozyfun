@@ -146,7 +146,7 @@ class JsSandboxEngine implements SandboxEngine {
         const px = x + dx;
         const py = y + dy;
         if (!this.inBounds(px, py)) continue;
-        const kind = Math.min(material, MATERIAL.Flower);
+        const kind = Math.min(material, MATERIAL.Glass);
         this.writeCell(this.index(px, py), kind, this.variant(px, py, kind), startEnergy(kind), 0);
       }
     }
@@ -200,7 +200,7 @@ class JsSandboxEngine implements SandboxEngine {
     if (bytes.byteLength !== this.cells.byteLength) return false;
     const sanitized = bytes.slice();
     for (let idx = 0; idx < sanitized.byteLength; idx += CELL_STRIDE) {
-      const kind = Math.min(sanitized[idx], MATERIAL.Flower);
+      const kind = Math.min(sanitized[idx], MATERIAL.Glass);
       if (kind === MATERIAL.Empty) {
         sanitized.fill(0, idx, idx + CELL_STRIDE);
         continue;
@@ -304,6 +304,10 @@ class JsSandboxEngine implements SandboxEngine {
             }
             continue;
           }
+          if (other === MATERIAL.Sand && readU16(old, idx + 4) > 190 && this.chance(9)) {
+            writeCellBytes(next, nidx, MATERIAL.Glass, old[nidx + 1]);
+            continue;
+          }
           if (flammable(other) && this.chance(burnChance(other))) {
             writeCellBytes(next, nidx, MATERIAL.Fire, old[nidx + 1], 220);
           }
@@ -319,6 +323,10 @@ class JsSandboxEngine implements SandboxEngine {
             if (readU16(old, nidx + 6) & CELL_FLAG.Wet) {
               this.emitVaporFrom(nidx, old, next, MATERIAL.Steam, old[nidx + 1], 180);
             }
+            continue;
+          }
+          if (other === MATERIAL.Sand && this.chance(6)) {
+            writeCellBytes(next, nidx, MATERIAL.Glass, old[nidx + 1]);
             continue;
           }
           if (flammable(other) && this.chance(3)) {
@@ -567,7 +575,9 @@ class JsSandboxEngine implements SandboxEngine {
       } else if (old[nidx] === MATERIAL.Empty && this.chance(3)) {
         writeCellBytes(next, nidx, MATERIAL.Fire, cell[1], 190);
       } else if (heatSoftens(next, nidx, old, 72)) continue;
-      else if (flammable(old[nidx])) {
+      else if (old[nidx] === MATERIAL.Sand && this.chance(2)) {
+        writeCellBytes(next, nidx, MATERIAL.Glass, old[nidx + 1]);
+      } else if (flammable(old[nidx])) {
         writeCellBytes(next, nidx, MATERIAL.Fire, old[nidx + 1], 230);
       }
     }

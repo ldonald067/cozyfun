@@ -31,7 +31,8 @@ export const MATERIAL = {
   Stardust: 16,
   Meteor: 17,
   Moonwater: 18,
-  Flower: 19
+  Flower: 19,
+  Glass: 20
 } as const;
 
 export type MaterialId = (typeof MATERIAL)[keyof typeof MATERIAL];
@@ -193,6 +194,17 @@ export const MATERIALS: MaterialDef[] = [
     palette: ["#75b95e", "#f3cf69", "#f38fbe", "#e8f3a8", "#b98dff", "#fff4c2"],
     glow: "#f7d574",
     group: "life",
+    userSelectable: false
+  },
+  {
+    id: MATERIAL.Glass,
+    label: "Glass",
+    slug: "glass",
+    description: "Generated pane fused where strong heat vitrifies dry sand.",
+    identity: ["Heat-fused sand pane", "Translucent glints over warm seams"],
+    color: "#bfe3dd",
+    palette: ["#9fc9c6", "#b7ded9", "#d5f0ec", "#8fb6b8"],
+    group: "basic",
     userSelectable: false
   },
   {

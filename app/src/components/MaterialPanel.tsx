@@ -7,6 +7,7 @@ import {
   Flame,
   Flower2,
   Gem,
+  Grid2x2,
   Leaf,
   Moon,
   Mountain,
@@ -42,7 +43,8 @@ const MATERIAL_ICONS: Record<MaterialId, LucideIcon> = {
   [MATERIAL.Steam]: Wind,
   [MATERIAL.Stardust]: Sparkles,
   [MATERIAL.Meteor]: Orbit,
-  [MATERIAL.Moonwater]: Moon
+  [MATERIAL.Moonwater]: Moon,
+  [MATERIAL.Glass]: Grid2x2
 };
 
 type MaterialPanelProps = {

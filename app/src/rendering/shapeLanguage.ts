@@ -60,6 +60,7 @@ export function applyShapeLanguage(context: ShapeContext): Rgb {
   else if (kind === MATERIAL.Seed) out = seedColor(context);
   else if (kind === MATERIAL.Flower) out = flowerColor(context);
   else if (kind === MATERIAL.Ice) out = iceColor(context);
+  else if (kind === MATERIAL.Glass) out = glassColor(context);
   else if (kind === MATERIAL.Stone) out = stoneColor(context);
   else if (kind === MATERIAL.Water || kind === MATERIAL.Moonwater || kind === MATERIAL.Oil) out = liquidColor(context);
   else if (kind === MATERIAL.Moss || kind === MATERIAL.Fungus) out = growthColor(context);
@@ -381,6 +382,19 @@ function iceColor({ color, variant, cells, width, height, x, y }: ShapeContext) 
   if (crack) out = mixRgb(out, [39, 96, 131], 0.58);
   if (heatContact) out = mixRgb(out, [183, 224, 236], 0.34);
   if (hash % 31 === 0 && (localX === 1 || localY === 1)) out = mixRgb(out, [255, 255, 255], 0.64);
+  return out;
+}
+
+function glassColor({ color, variant, age, cells, width, height, x, y }: ShapeContext) {
+  const hash = hashCell(x >> 1, y >> 1, variant);
+  const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Glass);
+  let out = mixRgb(color, [222, 247, 244], 0.28);
+  out = mixRgb(out, [9, 14, 20], 0.34);
+  if (((x + y * 2 + (hash & 3)) & 7) === 0) out = mixRgb(out, [235, 255, 252], 0.4);
+  if (edge.top || edge.left) out = mixRgb(out, [244, 255, 253], 0.5);
+  if (edge.bottom || edge.right) out = mixRgb(out, [58, 96, 104], 0.42);
+  if ((hash & 31) === 5) out = mixRgb(out, [255, 255, 255], 0.6);
+  if (age < 70) out = mixRgb(out, [255, 176, 96], 0.36 * (1 - age / 70));
   return out;
 }
 

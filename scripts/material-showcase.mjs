@@ -6,7 +6,7 @@ export function materialShowcaseScript() {
     const width = 220;
     const height = 140;
     const stride = 8;
-    const material = { Wall: 1, Sand: 2, Water: 3, Soil: 5, Fire: 6, Wood: 7, Lava: 8, Stone: 9, Moss: 10, Seed: 11, Fungus: 12, Oil: 13, Ice: 14, Steam: 15, Stardust: 16, Meteor: 17, Moonwater: 18, Flower: 19 };
+    const material = { Wall: 1, Sand: 2, Water: 3, Soil: 5, Fire: 6, Wood: 7, Lava: 8, Stone: 9, Moss: 10, Seed: 11, Fungus: 12, Oil: 13, Ice: 14, Steam: 15, Stardust: 16, Meteor: 17, Moonwater: 18, Flower: 19, Glass: 20 };
     const flag = { Wet: 1, Rooted: 2, Cosmic: 4, Frozen: 8, Scorched: 16 };
     const cells = new Uint8Array(width * height * stride);
     const writeU16 = (offset, value) => {
@@ -92,6 +92,11 @@ export function materialShowcaseScript() {
     setCell(153, 65, material.Steam, 220, 18);
     setCell(154, 66, material.Stone, 0, 80, flag.Scorched);
     rect(160, 174, 62, 71, material.Ice, 90, 24);
+
+    // Vitrified glass: fresh warm pane beside the lava pool and a cooled pane over sand.
+    rect(139, 151, 74, 75, material.Glass, 0, 12);
+    rect(96, 110, 106, 108, material.Glass, 0, 220);
+    line(96, 110, 109, material.Sand, 0, 60);
 
     // Water-type contrast: ordinary water picks up earth/oil/life contact, moonwater lights hard surfaces.
     line(118, 127, 90, material.Moonwater, 140, 22, flag.Cosmic);

@@ -27,7 +27,8 @@ const MATERIAL = {
   Stardust: 16,
   Meteor: 17,
   Moonwater: 18,
-  Flower: 19
+  Flower: 19,
+  Glass: 20
 };
 
 const CELL_FLAG = {
@@ -408,6 +409,20 @@ withUniverse(16, 16, 17, (universe) => {
   for (let tick = 0; tick < 24; tick++) wasm.universe_tick(universe);
   const cells = readCells(universe);
   assert(countKind(cells, MATERIAL.Stardust) > 0, "moonwater should clean oil into stardust");
+});
+
+withUniverse(16, 16, 7, (universe) => {
+  const cells = new Uint8Array(16 * 16 * 8);
+  setCell(cells, 16, 7, 8, MATERIAL.Lava, { energy: 255 });
+  setCell(cells, 16, 8, 8, MATERIAL.Sand);
+  for (const [x, y] of [[7, 9], [8, 9], [9, 9], [9, 8], [6, 8], [5, 8], [6, 9]]) setCell(cells, 16, x, y, MATERIAL.Stone);
+  const ptr = wasm.alloc(cells.byteLength);
+  new Uint8Array(wasm.memory.buffer, ptr, cells.byteLength).set(cells);
+  assert(wasm.universe_load_cells(universe, ptr, cells.byteLength) === 1, "vitrification cells should load");
+  wasm.dealloc(ptr, cells.byteLength);
+  for (let tick = 0; tick < 24; tick++) wasm.universe_tick(universe);
+  const updated = readCells(universe);
+  assert(countKind(updated, MATERIAL.Glass) > 0, "lava should vitrify dry sand into glass");
 });
 
 console.log("WASM smoke checks passed");

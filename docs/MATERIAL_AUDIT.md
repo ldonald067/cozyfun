@@ -24,6 +24,7 @@ Planned direction (see the element depth plan in `ROADMAP.md`): the bar rises to
 | Moss | Keep | Surface colonizer. Spreads over damp substrates; does not bloom. |
 | Seed | Keep | Rooting growth unit. Needs water plus soil to produce generated flowers. |
 | Flower | Generated only | Outcome of successful seeded growth; not selectable. |
+| Glass | Generated only | Outcome of strong heat fusing dry sand; translucent pane, not selectable. |
 | Fungus | Keep | Decomposer. Rots wet seeds, overtakes old/wet moss, and feeds on wood/soil. |
 | Oil | Keep | Floating smothering liquid. Blocks hydration, strips wet flags, burns readily. |
 | Stardust | Keep | Cosmic powder. Charges water, energizes life/soil/fungus, and produces visual sparkle. |
@@ -36,7 +37,7 @@ Planned direction (see the element depth plan in `ROADMAP.md`): the bar rises to
 | Eraser | Clears cells without adding state. | Browser smoke: `clear, save, and load update scene state`; not a simulation material. |
 | Wall | Blocks flow; resists casual moss; takes damp/soot/frost states. | Tests: `water_weathers_stone_more_than_sealed_wall`, `moss_needs_extra_energy_to_cross_wall`, `smoke_leaves_soot_instead_of_condensation`, `ice_frost_stresses_damp_hard_materials`. |
 | Stone | Blocks flow; weathers and condenses harder than wall; receives cooled lava or meteor. | Tests: `water_weathers_stone_more_than_sealed_wall`, `steam_condenses_on_hard_surfaces`, `moss_colonizes_damp_stone`, `water_quenches_lava_into_steam_and_stone`, `water_shocks_meteor_into_steam_and_stone`. |
-| Sand | Falls as powder; clumps when wet; dries loose again. | Tests: `sand_falls`, `water_wets_sand_into_clumps`, `wet_sand_drains_back_to_loose_sand`. |
+| Sand | Falls as powder; clumps when wet; dries loose again, and strong heat fuses dry grains into glass. | Tests: `sand_falls`, `water_wets_sand_into_clumps`, `wet_sand_drains_back_to_loose_sand`, `lava_vitrifies_dry_sand_into_glass`. |
 | Water | Flows and spreads; hydrates life/soil/sand; cools heat into steam or stone. | Tests: `water_spreads_when_blocked`, `wet_seed_on_soil_blooms`, `watered_soil_greens_up`, `water_fire_creates_steam_glow_instead_of_instant_delete`, `water_quenches_lava_into_steam_and_stone`. |
 | Moonwater | Moves like water; supercharges growth; cleans oil or meteor into stardust. | Tests: `moonwater_cleans_oil_into_stardust`, `meteor_moonwater_contact_bursts_to_stardust`, `lava_cools_near_moonwater`; visual QA: `material-identity-showcase`. |
 | Smoke | Rises and fades; soots hard surfaces. | Tests: `smoke_leaves_soot_instead_of_condensation`; source: `update_gas` owns rise/fade. |
@@ -49,6 +50,7 @@ Planned direction (see the element depth plan in `ROADMAP.md`): the bar rises to
 | Moss | Spreads over damp substrate; crosses walls only when strongly fed; stays carpet instead of bloom. | Tests: `moss_colonizes_damp_stone`, `moss_needs_extra_energy_to_cross_wall`, `heat_dries_wet_growth_before_burning`; source: `update_moss` keeps moss distinct from seed bloom. |
 | Seed | Roots in soil; blooms when wet; waits when frozen. | Tests: `wet_seed_on_soil_blooms`, `frozen_seed_waits_instead_of_blooming`, `fungus_can_rot_wet_seed`. |
 | Flower | Marks successful seeded growth; reacts visually to wet and cosmic states. | Tests: `wet_seed_on_soil_blooms`; visual QA: `material-identity-showcase`; generated-only outcome. |
+| Glass | Marks where strong heat fused dry sand; stays as an inert translucent pane. | Tests: `lava_vitrifies_dry_sand_into_glass`, `meteor_impact_vitrifies_nearby_sand`, `wet_sand_takes_scorch_before_vitrifying`; visual QA: `material-identity-showcase`. |
 | Fungus | Rots wet seeds; overtakes old or wet moss; feeds on wood or soil. | Tests: `fungus_can_rot_wet_seed`; source: `update_fungus` handles moss/wood/soil contact; visual QA: contact-colored states. |
 | Oil | Floats over water; blocks hydration; burns readily. | Tests: `oil_rises_above_water`, `oil_blocks_plain_water_hydration`, `moonwater_cleans_oil_into_stardust`; source: `update_oil` owns burn readiness. |
 | Stardust | Drifts as cosmic powder; charges water into moonwater; marks life/soil/fungus cosmic. | Tests: `stardust_charges_water_into_moonwater`; source: `update_stardust` handles drift and cosmic marking; visual QA: sparkle/cosmic states. |
