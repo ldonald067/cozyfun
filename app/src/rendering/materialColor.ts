@@ -63,6 +63,7 @@ export function hasGlow(kind: number) {
 
 export function glowIntensity(kind: number, energy: number, age: number, time: number) {
   const pulse = (Math.sin(time * 0.01 + age * 0.25) + 1) * 0.5;
+  if (kind === MATERIAL.Ember) return clampColor(energy * 0.85 + (energy > 40 ? pulse * 35 : 0));
   const base = kind === MATERIAL.Stardust || kind === MATERIAL.Moonwater || kind === MATERIAL.Flower ? 80 : 120;
   return clampColor(base + energy * 0.45 + pulse * 55);
 }

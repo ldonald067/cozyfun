@@ -44,7 +44,8 @@ const MATERIAL_ICONS: Record<MaterialId, LucideIcon> = {
   [MATERIAL.Stardust]: Sparkles,
   [MATERIAL.Meteor]: Orbit,
   [MATERIAL.Moonwater]: Moon,
-  [MATERIAL.Glass]: Grid2x2
+  [MATERIAL.Glass]: Grid2x2,
+  [MATERIAL.Ember]: Flame
 };
 
 type MaterialPanelProps = {

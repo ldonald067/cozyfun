@@ -61,6 +61,7 @@ export function applyShapeLanguage(context: ShapeContext): Rgb {
   else if (kind === MATERIAL.Flower) out = flowerColor(context);
   else if (kind === MATERIAL.Ice) out = iceColor(context);
   else if (kind === MATERIAL.Glass) out = glassColor(context);
+  else if (kind === MATERIAL.Ember) out = emberColor(context);
   else if (kind === MATERIAL.Stone) out = stoneColor(context);
   else if (kind === MATERIAL.Water || kind === MATERIAL.Moonwater || kind === MATERIAL.Oil) out = liquidColor(context);
   else if (kind === MATERIAL.Moss || kind === MATERIAL.Fungus) out = growthColor(context);
@@ -386,6 +387,21 @@ function iceColor({ color, variant, cells, width, height, x, y }: ShapeContext) 
   if (crack) out = mixRgb(out, [39, 96, 131], 0.58);
   if (heatContact) out = mixRgb(out, [183, 224, 236], 0.34);
   if (hash % 31 === 0 && (localX === 1 || localY === 1)) out = mixRgb(out, [255, 255, 255], 0.64);
+  return out;
+}
+
+function emberColor({ variant, energy, flags, time, x, y }: ShapeContext) {
+  const hash = hashCell(x, y, variant);
+  const heat = Math.min(1, energy / 220);
+  let out: Rgb = [26, 20, 18];
+  if ((x + (hash & 1)) % 3 === 0) out = mixRgb(out, [48, 36, 30], 0.5);
+  if ((hash & 15) === 2) out = mixRgb(out, [58, 42, 28], 0.4);
+  if (heat > 0.05) {
+    const pulse = (Math.sin(time * 0.008 + hash * 0.7 + x + y) + 1) * 0.5;
+    out = mixRgb(out, [255, 120, 40], heat * (0.4 + pulse * 0.3));
+    if ((hash & 7) === 0) out = mixRgb(out, [255, 208, 120], heat * 0.7);
+  }
+  if (flags & CELL_FLAG.Wet) out = mixRgb(out, [40, 52, 58], 0.4);
   return out;
 }
 

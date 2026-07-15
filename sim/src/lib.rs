@@ -25,6 +25,7 @@ pub enum Material {
     Moonwater = 18,
     Flower = 19,
     Glass = 20,
+    Ember = 21,
 }
 
 const FLAG_WET: u16 = 1 << 0;
@@ -136,7 +137,7 @@ impl Universe {
                     continue;
                 }
                 let idx = self.idx(px as u32, py as u32);
-                let kind = material.min(Material::Glass as u8);
+                let kind = material.min(Material::Ember as u8);
                 self.cells[idx] = if kind == Material::Empty as u8 {
                     Cell::empty()
                 } else {
@@ -152,7 +153,7 @@ impl Universe {
             return false;
         }
         for (idx, chunk) in data.chunks_exact(size_of::<Cell>()).enumerate() {
-            let kind = chunk[0].min(Material::Glass as u8);
+            let kind = chunk[0].min(Material::Ember as u8);
             self.cells[idx] = if kind == Material::Empty as u8 {
                 Cell::empty()
             } else {
@@ -393,6 +394,7 @@ impl Universe {
             cell.age = cell.age.saturating_add(1);
             let drain = match cell.kind {
                 x if x == Material::Fire as u8 => 3,
+                x if x == Material::Ember as u8 => 2,
                 x if x == Material::Steam as u8 => 2,
                 x if x == Material::Smoke as u8 => 1,
                 x if x == Material::Stardust as u8 => 1,
@@ -452,7 +454,7 @@ impl Universe {
                             continue;
                         }
                         if is_flammable(other.kind) && self.chance(burn_chance(other.kind)) {
-                            next[nidx] = Cell::new(Material::Fire as u8, other.variant, 220);
+                            next[nidx] = ignited_cell(other, 220);
                         }
                     }
                     if dampened {
@@ -483,7 +485,7 @@ impl Universe {
                             continue;
                         }
                         if is_flammable(other.kind) && self.chance(3) {
-                            next[nidx] = Cell::new(Material::Fire as u8, other.variant, 240);
+                            next[nidx] = ignited_cell(other, 240);
                         }
                     }
                     if cooling > 0 && next[idx].kind == Material::Lava as u8 {
@@ -668,6 +670,33 @@ impl Universe {
                         {
                             next[nidx].flags |= FLAG_SCORCHED;
                         }
+                    }
+                }
+                x if x == Material::Ember as u8 => {
+                    for nidx in neighbors {
+                        let other = old[nidx];
+                        if other.kind == Material::Water as u8 || other.kind == Material::Moonwater as u8 {
+                            next[idx].energy = next[idx].energy.saturating_sub(120);
+                            next[idx].flags |= FLAG_WET;
+                            if self.chance(6) {
+                                next[nidx] = Cell::new(Material::Steam as u8, other.variant, 170);
+                            }
+                            continue;
+                        }
+                        if cell.energy < 60 && is_hot(other.kind) && next[idx].kind == Material::Ember as u8 {
+                            next[idx].energy = 210;
+                            next[idx].flags &= !FLAG_WET;
+                            continue;
+                        }
+                        if cell.energy > 90
+                            && is_flammable(other.kind)
+                            && self.chance(burn_chance(other.kind) * 2)
+                        {
+                            next[nidx] = ignited_cell(other, 210);
+                        }
+                    }
+                    if cell.energy > 90 && self.chance(9) {
+                        self.emit_vapor_from(idx, old, next, Material::Smoke as u8, cell.variant, 80);
                     }
                 }
                 x if x == Material::Oil as u8 => {
@@ -1017,7 +1046,7 @@ impl Universe {
             } else if old[nidx].kind == Material::Sand as u8 && self.chance(2) {
                 next[nidx] = Cell::new(Material::Glass as u8, old[nidx].variant, 0);
             } else if is_flammable(old[nidx].kind) {
-                next[nidx] = Cell::new(Material::Fire as u8, old[nidx].variant, 230);
+                next[nidx] = ignited_cell(old[nidx], 230);
             }
         }
     }
@@ -1101,6 +1130,14 @@ fn starting_energy(kind: u8) -> u16 {
 
 fn is_hot(kind: u8) -> bool {
     kind == Material::Fire as u8 || kind == Material::Lava as u8 || kind == Material::Meteor as u8
+}
+
+fn ignited_cell(fuel: Cell, energy: u16) -> Cell {
+    if fuel.kind == Material::Wood as u8 {
+        Cell::new(Material::Ember as u8, fuel.variant, 230)
+    } else {
+        Cell::new(Material::Fire as u8, fuel.variant, energy)
+    }
 }
 
 fn is_water_like(kind: u8) -> bool {
@@ -1584,6 +1621,54 @@ mod tests {
         set_cell(&mut u, 9, 9, Material::Stone);
         u.tick();
         assert_eq!(kind_at(&u, 7, 8), Material::Stardust as u8);
+    }
+
+    #[test]
+    fn wood_ignites_into_ember_instead_of_bare_flame() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 7, 8, Material::Fire);
+        set_cell(&mut u, 8, 8, Material::Wood);
+        let mut embered = false;
+        for _ in 0..40 {
+            u.tick();
+            if u.cells.iter().any(|cell| cell.kind == Material::Ember as u8) {
+                embered = true;
+                break;
+            }
+        }
+        assert!(embered, "burning wood should become a glowing ember");
+    }
+
+    #[test]
+    fn ember_cools_into_inert_char() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell_state(&mut u, 8, 8, Material::Ember, 40, 4, 0);
+        for _ in 0..6 {
+            u.tick();
+        }
+        assert_eq!(kind_at(&u, 8, 8), Material::Ember as u8, "cold char should persist instead of vanishing");
+        assert_eq!(energy_at(&u, 8, 8), 0);
+    }
+
+    #[test]
+    fn water_quenches_hot_ember() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell_state(&mut u, 8, 8, Material::Ember, 10, 230, 0);
+        set_cell(&mut u, 7, 8, Material::Water);
+        u.tick();
+        assert_eq!(kind_at(&u, 8, 8), Material::Ember as u8);
+        assert!(energy_at(&u, 8, 8) < 120, "water should quench ember heat");
+        assert!(flags_at(&u, 8, 8) & FLAG_WET != 0, "quenched ember should read wet");
+    }
+
+    #[test]
+    fn cold_char_relights_near_fire() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell_state(&mut u, 8, 8, Material::Ember, 120, 20, 0);
+        set_cell(&mut u, 7, 8, Material::Fire);
+        u.tick();
+        assert_eq!(kind_at(&u, 8, 8), Material::Ember as u8);
+        assert!(energy_at(&u, 8, 8) > 150, "char should relight near open heat");
     }
 
     #[test]

@@ -25,6 +25,7 @@ Planned direction (see the element depth plan in `ROADMAP.md`): the bar rises to
 | Seed | Keep | Rooting growth unit. Needs water plus soil to produce generated flowers. |
 | Flower | Generated only | Outcome of successful seeded growth; not selectable. |
 | Glass | Generated only | Outcome of strong heat fusing dry sand; translucent pane, not selectable. |
+| Ember | Generated only | Outcome of burning wood; glowing remains that cool into relightable char, not selectable. |
 | Fungus | Keep | Decomposer. Rots wet seeds, overtakes old/wet moss, and feeds on wood/soil. |
 | Oil | Keep | Floating smothering liquid. Blocks hydration, strips wet flags, burns readily. |
 | Stardust | Keep | Cosmic powder. Charges water, energizes life/soil/fungus, and produces visual sparkle. |
@@ -43,7 +44,7 @@ Planned direction (see the element depth plan in `ROADMAP.md`): the bar rises to
 | Smoke | Rises and fades; soots hard surfaces. | Tests: `smoke_leaves_soot_instead_of_condensation`; source: `update_gas` owns rise/fade. |
 | Steam | Rises and fades; condenses on hard surfaces; frosts near ice. | Tests: `steam_condenses_on_hard_surfaces`, `steam_frosts_against_ice`, `water_fire_creates_steam_glow_instead_of_instant_delete`; source: `update_gas` owns rise/fade. |
 | Soil | Falls as substrate; stores water; greens into moss. | Tests: `watered_soil_greens_up`, `wet_seed_on_soil_blooms`; source: `update_soil` and `density` own substrate behavior. |
-| Wood | Burns as fuel; wet wood vents steam; feeds moss and fungus. | Tests: `heat_steams_wet_wood_before_burning`; source: `update_moss` and `update_fungus` handle organic contact; visual QA: damp/char states. |
+| Wood | Burns through a wet/dry/ember/char arc instead of vanishing; wet wood vents steam; feeds moss and fungus. | Tests: `heat_steams_wet_wood_before_burning`, `wood_ignites_into_ember_instead_of_bare_flame`; source: `update_moss` and `update_fungus` handle organic contact; visual QA: damp/char states. |
 | Fire | Short-lived heat; dries before burning; makes smoke or steam. | Tests: `heat_dries_wet_growth_before_burning`, `water_fire_creates_steam_glow_instead_of_instant_delete`, `heat_steams_wet_wood_before_burning`; source: `update_fire`. |
 | Lava | Moves as slow hot liquid; ignites fuel; cools into scorched stone. | Tests: `lava_cools_near_moonwater`, `water_quenches_lava_into_steam_and_stone`; source: `update_lava` owns movement and ignition. |
 | Ice | Freezes water; pauses life; frost-stresses damp hard cells. | Tests: `ice_freezes_trapped_water`, `frozen_seed_waits_instead_of_blooming`, `ice_frost_stresses_damp_hard_materials`, `steam_frosts_against_ice`. |
@@ -51,6 +52,7 @@ Planned direction (see the element depth plan in `ROADMAP.md`): the bar rises to
 | Seed | Roots in soil; blooms when wet; waits when frozen. | Tests: `wet_seed_on_soil_blooms`, `frozen_seed_waits_instead_of_blooming`, `fungus_can_rot_wet_seed`. |
 | Flower | Marks successful seeded growth; reacts visually to wet and cosmic states. | Tests: `wet_seed_on_soil_blooms`; visual QA: `material-identity-showcase`; generated-only outcome. |
 | Glass | Marks where strong heat fused dry sand; stays as an inert translucent pane. | Tests: `lava_vitrifies_dry_sand_into_glass`, `meteor_impact_vitrifies_nearby_sand`, `wet_sand_takes_scorch_before_vitrifying`; visual QA: `material-identity-showcase`. |
+| Ember | Glows while hot and weakly spreads fire; cools into inert char that relights near heat; quenches wet under water. | Tests: `wood_ignites_into_ember_instead_of_bare_flame`, `ember_cools_into_inert_char`, `water_quenches_hot_ember`, `cold_char_relights_near_fire`; visual QA: `material-identity-showcase`. |
 | Fungus | Rots wet seeds; overtakes old or wet moss; feeds on wood or soil. | Tests: `fungus_can_rot_wet_seed`; source: `update_fungus` handles moss/wood/soil contact; visual QA: contact-colored states. |
 | Oil | Floats over water; blocks hydration; burns readily. | Tests: `oil_rises_above_water`, `oil_blocks_plain_water_hydration`, `moonwater_cleans_oil_into_stardust`; source: `update_oil` owns burn readiness. |
 | Stardust | Charges water into moonwater and energizes life/soil/fungus; snuffs fire into sparkle bursts; etches constellation marks onto stone and wall. | Tests: `stardust_charges_water_into_moonwater`, `stardust_snuffs_fire_into_sparkle`, `stardust_etches_constellations_on_stone`; visual QA: `material-identity-showcase`. |

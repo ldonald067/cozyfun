@@ -61,7 +61,8 @@ const MATERIAL = {
   Meteor: 17,
   Moonwater: 18,
   Flower: 19,
-  Glass: 20
+  Glass: 20,
+  Ember: 21
 };
 
 const CELL_FLAG = {
@@ -407,6 +408,19 @@ withEngine(7, (engine) => {
   engine.tick();
   const updated = engine.getCellBytes();
   assert(kindAt(updated, 16, 8, 8) === MATERIAL.Stone, "accumulated freeze-thaw stress should crumble wall into stone");
+});
+
+withEngine(7, (engine) => {
+  const cells = new Uint8Array(16 * 16 * CELL_STRIDE);
+  setCell(cells, 16, 8, 8, MATERIAL.Ember, { age: 10, energy: 230 });
+  setCell(cells, 16, 7, 8, MATERIAL.Water);
+  loadCells(engine, cells, "ember quench cells should load");
+  engine.tick();
+  const updated = engine.getCellBytes();
+  const emberOffset = (8 * 16 + 8) * CELL_STRIDE;
+  assert(kindAt(updated, 16, 8, 8) === MATERIAL.Ember, "quenched ember should stay as char");
+  assert(readU16(updated, emberOffset + 4) < 120, "water should quench ember heat");
+  assert((readU16(updated, emberOffset + 6) & CELL_FLAG.Wet) !== 0, "quenched ember should read wet");
 });
 
 console.log("JS fallback smoke checks passed");

@@ -28,7 +28,8 @@ const MATERIAL = {
   Meteor: 17,
   Moonwater: 18,
   Flower: 19,
-  Glass: 20
+  Glass: 20,
+  Ember: 21
 };
 
 const CELL_FLAG = {
@@ -452,6 +453,17 @@ withUniverse(16, 16, 7, (universe) => {
   wasm.universe_tick(universe);
   const updated = readCells(universe);
   assert(kindAt(updated, 16, 8, 8) === MATERIAL.Stone, "accumulated freeze-thaw stress should crumble wall into stone");
+});
+
+withUniverse(16, 16, 7, (universe) => {
+  wasm.universe_paint(universe, 7, 8, 1, MATERIAL.Fire);
+  wasm.universe_paint(universe, 9, 8, 1, MATERIAL.Wood);
+  let embered = false;
+  for (let tick = 0; tick < 40 && !embered; tick++) {
+    wasm.universe_tick(universe);
+    embered = countKind(readCells(universe), MATERIAL.Ember) > 0;
+  }
+  assert(embered, "burning wood should leave glowing embers");
 });
 
 console.log("WASM smoke checks passed");

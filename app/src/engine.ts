@@ -146,7 +146,7 @@ class JsSandboxEngine implements SandboxEngine {
         const px = x + dx;
         const py = y + dy;
         if (!this.inBounds(px, py)) continue;
-        const kind = Math.min(material, MATERIAL.Glass);
+        const kind = Math.min(material, MATERIAL.Ember);
         this.writeCell(this.index(px, py), kind, this.variant(px, py, kind), startEnergy(kind), 0);
       }
     }
@@ -200,7 +200,7 @@ class JsSandboxEngine implements SandboxEngine {
     if (bytes.byteLength !== this.cells.byteLength) return false;
     const sanitized = bytes.slice();
     for (let idx = 0; idx < sanitized.byteLength; idx += CELL_STRIDE) {
-      const kind = Math.min(sanitized[idx], MATERIAL.Glass);
+      const kind = Math.min(sanitized[idx], MATERIAL.Ember);
       if (kind === MATERIAL.Empty) {
         sanitized.fill(0, idx, idx + CELL_STRIDE);
         continue;
@@ -257,7 +257,7 @@ class JsSandboxEngine implements SandboxEngine {
       const drain =
         kind === MATERIAL.Fire
           ? 3
-          : kind === MATERIAL.Steam
+          : kind === MATERIAL.Ember || kind === MATERIAL.Steam
             ? 2
             : kind === MATERIAL.Smoke ||
                 kind === MATERIAL.Stardust ||
@@ -309,7 +309,7 @@ class JsSandboxEngine implements SandboxEngine {
             continue;
           }
           if (flammable(other) && this.chance(burnChance(other))) {
-            writeCellBytes(next, nidx, MATERIAL.Fire, old[nidx + 1], 220);
+            writeIgnitedCell(next, nidx, other, old[nidx + 1], 220);
           }
         }
         if (kind === MATERIAL.Lava) {
@@ -330,7 +330,7 @@ class JsSandboxEngine implements SandboxEngine {
             continue;
           }
           if (flammable(other) && this.chance(3)) {
-            writeCellBytes(next, nidx, MATERIAL.Fire, old[nidx + 1], 240);
+            writeIgnitedCell(next, nidx, other, old[nidx + 1], 240);
           }
         }
         if (kind === MATERIAL.Ice && (other === MATERIAL.Fire || other === MATERIAL.Lava || other === MATERIAL.Meteor)) {
@@ -437,6 +437,25 @@ class JsSandboxEngine implements SandboxEngine {
             writeU16(next, nidx + 6, readU16(next, nidx + 6) | CELL_FLAG.Wet | (kind === MATERIAL.Moonwater ? CELL_FLAG.Cosmic : 0));
           }
         }
+        if (kind === MATERIAL.Ember) {
+          if (other === MATERIAL.Water || other === MATERIAL.Moonwater) {
+            writeU16(next, idx + 4, Math.max(0, readU16(next, idx + 4) - 120));
+            writeU16(next, idx + 6, readU16(next, idx + 6) | CELL_FLAG.Wet);
+            if (this.chance(6)) {
+              writeCellBytes(next, nidx, MATERIAL.Steam, old[nidx + 1], 170);
+            }
+            continue;
+          }
+          const emberEnergy = readU16(old, idx + 4);
+          if (emberEnergy < 60 && (other === MATERIAL.Fire || other === MATERIAL.Lava || other === MATERIAL.Meteor) && next[idx] === MATERIAL.Ember) {
+            writeU16(next, idx + 4, 210);
+            writeU16(next, idx + 6, readU16(next, idx + 6) & ~CELL_FLAG.Wet);
+            continue;
+          }
+          if (emberEnergy > 90 && flammable(other) && this.chance(burnChance(other) * 2)) {
+            writeIgnitedCell(next, nidx, other, old[nidx + 1], 210);
+          }
+        }
         if (kind === MATERIAL.Oil) {
           if (other === MATERIAL.Fire || other === MATERIAL.Lava || other === MATERIAL.Meteor) {
             writeCellBytes(next, idx, MATERIAL.Fire, old[idx + 1], 240);
@@ -468,6 +487,9 @@ class JsSandboxEngine implements SandboxEngine {
             writeU16(next, nidx + 6, readU16(next, nidx + 6) | CELL_FLAG.Scorched);
           }
         }
+      }
+      if (kind === MATERIAL.Ember && readU16(old, idx + 4) > 90 && this.chance(9)) {
+        this.emitVaporFrom(idx, old, next, MATERIAL.Smoke, old[idx + 1], 80);
       }
       if (kind === MATERIAL.Fire && fireDampened) {
         const energy = Math.max(0, readU16(next, idx + 4) - 32);
@@ -585,7 +607,7 @@ class JsSandboxEngine implements SandboxEngine {
       else if (old[nidx] === MATERIAL.Sand && this.chance(2)) {
         writeCellBytes(next, nidx, MATERIAL.Glass, old[nidx + 1]);
       } else if (flammable(old[nidx])) {
-        writeCellBytes(next, nidx, MATERIAL.Fire, old[nidx + 1], 230);
+        writeIgnitedCell(next, nidx, old[nidx], old[nidx + 1], 230);
       }
     }
   }
@@ -729,6 +751,14 @@ function readU16(bytes: Uint8Array, offset: number) {
 function writeU16(bytes: Uint8Array, offset: number, value: number) {
   bytes[offset] = value & 255;
   bytes[offset + 1] = (value >> 8) & 255;
+}
+
+function writeIgnitedCell(next: Uint8Array, idx: number, fuelKind: number, variant: number, energy: number) {
+  if (fuelKind === MATERIAL.Wood) {
+    writeCellBytes(next, idx, MATERIAL.Ember, variant, 230);
+  } else {
+    writeCellBytes(next, idx, MATERIAL.Fire, variant, energy);
+  }
 }
 
 function writeCellBytes(bytes: Uint8Array, idx: number, kind: number, variant = 0, energy = 0, age = 0, flags = 0) {

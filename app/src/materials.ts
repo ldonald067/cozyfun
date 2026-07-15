@@ -32,7 +32,8 @@ export const MATERIAL = {
   Meteor: 17,
   Moonwater: 18,
   Flower: 19,
-  Glass: 20
+  Glass: 20,
+  Ember: 21
 } as const;
 
 export type MaterialId = (typeof MATERIAL)[keyof typeof MATERIAL];
@@ -194,6 +195,18 @@ export const MATERIALS: MaterialDef[] = [
     palette: ["#75b95e", "#f3cf69", "#f38fbe", "#e8f3a8", "#b98dff", "#fff4c2"],
     glow: "#f7d574",
     group: "life",
+    userSelectable: false
+  },
+  {
+    id: MATERIAL.Ember,
+    label: "Ember",
+    slug: "ember",
+    description: "Generated glowing remains of burning wood that cool into relightable char.",
+    identity: ["Glowing wood remains", "Cools into relightable char"],
+    color: "#c96a35",
+    palette: ["#241a16", "#3a2a20", "#552f1d", "#1b1512"],
+    glow: "#ff7a30",
+    group: "heat",
     userSelectable: false
   },
   {
