@@ -364,46 +364,13 @@ Completed:
 
 ## Phase 11: Element Depth + Visual Payoff
 
-Status: 11A complete; 11B in progress.
+Status: complete.
 
-Goal: every toolbar element earns its slot with at least 4 special interactions, each landing with a distinct visible moment. Elements that stay too similar get combined or removed instead of padded.
+Completed:
 
-A "special interaction" is a distinct, player-visible sim reaction with another material or state. Movement style alone does not count, and a shared flag treatment (generic wet/frozen/scorched tinting) counts once, not once per flag.
+- 11A: Smoke and Steam left the toolbar as generated-only vapors; the toolbar went from 19 to 17 paint choices with no sim loss.
+- 11B: Sand vitrifies into generated-only Glass under strong heat; stardust snuffs fire into sparkle bursts and etches constellations onto stone/wall; walls crack and crumble into stone under accumulated freeze-thaw stress; wood burns through a glowing Ember arc into relightable char.
+- 11C: every new interaction shipped with its renderer moment, and the deterministic showcase now covers the glass, ember, freeze-thaw, and constellation states alongside the existing wet/frozen/scorched/cosmic captures.
+- 11D: `npm run material:audit` now requires 4-6 documented interaction roles per toolbar material (generated-only outcomes and the Eraser stay at 1-3), and the audit matrix documents the new bar for all 17 toolbar materials.
 
-Current interaction counts from `sim/src/lib.rs`:
-
-| Passes the bar (4+) | Count | Below the bar | Count |
-| --- | --- | --- | --- |
-| Water | 8 | Wood | 3 |
-| Seed | 6 | Wall | 3 |
-| Ice, Fire, Moonwater, Oil | 5 | Steam | 2 |
-| Meteor, Moss, Fungus, Soil, Stone, Lava | 4 | Sand | 2 |
-| | | Stardust | 2 |
-| | | Smoke | 1 |
-
-### Phase 11A: Combine/Remove Pass
-
-- Demote Smoke and Steam from the toolbar to generated-only vapors, like Flower. All sim rules stay (rise/fade, soot, condensation, frost); players keep creating them through fire and water play, they just stop being paint choices with near-identical movement and 1-2 interactions each. Toolbar goes 19 to 17.
-  - Fallback option if painting vapor turns out to be missed: one combined "Vapor" toolbar entry that paints steam.
-- Wall stays for now as the deliberate construction material, on the condition that Phase 11B gives it real weathering. If it still reads as "stone minus interactions" afterward, the existing removal trigger in `docs/MATERIAL_AUDIT.md` fires.
-
-### Phase 11B: New Interactions To Reach the Bar
-
-One material per atomic pass, each with Rust + JS fallback parity, tests, and a showcase update:
-
-- Sand: strong heat (lava, meteor, dense fire) vitrifies sand into Glass, a new generated-only material with translucent pane rendering and heat-shimmer edges. Sand then holds: wet clumping, drying, vitrify, frost. Glass stays out of the toolbar.
-- Stardust: fire contact becomes a starfire flare that transmutes the fire cell into a brief harmless sparkle burst (cosmic fire suppression); resting stardust etches constellation glitter veins onto stone and wall via the cosmic flag. Stardust then holds: charge water to moonwater, energize life/soil/fungus, starfire, etching.
-- Wall: freeze-thaw weathering. A frozen wall cell that later thaws near heat gains crack stages and can eventually crumble into stone, so sealed construction has a slow natural decay arc. Wall then holds: sealed blocking, soot staining, freeze-thaw crumble, moss resistance.
-- Wood: burned wood leaves glowing Ember cells that cool through char instead of vanishing, giving fire an afterglow state. Wood then holds: the wet, dry, char, ember arc; steam venting; moss host; fungus food.
-
-### Phase 11C: Visual Payoff Pass
-
-- No interaction ships without its visible moment: each 11B rule lands with a renderer cue (transformation flash, texture change, or contact accent) in the same pass as the sim rule.
-- State readability audit: capture every toolbar material in wet, frozen, scorched, and cosmic states in the deterministic showcase, and rework any state that reads as only a palette tint.
-
-### Phase 11D: Bar Enforcement
-
-- Raise `npm run material:audit` to require 4 documented interaction roles per toolbar material (generated-only materials exempt) once 11A-11B land.
-- Update `docs/MATERIAL_AUDIT.md` with the new matrix, the Smoke/Steam demotion, and the Glass/Ember generated-only entries.
-
-Order: 11A first (smallest diff, immediate toolbar clarity), then 11B one material at a time with 11C riding along, and 11D last so the audit never blocks mid-phase work.
+The bar this phase established: a "special interaction" is a distinct, player-visible sim reaction with another material or state. Movement style alone does not count, and a shared flag treatment counts once, not once per flag. Elements that fall below 4 interactions get combined, demoted to generated-only, or removed instead of padded; `docs/MATERIAL_AUDIT.md` is the enforcement point.

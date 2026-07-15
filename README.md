@@ -97,7 +97,7 @@ Moss, Seed, Fungus, Oil, Ice, Stardust, Meteor, Moonwater
 Generated outcomes (created by play, not painted directly):
 
 ```txt
-Flower, Smoke, Steam
+Flower, Smoke, Steam, Glass, Ember
 ```
 
 Some key reactions:
@@ -112,7 +112,10 @@ Some key reactions:
 - Fire thaws frozen cells and dries wet life or wood into a scorched state before it can burn them; wet wood vents steam while drying.
 - Oil smothers nearby hydrated cells and blocks plain water from feeding life through it.
 - Steam condenses on stone and wall; smoke leaves dry soot/scorch marks instead of acting like wet vapor.
-- Stardust can charge ordinary water into moonwater and energize life, soil, and fungus.
+- Stardust can charge ordinary water into moonwater, energize life, soil, and fungus, snuff fire into sparkle bursts, and etch constellation marks onto stone and wall.
+- Strong heat fuses dry sand into translucent glass panes; wet sand dries and scorches first.
+- Burning wood leaves glowing embers that cool into relightable char instead of vanishing, and water quenches embers with a steam hiss.
+- Repeated freeze-thaw cycles crack sealed walls until they crumble into natural stone.
 - Seeds are now potential: wet rooted seeds can bloom into flowers, moss beds can overtake them, and nearby fungus can rot them.
 - Moss is carpet growth: it spreads over damp soil and wood but does not bloom.
 - Wall and stone are intentionally separate: wall is sealed construction, while stone is natural, weatherable, and easier for moss/condensation to affect.

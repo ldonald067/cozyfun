@@ -16,7 +16,7 @@ const materialBlocks = [...source.matchAll(/\{\s*id:\s*MATERIAL\.([A-Za-z]+),[\s
 const seen = new Set();
 const labels = new Map();
 const failures = [];
-let generatedOnly = 0;
+const generatedLabels = new Set();
 
 for (const match of materialBlocks) {
   const [, id] = match;
@@ -26,7 +26,7 @@ for (const match of materialBlocks) {
 
   seen.add(id);
   labels.set(id, label);
-  if (block.includes("userSelectable: false")) generatedOnly += 1;
+  if (block.includes("userSelectable: false")) generatedLabels.add(label);
 
   if (!identity) {
     failures.push(`${label} is missing exactly two identity traits`);
@@ -59,7 +59,7 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `Material identity audit passed: ${seen.size - generatedOnly} toolbar materials and ${generatedOnly} generated material have two traits plus 1-3 documented roles.`
+  `Material identity audit passed: ${seen.size - generatedLabels.size} toolbar materials carry 4+ documented interaction roles and ${generatedLabels.size} generated materials carry 1-3.`
 );
 
 function auditInteractionMatrix(markdown, materialLabels, failures) {
@@ -85,7 +85,15 @@ function auditInteractionMatrix(markdown, materialLabels, failures) {
     const roles = rolesCell.split(";").map((role) => role.trim()).filter(Boolean);
     matrix.set(material, { roles, coverage });
 
-    if (roles.length < 1 || roles.length > 3) failures.push(`${material} must document 1-3 interaction roles, found ${roles.length}`);
+    const isTool = material === "Eraser";
+    const isGenerated = generatedLabels.has(material);
+    if (isTool || isGenerated) {
+      if (roles.length < 1 || roles.length > 3) {
+        failures.push(`${material} must document 1-3 interaction roles, found ${roles.length}`);
+      }
+    } else if (roles.length < 4 || roles.length > 6) {
+      failures.push(`${material} must document 4-6 special interaction roles, found ${roles.length}`);
+    }
     for (const role of roles) {
       if (role.length < 8) failures.push(`${material} has a too-vague interaction role: "${role}"`);
       if (/^(todo|tbd|unique|special)$/i.test(role)) failures.push(`${material} has placeholder interaction role text: "${role}"`);
