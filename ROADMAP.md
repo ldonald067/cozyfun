@@ -308,7 +308,7 @@ Started:
 - Desk Radio shows a compact ready row for the current embeddable source, including timestamp labels and a clear open-on-YouTube action.
 - Browser smoke coverage now checks timestamped YouTube embed parsing, radio playlist links, player start time, saved metadata, blocked-embed fallback, and native ambience restore.
 - Browser smoke coverage now verifies the local ambience recordings are served from `dist` and decode in Chromium.
-- `.\scripts\audio-qa.ps1` renders deterministic WAV references for native ambience listening review.
+- `.\scripts\audio-qa.ps1` writes a native ambience QA manifest covering asset presence, loop targets, and mood balances.
 - Reaction-driven native cues now observe visible post-tick transitions for steam flashes, blooms, cosmic charges, moonwater/oil cleaning, and meteor bursts without changing sim behavior.
 - Audio reaction smoke coverage now checks detector priority, duplicate collapse, and false-positive avoidance for ordinary steam movement.
 - Renderer-only visual cues for damp, frozen, scorched, cosmic, and plant contact states are stronger on wall, stone, moss, fungus, and wood.
@@ -334,7 +334,7 @@ Completed:
 - Forest Hut uses filtered rain, lower room hum, outdoor air, and occasional branch/leaf movement.
 - Snow Window uses softer damped hush, lighter drips, colder room tone, and sparse frost ticks.
 - The audio controller now tracks the active room separately from saved audio preferences, so imported scenes and live room changes update ambience without changing the scene file format.
-- `.\scripts\audio-qa.ps1` now renders deterministic per-room ambience references.
+- `.\scripts\audio-qa.ps1` now covers per-room ambience balances in its manifest.
 
 ## Phase 10: Element Variation + Identity
 

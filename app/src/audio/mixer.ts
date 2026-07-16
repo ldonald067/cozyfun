@@ -4,13 +4,17 @@ import type { AudioChannel, AudioPrefs, RunningAudio } from "./types";
 export function createAudioMixer(context: AudioContext): RunningAudio {
   const master = context.createGain();
   const ambience = context.createGain();
+  // Short cues bypass the ambience slider so quiet beds never silence interaction feedback.
+  const cueBus = context.createGain();
 
   ambience.connect(master);
+  cueBus.connect(master);
   master.connect(context.destination);
 
   return {
     context,
-    channels: { master, ambience }
+    channels: { master, ambience },
+    cueBus
   };
 }
 

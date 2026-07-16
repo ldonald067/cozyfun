@@ -57,10 +57,6 @@ export function playMaterialPaintCue(audio: RunningAudio, material: MaterialId, 
       playNoise(audio, time, { duration: 0.044, frequency: material === MATERIAL.Fire ? 1700 : 1250, gain: 0.0042, type: "bandpass", q: 0.42 });
       playTone(audio, time, { duration: 0.036, frequency: material === MATERIAL.Meteor ? 92 : 120, gain: 0.0035, type: "sine" });
       return;
-    case MATERIAL.Smoke:
-    case MATERIAL.Steam:
-      playNoise(audio, time, { duration: 0.068, frequency: material === MATERIAL.Steam ? 1450 : 700, gain: 0.0027, type: "bandpass", q: 0.24 });
-      return;
     case MATERIAL.Stardust:
       playTone(audio, time, { duration: 0.078, frequency: 1040, endFrequency: 1560, gain: 0.0032, type: "sine" });
       playTone(audio, time + 0.025, { duration: 0.066, frequency: 1390, gain: 0.002, type: "sine" });
@@ -128,7 +124,7 @@ function playDroplet(audio: RunningAudio, time: number, cosmic: boolean) {
 }
 
 function playTone(audio: RunningAudio, time: number, options: ToneCue) {
-  const { context, channels } = audio;
+  const { context } = audio;
   const oscillator = context.createOscillator();
   oscillator.type = options.type ?? "sine";
   oscillator.frequency.setValueAtTime(options.frequency, time);
@@ -140,14 +136,14 @@ function playTone(audio: RunningAudio, time: number, options: ToneCue) {
   gain.gain.exponentialRampToValueAtTime(0.0001, time + options.duration);
 
   oscillator.connect(gain);
-  gain.connect(channels.ambience);
+  gain.connect(audio.cueBus);
   disconnectAfterEnded(oscillator, gain);
   oscillator.start(time);
   oscillator.stop(time + options.duration + 0.02);
 }
 
 function playNoise(audio: RunningAudio, time: number, options: NoiseCue) {
-  const { context, channels } = audio;
+  const { context } = audio;
   const source = context.createBufferSource();
   source.buffer = createNoiseBuffer(context, options.duration);
 
@@ -163,7 +159,7 @@ function playNoise(audio: RunningAudio, time: number, options: NoiseCue) {
 
   source.connect(filter);
   filter.connect(gain);
-  gain.connect(channels.ambience);
+  gain.connect(audio.cueBus);
   disconnectAfterEnded(source, filter, gain);
   source.start(time);
   source.stop(time + options.duration + 0.01);

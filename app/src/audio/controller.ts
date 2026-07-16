@@ -96,13 +96,10 @@ class CozyAudioController {
 
   setMoodAndRoom(mood: AudioMood, room: SceneEnvironmentId) {
     const nextPrefs = normalizeAudioPrefs({ ...this.prefs, mood });
-    const moodChanged = nextPrefs.mood !== this.prefs.mood;
-    const roomChanged = room !== this.room;
-    if (!moodChanged && !roomChanged) return;
+    if (nextPrefs.mood === this.prefs.mood && room === this.room) return;
     this.prefs = nextPrefs;
     this.room = room;
-    if (moodChanged) this.restartAmbienceLayer();
-    else this.restartAmbienceLayer();
+    this.restartAmbienceLayer();
   }
 
   setAudioProvider(provider: AudioProvider) {

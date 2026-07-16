@@ -15,6 +15,7 @@ export type AudioContextConstructor = typeof AudioContext;
 export type RunningAudio = {
   context: AudioContext;
   channels: Record<AudioChannel, GainNode>;
+  cueBus: GainNode;
 };
 
 export type AudioLayerHandle = {

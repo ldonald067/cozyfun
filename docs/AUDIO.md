@@ -74,7 +74,7 @@ Add new sounds in the narrowest module:
 - recorded ambience loop: `assets.ts`, `ambience.ts`, and `ASSET_CREDITS.md`
 - new mood preset: `moods.ts`
 - room-specific ambience balance: `rooms.ts`
-- short material cue: `cues.ts`, routed through the ambience channel and throttled by `controller.ts`
+- short material cue: `cues.ts`, routed through the dedicated cue bus under master (so quiet ambience never silences feedback) and throttled by `controller.ts`
 - reaction cue detection: `reactions.ts`
 - provider switching or external playback hooks: keep YouTube-specific parsing and persistence isolated in `deskRadio.ts`
 - channel/routing behavior: `mixer.ts`
