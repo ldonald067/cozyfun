@@ -1,4 +1,4 @@
-import { GLOW_MATERIALS, MATERIAL, MATERIAL_BY_ID, type MaterialId } from "../materials";
+import { CELL_FLAG, GLOW_MATERIALS, MATERIAL, MATERIAL_BY_ID, type MaterialId } from "../materials";
 import { clampColor, hexToRgb, type Rgb } from "./color";
 import { applyShapeLanguage, emptyCellColor } from "./shapeLanguage";
 
@@ -69,18 +69,21 @@ export function colorForCell(options: {
   return applyShapeLanguage({ kind, color: [r, g, b], variant, age, energy, flags, time, cells, width, height, x, y });
 }
 
-export function hasGlow(kind: number) {
+export function hasGlow(kind: number, flags = 0) {
+  if (kind === MATERIAL.Moss && (flags & CELL_FLAG.Cosmic) !== 0) return true;
   return GLOW_MATERIALS.has(kind as MaterialId);
 }
 
 export function glowIntensity(kind: number, energy: number, age: number, time: number) {
   const pulse = (Math.sin(time * 0.01 + age * 0.25) + 1) * 0.5;
   if (kind === MATERIAL.Ember) return clampColor(energy * 0.85 + (energy > 40 ? pulse * 35 : 0));
+  if (kind === MATERIAL.Moss) return clampColor(46 + energy * 0.28 + pulse * 26);
   const base = kind === MATERIAL.Stardust || kind === MATERIAL.Moonwater || kind === MATERIAL.Flower ? 80 : 120;
   return clampColor(base + energy * 0.45 + pulse * 55);
 }
 
-export function glowColorFor(kind: number): Rgb {
+export function glowColorFor(kind: number, flags = 0): Rgb {
+  if (kind === MATERIAL.Moss && (flags & CELL_FLAG.Cosmic) !== 0) return [159, 232, 196];
   const material = MATERIAL_BY_ID.get(kind as MaterialId);
   return hexToRgb(material?.glow ?? material?.color ?? "#ffffff");
 }

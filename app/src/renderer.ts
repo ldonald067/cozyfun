@@ -41,9 +41,9 @@ export function renderSandbox(engine: SandboxEngine, targets: RenderTargets, tim
     base.data[pixelOffset + 2] = color[2];
     base.data[pixelOffset + 3] = 255;
 
-    if (hasGlow(kind)) {
+    if (hasGlow(kind, flags)) {
       const intensity = glowIntensity(kind, energy, age, time);
-      const glowColor = glowColorFor(kind);
+      const glowColor = glowColorFor(kind, flags);
       glow.data[pixelOffset] = glowColor[0];
       glow.data[pixelOffset + 1] = glowColor[1];
       glow.data[pixelOffset + 2] = glowColor[2];

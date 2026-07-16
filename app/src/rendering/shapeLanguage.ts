@@ -1,6 +1,6 @@
 import { CELL_FLAG, MATERIAL } from "../materials";
 import { adjustRgb, mixRgb, type Rgb } from "./color";
-import { cardinalNeighborCount, contactInfo, edgeInfo, hasNearbyKind, kindAt, sameKind, sameLiquid } from "./cells";
+import { cardinalNeighborCount, contactInfo, edgeInfo, hasNearbyKind, kindAt, readU16, sameKind, sameLiquid } from "./cells";
 import { hashCell } from "./hash";
 
 export type ShapeContext = {
@@ -31,6 +31,16 @@ const EARTH_CONTACT_KINDS = [MATERIAL.Sand, MATERIAL.Soil, MATERIAL.Stone, MATER
 
 export function emptyCellColor(cells: Uint8Array, width: number, height: number, x: number, y: number, time: number): Rgb {
   const background: Rgb = [9, 14, 20];
+  if (kindAt(cells, width, height, x, y + 1) === MATERIAL.Ember) {
+    const emberEnergy = readU16(cells, ((y + 1) * width + x) * 8 + 4);
+    if (emberEnergy > 90) {
+      const hash = hashCell(x, y, 3);
+      const spark = Math.sin(time * 0.03 + hash * 1.7 + x * 0.9);
+      if (spark > 0.92 && (hash & 3) === 0) {
+        return mixRgb(background, [255, 196, 90], 0.62);
+      }
+    }
+  }
   if (kindAt(cells, width, height, x, y + 1) === MATERIAL.Meteor) {
     const flicker = (Math.sin(time * 0.02 + x * 1.3) + 1) * 0.5;
     return mixRgb(background, [255, 170, 80], 0.2 + flicker * 0.14);
@@ -77,6 +87,15 @@ export function applyShapeLanguage(context: ShapeContext): Rgb {
   else if (kind === MATERIAL.Wood) out = woodColor(context);
   else if (kind === MATERIAL.Stardust) out = stardustColor(context);
   return nearbyLight(context, out);
+}
+
+// Branching frost veins for frozen solids, so deep cold reads as growth instead of a flat tint.
+function frostFerns(out: Rgb, hash: number, x: number, y: number): Rgb {
+  const branch = (x * 3 + y * 5 + (hash & 7)) % 11 === 0 || ((x ^ y) + (hash >> 3)) % 13 === 0;
+  const vein = ((x + y * 2 + hash) & 7) === 0;
+  if (branch) return mixRgb(out, [228, 249, 255], 0.5);
+  if (vein) return mixRgb(out, [178, 224, 242], 0.35);
+  return out;
 }
 
 function nearbyLight({ kind, cells, width, height, x, y }: ShapeContext, color: Rgb): Rgb {
@@ -139,6 +158,7 @@ function wallColor({ color, variant, energy, flags, cells, width, height, x, y }
     out = mixRgb(out, [172, 215, 228], edge.top ? 0.52 : 0.36);
     if (brickY === 0 || (brickX === 1 && hash % 2 === 0)) out = mixRgb(out, [235, 252, 255], 0.3);
     if (brickY === 3 && hash % 4 === 0) out = mixRgb(out, [122, 190, 211], 0.18);
+    out = frostFerns(out, hash, x, y);
   }
   if (energy > 130) {
     if ((hash + brickX * 5 + brickY * 3) % 6 === 0) out = mixRgb(out, [15, 18, 24], 0.5);
@@ -186,6 +206,7 @@ function sandColor({ color, variant, energy, flags, cells, width, height, x, y }
   if (frozen) {
     out = mixRgb(out, [194, 225, 229], surface ? 0.48 : 0.32);
     if (surface || localY === 0) out = mixRgb(out, [239, 252, 255], 0.22);
+    out = frostFerns(out, hash, x, y);
   }
   if (cosmic) {
     out = mixRgb(out, [142, 154, 215], 0.18);
@@ -231,6 +252,7 @@ function soilColor({ color, variant, energy, flags, cells, width, height, x, y }
   if (frozen) {
     out = mixRgb(out, [172, 214, 230], surface ? 0.52 : 0.38);
     if (surface || localY === 0) out = mixRgb(out, [233, 252, 255], 0.22);
+    out = frostFerns(out, hash, x, y);
   }
   return out;
 }
@@ -482,6 +504,7 @@ function stoneColor({ color, variant, energy, flags, cells, width, height, x, y 
     out = mixRgb(out, [179, 220, 232], edge.top || localY === 0 ? 0.54 : 0.38);
     if (localX + localY === 3 || facet % 13 === 0) out = mixRgb(out, [237, 253, 255], 0.3);
     if (edge.left || localX === 0) out = mixRgb(out, [123, 190, 211], 0.16);
+    out = frostFerns(out, facet, x, y);
   }
   if (cosmic) {
     out = mixRgb(out, [118, 134, 204], 0.26);
@@ -585,7 +608,10 @@ function growthColor({ kind, color, variant, age, energy, flags, cells, width, h
     if (Boolean(flags & CELL_FLAG.Wet) && energy > 110 && (hash % 6 === 0 || (edge.top && hash % 3 === 0))) {
       out = mixRgb(out, [222, 248, 255], 0.55);
     }
-    if (cosmic) out = mixRgb(out, [143, 238, 177], moonFed ? 0.34 : 0.22);
+    if (cosmic) {
+      out = mixRgb(out, [143, 238, 177], moonFed ? 0.34 : 0.22);
+      if (edge.top && hash % 3 !== 2) out = mixRgb(out, [196, 255, 219], 0.4);
+    }
     if (oilContact.count > 0) {
       out = mixRgb(out, [32, 42, 27], oilContact.top ? 0.42 : 0.28);
       if (edge.top || hash % 4 === 0) out = mixRgb(out, [86, 88, 47], 0.24);
@@ -712,6 +738,7 @@ function woodColor({ color, variant, energy, flags, cells, width, height, x, y }
   if (frozen) {
     out = mixRgb(out, [166, 205, 216], 0.48);
     if (edge.top || endGrain) out = mixRgb(out, [228, 248, 255], 0.3);
+    out = frostFerns(out, hash, x, y);
   }
   return out;
 }
