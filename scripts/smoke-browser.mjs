@@ -278,11 +278,11 @@ async function main() {
     const importedMetadata = await evaluate(cdp, `(() => ({
       roomClass: document.querySelector(".app-shell")?.classList.contains("scene-snow-window"),
       roomImage: getComputedStyle(document.querySelector(".app-shell")).getPropertyValue("--room-image"),
-      windowMoodActive: document.querySelector('[data-testid="audio-mood-window"]')?.classList.contains("active")
+      purrMoodActive: document.querySelector('[data-testid="audio-mood-purr"]')?.classList.contains("active")
     }))()`);
     assert(importedMetadata.roomClass, "imported scene metadata did not restore the snow room");
     assert(importedMetadata.roomImage.includes("snow-window.jpg"), `imported scene room image was not applied: ${importedMetadata.roomImage}`);
-    assert(importedMetadata.windowMoodActive, "imported scene metadata did not restore the window sound mood");
+    assert(importedMetadata.purrMoodActive, "imported legacy window mood metadata did not map to the purr mood");
     await evaluate(
       cdp,
       `(() => {
@@ -349,7 +349,7 @@ async function main() {
     );
     const hearthAmbience = await evaluate(cdp, `window.__cozyNativeAmbienceProbe?.starts ?? []`);
     assertNativeStart(hearthAmbience, "fireCrackle", "/audio/fire-crackle.wav", 120, { minGain: 0.05 });
-    await click(cdp, '[data-testid="audio-mood-stardust"]');
+    await click(cdp, '[data-testid="audio-mood-fire"]');
     await waitForStatus(cdp, "fireplace crackle on");
     await click(cdp, '[data-testid="audio-mute"]');
     await waitForStatus(cdp, "audio muted");
@@ -433,7 +433,7 @@ async function main() {
     const moonImage = await evaluate(cdp, `getComputedStyle(document.querySelector(".app-shell")).getPropertyValue("--room-image")`);
     assert(moonClass, "moonwater room class was not applied");
     assert(moonImage.includes("moonwater-garden.jpg"), `moonwater room image was not applied: ${moonImage}`);
-    await waitUntil(() => textIncludes(cdp, '[data-testid="audio-mood-window"]', "Purr"), "purr mood control to stay visible");
+    await waitUntil(() => textIncludes(cdp, '[data-testid="audio-mood-purr"]', "Purr"), "purr mood control to stay visible");
     await click(cdp, '[data-testid="scene-environment-stardust-hearth"]');
     await waitForStatus(cdp, "stardust hearth backdrop on");
     const hearthClass = await evaluate(cdp, `document.querySelector(".app-shell")?.classList.contains("scene-stardust-hearth")`);

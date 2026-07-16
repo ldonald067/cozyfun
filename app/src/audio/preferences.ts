@@ -1,4 +1,4 @@
-import { DEFAULT_AUDIO_MOOD, isAudioMood } from "./moods";
+import { DEFAULT_AUDIO_MOOD, resolveAudioMood } from "./moods";
 import { DEFAULT_AUDIO_PROVIDER, normalizeAudioProvider } from "./providers";
 import type { AudioChannel, AudioPrefs } from "./types";
 import { clamp01 } from "./utils";
@@ -42,7 +42,7 @@ export function normalizeAudioPrefs(value: unknown): AudioPrefs {
   return {
     enabled: typeof candidate.enabled === "boolean" ? candidate.enabled : DEFAULT_AUDIO_PREFS.enabled,
     muted: typeof candidate.muted === "boolean" ? candidate.muted : DEFAULT_AUDIO_PREFS.muted,
-    mood: isAudioMood(candidate.mood) ? candidate.mood : DEFAULT_AUDIO_PREFS.mood,
+    mood: resolveAudioMood(candidate.mood) ?? DEFAULT_AUDIO_PREFS.mood,
     provider: normalizeAudioProvider(candidate.provider),
     volumes: {
       master: readVolume(candidate.volumes?.master, DEFAULT_AUDIO_PREFS.volumes.master),

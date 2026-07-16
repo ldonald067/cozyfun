@@ -1,5 +1,5 @@
 export type AudioChannel = "master" | "ambience";
-export type AudioMood = "rain" | "window" | "stardust";
+export type AudioMood = "rain" | "purr" | "fire";
 export type AudioProvider = "native" | "external";
 
 export type AudioPrefs = {

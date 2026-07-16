@@ -15,7 +15,7 @@ export const AUDIO_MOODS: AudioMoodDef[] = [
     }
   },
   {
-    id: "window",
+    id: "purr",
     label: "Purr",
     title: "Cat Purr",
     status: "cat purr on",
@@ -28,7 +28,7 @@ export const AUDIO_MOODS: AudioMoodDef[] = [
     }
   },
   {
-    id: "stardust",
+    id: "fire",
     label: "Fire",
     title: "Fireplace",
     status: "fireplace crackle on",
@@ -50,4 +50,16 @@ export function getAudioMoodDef(mood: AudioMood) {
 
 export function isAudioMood(value: unknown): value is AudioMood {
   return typeof value === "string" && AUDIO_MOODS.some((candidate) => candidate.id === value);
+}
+
+// Saves and prefs written before the mood rename carry these ids.
+const LEGACY_AUDIO_MOOD_IDS: Record<string, AudioMood> = {
+  window: "purr",
+  stardust: "fire"
+};
+
+export function resolveAudioMood(value: unknown): AudioMood | null {
+  if (typeof value !== "string") return null;
+  const mapped = LEGACY_AUDIO_MOOD_IDS[value] ?? value;
+  return isAudioMood(mapped) ? mapped : null;
 }

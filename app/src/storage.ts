@@ -1,5 +1,5 @@
 import type { SandboxEngine } from "./engine";
-import { isAudioMood } from "./audio/moods";
+import { resolveAudioMood } from "./audio/moods";
 import type { AudioMood, AudioProvider } from "./audio/types";
 import { validateDeskRadioSource, type DeskRadioSource } from "./deskRadio";
 import { CELL_STRIDE } from "./materials";
@@ -158,14 +158,15 @@ function validateSnapshotMetadata(value: unknown): SceneSnapshotMetadata | null 
   if (candidate.app !== APP_NAME) return null;
   if (typeof candidate.title !== "string" || candidate.title.trim().length === 0) return null;
   if (!isSceneEnvironmentId(candidate.room)) return null;
-  if (!isAudioMood(candidate.mood)) return null;
+  const mood = resolveAudioMood(candidate.mood);
+  if (!mood) return null;
   const deskRadio = validateDeskRadioSource(candidate.deskRadio);
   const musicProvider = candidate.musicProvider === "external" && deskRadio ? "external" : "generated";
   return {
     app: APP_NAME,
     title: candidate.title.trim(),
     room: candidate.room,
-    mood: candidate.mood,
+    mood,
     musicProvider,
     deskRadio: musicProvider === "external" ? deskRadio : undefined
   };
