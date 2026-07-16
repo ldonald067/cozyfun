@@ -605,6 +605,9 @@ impl Universe {
                             if is_moonwater {
                                 next[nidx].flags |= FLAG_COSMIC;
                             }
+                            if next[nidx].flags & FLAG_SCORCHED != 0 && self.chance(5) {
+                                next[nidx].flags &= !FLAG_SCORCHED;
+                            }
                         }
                         if other.kind == Material::Wall as u8 {
                             let wall_vigor = (vigor / if is_moonwater { 3 } else { 5 }).max(8);
@@ -612,6 +615,9 @@ impl Universe {
                             next[nidx].flags |= FLAG_WET;
                             if is_moonwater {
                                 next[nidx].flags |= FLAG_COSMIC;
+                            }
+                            if next[nidx].flags & FLAG_SCORCHED != 0 && self.chance(5) {
+                                next[nidx].flags &= !FLAG_SCORCHED;
                             }
                         }
                     }
@@ -1569,6 +1575,26 @@ mod tests {
         assert_eq!(kind_at(&u, 8, 8), Material::Wood as u8);
         assert!(flags_at(&u, 8, 8) & FLAG_SCORCHED != 0);
         assert_eq!(flags_at(&u, 8, 8) & FLAG_WET, 0);
+    }
+
+    #[test]
+    fn water_rinses_soot_from_hard_surfaces() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 7, 8, Material::Water);
+        set_cell_state(&mut u, 8, 8, Material::Stone, 12, 40, FLAG_SCORCHED);
+        for (x, y) in [(6, 8), (5, 8), (9, 8), (6, 9), (7, 9), (8, 9)] {
+            set_cell(&mut u, x, y, Material::Stone);
+        }
+        let mut rinsed = false;
+        for _ in 0..40 {
+            u.tick();
+            if flags_at(&u, 8, 8) & FLAG_SCORCHED == 0 {
+                rinsed = true;
+                break;
+            }
+        }
+        assert!(rinsed, "running water should rinse soot from scorched stone");
+        assert_eq!(kind_at(&u, 8, 8), Material::Stone as u8);
     }
 
     #[test]

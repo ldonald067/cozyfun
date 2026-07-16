@@ -31,7 +31,8 @@ class CozyAudioController {
     "ember-glow": Number.NEGATIVE_INFINITY,
     quench: Number.NEGATIVE_INFINITY,
     crumble: Number.NEGATIVE_INFINITY,
-    frost: Number.NEGATIVE_INFINITY
+    frost: Number.NEGATIVE_INFINITY,
+    dew: Number.NEGATIVE_INFINITY
   };
 
   async init(prefs: AudioPrefs, room: SceneEnvironmentId = this.room) {
@@ -181,6 +182,7 @@ const REACTION_CUE_PRIORITY: ReactionCue[] = [
   "cosmic-charge",
   "bloom",
   "frost",
+  "dew",
   "steam-flash"
 ];
 
@@ -195,5 +197,6 @@ const REACTION_CUE_COOLDOWNS: Record<ReactionCue, number> = {
   "ember-glow": 1.25,
   quench: 1.05,
   crumble: 1.6,
-  frost: 1.2
+  frost: 1.2,
+  dew: 1.35
 };

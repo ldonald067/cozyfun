@@ -115,6 +115,10 @@ export function playReactionCue(audio: RunningAudio, cue: ReactionCue, time: num
       playTone(audio, time, { duration: 0.06, frequency: 1240, endFrequency: 1580, gain: 0.0018, type: "sine" });
       playNoise(audio, time + 0.008, { duration: 0.04, frequency: 4200, gain: 0.0007, type: "highpass", q: 0.5 });
       return;
+    case "dew":
+      playTone(audio, time, { duration: 0.06, frequency: 1180, endFrequency: 860, gain: 0.0022, type: "sine" });
+      playTone(audio, time + 0.05, { duration: 0.05, frequency: 1420, endFrequency: 1020, gain: 0.0014, type: "sine" });
+      return;
   }
 }
 

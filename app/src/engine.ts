@@ -430,11 +430,17 @@ class JsSandboxEngine implements SandboxEngine {
           if (other === MATERIAL.Stone) {
             writeU16(next, nidx + 4, Math.min(255, readU16(next, nidx + 4) + Math.floor(vigor / 2)));
             writeU16(next, nidx + 6, readU16(next, nidx + 6) | CELL_FLAG.Wet | (kind === MATERIAL.Moonwater ? CELL_FLAG.Cosmic : 0));
+            if (readU16(next, nidx + 6) & CELL_FLAG.Scorched && this.chance(5)) {
+              writeU16(next, nidx + 6, readU16(next, nidx + 6) & ~CELL_FLAG.Scorched);
+            }
           }
           if (other === MATERIAL.Wall) {
             const wallVigor = Math.max(8, Math.floor(vigor / (kind === MATERIAL.Moonwater ? 3 : 5)));
             writeU16(next, nidx + 4, Math.min(255, readU16(next, nidx + 4) + wallVigor));
             writeU16(next, nidx + 6, readU16(next, nidx + 6) | CELL_FLAG.Wet | (kind === MATERIAL.Moonwater ? CELL_FLAG.Cosmic : 0));
+            if (readU16(next, nidx + 6) & CELL_FLAG.Scorched && this.chance(5)) {
+              writeU16(next, nidx + 6, readU16(next, nidx + 6) & ~CELL_FLAG.Scorched);
+            }
           }
         }
         if (kind === MATERIAL.Ember) {

@@ -50,7 +50,7 @@ export function colorForCell(options: {
   if (kind === MATERIAL.Stardust) {
     const twinkle = Math.sin(time * 0.018 + variant * 3 + age * 0.13) * 32;
     r = clampColor(r + twinkle);
-    b = clampColor(b + twinkle);
+    g = clampColor(g + twinkle * 0.7);
   }
 
   if (kind === MATERIAL.Seed) {

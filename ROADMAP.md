@@ -388,6 +388,28 @@ Completed:
 
 Remaining review targets when taste says so: Fungus vs Stardust purples (53) and Ember vs Oil darks (49) both rely on motion, glow, and shape to separate, which currently reads fine in play.
 
+Follow-up from live testing: palettes alone were not enough for stardust vs moonwater because both bloomed nearly identical lavender glow halos. Stardust now glows warm gold starlight (glow, twinkle, and air sparkle all lean gold over violet) while moonwater glows cool silver-blue moonlight.
+
+## Phase 14: Living Touches
+
+Status: first two landed; the rest are candidates.
+
+Interactions grounded in real life or cozy invention, each with a visible or audible moment. Landed so far:
+
+- Dew: freshly watered moss beads with bright dew glints and plays a soft double-plink cue, so watering the garden answers back.
+- Rain rinse: flowing water gradually washes soot and scorch marks off wall and stone, so a burned corner can be cleaned instead of staying stained forever.
+
+Candidate backlog (pick by taste, one atomic pass each):
+
+- Petrichor puff: the first water landing on long-dry soil releases a brief dust-mist wisp (real: the smell of rain on dry earth).
+- Dew drip: overnight-wet moss and flowers occasionally shed a single falling droplet (real: morning dew).
+- Pollen drift: mature flowers release slow-drifting golden motes that can seed nearby soil (half real, half cozy).
+- Frost ferns: frozen glass and stone grow branching frost patterns instead of a flat tint (real: window frost).
+- Moon blessing: moonwater-fed moss glows faintly at its tips at night, a quiet cosmic lantern (invented).
+- Ember pop: hot embers occasionally spit a tiny spark that arcs and dies (real: fireplace pops, pairs with the crackle bed).
+- Charcoal ink: cold char crumbled by water tints the puddle briefly dark (real: soot wash).
+- Glass chime: meteor impact on existing glass shatters it back to sand with a bright chime (real physics, satisfying loop with vitrify).
+
 ## Phase 12: Heat Identity + Discovery Moments
 
 Status: 12A and 12B complete; 12C shipped, then removed after play testing; 12D open.

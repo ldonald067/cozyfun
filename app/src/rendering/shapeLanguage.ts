@@ -50,7 +50,7 @@ export function emptyCellColor(cells: Uint8Array, width: number, height: number,
     const hash = hashCell(x, y, i);
     if ((hash & 3) === 0) {
       const twinkle = (Math.sin(time * 0.018 + hash * 0.0001) + 1) * 0.5;
-      return mixRgb(background, [154, 128, 255], 0.28 + twinkle * 0.16);
+      return mixRgb(background, [255, 214, 138], 0.24 + twinkle * 0.16);
     }
   }
   return background;
@@ -582,6 +582,9 @@ function growthColor({ kind, color, variant, age, energy, flags, cells, width, h
       out = mixRgb(out, [102, 180, 83], 0.22);
       if (edge.top || hash % 11 === 0) out = mixRgb(out, [207, 241, 153], 0.38);
     }
+    if (Boolean(flags & CELL_FLAG.Wet) && energy > 110 && (hash % 6 === 0 || (edge.top && hash % 3 === 0))) {
+      out = mixRgb(out, [222, 248, 255], 0.55);
+    }
     if (cosmic) out = mixRgb(out, [143, 238, 177], moonFed ? 0.34 : 0.22);
     if (oilContact.count > 0) {
       out = mixRgb(out, [32, 42, 27], oilContact.top ? 0.42 : 0.28);
@@ -717,8 +720,8 @@ function stardustColor({ color, variant, age, time, cells, width, height, x, y }
   const hash = hashCell(x, y, variant);
   const twinkle = (Math.sin(time * 0.02 + age * 0.2 + hash * 0.0002) + 1) * 0.5;
   const moonContact = hasNearbyKind(cells, width, height, x, y, MOONWATER_KINDS);
-  let out = mixRgb(color, hash % 3 === 0 ? [255, 233, 159] : [174, 227, 255], 0.32 + twinkle * 0.28);
+  let out = mixRgb(color, hash % 3 === 0 ? [186, 214, 255] : [255, 224, 140], 0.32 + twinkle * 0.28);
   if (moonContact) out = mixRgb(out, [236, 222, 255], 0.34);
-  if (hash % 9 === 0) out = [255, 246, 197];
+  if (hash % 9 === 0) out = [255, 240, 180];
   return adjustRgb(out, twinkle * 22);
 }

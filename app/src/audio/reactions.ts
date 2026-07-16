@@ -11,7 +11,8 @@ export const REACTION_CUES = [
   "ember-glow",
   "quench",
   "crumble",
-  "frost"
+  "frost",
+  "dew"
 ] as const;
 
 export type ReactionCue = (typeof REACTION_CUES)[number];
@@ -64,6 +65,9 @@ export function detectReactionCues(before: Uint8Array, after: Uint8Array): React
     }
     if ((beforeKind === MATERIAL.Steam || beforeKind === MATERIAL.Water) && afterKind === MATERIAL.Ice) {
       found.add("frost");
+    }
+    if (beforeKind === MATERIAL.Moss && afterKind === MATERIAL.Moss && gainedFlag(before, after, idx, CELL_FLAG.Wet)) {
+      found.add("dew");
     }
 
     if (found.size === REACTION_CUES.length) break;

@@ -260,7 +260,7 @@ export const MATERIALS: MaterialDef[] = [
     identity: ["Cosmic drifting powder", "Charges water and life"],
     color: "#9d7ef5",
     palette: ["#5c48d8", "#8a66f2", "#b48cff", "#ffd98a", "#6a54e0"],
-    glow: "#a988ff",
+    glow: "#ffd27e",
     group: "cosmic"
   },
   {
@@ -282,7 +282,7 @@ export const MATERIALS: MaterialDef[] = [
     identity: ["Cosmic growth liquid", "Cleans oil into stardust"],
     color: "#aab4f2",
     palette: ["#7284e0", "#96a8f2", "#c2c8ff", "#e9e5ff", "#c9aefc"],
-    glow: "#a9a4ff",
+    glow: "#8fb4ff",
     group: "cosmic"
   }
 ];

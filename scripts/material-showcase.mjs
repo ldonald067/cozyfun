@@ -65,7 +65,7 @@ export function materialShowcaseScript() {
     line(43, 82, 76, material.Wood, 30, 48);
     line(43, 57, 74, material.Wood, 96, 40, flag.Wet);
     line(60, 74, 73, material.Wood, 18, 84, flag.Scorched);
-    rect(46, 63, 65, 72, material.Moss, 110, 88, flag.Wet);
+    rect(46, 63, 65, 72, material.Moss, 160, 88, flag.Wet);
     rect(64, 75, 63, 70, material.Fungus, 96, 96, flag.Wet);
     rect(76, 82, 58, 64, material.Fungus, 130, 116, flag.Wet | flag.Cosmic);
     line(77, 81, 57, material.Moonwater, 140, 22, flag.Cosmic);

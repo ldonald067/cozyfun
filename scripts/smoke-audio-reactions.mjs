@@ -52,6 +52,7 @@ const MATERIAL = {
   Fire: 6,
   Wood: 7,
   Stone: 9,
+  Moss: 10,
   Seed: 11,
   Oil: 13,
   Ice: 14,
@@ -66,6 +67,7 @@ const MATERIAL = {
 
 const CELL_FLAG = {
   Wet: 1 << 0,
+  Rooted: 1 << 1,
   Cosmic: 1 << 2
 };
 
@@ -177,6 +179,16 @@ expectCues("water freezes into ice", (before, after) => {
   setCell(before, 1, 1, MATERIAL.Water);
   setCell(after, 1, 1, MATERIAL.Ice);
 }, ["frost"]);
+
+expectCues("watered moss beads with dew", (before, after) => {
+  setCell(before, 1, 1, MATERIAL.Moss);
+  setCell(after, 1, 1, MATERIAL.Moss, { flags: CELL_FLAG.Wet });
+}, ["dew"]);
+
+expectCues("already wet moss stays silent", (before, after) => {
+  setCell(before, 1, 1, MATERIAL.Moss, { flags: CELL_FLAG.Wet });
+  setCell(after, 1, 1, MATERIAL.Moss, { flags: CELL_FLAG.Wet });
+}, []);
 
 expectCues("priority order and uniqueness", (before, after) => {
   setCell(before, 0, 0, MATERIAL.Water);
