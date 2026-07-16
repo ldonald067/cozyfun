@@ -466,4 +466,24 @@ withUniverse(16, 16, 7, (universe) => {
   assert(embered, "burning wood should leave glowing embers");
 });
 
+withUniverse(16, 16, 7, (universe) => {
+  const cells = new Uint8Array(16 * 16 * 8);
+  setCell(cells, 16, 7, 8, MATERIAL.Fire, { energy: 240 });
+  setCell(cells, 16, 8, 8, MATERIAL.Water);
+  for (const [x, y] of [[6, 8], [5, 8], [9, 8], [10, 8], [6, 9], [7, 9], [8, 9], [9, 9]]) setCell(cells, 16, x, y, MATERIAL.Stone);
+  const ptr = wasm.alloc(cells.byteLength);
+  new Uint8Array(wasm.memory.buffer, ptr, cells.byteLength).set(cells);
+  assert(wasm.universe_load_cells(universe, ptr, cells.byteLength) === 1, "boiling cells should load");
+  wasm.dealloc(ptr, cells.byteLength);
+  wasm.universe_tick(universe);
+  wasm.universe_tick(universe);
+  assert(kindAt(readCells(universe), 16, 8, 8) === MATERIAL.Water, "water should heat gradually instead of flashing to steam");
+  let boiled = false;
+  for (let tick = 0; tick < 30 && !boiled; tick++) {
+    wasm.universe_tick(universe);
+    boiled = kindAt(readCells(universe), 16, 8, 8) === MATERIAL.Steam;
+  }
+  assert(boiled, "sustained flame should boil water into steam");
+});
+
 console.log("WASM smoke checks passed");

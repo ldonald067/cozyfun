@@ -529,7 +529,7 @@ function stoneColor({ color, variant, energy, flags, cells, width, height, x, y 
   return out;
 }
 
-function liquidColor({ kind, color, variant, flags, time, cells, width, height, x, y }: ShapeContext) {
+function liquidColor({ kind, color, variant, energy, flags, time, cells, width, height, x, y }: ShapeContext) {
   const top = !sameLiquid(cells, width, height, x, y - 1, kind);
   const left = sameLiquid(cells, width, height, x - 1, y, kind);
   const right = sameLiquid(cells, width, height, x + 1, y, kind);
@@ -544,6 +544,13 @@ function liquidColor({ kind, color, variant, flags, time, cells, width, height, 
   if (kind === MATERIAL.Water && hasNearbyKind(cells, width, height, x, y, EMBER_KINDS)) {
     // Charcoal ink: water running over char picks up a sooty murk.
     out = mixRgb(out, [31, 29, 27], 0.32);
+  }
+  if (kind === MATERIAL.Water && energy > 120) {
+    // Water's energy is temperature: simmering water warms and bubbles, boiling water churns.
+    const rolling = energy > 190;
+    out = mixRgb(out, [186, 170, 158], 0.1 + (energy / 255) * 0.1);
+    const bubble = (x * 7 + y * 13 + Math.floor(time * 0.02) + hash) % (rolling ? 4 : 9) === 0;
+    if (bubble) out = mixRgb(out, [240, 252, 255], rolling ? 0.66 : 0.5);
   }
 
   if (kind === MATERIAL.Oil) {

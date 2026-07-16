@@ -398,6 +398,7 @@ impl Universe {
                 x if x == Material::Fire as u8 => 3,
                 x if x == Material::Ember as u8 => 2,
                 x if x == Material::Pollen as u8 => 2,
+                x if x == Material::Water as u8 => 2,
                 x if x == Material::Steam as u8 => 2,
                 x if x == Material::Smoke as u8 => 1,
                 x if x == Material::Stardust as u8 => 1,
@@ -441,9 +442,20 @@ impl Universe {
                     let mut dampened = false;
                     for nidx in neighbors {
                         let other = old[nidx];
-                        if other.kind == Material::Water as u8 || other.kind == Material::Moonwater as u8 {
+                        if other.kind == Material::Water as u8 {
+                            // Water heats gradually: its energy field is temperature, and a
+                            // sustained flame walks it from simmer to a boil-off into steam.
                             dampened = true;
-                            if self.chance(if other.kind == Material::Moonwater as u8 { 2 } else { 3 }) {
+                            if next[nidx].kind == Material::Water as u8 {
+                                next[nidx].energy = next[nidx].energy.saturating_add(30).min(255);
+                                if next[nidx].energy > 200 {
+                                    next[nidx] = Cell::new(Material::Steam as u8, other.variant, 180);
+                                }
+                            }
+                        }
+                        if other.kind == Material::Moonwater as u8 {
+                            dampened = true;
+                            if self.chance(2) {
                                 next[nidx] = Cell::new(Material::Steam as u8, other.variant, 180);
                             }
                         }
@@ -535,8 +547,17 @@ impl Universe {
                 x if x == Material::Water as u8 || x == Material::Moonwater as u8 => {
                     let is_moonwater = cell.kind == Material::Moonwater as u8;
                     let vigor = if is_moonwater { 96 } else { 56 };
+                    if !is_moonwater && cell.energy > 150 && self.chance(20) {
+                        // Simmering water vents a wisp and loses heat to evaporation.
+                        self.emit_vapor_from(idx, old, next, Material::Steam as u8, cell.variant, 120);
+                        next[idx].energy = next[idx].energy.saturating_sub(40);
+                    }
                     for nidx in neighbors {
                         let other = old[nidx];
+                        if !is_moonwater && other.kind == Material::Ice as u8 && cell.energy > 120 && self.chance(2) {
+                            next[nidx] = Cell::new(Material::Water as u8, other.variant, 40);
+                            continue;
+                        }
                         if is_moonwater && other.kind == Material::Oil as u8 && self.chance(4) {
                             next[nidx] = Cell::new(Material::Stardust as u8, other.variant, 150);
                             continue;
@@ -642,7 +663,7 @@ impl Universe {
                     }
                     for nidx in neighbors {
                         let other = old[nidx];
-                        if other.kind == Material::Water as u8 && self.chance(5) {
+                        if other.kind == Material::Water as u8 && other.energy < 120 && self.chance(5) {
                             next[nidx] = Cell::new(Material::Ice as u8, other.variant, 90);
                         } else if other.kind == Material::Moonwater as u8 && self.chance(10) {
                             next[nidx] = Cell::new(Material::Ice as u8, other.variant, 110);
@@ -1737,6 +1758,48 @@ mod tests {
             }
         }
         assert!(dripped, "saturated overhanging moss should shed a dew droplet");
+    }
+
+    #[test]
+    fn sustained_flame_simmers_then_boils_water() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 7, 8, Material::Fire);
+        set_cell(&mut u, 8, 8, Material::Water);
+        for (x, y) in [(6, 8), (5, 8), (9, 8), (10, 8), (6, 9), (7, 9), (8, 9), (9, 9)] {
+            set_cell(&mut u, x, y, Material::Stone);
+        }
+        u.tick();
+        u.tick();
+        assert_eq!(kind_at(&u, 8, 8), Material::Water as u8, "water should heat gradually, not flash to steam");
+        assert!(energy_at(&u, 8, 8) > 30, "heated water should store temperature");
+        let mut boiled = false;
+        for _ in 0..30 {
+            u.tick();
+            if kind_at(&u, 8, 8) == Material::Steam as u8 {
+                boiled = true;
+                break;
+            }
+        }
+        assert!(boiled, "sustained flame should boil water away into steam");
+    }
+
+    #[test]
+    fn hot_water_melts_ice_and_resists_freezing() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell_state(&mut u, 7, 8, Material::Water, 4, 220, 0);
+        set_cell(&mut u, 8, 8, Material::Ice);
+        for (x, y) in [(6, 8), (5, 8), (6, 9), (7, 9), (8, 9)] {
+            set_cell(&mut u, x, y, Material::Stone);
+        }
+        let mut melted = false;
+        for _ in 0..40 {
+            u.tick();
+            if kind_at(&u, 8, 8) == Material::Water as u8 {
+                melted = true;
+                break;
+            }
+        }
+        assert!(melted, "hot water should melt adjacent ice instead of freezing");
     }
 
     #[test]

@@ -406,6 +406,7 @@ Interactions grounded in real life or cozy invention, each with a visible or aud
 - Charcoal ink: running water crumbles cold char away while picking up a sooty murk, and only hot embers hiss steam.
 - Glass chime: meteor impact shatters existing glass back to sand with a bright chime, closing the sand-glass-sand loop.
 - Pollen drift: mature, healthy flowers spend energy releasing rare golden pollen motes that drift, settle, and can take root as seeds on damp soil, letting a tended garden slowly spread on its own.
+- Boiling: water's stored energy is temperature. Sustained flame simmers it (warm bubbling visuals, steam wisps that cool it back), then boils it away to steam; hot water melts ice and resists freezing; lava and meteor keep their instant flash; moonwater never boils. A state, not a new toolbar element.
 
 ## Phase 12: Heat Identity + Discovery Moments
 

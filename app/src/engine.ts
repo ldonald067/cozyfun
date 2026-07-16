@@ -258,7 +258,7 @@ class JsSandboxEngine implements SandboxEngine {
       const drain =
         kind === MATERIAL.Fire
           ? 3
-          : kind === MATERIAL.Ember || kind === MATERIAL.Steam || kind === MATERIAL.Pollen
+          : kind === MATERIAL.Ember || kind === MATERIAL.Steam || kind === MATERIAL.Pollen || kind === MATERIAL.Water
             ? 2
             : kind === MATERIAL.Smoke ||
                 kind === MATERIAL.Stardust ||
@@ -298,9 +298,19 @@ class JsSandboxEngine implements SandboxEngine {
       for (const nidx of this.neighbors(x, y)) {
         const other = old[nidx];
         if (kind === MATERIAL.Fire) {
-          if (other === MATERIAL.Water || other === MATERIAL.Moonwater) {
+          if (other === MATERIAL.Water) {
             fireDampened = true;
-            if (this.chance(other === MATERIAL.Moonwater ? 2 : 3)) {
+            if (next[nidx] === MATERIAL.Water) {
+              const heated = Math.min(255, readU16(next, nidx + 4) + 30);
+              writeU16(next, nidx + 4, heated);
+              if (heated > 200) {
+                writeCellBytes(next, nidx, MATERIAL.Steam, old[nidx + 1], 180);
+              }
+            }
+          }
+          if (other === MATERIAL.Moonwater) {
+            fireDampened = true;
+            if (this.chance(2)) {
               writeCellBytes(next, nidx, MATERIAL.Steam, old[nidx + 1], 180);
             }
           }
@@ -343,7 +353,7 @@ class JsSandboxEngine implements SandboxEngine {
           writeCellBytes(next, idx, MATERIAL.Water, old[idx + 1], 70);
           continue;
         }
-        if (kind === MATERIAL.Ice && other === MATERIAL.Water && this.chance(5)) {
+        if (kind === MATERIAL.Ice && other === MATERIAL.Water && readU16(old, nidx + 4) < 120 && this.chance(5)) {
           writeCellBytes(next, nidx, MATERIAL.Ice, old[nidx + 1], 90);
         }
         if (kind === MATERIAL.Ice && other === MATERIAL.Moonwater && this.chance(10)) {
@@ -386,6 +396,10 @@ class JsSandboxEngine implements SandboxEngine {
         }
         if (kind === MATERIAL.Water || kind === MATERIAL.Moonwater) {
           const vigor = kind === MATERIAL.Moonwater ? 96 : 56;
+          if (kind === MATERIAL.Water && other === MATERIAL.Ice && readU16(old, idx + 4) > 120 && this.chance(2)) {
+            writeCellBytes(next, nidx, MATERIAL.Water, old[nidx + 1], 40);
+            continue;
+          }
           if (kind === MATERIAL.Moonwater && other === MATERIAL.Oil && this.chance(4)) {
             writeCellBytes(next, nidx, MATERIAL.Stardust, old[nidx + 1], 150);
             continue;
@@ -509,6 +523,10 @@ class JsSandboxEngine implements SandboxEngine {
       }
       if (kind === MATERIAL.Ember && readU16(old, idx + 4) > 90 && this.chance(9)) {
         this.emitVaporFrom(idx, old, next, MATERIAL.Smoke, old[idx + 1], 80);
+      }
+      if (kind === MATERIAL.Water && readU16(old, idx + 4) > 150 && this.chance(20)) {
+        this.emitVaporFrom(idx, old, next, MATERIAL.Steam, old[idx + 1], 120);
+        writeU16(next, idx + 4, Math.max(0, readU16(next, idx + 4) - 40));
       }
       if (kind === MATERIAL.Flower) {
         const flowerAge = readU16(old, idx + 2);
