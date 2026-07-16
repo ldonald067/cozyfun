@@ -375,6 +375,19 @@ Completed:
 
 The bar this phase established: a "special interaction" is a distinct, player-visible sim reaction with another material or state. Movement style alone does not count, and a shared flag treatment counts once, not once per flag. Elements that fall below 4 interactions get combined, demoted to generated-only, or removed instead of padded; `docs/MATERIAL_AUDIT.md` is the enforcement point.
 
+## Phase 13: Element Color Uniqueness
+
+Status: first pass complete; enforcement live.
+
+`scripts/material-contrast.mjs` ranks every material pair by palette distance so uniqueness work is measured instead of eyeballed. The first report found the cool pale family badly clustered: stardust and moonwater sat at distance 19 (near-identical), glass and ice at 25, and ember char near oil at 42.
+
+Completed:
+
+- Spread the cool family across hue anchors: steam went neutral gray, ice stays the cyan-blue anchor, glass shifted green-teal, moonwater kept silver-lavender, and stardust deepened to violet with gold flecks. Ember char warmed away from oil's green slick, and seed leaned greener away from wood.
+- The closest pair rose from 19 to 49, and `npm run material:contrast` now gates `npm run check` with a distance floor of 45 so palettes cannot silently drift back together.
+
+Remaining review targets when taste says so: Fungus vs Stardust purples (53) and Ember vs Oil darks (49) both rely on motion, glow, and shape to separate, which currently reads fine in play.
+
 ## Phase 12: Heat Identity + Discovery Moments
 
 Status: 12A and 12B complete; 12C shipped, then removed after play testing; 12D open.

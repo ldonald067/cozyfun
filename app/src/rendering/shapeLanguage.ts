@@ -302,7 +302,7 @@ function vaporColor({ kind, color, variant, age, cells, width, height, x, y }: S
   const cosmic = cosmicContact.count > 0;
 
   const steam = kind === MATERIAL.Steam;
-  let out = steam ? mixRgb(color, [222, 241, 248], 0.34) : mixRgb(color, [86, 88, 92], 0.34);
+  let out = steam ? mixRgb(color, [219, 226, 231], 0.34) : mixRgb(color, [86, 88, 92], 0.34);
   if (edge) out = mixRgb(out, [9, 14, 20], steam ? 0.22 : 0.44);
   else out = adjustRgb(out, steam ? 16 : 4);
   if (rim) out = mixRgb(out, [9, 14, 20], steam ? 0.1 : 0.32);
@@ -413,9 +413,9 @@ function iceColor({ color, variant, cells, width, height, x, y }: ShapeContext) 
 function emberColor({ variant, energy, flags, time, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
   const heat = Math.min(1, energy / 220);
-  let out: Rgb = [26, 20, 18];
-  if ((x + (hash & 1)) % 3 === 0) out = mixRgb(out, [48, 36, 30], 0.5);
-  if ((hash & 15) === 2) out = mixRgb(out, [58, 42, 28], 0.4);
+  let out: Rgb = [33, 22, 14];
+  if ((x + (hash & 1)) % 3 === 0) out = mixRgb(out, [60, 41, 25], 0.5);
+  if ((hash & 15) === 2) out = mixRgb(out, [74, 50, 29], 0.4);
   if (heat > 0.05) {
     const pulse = (Math.sin(time * 0.008 + hash * 0.7 + x + y) + 1) * 0.5;
     out = mixRgb(out, [255, 120, 40], heat * (0.4 + pulse * 0.3));
@@ -428,11 +428,11 @@ function emberColor({ variant, energy, flags, time, x, y }: ShapeContext) {
 function glassColor({ color, variant, age, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x >> 1, y >> 1, variant);
   const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Glass);
-  let out = mixRgb(color, [205, 244, 250], 0.3);
+  let out = mixRgb(color, [198, 246, 230], 0.3);
   out = mixRgb(out, [9, 14, 20], 0.24);
-  if (((x + y * 2 + (hash & 3)) & 7) === 0) out = mixRgb(out, [226, 252, 255], 0.44);
-  if (edge.top || edge.left) out = mixRgb(out, [238, 254, 255], 0.52);
-  if (edge.bottom || edge.right) out = mixRgb(out, [44, 92, 110], 0.44);
+  if (((x + y * 2 + (hash & 3)) & 7) === 0) out = mixRgb(out, [216, 252, 240], 0.44);
+  if (edge.top || edge.left) out = mixRgb(out, [234, 255, 246], 0.52);
+  if (edge.bottom || edge.right) out = mixRgb(out, [36, 102, 84], 0.44);
   if ((hash & 31) === 5) out = mixRgb(out, [255, 255, 255], 0.6);
   if (age < 8) out = mixRgb(out, [255, 244, 214], 0.6 * (1 - age / 8));
   if (age < 70) out = mixRgb(out, [255, 176, 96], 0.36 * (1 - age / 70));

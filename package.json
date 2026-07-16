@@ -10,6 +10,7 @@
     "dev:fallback": "npm --prefix app run dev -- --host 127.0.0.1",
     "build": "npm run build:sim && npm --prefix app run build",
     "material:audit": "node scripts/material-identity-audit.mjs",
+    "material:contrast": "node scripts/material-contrast.mjs --check",
     "test:sim": "node scripts/test-sim.mjs",
     "test:wasm": "npm run build:sim && node scripts/smoke-wasm.mjs",
     "test:js-fallback": "node scripts/smoke-js-fallback.mjs",
@@ -19,6 +20,6 @@
     "test:firefox": "powershell -ExecutionPolicy Bypass -File scripts/test-firefox.ps1",
     "visual:qa": "node scripts/visual-qa.mjs",
     "audio:qa": "node scripts/audio-qa.mjs",
-    "check": "npm run material:audit && npm run test:sim && npm run build && node scripts/smoke-wasm.mjs && npm run test:js-fallback && npm run test:audio-reactions && npm run test:browser && npm run audio:qa && npm run visual:qa"
+    "check": "npm run material:audit && npm run material:contrast && npm run test:sim && npm run build && node scripts/smoke-wasm.mjs && npm run test:js-fallback && npm run test:audio-reactions && npm run test:browser && npm run audio:qa && npm run visual:qa"
   }
 }

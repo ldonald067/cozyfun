@@ -172,7 +172,7 @@ export const MATERIALS: MaterialDef[] = [
     description: "Rooting life that needs water and soil to bloom into generated flowers.",
     identity: ["Rooting potential", "Blooms only when fed and grounded"],
     color: "#7fc66f",
-    palette: ["#4f2b1d", "#6c3d23", "#8c5930", "#67aa54", "#8acb6c", "#d0a15f"],
+    palette: ["#4f2b1d", "#7bbf63", "#8c5930", "#67aa54", "#9ed67e", "#c8e09a"],
     group: "life"
   },
   {
@@ -204,7 +204,7 @@ export const MATERIALS: MaterialDef[] = [
     description: "Generated glowing remains of burning wood that cool into relightable char.",
     identity: ["Glowing wood remains", "Cools into relightable char"],
     color: "#c96a35",
-    palette: ["#241a16", "#3a2a20", "#552f1d", "#1b1512"],
+    palette: ["#2e1d14", "#4a2f1c", "#6b3a1e", "#241811"],
     glow: "#ff7a30",
     group: "heat",
     userSelectable: false
@@ -215,8 +215,8 @@ export const MATERIALS: MaterialDef[] = [
     slug: "glass",
     description: "Generated pane fused where strong heat vitrifies dry sand.",
     identity: ["Heat-fused sand pane", "Translucent glints over warm seams"],
-    color: "#8fd4dc",
-    palette: ["#7fc4cf", "#9adfe6", "#c2f2f7", "#68a9bd"],
+    color: "#7fcfba",
+    palette: ["#79c9b8", "#95e0d0", "#bff2e6", "#5faa9e"],
     group: "basic",
     userSelectable: false
   },
@@ -246,9 +246,9 @@ export const MATERIALS: MaterialDef[] = [
     slug: "steam",
     description: "Wet vapor that rises, condenses on hard surfaces, and frosts near ice.",
     identity: ["Wet rising vapor", "Condenses or frosts"],
-    color: "#d9e9ef",
-    palette: ["#aac6d1", "#cee2ea", "#eff8fb", "#9fb9c4"],
-    glow: "#9dd8ff",
+    color: "#d3dade",
+    palette: ["#b3bcc3", "#d2d9de", "#edf0f2", "#a2abb2"],
+    glow: "#c7d4dc",
     group: "heat",
     userSelectable: false
   },
@@ -258,9 +258,9 @@ export const MATERIALS: MaterialDef[] = [
     slug: "stardust",
     description: "Cosmic powder that charges water, feeds life, and twinkles through air.",
     identity: ["Cosmic drifting powder", "Charges water and life"],
-    color: "#c7a7ff",
-    palette: ["#7d6df0", "#a68cff", "#d2bdff", "#ffe7a2", "#8edcff"],
-    glow: "#b99cff",
+    color: "#9d7ef5",
+    palette: ["#5c48d8", "#8a66f2", "#b48cff", "#ffd98a", "#6a54e0"],
+    glow: "#a988ff",
     group: "cosmic"
   },
   {
