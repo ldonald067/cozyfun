@@ -78,6 +78,7 @@ export function glowIntensity(kind: number, energy: number, age: number, time: n
   const pulse = (Math.sin(time * 0.01 + age * 0.25) + 1) * 0.5;
   if (kind === MATERIAL.Ember) return clampColor(energy * 0.85 + (energy > 40 ? pulse * 35 : 0));
   if (kind === MATERIAL.Moss) return clampColor(46 + energy * 0.28 + pulse * 26);
+  if (kind === MATERIAL.Pollen) return clampColor(30 + energy * 0.25 + pulse * 20);
   const base = kind === MATERIAL.Stardust || kind === MATERIAL.Moonwater || kind === MATERIAL.Flower ? 80 : 120;
   return clampColor(base + energy * 0.45 + pulse * 55);
 }

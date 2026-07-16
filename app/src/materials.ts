@@ -33,7 +33,8 @@ export const MATERIAL = {
   Moonwater: 18,
   Flower: 19,
   Glass: 20,
-  Ember: 21
+  Ember: 21,
+  Pollen: 22
 } as const;
 
 export type MaterialId = (typeof MATERIAL)[keyof typeof MATERIAL];
@@ -194,6 +195,18 @@ export const MATERIALS: MaterialDef[] = [
     color: "#f0c25f",
     palette: ["#75b95e", "#f3cf69", "#f38fbe", "#e8f3a8", "#b98dff", "#fff4c2"],
     glow: "#f7d574",
+    group: "life",
+    userSelectable: false
+  },
+  {
+    id: MATERIAL.Pollen,
+    label: "Pollen",
+    slug: "pollen",
+    description: "Generated golden motes drifting from mature flowers that can seed damp soil.",
+    identity: ["Drifting golden motes", "Settles and seeds damp soil"],
+    color: "#ffdf8e",
+    palette: ["#ffe9a8", "#ffd97e", "#fff4cd", "#e8c26a"],
+    glow: "#ffe6a0",
     group: "life",
     userSelectable: false
   },

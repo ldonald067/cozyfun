@@ -26,6 +26,7 @@ pub enum Material {
     Flower = 19,
     Glass = 20,
     Ember = 21,
+    Pollen = 22,
 }
 
 const FLAG_WET: u16 = 1 << 0;
@@ -137,7 +138,7 @@ impl Universe {
                     continue;
                 }
                 let idx = self.idx(px as u32, py as u32);
-                let kind = material.min(Material::Ember as u8);
+                let kind = material.min(Material::Pollen as u8);
                 self.cells[idx] = if kind == Material::Empty as u8 {
                     Cell::empty()
                 } else {
@@ -153,7 +154,7 @@ impl Universe {
             return false;
         }
         for (idx, chunk) in data.chunks_exact(size_of::<Cell>()).enumerate() {
-            let kind = chunk[0].min(Material::Ember as u8);
+            let kind = chunk[0].min(Material::Pollen as u8);
             self.cells[idx] = if kind == Material::Empty as u8 {
                 Cell::empty()
             } else {
@@ -187,6 +188,7 @@ impl Universe {
                 x if x == Material::Stardust as u8 => {
                     self.update_stardust(idx, cell, &old, &mut next)
                 }
+                x if x == Material::Pollen as u8 => self.update_pollen(idx, cell, &old, &mut next),
                 x if x == Material::Meteor as u8 => self.update_meteor(idx, cell, &old, &mut next),
                 x if x == Material::Water as u8 => self.update_liquid(idx, cell, &old, &mut next, 1),
                 x if x == Material::Moonwater as u8 => {
@@ -395,6 +397,7 @@ impl Universe {
             let drain = match cell.kind {
                 x if x == Material::Fire as u8 => 3,
                 x if x == Material::Ember as u8 => 2,
+                x if x == Material::Pollen as u8 => 2,
                 x if x == Material::Steam as u8 => 2,
                 x if x == Material::Smoke as u8 => 1,
                 x if x == Material::Stardust as u8 => 1,
@@ -417,6 +420,7 @@ impl Universe {
 
             if (cell.kind == Material::Smoke as u8 && cell.age > 180)
                 || (cell.kind == Material::Steam as u8 && cell.age > 150)
+                || (cell.kind == Material::Pollen as u8 && cell.age > 140)
                 || (cell.kind == Material::Fire as u8 && cell.age > 90 && cell.energy < 24)
             {
                 *cell = Cell::empty();
@@ -685,6 +689,13 @@ impl Universe {
                         {
                             next[nidx].flags |= FLAG_SCORCHED;
                         }
+                    }
+                }
+                x if x == Material::Flower as u8 => {
+                    // Mature, healthy flowers spend stored energy to release rare pollen motes.
+                    if cell.age > 120 && cell.energy > 80 && cell.flags & FLAG_FROZEN == 0 && self.chance(300) {
+                        self.emit_vapor_from(idx, old, next, Material::Pollen as u8, cell.variant, 150);
+                        next[idx].energy = next[idx].energy.saturating_sub(30);
                     }
                 }
                 x if x == Material::Ember as u8 => {
@@ -1056,6 +1067,39 @@ impl Universe {
         }
     }
 
+    fn update_pollen(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
+        if next[idx].kind != Material::Pollen as u8 {
+            return;
+        }
+        let (x, y) = self.xy(idx);
+        if y + 1 < self.height as i32 {
+            let below = old[self.idx(x as u32, (y + 1) as u32)];
+            if below.kind == Material::Soil as u8
+                && (below.flags & FLAG_WET != 0 || below.energy > 60)
+                && self.chance(8)
+            {
+                next[idx] = Cell::new(Material::Seed as u8, cell.variant, 40);
+                return;
+            }
+        }
+        if self.tick_count % 3 != 0 {
+            return;
+        }
+        // Settled motes mostly rest where they landed instead of jittering sideways.
+        let supported =
+            y + 1 >= self.height as i32 || !old[self.idx(x as u32, (y + 1) as u32)].is_empty();
+        if supported && !self.chance(3) {
+            return;
+        }
+        let side = if self.chance(2) { 1 } else { -1 };
+        let dirs = [(0, 1), (side, 0), (side, 1), (-side, 0)];
+        for (dx, dy) in dirs {
+            if self.try_move(idx, x + dx, y + dy, cell, old, next, true) {
+                return;
+            }
+        }
+    }
+
     fn update_meteor(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
         if next[idx].kind != Material::Meteor as u8 {
             return;
@@ -1159,6 +1203,7 @@ fn starting_energy(kind: u8) -> u16 {
         x if x == Material::Stardust as u8 => 190,
         x if x == Material::Meteor as u8 => 255,
         x if x == Material::Moonwater as u8 => 120,
+        x if x == Material::Pollen as u8 => 150,
         x if x == Material::Seed as u8 => 50,
         x if x == Material::Moss as u8 => 70,
         x if x == Material::Fungus as u8 => 70,
@@ -1594,6 +1639,44 @@ mod tests {
         assert_eq!(kind_at(&u, 8, 8), Material::Wood as u8);
         assert!(flags_at(&u, 8, 8) & FLAG_SCORCHED != 0);
         assert_eq!(flags_at(&u, 8, 8) & FLAG_WET, 0);
+    }
+
+    #[test]
+    fn mature_flower_releases_pollen() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell_state(&mut u, 8, 8, Material::Flower, 130, 220, FLAG_ROOTED | FLAG_WET);
+        set_cell(&mut u, 7, 8, Material::Water);
+        for (x, y) in [(6, 8), (5, 8), (9, 8), (6, 9), (7, 9), (8, 9), (9, 9)] {
+            set_cell(&mut u, x, y, Material::Stone);
+        }
+        let mut released = false;
+        for _ in 0..2000 {
+            u.tick();
+            if u.cells.iter().any(|cell| cell.kind == Material::Pollen as u8) {
+                released = true;
+                break;
+            }
+        }
+        assert!(released, "a mature healthy flower should release pollen motes");
+    }
+
+    #[test]
+    fn pollen_seeds_wet_soil() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 8, 8, Material::Pollen);
+        set_cell_state(&mut u, 8, 9, Material::Soil, 12, 90, FLAG_WET);
+        for (x, y) in [(7, 9), (9, 9), (7, 10), (8, 10), (9, 10)] {
+            set_cell(&mut u, x, y, Material::Stone);
+        }
+        let mut seeded = false;
+        for _ in 0..120 {
+            u.tick();
+            if u.cells.iter().any(|cell| cell.kind == Material::Seed as u8 || cell.kind == Material::Flower as u8) {
+                seeded = true;
+                break;
+            }
+        }
+        assert!(seeded, "pollen resting on wet soil should take root as a seed");
     }
 
     #[test]

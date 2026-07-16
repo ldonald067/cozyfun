@@ -6,7 +6,7 @@ export function materialShowcaseScript() {
     const width = 220;
     const height = 140;
     const stride = 8;
-    const material = { Wall: 1, Sand: 2, Water: 3, Soil: 5, Fire: 6, Wood: 7, Lava: 8, Stone: 9, Moss: 10, Seed: 11, Fungus: 12, Oil: 13, Ice: 14, Steam: 15, Stardust: 16, Meteor: 17, Moonwater: 18, Flower: 19, Glass: 20, Ember: 21 };
+    const material = { Wall: 1, Sand: 2, Water: 3, Soil: 5, Fire: 6, Wood: 7, Lava: 8, Stone: 9, Moss: 10, Seed: 11, Fungus: 12, Oil: 13, Ice: 14, Steam: 15, Stardust: 16, Meteor: 17, Moonwater: 18, Flower: 19, Glass: 20, Ember: 21, Pollen: 22 };
     const flag = { Wet: 1, Rooted: 2, Cosmic: 4, Frozen: 8, Scorched: 16 };
     const cells = new Uint8Array(width * height * stride);
     const writeU16 = (offset, value) => {
@@ -76,6 +76,7 @@ export function materialShowcaseScript() {
     for (const [x, y] of [[86, 58], [87, 57], [88, 58], [89, 57], [90, 58], [88, 55]]) setCell(x, y, material.Flower, 130, 48, flag.Rooted, x + y);
     setCell(91, 57, material.Oil, 70, 20);
     setCell(87, 54, material.Moonwater, 140, 22, flag.Cosmic);
+    for (const [x, y] of [[85, 53], [89, 52], [92, 54]]) setCell(x, y, material.Pollen, 150, 24, 0, x);
 
     // Cosmic and heat/cold readable outcomes.
     rect(104, 118, 63, 69, material.Moonwater, 130, 24, flag.Cosmic);

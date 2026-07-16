@@ -87,6 +87,7 @@ export function applyShapeLanguage(context: ShapeContext): Rgb {
   else if (kind === MATERIAL.Moss || kind === MATERIAL.Fungus) out = growthColor(context);
   else if (kind === MATERIAL.Wood) out = woodColor(context);
   else if (kind === MATERIAL.Stardust) out = stardustColor(context);
+  else if (kind === MATERIAL.Pollen) out = pollenColor(context);
   return nearbyLight(context, out);
 }
 
@@ -256,6 +257,15 @@ function soilColor({ color, variant, energy, flags, cells, width, height, x, y }
     out = frostFerns(out, hash, x, y);
   }
   return out;
+}
+
+function pollenColor({ color, variant, age, time, x, y }: ShapeContext) {
+  const hash = hashCell(x, y, variant);
+  const bob = (Math.sin(time * 0.01 + hash * 1.3 + x) + 1) * 0.5;
+  let out = mixRgb(color, [255, 246, 214], 0.3 + bob * 0.25);
+  if ((hash & 7) === 2) out = mixRgb(out, [232, 194, 106], 0.4);
+  const fade = Math.max(0, 1 - age / 150);
+  return mixRgb([9, 14, 20], out, 0.55 + fade * 0.45);
 }
 
 function fireColor({ color, variant, age, energy, time, cells, width, height, x, y }: ShapeContext) {

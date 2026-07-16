@@ -146,7 +146,7 @@ class JsSandboxEngine implements SandboxEngine {
         const px = x + dx;
         const py = y + dy;
         if (!this.inBounds(px, py)) continue;
-        const kind = Math.min(material, MATERIAL.Ember);
+        const kind = Math.min(material, MATERIAL.Pollen);
         this.writeCell(this.index(px, py), kind, this.variant(px, py, kind), startEnergy(kind), 0);
       }
     }
@@ -171,6 +171,7 @@ class JsSandboxEngine implements SandboxEngine {
         if (kind === MATERIAL.Oil) this.oil(idx, x, y, cell, old, next);
         if (kind === MATERIAL.Lava) this.liquid(idx, x, y, cell, old, next, 2);
         if (kind === MATERIAL.Stardust) this.stardust(idx, x, y, cell, old, next);
+        if (kind === MATERIAL.Pollen) this.pollen(idx, x, y, cell, old, next);
         if (kind === MATERIAL.Meteor) this.meteor(idx, x, y, cell, old, next);
       }
     }
@@ -200,7 +201,7 @@ class JsSandboxEngine implements SandboxEngine {
     if (bytes.byteLength !== this.cells.byteLength) return false;
     const sanitized = bytes.slice();
     for (let idx = 0; idx < sanitized.byteLength; idx += CELL_STRIDE) {
-      const kind = Math.min(sanitized[idx], MATERIAL.Ember);
+      const kind = Math.min(sanitized[idx], MATERIAL.Pollen);
       if (kind === MATERIAL.Empty) {
         sanitized.fill(0, idx, idx + CELL_STRIDE);
         continue;
@@ -257,7 +258,7 @@ class JsSandboxEngine implements SandboxEngine {
       const drain =
         kind === MATERIAL.Fire
           ? 3
-          : kind === MATERIAL.Ember || kind === MATERIAL.Steam
+          : kind === MATERIAL.Ember || kind === MATERIAL.Steam || kind === MATERIAL.Pollen
             ? 2
             : kind === MATERIAL.Smoke ||
                 kind === MATERIAL.Stardust ||
@@ -275,7 +276,12 @@ class JsSandboxEngine implements SandboxEngine {
       if (energy === 0) {
         writeU16(next, idx + 6, flags & CELL_FLAG.Frozen ? thawedFlags(kind, flags) : flags & ~(CELL_FLAG.Wet | CELL_FLAG.Cosmic));
       }
-      if ((kind === MATERIAL.Smoke && age > 180) || (kind === MATERIAL.Steam && age > 150) || (kind === MATERIAL.Fire && age > 90 && energy < 24)) {
+      if (
+        (kind === MATERIAL.Smoke && age > 180) ||
+        (kind === MATERIAL.Steam && age > 150) ||
+        (kind === MATERIAL.Pollen && age > 140) ||
+        (kind === MATERIAL.Fire && age > 90 && energy < 24)
+      ) {
         next.fill(0, idx, idx + CELL_STRIDE);
       }
     }
@@ -504,6 +510,15 @@ class JsSandboxEngine implements SandboxEngine {
       if (kind === MATERIAL.Ember && readU16(old, idx + 4) > 90 && this.chance(9)) {
         this.emitVaporFrom(idx, old, next, MATERIAL.Smoke, old[idx + 1], 80);
       }
+      if (kind === MATERIAL.Flower) {
+        const flowerAge = readU16(old, idx + 2);
+        const flowerEnergy = readU16(old, idx + 4);
+        const flowerFlags = readU16(old, idx + 6);
+        if (flowerAge > 120 && flowerEnergy > 80 && !(flowerFlags & CELL_FLAG.Frozen) && this.chance(300)) {
+          this.emitVaporFrom(idx, old, next, MATERIAL.Pollen, old[idx + 1], 150);
+          writeU16(next, idx + 4, Math.max(0, readU16(next, idx + 4) - 30));
+        }
+      }
       if (kind === MATERIAL.Fire && fireDampened) {
         const energy = Math.max(0, readU16(next, idx + 4) - 32);
         writeU16(next, idx + 4, energy);
@@ -602,6 +617,25 @@ class JsSandboxEngine implements SandboxEngine {
     }
     if (this.chance(18)) {
       writeCellBytes(next, idx, MATERIAL.Smoke, cell[1], 70);
+    }
+  }
+
+  private pollen(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
+    if (next[idx] !== MATERIAL.Pollen) return;
+    if (this.inBounds(x, y + 1)) {
+      const below = this.index(x, y + 1);
+      const belowWet = Boolean(readU16(old, below + 6) & CELL_FLAG.Wet) || readU16(old, below + 4) > 60;
+      if (old[below] === MATERIAL.Soil && belowWet && this.chance(8)) {
+        writeCellBytes(next, idx, MATERIAL.Seed, cell[1], 40);
+        return;
+      }
+    }
+    if (this.ticks % 3 !== 0) return;
+    const supported = !this.inBounds(x, y + 1) || old[this.index(x, y + 1)] !== MATERIAL.Empty;
+    if (supported && !this.chance(3)) return;
+    const side = this.chance(2) ? 1 : -1;
+    for (const [dx, dy] of [[0, 1], [side, 0], [side, 1], [-side, 0]]) {
+      if (this.move(idx, x + dx, y + dy, cell, old, next)) return;
     }
   }
 
@@ -805,6 +839,7 @@ function startEnergy(kind: number) {
   if (kind === MATERIAL.Smoke) return 90;
   if (kind === MATERIAL.Steam) return 160;
   if (kind === MATERIAL.Stardust) return 190;
+  if (kind === MATERIAL.Pollen) return 150;
   if (kind === MATERIAL.Moonwater) return 120;
   if (kind === MATERIAL.Seed) return 50;
   if (kind === MATERIAL.Moss || kind === MATERIAL.Fungus) return 70;
