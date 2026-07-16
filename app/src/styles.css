@@ -479,18 +479,11 @@ input:focus-visible {
 }
 
 .audio-panel {
-  position: sticky;
-  z-index: 2;
-  bottom: 0;
   display: grid;
   gap: 10px;
   margin: 0 0 18px;
   padding: 14px 0 2px;
   border-top: 1px solid rgba(239, 211, 166, 0.12);
-  background:
-    linear-gradient(180deg, rgba(9, 13, 20, 0.72), rgba(9, 13, 20, 0.96) 18%),
-    rgba(9, 13, 20, 0.9);
-  box-shadow: 0 -16px 36px rgba(0, 0, 0, 0.24);
 }
 
 .audio-panel-header,
@@ -998,10 +991,7 @@ input:focus-visible {
   }
 
   .audio-panel {
-    position: static;
     margin-bottom: 0;
-    padding-top: 14px;
-    box-shadow: none;
   }
 
   .segmented-control button,
