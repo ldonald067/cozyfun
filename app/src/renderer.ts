@@ -61,7 +61,6 @@ export type PostcardOptions = {
   sceneTitle: string;
   moodTitle: string;
   soundSource: string;
-  discoveries?: string;
 };
 
 export async function exportPostcard(engine: SandboxEngine, base: HTMLCanvasElement, glow: HTMLCanvasElement, options: PostcardOptions) {
@@ -101,8 +100,7 @@ export async function exportPostcard(engine: SandboxEngine, base: HTMLCanvasElem
   drawFittedText(ctx, `${options.moodTitle} / ${options.soundSource}`, margin, footerY + 32, width);
   ctx.fillStyle = "rgba(153, 184, 200, 0.82)";
   ctx.font = "15px system-ui, sans-serif";
-  const simLine = `${engine.source.toUpperCase()} sim  |  tick ${engine.tickCount()}  |  ${dateStamp()}`;
-  drawFittedText(ctx, options.discoveries ? `${simLine}  |  ✦ ${options.discoveries}` : simLine, margin, footerY + 60, width);
+  drawFittedText(ctx, `${engine.source.toUpperCase()} sim  |  tick ${engine.tickCount()}  |  ${dateStamp()}`, margin, footerY + 60, width);
   ctx.fillStyle = "rgba(255, 226, 177, 0.5)";
   ctx.font = "14px system-ui, sans-serif";
   ctx.fillText("cozy pixel sandbox", margin, footerY + 92);

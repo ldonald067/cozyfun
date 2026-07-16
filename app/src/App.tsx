@@ -17,18 +17,8 @@ import { detectReactionCues } from "./audio/reactions";
 import { SegmentedControl, type SegmentOption } from "./components/SegmentedControl";
 import { AudioPanel } from "./components/AudioPanel";
 import type { DeskRadioPlaybackState } from "./components/DeskRadioPanel";
-import { DiscoveryPanel } from "./components/DiscoveryPanel";
 import { MaterialPanel } from "./components/MaterialPanel";
 import { SharePanel } from "./components/SharePanel";
-import {
-  detectDiscoveries,
-  DISCOVERIES,
-  DISCOVERY_BY_ID,
-  loadDiscoveries,
-  saveDiscoveries,
-  type DiscoveryId,
-  type DiscoveryLog
-} from "./discoveries";
 import {
   loadDeskRadioSource,
   parseDeskRadioUrl,
@@ -73,16 +63,6 @@ export function App() {
   const soundSourceLabel = audioPrefs.provider === "external" && deskRadioSource ? deskRadioSource.label : activeAudioProvider.label;
   const [engine, setEngine] = useState<SandboxEngine | null>(null);
   const [selected, setSelected] = useState<MaterialId>(MATERIAL.Sand);
-  const [discovered, setDiscovered] = useState<DiscoveryLog>(() => loadDiscoveries());
-  const [discoveryOpen, setDiscoveryOpen] = useState(false);
-  const [discoveryToast, setDiscoveryToast] = useState<string | null>(null);
-  const [discoveryToastQueue, setDiscoveryToastQueue] = useState<string[]>([]);
-  const [unseenDiscoveries, setUnseenDiscoveries] = useState(0);
-  const discoveredRef = useRef(discovered);
-  discoveredRef.current = discovered;
-  const discoveryOpenRef = useRef(discoveryOpen);
-  discoveryOpenRef.current = discoveryOpen;
-  const toastTimerRef = useRef<number | null>(null);
   const [sceneEnvironment, setSceneEnvironment] = useState<SceneEnvironmentId>(() => loadSceneEnvironmentId());
   const activeSceneEnvironment = getSceneEnvironment(sceneEnvironment);
   const [brushSize, setBrushSize] = useState(4);
@@ -137,43 +117,6 @@ export function App() {
     return () => audio.dispose();
   }, [audio]);
 
-  const recordDiscoveries = useCallback((found: DiscoveryId[]) => {
-    const stamp = Date.now();
-    setDiscovered((current) => {
-      const next = new Map(current);
-      for (const id of found) next.set(id, stamp);
-      saveDiscoveries(next);
-      return next;
-    });
-    if (!discoveryOpenRef.current) {
-      setUnseenDiscoveries((count) => count + found.length);
-    }
-    const titles = found
-      .map((id) => DISCOVERY_BY_ID.get(id)?.title)
-      .filter((title): title is string => Boolean(title));
-    setDiscoveryToastQueue((queue) => [...queue, ...titles]);
-  }, []);
-
-  useEffect(() => {
-    if (discoveryToast !== null || discoveryToastQueue.length === 0) return;
-    setDiscoveryToast(`Discovery: ${discoveryToastQueue[0]}`);
-    setDiscoveryToastQueue((queue) => queue.slice(1));
-    toastTimerRef.current = window.setTimeout(() => setDiscoveryToast(null), 3400);
-  }, [discoveryToast, discoveryToastQueue]);
-
-  useEffect(() => {
-    return () => {
-      if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
-    };
-  }, []);
-
-  function handleDiscoveryToggle() {
-    setDiscoveryOpen((open) => {
-      if (!open) setUnseenDiscoveries(0);
-      return !open;
-    });
-  }
-
   useEffect(() => {
     if (!engine) return;
     let frame = 0;
@@ -183,19 +126,10 @@ export function App() {
 
     const loop = (time: number) => {
       if (!paused && time - lastSimTick >= SIM_TICK_MS) {
-        const wantCues = audio.canPlayReactionCues();
-        const wantDiscoveries = discoveredRef.current.size < DISCOVERIES.length;
-        const cellsBefore = wantCues || wantDiscoveries ? engine.getCellBytes() : null;
+        const reactionCellsBefore = audio.canPlayReactionCues() ? engine.getCellBytes() : null;
         engine.tick();
-        if (cellsBefore) {
-          const cellsAfter = engine.getCellBytes();
-          if (wantCues) {
-            audio.playReactionCues(detectReactionCues(cellsBefore, cellsAfter));
-          }
-          if (wantDiscoveries) {
-            const found = detectDiscoveries(cellsBefore, cellsAfter, new Set(discoveredRef.current.keys()));
-            if (found.length > 0) recordDiscoveries(found);
-          }
+        if (reactionCellsBefore) {
+          audio.playReactionCues(detectReactionCues(reactionCellsBefore, engine.getCellBytes()));
         }
         lastSimTick = time;
       }
@@ -215,7 +149,7 @@ export function App() {
 
     frame = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frame);
-  }, [audio, engine, paused, recordDiscoveries]);
+  }, [audio, engine, paused]);
 
   const groupedMaterials = useMemo<Record<string, MaterialDef[]>>(
     () => ({
@@ -382,8 +316,7 @@ export function App() {
     await exportPostcard(engine, baseCanvasRef.current, glowCanvasRef.current, {
       sceneTitle: activeSceneEnvironment.title,
       moodTitle: activeMood.title,
-      soundSource: soundSourceLabel,
-      discoveries: discovered.size > 0 ? `${discovered.size}/${DISCOVERIES.length} discoveries` : undefined
+      soundSource: soundSourceLabel
     });
     setStatus("postcard PNG exported");
   }
@@ -552,11 +485,6 @@ export function App() {
             <canvas ref={glowCanvasRef} className="sandbox-canvas glow-canvas" />
             <canvas ref={baseCanvasRef} className="sandbox-canvas base-canvas" />
             <div className="glass-sheen" aria-hidden="true" />
-            {discoveryToast && (
-              <div className="discovery-toast" data-testid="discovery-toast" role="status">
-                ✦ {discoveryToast}
-              </div>
-            )}
           </div>
           <div className="status-bar">
             <span data-testid="status-message">{status}</span>
@@ -632,12 +560,6 @@ export function App() {
               onExportPostcard={handlePostcard}
               onExportScene={handleExport}
               onImportScene={() => fileInputRef.current?.click()}
-            />
-            <DiscoveryPanel
-              discovered={discovered}
-              unseen={unseenDiscoveries}
-              open={discoveryOpen}
-              onToggle={handleDiscoveryToggle}
             />
           </div>
 

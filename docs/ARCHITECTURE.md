@@ -9,7 +9,6 @@ This project is a static browser toy: React owns the interface, Rust/WASM owns t
 3. `sim` contains the Rust cellular automata rules.
 4. `app/src/renderer.ts` converts the engine cell bytes into base, glow, and atmosphere canvas layers.
 5. `app/src/storage.ts` handles browser-local saves and JSON scene import/export.
-6. `app/src/discoveries.ts` detects first-time interaction transitions after each tick and keeps the browser-local discovery journal.
 6. `app/src/audio.ts` exposes the optional local native audio controller.
 7. `app/src/deskRadio.ts` validates user-provided YouTube Desk Radio sources and creates visible watch/embed URLs.
 8. `app/src/sceneEnvironments.ts` provides non-destructive room/backdrop definitions and their local image metadata.

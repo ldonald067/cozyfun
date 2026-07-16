@@ -377,12 +377,12 @@ The bar this phase established: a "special interaction" is a distinct, player-vi
 
 ## Phase 12: Heat Identity + Discovery Moments
 
-Status: 12A and 12C complete; 12B and 12D open.
+Status: 12A complete; 12C shipped, then removed after play testing; 12B and 12D open.
 
 Completed:
 
 - 12A: fire, lava, and meteor have separate renderers and split palettes: hot yellow-white airy fire with tongue silhouettes, deep basalt lava with crusted glowing seams and a slow pulse, and a white-hot meteor head with a trail shimmer. Moonwater shifted silver-lavender, and the showcase gained a side-by-side heat lineup.
-- 12C: a browser-local discovery journal tracks 14 first-time interactions through the post-tick transition detector, with a toast on first trigger, a journal drawer listing found discoveries and hints for the rest, a postcard discovery stamp, and browser smoke coverage that earns First Bloom live.
+- 12C: a discovery journal shipped (14 first-time interaction moments with toasts, a journal drawer, timestamps, and postcard stamps) and was removed after play testing: it added UI weight without earning its place in the toy. The post-tick transition detector it shared with audio reactions stays. If celebration returns, it should go through 12B's sound and renderer moments instead of more UI.
 
 Goal: make every element recognizable at a glance, starting with the heat family, then turn the interaction web itself into visible, celebrated gameplay.
 
