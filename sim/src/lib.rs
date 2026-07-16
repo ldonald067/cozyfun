@@ -581,6 +581,10 @@ impl Universe {
                             }
                         }
                         if other.kind == Material::Soil as u8 {
+                            if other.energy == 0 && other.age > 40 {
+                                // Petrichor: the first water on long-dry soil breathes out a moist wisp.
+                                self.emit_vapor_from(nidx, old, next, Material::Steam as u8, other.variant, 90);
+                            }
                             next[nidx].energy = next[nidx].energy.saturating_add(vigor * 2).min(255);
                             next[nidx].flags = (next[nidx].flags | FLAG_WET) & !FLAG_SCORCHED;
                             if is_moonwater {
@@ -953,6 +957,14 @@ impl Universe {
             return;
         }
         let (x, y) = self.xy(idx);
+        // Dew drip: saturated moss hanging over open air sheds a droplet, spending stored water.
+        if cell.flags & FLAG_WET != 0 && cell.energy > 90 && y + 1 < self.height as i32 {
+            let below = self.idx(x as u32, (y + 1) as u32);
+            if old[below].is_empty() && next[below].is_empty() && self.chance(60) {
+                next[below] = Cell::new(Material::Water as u8, cell.variant, 26);
+                next[idx].energy = next[idx].energy.saturating_sub(24);
+            }
+        }
         let wet = cell.flags & FLAG_WET != 0 || cell.energy > 70;
         if !(wet || self.chance(120)) {
             return;
@@ -1575,6 +1587,36 @@ mod tests {
         assert_eq!(kind_at(&u, 8, 8), Material::Wood as u8);
         assert!(flags_at(&u, 8, 8) & FLAG_SCORCHED != 0);
         assert_eq!(flags_at(&u, 8, 8) & FLAG_WET, 0);
+    }
+
+    #[test]
+    fn first_water_on_dry_soil_breathes_mist() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell_state(&mut u, 8, 8, Material::Soil, 60, 0, 0);
+        set_cell(&mut u, 7, 8, Material::Water);
+        for (x, y) in [(6, 8), (5, 8), (9, 8), (6, 9), (7, 9), (8, 9), (9, 9)] {
+            set_cell(&mut u, x, y, Material::Stone);
+        }
+        u.tick();
+        assert!(
+            u.cells.iter().any(|cell| cell.kind == Material::Steam as u8),
+            "first watering of long-dry soil should breathe out a mist wisp"
+        );
+    }
+
+    #[test]
+    fn saturated_moss_drips_dew() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell_state(&mut u, 8, 4, Material::Moss, 10, 220, FLAG_WET);
+        let mut dripped = false;
+        for _ in 0..200 {
+            u.tick();
+            if u.cells.iter().any(|cell| cell.kind == Material::Water as u8) {
+                dripped = true;
+                break;
+            }
+        }
+        assert!(dripped, "saturated overhanging moss should shed a dew droplet");
     }
 
     #[test]

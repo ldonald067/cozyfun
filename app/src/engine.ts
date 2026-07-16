@@ -415,6 +415,9 @@ class JsSandboxEngine implements SandboxEngine {
             writeU16(next, nidx + 6, (readU16(next, nidx + 6) | CELL_FLAG.Wet | (kind === MATERIAL.Moonwater ? CELL_FLAG.Cosmic : 0)) & ~CELL_FLAG.Scorched);
           }
           if (other === MATERIAL.Soil) {
+            if (readU16(old, nidx + 4) === 0 && readU16(old, nidx + 2) > 40) {
+              this.emitVaporFrom(nidx, old, next, MATERIAL.Steam, old[nidx + 1], 90);
+            }
             writeU16(next, nidx + 4, Math.min(255, readU16(next, nidx + 4) + vigor * 2));
             writeU16(next, nidx + 6, (readU16(next, nidx + 6) | CELL_FLAG.Wet | (kind === MATERIAL.Moonwater ? CELL_FLAG.Cosmic : 0)) & ~CELL_FLAG.Scorched);
           }
@@ -672,6 +675,13 @@ class JsSandboxEngine implements SandboxEngine {
     const energy = readU16(next, idx + 4);
     const wet = Boolean(readU16(next, idx + 6) & CELL_FLAG.Wet) || energy > 70;
     if (readU16(next, idx + 6) & CELL_FLAG.Frozen) return;
+    if (Boolean(readU16(old, idx + 6) & CELL_FLAG.Wet) && readU16(old, idx + 4) > 90 && this.inBounds(x, y + 1)) {
+      const below = this.index(x, y + 1);
+      if (old[below] === MATERIAL.Empty && next[below] === MATERIAL.Empty && this.chance(60)) {
+        writeCellBytes(next, below, MATERIAL.Water, cell[1], 26);
+        writeU16(next, idx + 4, Math.max(0, readU16(next, idx + 4) - 24));
+      }
+    }
     if (!(wet || this.chance(120))) return;
     for (const nidx of this.neighbors(x, y)) {
       const other = old[nidx];

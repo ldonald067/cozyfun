@@ -66,7 +66,11 @@ export function detectReactionCues(before: Uint8Array, after: Uint8Array): React
     if ((beforeKind === MATERIAL.Steam || beforeKind === MATERIAL.Water) && afterKind === MATERIAL.Ice) {
       found.add("frost");
     }
-    if (beforeKind === MATERIAL.Moss && afterKind === MATERIAL.Moss && gainedFlag(before, after, idx, CELL_FLAG.Wet)) {
+    if (
+      beforeKind === afterKind &&
+      (afterKind === MATERIAL.Moss || afterKind === MATERIAL.Soil) &&
+      gainedFlag(before, after, idx, CELL_FLAG.Wet)
+    ) {
       found.add("dew");
     }
 
