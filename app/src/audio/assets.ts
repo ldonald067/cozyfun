@@ -1,20 +1,29 @@
 export type AmbientAudioAssetId = "catPurr" | "rainFall" | "fireCrackle";
 
-export const AMBIENT_AUDIO_ASSETS: Record<AmbientAudioAssetId, { url: string; label: string; minLoopSeconds: number }> = {
+// levelTrim normalizes each recording's loudness to the rain reference so mood/room
+// gains mean the same thing across beds (measured filtered RMS: rain 0.194,
+// fire 0.020, purr 0.0075). The credited files themselves stay untouched.
+export const AMBIENT_AUDIO_ASSETS: Record<
+  AmbientAudioAssetId,
+  { url: string; label: string; minLoopSeconds: number; levelTrim: number }
+> = {
   catPurr: {
     url: "/audio/cat-purr.mp3",
     label: "cat purr",
-    minLoopSeconds: 120
+    minLoopSeconds: 120,
+    levelTrim: 26
   },
   rainFall: {
     url: "/audio/rain.mp3",
     label: "rain",
-    minLoopSeconds: 150
+    minLoopSeconds: 150,
+    levelTrim: 1
   },
   fireCrackle: {
     url: "/audio/fire-crackle.wav",
     label: "fire crackle",
-    minLoopSeconds: 120
+    minLoopSeconds: 120,
+    levelTrim: 9.7
   }
 };
 

@@ -120,7 +120,7 @@ function startRecordedLoop(
     filter.Q.value = options.filter.q;
 
     const gain = audio.context.createGain();
-    gain.gain.value = options.gain;
+    gain.gain.value = options.gain * AMBIENT_AUDIO_ASSETS[id].levelTrim;
 
     source.connect(filter);
     filter.connect(gain);

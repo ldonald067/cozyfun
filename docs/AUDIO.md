@@ -16,7 +16,7 @@ Focused implementation modules live under `app/src/audio`:
 - `rooms.ts`: room-linked ambience profiles that bias native ambience without adding controls.
 - `providers.ts`: native/Desk Radio source definitions and compatibility rules.
 - `mixer.ts`: Web Audio graph for `master` and `ambience`.
-- `assets.ts`: local ambience recording metadata and browser decode cache.
+- `assets.ts`: local ambience recording metadata, per-asset loudness trims that normalize the recordings to a shared reference level, and the browser decode cache.
 - `ambience.ts`: recorded rain, cat purr, and fire loops, including in-memory loop extension for short local recordings.
 - `cues.ts`: short paint and reaction cues for material feedback.
 - `reactions.ts`: post-tick reaction detector for sparse audio cues.
