@@ -470,6 +470,7 @@ input:focus-visible {
 .brush-control input {
   grid-column: 1 / -1;
   width: 100%;
+  min-width: 0;
   accent-color: #dfb65e;
 }
 
@@ -782,8 +783,9 @@ input:focus-visible {
   position: absolute;
   z-index: 5;
   bottom: calc(100% + 8px);
-  left: -12px;
-  width: 188px;
+  /* Sized and offset to stay inside the control panel, which clips horizontal overflow. */
+  left: -62px;
+  width: 158px;
   padding: 8px 9px;
   border: 1px solid rgba(141, 207, 227, 0.22);
   border-radius: 6px;
@@ -853,7 +855,8 @@ input:focus-visible {
 }
 
 .scene-environment-control {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* Two columns so the longest room label (Stardust) fits without clipping. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .scene-environment-control button {
