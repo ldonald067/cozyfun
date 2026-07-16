@@ -11,6 +11,15 @@ export function startNativeAmbience(audio: RunningAudio, mood: AudioMood, room: 
   const registry: AudioNodeRegistry = { sources: [], nodes: [] };
   const pendingLoads: Array<() => void> = [];
 
+  // Every loop plays through one shared envelope so mood/room switches fade instead of popping.
+  const layerGain = audio.context.createGain();
+  const startAt = audio.context.currentTime;
+  layerGain.gain.setValueAtTime(0.0001, startAt);
+  layerGain.gain.setTargetAtTime(1, startAt, 0.24);
+  layerGain.connect(audio.channels.ambience);
+  registry.nodes.push(layerGain);
+  registry.destination = layerGain;
+
   startRecordedLoop(audio, registry, pendingLoads, "catPurr", {
     gain: settings.purrGain * roomSettings.purrGainScale,
     filter: {
@@ -41,8 +50,15 @@ export function startNativeAmbience(audio: RunningAudio, mood: AudioMood, room: 
   return {
     stop() {
       for (const cancelLoad of pendingLoads) cancelLoad();
-      stopSources(registry.sources);
-      disconnectAudioNodes(...registry.nodes);
+      const now = audio.context.currentTime;
+      layerGain.gain.cancelScheduledValues(now);
+      layerGain.gain.setTargetAtTime(0.0001, now, 0.09);
+      const sources = [...registry.sources];
+      const nodes = [...registry.nodes];
+      setTimeout(() => {
+        stopSources(sources);
+        disconnectAudioNodes(...nodes);
+      }, 420);
     }
   };
 }
@@ -50,6 +66,7 @@ export function startNativeAmbience(audio: RunningAudio, mood: AudioMood, room: 
 type AudioNodeRegistry = {
   sources: AudioScheduledSourceNode[];
   nodes: AudioNode[];
+  destination?: AudioNode;
 };
 
 type RecordedLoopOptions = {
@@ -103,7 +120,7 @@ function startRecordedLoop(
 
     source.connect(filter);
     filter.connect(gain);
-    gain.connect(audio.channels.ambience);
+    gain.connect(registry.destination ?? audio.channels.ambience);
     source.start();
     recordNativeAmbienceStart(id, source, gain, filter);
 
