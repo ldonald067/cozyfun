@@ -92,6 +92,33 @@ export function playReactionCue(audio: RunningAudio, cue: ReactionCue, time: num
       playNoise(audio, time + 0.008, { duration: 0.084, frequency: 1040, gain: 0.0026, type: "bandpass", q: 0.42 });
       playTone(audio, time + 0.032, { duration: 0.07, frequency: 1380, endFrequency: 980, gain: 0.0018, type: "triangle" });
       return;
+    case "vitrify":
+      playTone(audio, time, { duration: 0.14, frequency: 1680, endFrequency: 1240, gain: 0.0026, type: "sine" });
+      playTone(audio, time + 0.02, { duration: 0.09, frequency: 2140, gain: 0.0012, type: "triangle" });
+      playNoise(audio, time, { duration: 0.05, frequency: 3200, gain: 0.0008, type: "highpass", q: 0.4 });
+      return;
+    case "starfire":
+      playTone(audio, time, { duration: 0.11, frequency: 1560, endFrequency: 1170, gain: 0.0024, type: "sine" });
+      playTone(audio, time + 0.045, { duration: 0.12, frequency: 1980, endFrequency: 1480, gain: 0.0014, type: "sine" });
+      playNoise(audio, time + 0.01, { duration: 0.06, frequency: 2600, gain: 0.0008, type: "bandpass", q: 0.5 });
+      return;
+    case "ember-glow":
+      playTone(audio, time, { duration: 0.07, frequency: 110, gain: 0.0034, type: "triangle" });
+      playNoise(audio, time + 0.012, { duration: 0.09, frequency: 900, gain: 0.0024, type: "bandpass", q: 0.3 });
+      return;
+    case "quench":
+      playNoise(audio, time, { duration: 0.16, frequency: 640, gain: 0.003, type: "bandpass", q: 0.2 });
+      playNoise(audio, time + 0.05, { duration: 0.1, frequency: 320, gain: 0.0014, type: "lowpass", q: 0.3 });
+      return;
+    case "crumble":
+      playTone(audio, time, { duration: 0.06, frequency: 96, gain: 0.0036, type: "triangle" });
+      playTone(audio, time + 0.05, { duration: 0.055, frequency: 74, gain: 0.0028, type: "triangle" });
+      playNoise(audio, time + 0.01, { duration: 0.1, frequency: 420, gain: 0.002, type: "lowpass", q: 0.35 });
+      return;
+    case "frost":
+      playTone(audio, time, { duration: 0.06, frequency: 1240, endFrequency: 1580, gain: 0.0018, type: "sine" });
+      playNoise(audio, time + 0.008, { duration: 0.04, frequency: 4200, gain: 0.0007, type: "highpass", q: 0.5 });
+      return;
   }
 }
 

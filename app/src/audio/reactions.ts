@@ -1,6 +1,18 @@
 import { CELL_FLAG, CELL_STRIDE, MATERIAL } from "../materials";
 
-export const REACTION_CUES = ["impact-burst", "cleanse", "cosmic-charge", "bloom", "steam-flash"] as const;
+export const REACTION_CUES = [
+  "impact-burst",
+  "cleanse",
+  "cosmic-charge",
+  "bloom",
+  "steam-flash",
+  "vitrify",
+  "starfire",
+  "ember-glow",
+  "quench",
+  "crumble",
+  "frost"
+] as const;
 
 export type ReactionCue = (typeof REACTION_CUES)[number];
 
@@ -34,6 +46,24 @@ export function detectReactionCues(before: Uint8Array, after: Uint8Array): React
     }
     if (afterKind === MATERIAL.Steam && beforeKind !== MATERIAL.Steam && isSteamFlashSource(beforeKind)) {
       found.add("steam-flash");
+    }
+    if (afterKind === MATERIAL.Glass && beforeKind !== MATERIAL.Glass) {
+      found.add("vitrify");
+    }
+    if (beforeKind === MATERIAL.Fire && afterKind === MATERIAL.Stardust) {
+      found.add("starfire");
+    }
+    if (beforeKind === MATERIAL.Wood && afterKind === MATERIAL.Ember) {
+      found.add("ember-glow");
+    }
+    if (beforeKind === MATERIAL.Ember && afterKind === MATERIAL.Ember && gainedFlag(before, after, idx, CELL_FLAG.Wet)) {
+      found.add("quench");
+    }
+    if (beforeKind === MATERIAL.Wall && afterKind === MATERIAL.Stone) {
+      found.add("crumble");
+    }
+    if ((beforeKind === MATERIAL.Steam || beforeKind === MATERIAL.Water) && afterKind === MATERIAL.Ice) {
+      found.add("frost");
     }
 
     if (found.size === REACTION_CUES.length) break;

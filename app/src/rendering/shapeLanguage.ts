@@ -387,6 +387,7 @@ function flowerColor({ color, variant, age, energy, flags, time, cells, width, h
   }
   if (scorched) out = mixRgb(out, [55, 37, 31], 0.62);
   if (frozen) out = mixRgb(out, [207, 236, 245], 0.56);
+  if (age < 8) out = mixRgb(out, [255, 252, 224], 0.55 * (1 - age / 8));
   return out;
 }
 
@@ -433,6 +434,7 @@ function glassColor({ color, variant, age, cells, width, height, x, y }: ShapeCo
   if (edge.top || edge.left) out = mixRgb(out, [238, 254, 255], 0.52);
   if (edge.bottom || edge.right) out = mixRgb(out, [44, 92, 110], 0.44);
   if ((hash & 31) === 5) out = mixRgb(out, [255, 255, 255], 0.6);
+  if (age < 8) out = mixRgb(out, [255, 244, 214], 0.6 * (1 - age / 8));
   if (age < 70) out = mixRgb(out, [255, 176, 96], 0.36 * (1 - age / 70));
   return out;
 }

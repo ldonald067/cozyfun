@@ -46,19 +46,26 @@ const { detectReactionCues } = require(resolve(outDir, "audio/reactions.js"));
 
 const MATERIAL = {
   Empty: 0,
+  Wall: 1,
+  Sand: 2,
   Water: 3,
   Fire: 6,
+  Wood: 7,
   Stone: 9,
   Seed: 11,
   Oil: 13,
+  Ice: 14,
   Steam: 15,
   Stardust: 16,
   Meteor: 17,
   Moonwater: 18,
-  Flower: 19
+  Flower: 19,
+  Glass: 20,
+  Ember: 21
 };
 
 const CELL_FLAG = {
+  Wet: 1 << 0,
   Cosmic: 1 << 2
 };
 
@@ -130,6 +137,46 @@ expectCues("meteor moonwater burst", (before, after) => {
   setCell(before, 1, 1, MATERIAL.Moonwater);
   setCell(after, 1, 1, MATERIAL.Stardust);
 }, ["impact-burst"]);
+
+expectCues("sand fuses into glass", (before, after) => {
+  setCell(before, 1, 1, MATERIAL.Sand);
+  setCell(after, 1, 1, MATERIAL.Glass);
+}, ["vitrify"]);
+
+expectCues("stardust snuffs fire", (before, after) => {
+  setCell(before, 1, 1, MATERIAL.Fire);
+  setCell(after, 1, 1, MATERIAL.Stardust);
+}, ["starfire"]);
+
+expectCues("wood catches into ember", (before, after) => {
+  setCell(before, 1, 1, MATERIAL.Wood);
+  setCell(after, 1, 1, MATERIAL.Ember);
+}, ["ember-glow"]);
+
+expectCues("water quenches ember", (before, after) => {
+  setCell(before, 1, 1, MATERIAL.Ember);
+  setCell(after, 1, 1, MATERIAL.Ember, { flags: CELL_FLAG.Wet });
+}, ["quench"]);
+
+expectCues("already wet ember stays silent", (before, after) => {
+  setCell(before, 1, 1, MATERIAL.Ember, { flags: CELL_FLAG.Wet });
+  setCell(after, 1, 1, MATERIAL.Ember, { flags: CELL_FLAG.Wet });
+}, []);
+
+expectCues("wall crumbles into stone", (before, after) => {
+  setCell(before, 1, 1, MATERIAL.Wall);
+  setCell(after, 1, 1, MATERIAL.Stone);
+}, ["crumble"]);
+
+expectCues("steam frosts into ice", (before, after) => {
+  setCell(before, 1, 1, MATERIAL.Steam);
+  setCell(after, 1, 1, MATERIAL.Ice);
+}, ["frost"]);
+
+expectCues("water freezes into ice", (before, after) => {
+  setCell(before, 1, 1, MATERIAL.Water);
+  setCell(after, 1, 1, MATERIAL.Ice);
+}, ["frost"]);
 
 expectCues("priority order and uniqueness", (before, after) => {
   setCell(before, 0, 0, MATERIAL.Water);

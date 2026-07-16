@@ -25,7 +25,13 @@ class CozyAudioController {
     cleanse: Number.NEGATIVE_INFINITY,
     "cosmic-charge": Number.NEGATIVE_INFINITY,
     bloom: Number.NEGATIVE_INFINITY,
-    "steam-flash": Number.NEGATIVE_INFINITY
+    "steam-flash": Number.NEGATIVE_INFINITY,
+    vitrify: Number.NEGATIVE_INFINITY,
+    starfire: Number.NEGATIVE_INFINITY,
+    "ember-glow": Number.NEGATIVE_INFINITY,
+    quench: Number.NEGATIVE_INFINITY,
+    crumble: Number.NEGATIVE_INFINITY,
+    frost: Number.NEGATIVE_INFINITY
   };
 
   async init(prefs: AudioPrefs, room: SceneEnvironmentId = this.room) {
@@ -167,12 +173,30 @@ class CozyAudioController {
   }
 }
 
-const REACTION_CUE_PRIORITY: ReactionCue[] = ["impact-burst", "cleanse", "cosmic-charge", "bloom", "steam-flash"];
+const REACTION_CUE_PRIORITY: ReactionCue[] = [
+  "crumble",
+  "impact-burst",
+  "vitrify",
+  "starfire",
+  "cleanse",
+  "ember-glow",
+  "quench",
+  "cosmic-charge",
+  "bloom",
+  "frost",
+  "steam-flash"
+];
 
 const REACTION_CUE_COOLDOWNS: Record<ReactionCue, number> = {
   "impact-burst": 0.9,
   cleanse: 1.2,
   "cosmic-charge": 1.15,
   bloom: 1.4,
-  "steam-flash": 1.1
+  "steam-flash": 1.1,
+  vitrify: 1.1,
+  starfire: 1.0,
+  "ember-glow": 1.25,
+  quench: 1.05,
+  crumble: 1.6,
+  frost: 1.2
 };
