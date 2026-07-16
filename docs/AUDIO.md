@@ -63,7 +63,7 @@ npm run audio:qa
 
 (Windows wrapper: `.\scripts\audio-qa.ps1`.)
 
-It writes a native ambience manifest to `.tmp/audio-qa`. The manifest covers local audio asset presence, minimum byte checks, target loop length, the checked-in mood and room balances, and a guard that fails if `ambience.ts` reintroduces generated noise or oscillator ambience. Browser smoke checks verify that the assets are served and decodable. Browser Web Audio routing, autoplay behavior, and Desk Radio embedding are still covered by browser checks.
+It writes a native ambience manifest to `.tmp/audio-qa`. When a recording is added or replaced, also run `node scripts/audio-loudness.mjs` (after a build) to measure its RMS loudness and update the `levelTrim` in `assets.ts` so the beds stay loudness-matched. The manifest covers local audio asset presence, minimum byte checks, target loop length, the checked-in mood and room balances, and a guard that fails if `ambience.ts` reintroduces generated noise or oscillator ambience. Browser smoke checks verify that the assets are served and decodable. Browser Web Audio routing, autoplay behavior, and Desk Radio embedding are still covered by browser checks.
 
 Reference tracks can guide taste, but do not sample, copy, scrape, or embed hidden audio from them. YouTube links remain user-provided Desk Radio sources only.
 

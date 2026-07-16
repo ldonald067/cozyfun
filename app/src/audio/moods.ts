@@ -48,7 +48,7 @@ export function getAudioMoodDef(mood: AudioMood) {
   return AUDIO_MOODS.find((candidate) => candidate.id === mood) ?? AUDIO_MOODS[0];
 }
 
-export function isAudioMood(value: unknown): value is AudioMood {
+function isAudioMood(value: unknown): value is AudioMood {
   return typeof value === "string" && AUDIO_MOODS.some((candidate) => candidate.id === value);
 }
 
