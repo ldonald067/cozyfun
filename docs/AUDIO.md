@@ -45,7 +45,7 @@ Sound moods are small balance presets over local ambience recordings:
 
 Mood definitions live in `moods.ts`. Keep mood names user-facing and calm; keep implementation details inside the preset config.
 
-Room ambience profiles live in `rooms.ts`. They quietly bias rain, cat purr, and fire crackle when the room backdrop changes.
+Room ambience profiles live in `rooms.ts`. They quietly bias rain, cat purr, and fire crackle when the room backdrop changes. The selected mood's featured bed skips the room gain bias so an explicit mood choice always stays audible; only the background beds take the room scaling.
 
 ## Desk Radio
 

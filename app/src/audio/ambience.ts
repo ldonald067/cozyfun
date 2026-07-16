@@ -6,8 +6,12 @@ import { disconnectAudioNodes, stopSources } from "./utils";
 import type { SceneEnvironmentId } from "../sceneEnvironments";
 
 export function startNativeAmbience(audio: RunningAudio, mood: AudioMood, room: SceneEnvironmentId = DEFAULT_AUDIO_ROOM): AudioLayerHandle {
-  const settings = getAudioMoodDef(mood).ambience;
+  const moodDef = getAudioMoodDef(mood);
+  const settings = moodDef.ambience;
   const roomSettings = getRoomAmbienceDef(room);
+  // The mood's featured bed skips the room's gain bias: choosing Purr in the rain room
+  // must play purr, not a whisper of purr under leftover rain. Background beds keep the bias.
+  const bedGainScale = (bed: AudioMood, roomScale: number) => (moodDef.id === bed ? 1 : roomScale);
   const registry: AudioNodeRegistry = { sources: [], nodes: [] };
   const pendingLoads: Array<() => void> = [];
 
@@ -21,7 +25,7 @@ export function startNativeAmbience(audio: RunningAudio, mood: AudioMood, room: 
   registry.destination = layerGain;
 
   startRecordedLoop(audio, registry, pendingLoads, "catPurr", {
-    gain: settings.purrGain * roomSettings.purrGainScale,
+    gain: settings.purrGain * bedGainScale("purr", roomSettings.purrGainScale),
     filter: {
       frequency: settings.purrFilter * roomSettings.purrFilterScale,
       type: "lowpass",
@@ -30,7 +34,7 @@ export function startNativeAmbience(audio: RunningAudio, mood: AudioMood, room: 
   });
 
   startRecordedLoop(audio, registry, pendingLoads, "rainFall", {
-    gain: settings.rainGain * roomSettings.rainGainScale,
+    gain: settings.rainGain * bedGainScale("rain", roomSettings.rainGainScale),
     filter: {
       frequency: settings.rainFilter * roomSettings.rainFilterScale,
       type: "lowpass",
@@ -39,7 +43,7 @@ export function startNativeAmbience(audio: RunningAudio, mood: AudioMood, room: 
   });
 
   startRecordedLoop(audio, registry, pendingLoads, "fireCrackle", {
-    gain: settings.fireGain * roomSettings.fireGainScale,
+    gain: settings.fireGain * bedGainScale("fire", roomSettings.fireGainScale),
     filter: {
       frequency: 120,
       type: "highpass",

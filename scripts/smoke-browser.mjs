@@ -338,6 +338,19 @@ async function main() {
     assertNativeStart(nativeAmbience.nativeStarts, "fireCrackle", "/audio/fire-crackle.wav", 120, { minGain: 0.0001 });
 
     await evaluate(cdp, `window.__cozyNativeAmbienceProbe = { starts: [] }`);
+    await click(cdp, '[data-testid="audio-mood-purr"]');
+    await waitForStatus(cdp, "cat purr on");
+    await waitUntil(
+      () => evaluate(
+        cdp,
+        `(() => (window.__cozyNativeAmbienceProbe?.starts ?? []).some((start) => start.id === "catPurr" && start.gain >= 0.05))()`
+      ),
+      "featured purr bed to skip the rain room gain bias"
+    );
+    await click(cdp, '[data-testid="audio-mood-rain"]');
+    await waitForStatus(cdp, "rain on");
+
+    await evaluate(cdp, `window.__cozyNativeAmbienceProbe = { starts: [] }`);
     await click(cdp, '[data-testid="scene-environment-stardust-hearth"]');
     await waitForStatus(cdp, "stardust hearth backdrop on");
     await waitUntil(

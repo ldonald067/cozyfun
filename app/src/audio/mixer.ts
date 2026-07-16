@@ -5,7 +5,9 @@ export function createAudioMixer(context: AudioContext): RunningAudio {
   const master = context.createGain();
   const ambience = context.createGain();
   // Short cues bypass the ambience slider so quiet beds never silence interaction feedback.
+  // Cue voices are authored very quiet (0.001-0.006), so the bus lifts them to a readable level.
   const cueBus = context.createGain();
+  cueBus.gain.value = 3;
 
   ambience.connect(master);
   cueBus.connect(master);
