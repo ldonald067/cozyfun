@@ -20,7 +20,7 @@ export const AUDIO_MOODS: AudioMoodDef[] = [
     title: "Cat Purr",
     status: "cat purr on",
     ambience: {
-      purrGain: 0.052,
+      purrGain: 0.09,
       purrFilter: 480,
       rainGain: 0.018,
       rainFilter: 3300,
@@ -37,7 +37,7 @@ export const AUDIO_MOODS: AudioMoodDef[] = [
       purrFilter: 540,
       rainGain: 0.006,
       rainFilter: 4200,
-      fireGain: 0.052
+      fireGain: 0.09
     }
   }
 ];
