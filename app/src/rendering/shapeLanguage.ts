@@ -27,6 +27,7 @@ const MOONWATER_KINDS = [MATERIAL.Moonwater] as const;
 const STARDUST_KINDS = [MATERIAL.Stardust] as const;
 const WATER_KINDS = [MATERIAL.Water] as const;
 const OIL_KINDS = [MATERIAL.Oil] as const;
+const EMBER_KINDS = [MATERIAL.Ember] as const;
 const EARTH_CONTACT_KINDS = [MATERIAL.Sand, MATERIAL.Soil, MATERIAL.Stone, MATERIAL.Wall, MATERIAL.Wood] as const;
 
 export function emptyCellColor(cells: Uint8Array, width: number, height: number, x: number, y: number, time: number): Rgb {
@@ -530,6 +531,10 @@ function liquidColor({ kind, color, variant, flags, time, cells, width, height, 
   const earthContact = contactInfo(cells, width, height, x, y, EARTH_CONTACT_KINDS);
   const oilContact = contactInfo(cells, width, height, x, y, OIL_KINDS);
   let out = color;
+  if (kind === MATERIAL.Water && hasNearbyKind(cells, width, height, x, y, EMBER_KINDS)) {
+    // Charcoal ink: water running over char picks up a sooty murk.
+    out = mixRgb(out, [31, 29, 27], 0.32);
+  }
 
   if (kind === MATERIAL.Oil) {
     const nearHeat = heatContact.count > 0;

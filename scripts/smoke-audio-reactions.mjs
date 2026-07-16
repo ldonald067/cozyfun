@@ -180,6 +180,11 @@ expectCues("water freezes into ice", (before, after) => {
   setCell(after, 1, 1, MATERIAL.Ice);
 }, ["frost"]);
 
+expectCues("meteor shatters glass to sand", (before, after) => {
+  setCell(before, 1, 1, MATERIAL.Glass);
+  setCell(after, 1, 1, MATERIAL.Sand);
+}, ["shatter"]);
+
 expectCues("watered moss beads with dew", (before, after) => {
   setCell(before, 1, 1, MATERIAL.Moss);
   setCell(after, 1, 1, MATERIAL.Moss, { flags: CELL_FLAG.Wet });

@@ -119,6 +119,11 @@ export function playReactionCue(audio: RunningAudio, cue: ReactionCue, time: num
       playTone(audio, time, { duration: 0.06, frequency: 1180, endFrequency: 860, gain: 0.0022, type: "sine" });
       playTone(audio, time + 0.05, { duration: 0.05, frequency: 1420, endFrequency: 1020, gain: 0.0014, type: "sine" });
       return;
+    case "shatter":
+      playTone(audio, time, { duration: 0.05, frequency: 2260, endFrequency: 1660, gain: 0.0026, type: "triangle" });
+      playTone(audio, time + 0.03, { duration: 0.07, frequency: 1750, endFrequency: 1180, gain: 0.002, type: "sine" });
+      playNoise(audio, time, { duration: 0.09, frequency: 3400, gain: 0.0012, type: "highpass", q: 0.5 });
+      return;
   }
 }
 

@@ -399,6 +399,10 @@ class JsSandboxEngine implements SandboxEngine {
             writeCellBytes(next, nidx, MATERIAL.Stone, old[nidx + 1], 0, 0, CELL_FLAG.Scorched);
             continue;
           }
+          if (other === MATERIAL.Ember && readU16(old, nidx + 4) < 30 && this.chance(12)) {
+            next.fill(0, nidx, nidx + CELL_STRIDE);
+            continue;
+          }
           if (kind !== MATERIAL.Moonwater && hydratable(other) && this.neighborHasKind(old, nidx, MATERIAL.Oil)) {
             writeU16(next, nidx + 4, Math.max(0, readU16(next, nidx + 4) - 16));
             writeU16(next, nidx + 6, readU16(next, nidx + 6) & ~CELL_FLAG.Wet);
@@ -450,7 +454,7 @@ class JsSandboxEngine implements SandboxEngine {
           if (other === MATERIAL.Water || other === MATERIAL.Moonwater) {
             writeU16(next, idx + 4, Math.max(0, readU16(next, idx + 4) - 120));
             writeU16(next, idx + 6, readU16(next, idx + 6) | CELL_FLAG.Wet);
-            if (this.chance(6)) {
+            if (readU16(old, idx + 4) > 40 && this.chance(6)) {
               writeCellBytes(next, nidx, MATERIAL.Steam, old[nidx + 1], 170);
             }
             continue;
@@ -623,6 +627,8 @@ class JsSandboxEngine implements SandboxEngine {
       } else if (heatSoftens(next, nidx, old, 72)) continue;
       else if (old[nidx] === MATERIAL.Sand && this.chance(2)) {
         writeCellBytes(next, nidx, MATERIAL.Glass, old[nidx + 1]);
+      } else if (old[nidx] === MATERIAL.Glass) {
+        writeCellBytes(next, nidx, MATERIAL.Sand, old[nidx + 1]);
       } else if (flammable(old[nidx])) {
         writeIgnitedCell(next, nidx, old[nidx], old[nidx + 1], 230);
       }

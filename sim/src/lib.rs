@@ -553,6 +553,11 @@ impl Universe {
                             next[nidx].flags = FLAG_SCORCHED;
                             continue;
                         }
+                        if other.kind == Material::Ember as u8 && other.energy < 30 && self.chance(12) {
+                            // Charcoal wash: running water crumbles cold char away.
+                            next[nidx] = Cell::empty();
+                            continue;
+                        }
                         if !is_moonwater
                             && is_hydratable(other.kind)
                             && self.neighbor_has_kind(old, nidx, Material::Oil as u8)
@@ -688,7 +693,7 @@ impl Universe {
                         if other.kind == Material::Water as u8 || other.kind == Material::Moonwater as u8 {
                             next[idx].energy = next[idx].energy.saturating_sub(120);
                             next[idx].flags |= FLAG_WET;
-                            if self.chance(6) {
+                            if cell.energy > 40 && self.chance(6) {
                                 next[nidx] = Cell::new(Material::Steam as u8, other.variant, 170);
                             }
                             continue;
@@ -1077,6 +1082,8 @@ impl Universe {
                 continue;
             } else if old[nidx].kind == Material::Sand as u8 && self.chance(2) {
                 next[nidx] = Cell::new(Material::Glass as u8, old[nidx].variant, 0);
+            } else if old[nidx].kind == Material::Glass as u8 {
+                next[nidx] = Cell::new(Material::Sand as u8, old[nidx].variant, 0);
             } else if is_flammable(old[nidx].kind) {
                 next[nidx] = ignited_cell(old[nidx], 230);
             }
@@ -1587,6 +1594,36 @@ mod tests {
         assert_eq!(kind_at(&u, 8, 8), Material::Wood as u8);
         assert!(flags_at(&u, 8, 8) & FLAG_SCORCHED != 0);
         assert_eq!(flags_at(&u, 8, 8) & FLAG_WET, 0);
+    }
+
+    #[test]
+    fn water_washes_cold_char_away() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell_state(&mut u, 8, 8, Material::Ember, 200, 10, 0);
+        set_cell(&mut u, 7, 8, Material::Water);
+        for (x, y) in [(6, 8), (5, 8), (9, 8), (6, 9), (7, 9), (8, 9), (9, 9)] {
+            set_cell(&mut u, x, y, Material::Stone);
+        }
+        let mut washed = false;
+        for _ in 0..80 {
+            u.tick();
+            if kind_at(&u, 8, 8) != Material::Ember as u8 {
+                washed = true;
+                break;
+            }
+        }
+        assert!(washed, "running water should crumble cold char away");
+    }
+
+    #[test]
+    fn meteor_impact_shatters_glass_to_sand() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 8, 8, Material::Meteor);
+        set_cell(&mut u, 8, 9, Material::Stone);
+        set_cell(&mut u, 7, 8, Material::Glass);
+        set_cell(&mut u, 7, 9, Material::Stone);
+        u.tick();
+        assert_eq!(kind_at(&u, 7, 8), Material::Sand as u8, "impact should shatter glass back to sand");
     }
 
     #[test]
