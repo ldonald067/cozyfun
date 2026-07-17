@@ -112,6 +112,10 @@ export function materialShowcaseScript() {
     for (const [x, y] of [[22, 63], [22, 66], [22, 69]]) setCell(x, y, material.Ice, 90, 28);
     for (const [x, y] of [[34, 68], [34, 69]]) setCell(x, y, material.Fire, 230, 10);
 
+    // Geology: a larger stone mass with mineral veins and an old patinated wall.
+    rect(24, 44, 44, 56, material.Stone, 0, 60);
+    rect(208, 217, 96, 106, material.Wall, 0, 20000);
+
     // Constellation etching: stardust resting on stone/wall leaves cosmic glitter veins.
     rect(184, 196, 100, 106, material.Stone, 36, 90, flag.Cosmic);
     rect(198, 206, 98, 106, material.Wall, 36, 90, flag.Cosmic);

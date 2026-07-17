@@ -411,11 +411,13 @@ Interactions grounded in real life or cozy invention, each with a visible or aud
 
 ## Phase 15: Geology
 
-Status: 15A complete; 15B and 15C open.
+Status: complete.
 
 Completed:
 
 - 15A: stone fully saturated by touching water now erodes rarely into wet sand that keeps the stone's variant, with per-water-neighbor rolls so heavier flow wears faster. Damp stone without water contact never erodes and sealed wall is exempt, both pinned by sim tests, and erosion plays a soft grinding cue.
+- 15B: larger stone masses carry rare clustered mineral vein glints, so cliffs read as strata instead of uniform gray; single pebbles stay plain.
+- 15C: walls age visibly through the cell age field: mortar darkens, faces stain, and corners chip on long-standing builds.
 
 Stone and wall are the only reactive-only toolbar elements: everything happens to them and nothing happens because of them. This phase gives the mineral family one circular story instead of bolted-on behaviors.
 

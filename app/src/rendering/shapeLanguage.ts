@@ -117,7 +117,7 @@ function nearbyLight({ kind, cells, width, height, x, y }: ShapeContext, color: 
   return out;
 }
 
-function wallColor({ color, variant, energy, flags, cells, width, height, x, y }: ShapeContext) {
+function wallColor({ color, variant, age, energy, flags, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x >> 2, y >> 1, variant);
   const brickOffset = ((y >> 2) & 1) * 2;
   const brickX = (x + brickOffset) & 7;
@@ -177,6 +177,13 @@ function wallColor({ color, variant, energy, flags, cells, width, height, x, y }
     if ((brickX === 0 || brickY === 0 || moonContact.top) && hash % 5 === 0) out = mixRgb(out, [184, 196, 255], 0.34);
   }
   if ((hash + x + y) % 23 === 0) out = mixRgb(out, [70, 78, 91], 0.26);
+  const patina = Math.min(1, age / 12000);
+  if (patina > 0.1) {
+    // Long-standing walls weather visibly: mortar darkens, faces stain, corners chip.
+    if (brickX === 0 || brickY === 0) out = mixRgb(out, [26, 27, 30], 0.3 * patina);
+    if ((hash + brickX * 3 + brickY) % 9 === 0) out = mixRgb(out, [88, 90, 96], 0.35 * patina);
+    if (patina > 0.5 && (hash + x * 5 + y * 7) % 23 === 0) out = mixRgb(out, [20, 24, 31], 0.4 * patina);
+  }
   return out;
 }
 
@@ -499,6 +506,14 @@ function stoneColor({ color, variant, energy, flags, cells, width, height, x, y 
   }
   if (localX + localY === 2 && facet % 5 === 0) out = mixRgb(out, [121, 118, 104], 0.22);
   if (((x ^ y ^ blockHash) & 31) === 3) out = mixRgb(out, [192, 187, 169], 0.22);
+  if (edge.count === 0) {
+    // Mineral veins: rare clustered strata glint inside larger stone masses only.
+    const veinSeed = hashCell(x >> 3, y >> 3, 1);
+    if ((veinSeed & 15) === 3 && (x * 2 + y * 3 + (veinSeed & 7)) % 19 < 2) {
+      out = mixRgb(out, (veinSeed & 16) !== 0 ? [212, 190, 140] : [176, 196, 214], 0.4);
+      if (((x ^ y) & 7) === 2) out = mixRgb(out, [236, 226, 190], 0.35);
+    }
+  }
   if (dampContact.count > 0 || flags & CELL_FLAG.Wet || energy > 30) {
     out = mixRgb(out, [86, 111, 122], dampContact.top ? 0.36 : 0.26);
     if (edge.top || localY === 0 || dampContact.bottom) out = mixRgb(out, [128, 166, 179], 0.22);
