@@ -650,6 +650,16 @@ impl Universe {
                             if next[nidx].flags & FLAG_SCORCHED != 0 && self.chance(5) {
                                 next[nidx].flags &= !FLAG_SCORCHED;
                             }
+                            if next[nidx].kind == Material::Stone as u8
+                                && next[nidx].energy >= 250
+                                && self.chance(2000)
+                            {
+                                // Erosion: fully saturated stone slowly wears into wet grains that
+                                // keep the stone's variant. Rolls happen per touching water cell,
+                                // so heavier flow wears faster; sealed wall never erodes.
+                                next[nidx] = Cell::new(Material::Sand as u8, other.variant, 60);
+                                next[nidx].flags = FLAG_WET;
+                            }
                         }
                         if other.kind == Material::Wall as u8 {
                             let wall_vigor = (vigor / if is_moonwater { 3 } else { 5 }).max(8);
@@ -1766,6 +1776,37 @@ mod tests {
             }
         }
         assert!(dripped, "saturated overhanging moss should shed a dew droplet");
+    }
+
+    #[test]
+    fn sustained_water_erodes_saturated_stone_into_sand() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 8, 8, Material::Stone);
+        set_cell(&mut u, 7, 8, Material::Water);
+        set_cell(&mut u, 8, 7, Material::Water);
+        for (x, y) in [(6, 8), (5, 8), (6, 9), (7, 9), (8, 9), (9, 9), (9, 8), (10, 8), (7, 7), (6, 7), (9, 7), (8, 6), (7, 6), (9, 6)] {
+            set_cell(&mut u, x, y, Material::Wall);
+        }
+        let mut eroded = false;
+        for _ in 0..30000 {
+            u.tick();
+            if kind_at(&u, 8, 8) == Material::Sand as u8 {
+                eroded = true;
+                break;
+            }
+        }
+        assert!(eroded, "stone soaked by persistent water should erode into sand");
+        assert!(flags_at(&u, 8, 8) & FLAG_WET != 0, "eroded grains should be wet");
+    }
+
+    #[test]
+    fn damp_stone_without_water_contact_never_erodes() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell_state(&mut u, 8, 8, Material::Stone, 12, 200, FLAG_WET);
+        for _ in 0..5000 {
+            u.tick();
+        }
+        assert_eq!(kind_at(&u, 8, 8), Material::Stone as u8, "damp stone alone should stay stone");
     }
 
     #[test]

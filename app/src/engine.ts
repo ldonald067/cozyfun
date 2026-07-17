@@ -460,6 +460,9 @@ class JsSandboxEngine implements SandboxEngine {
             if (readU16(next, nidx + 6) & CELL_FLAG.Scorched && this.chance(5)) {
               writeU16(next, nidx + 6, readU16(next, nidx + 6) & ~CELL_FLAG.Scorched);
             }
+            if (next[nidx] === MATERIAL.Stone && readU16(next, nidx + 4) >= 250 && this.chance(2000)) {
+              writeCellBytes(next, nidx, MATERIAL.Sand, old[nidx + 1], 60, 0, CELL_FLAG.Wet);
+            }
           }
           if (other === MATERIAL.Wall) {
             const wallVigor = Math.max(8, Math.floor(vigor / (kind === MATERIAL.Moonwater ? 3 : 5)));

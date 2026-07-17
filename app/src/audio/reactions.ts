@@ -13,7 +13,8 @@ export const REACTION_CUES = [
   "crumble",
   "frost",
   "dew",
-  "shatter"
+  "shatter",
+  "erode"
 ] as const;
 
 export type ReactionCue = (typeof REACTION_CUES)[number];
@@ -54,6 +55,9 @@ export function detectReactionCues(before: Uint8Array, after: Uint8Array): React
     }
     if (beforeKind === MATERIAL.Glass && afterKind === MATERIAL.Sand) {
       found.add("shatter");
+    }
+    if (beforeKind === MATERIAL.Stone && afterKind === MATERIAL.Sand) {
+      found.add("erode");
     }
     if (beforeKind === MATERIAL.Fire && afterKind === MATERIAL.Stardust) {
       found.add("starfire");

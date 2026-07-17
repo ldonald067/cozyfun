@@ -124,6 +124,10 @@ export function playReactionCue(audio: RunningAudio, cue: ReactionCue, time: num
       playTone(audio, time + 0.03, { duration: 0.07, frequency: 1750, endFrequency: 1180, gain: 0.002, type: "sine" });
       playNoise(audio, time, { duration: 0.09, frequency: 3400, gain: 0.0012, type: "highpass", q: 0.5 });
       return;
+    case "erode":
+      playNoise(audio, time, { duration: 0.14, frequency: 760, gain: 0.0022, type: "bandpass", q: 0.3 });
+      playNoise(audio, time + 0.06, { duration: 0.09, frequency: 420, gain: 0.0012, type: "lowpass", q: 0.3 });
+      return;
   }
 }
 

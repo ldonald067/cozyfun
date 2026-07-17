@@ -411,7 +411,11 @@ Interactions grounded in real life or cozy invention, each with a visible or aud
 
 ## Phase 15: Geology
 
-Status: planned.
+Status: 15A complete; 15B and 15C open.
+
+Completed:
+
+- 15A: stone fully saturated by touching water now erodes rarely into wet sand that keeps the stone's variant, with per-water-neighbor rolls so heavier flow wears faster. Damp stone without water contact never erodes and sealed wall is exempt, both pinned by sim tests, and erosion plays a soft grinding cue.
 
 Stone and wall are the only reactive-only toolbar elements: everything happens to them and nothing happens because of them. This phase gives the mineral family one circular story instead of bolted-on behaviors.
 
