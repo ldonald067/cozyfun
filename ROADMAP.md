@@ -430,30 +430,22 @@ Watering the garden now answers back at every step of the growth arc:
 - Real stalked plants: rooted, fed seeds germinate into a generated-only Stem that climbs upward cell by cell (height varies per seed, taller with cosmic feeding) and blooms a flower at its tip, so gardens become stands of flowers at different heights that reseed themselves through pollen. Unsupported stalk segments fall, so cut plants collapse; stems burn, freeze, and scorch like living growth. Mature damp moss raises tiny sporophyte tufts, keeping its carpet identity while reading plant-like up close.
 - Sandbox-classic feel, learned from the game that inspired this project: paint strokes interpolate into continuous lines, powders and liquids sprinkle as grains while solids paint dense, and a quarter of expiring steam condenses back into falling droplets.
 
-## Phase 17: Wellspring and Sky Lantern
+## Phase 17: Rocket and Wellspring
 
-Status: planned. Cozy translations of the two classic sandbox elements the project's inspiration is loved for: the cloner and the rocket.
+Status: complete. Cozy translations of the two classic sandbox elements the project's inspiration is loved for: the rocket and the cloner. Both shipped as toolbar elements in the cosmic family carrying the 4-role audit bar.
+
+### Phase 17B: Rocket (the firework powder) — shipped first
+
+- Inert crimson powder with paper flecks that falls and piles calmly, so charges and fuse lines can be laid without accidents.
+- Any flame (fire, lava, hot ember, meteor) lights a grain's fuse instead of burning it: the lit grain climbs skyward with sway and a smoke trail, rendered as a bright firework head.
+- Bursts at fuse end or against a ceiling into a ring of brief fire sparks and lingering stardust, reusing the impact-burst cue; bursts chain-light neighboring powder so a lit pile erupts grain by grain.
 
 ### Phase 17A: Wellspring (the cozy cloner)
 
-A paintable sealed block that drinks the identity of the first material to touch it, then gently emits that material from its open faces forever. Eternal waterfalls, everlasting campfires, endless sand pours: persistent scenes stop needing the player's constant hand.
-
-- Identity stored in the cell's energy field as a material id; an unclaimed wellspring reads as a carved, rune-marked block, and a claimed one tints toward its material with a slow pulse.
-- Emission is gentle (rare per-tick chance per open face) so springs feel like sources, not firehoses; eraser clears them like anything else.
-- Toolbar element in the basic family, so it must carry 4 interaction roles: absorbs an identity, emits it, blocks flow like wall, and heat or frost visibly stresses the block without destroying it.
-
-### Phase 17B: Rocket (the firework powder)
-
-Matching how the inspiration actually plays it: rocket is an inert crimson powder, and fire is the trigger.
-
-- Unlit rocket falls and piles like a powder and does nothing on its own, so charges and fuse lines can be built calmly.
-- Any open flame (fire, lava, hot ember, meteor) lights it: the lit grain launches skyward like an inverse meteor, swaying as it climbs and leaving a smoke trail.
-- At the end of its fuse, or when it hits a ceiling, it bursts: a ring of brief fire sparks, a puff of stardust shimmer, and smoke. Bursts near flammables have real consequences, exactly like the inspiration.
-- Toolbar element in the cosmic family with 4 roles: falls inert, ignites from flame, flies with a trail, bursts at altitude or obstruction.
-
-Order: 17B first since it is the piece the inspiration is loved for, then 17A Wellspring.
-
-Stone and wall are the only reactive-only toolbar elements: everything happens to them and nothing happens because of them. This phase gives the mineral family one circular story instead of bolted-on behaviors.
+- A rune-carved block that drinks the identity of the first source material to touch it (consuming that cell, with a cosmic-charge chime) and stores it in the energy field as a material id.
+- Attuned runes tint toward the remembered material with a slow pulse; dormant runes shimmer faintly silver.
+- Gently pours the remembered material from open faces forever (rare per-tick chance per face), so eternal waterfalls, everlasting hearths, and meteor-shower windows are one-block scenes. Sources: sand, water, soil, fire, lava, oil, seed, stardust, meteor, moonwater, rocket.
+- Nearby ice stills the spring until the cold is removed; eraser clears it like anything else.
 
 The headline cycle: wall weathers into stone (freeze-thaw, shipped), stone erodes into sand (new), sand fuses into glass under heat (shipped), glass shatters back to sand under impact (shipped). Every mineral becomes a stage in one loop the player can push in either direction with water, cold, and heat.
 
