@@ -64,7 +64,8 @@ const MATERIAL = {
   Glass: 20,
   Ember: 21,
   Stem: 23,
-  Rocket: 24
+  Rocket: 24,
+  Wellspring: 25
 };
 
 const CELL_FLAG = {
@@ -150,6 +151,26 @@ withEngine(7, (engine) => {
     }
   }
   assert(burst, "flame-lit rocket powder should fly and burst into stardust");
+});
+
+withEngine(7, (engine) => {
+  const cells = new Uint8Array(16 * 16 * CELL_STRIDE);
+  setCell(cells, 16, 8, 8, MATERIAL.Wellspring);
+  setCell(cells, 16, 8, 7, MATERIAL.Water);
+  loadCells(engine, cells, "wellspring test cells should load");
+  let pouring = false;
+  for (let tick = 0; tick < 120 && !pouring; tick++) {
+    engine.tick();
+    const updated = engine.getCellBytes();
+    let water = 0;
+    for (let offset = 0; offset < updated.byteLength; offset += CELL_STRIDE) {
+      if (updated[offset] === MATERIAL.Water) water++;
+    }
+    if (water > 2) pouring = true;
+  }
+  assert(pouring, "a water-attuned wellspring should keep pouring water");
+  const updated = engine.getCellBytes();
+  assert(readU16(updated, (8 * 16 + 8) * CELL_STRIDE + 4) === MATERIAL.Water, "the wellspring should stay attuned to water");
 });
 
 withEngine(7, (engine) => {

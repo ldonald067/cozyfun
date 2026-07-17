@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import {
   BrickWall,
+  CircleDot,
   CloudFog,
   Droplet,
   Eraser,
@@ -50,7 +51,8 @@ const MATERIAL_ICONS: Record<MaterialId, LucideIcon> = {
   [MATERIAL.Ember]: Flame,
   [MATERIAL.Pollen]: Sparkle,
   [MATERIAL.Stem]: Sprout,
-  [MATERIAL.Rocket]: Rocket
+  [MATERIAL.Rocket]: Rocket,
+  [MATERIAL.Wellspring]: CircleDot
 };
 
 type MaterialPanelProps = {

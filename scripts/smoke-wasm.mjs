@@ -31,7 +31,8 @@ const MATERIAL = {
   Glass: 20,
   Ember: 21,
   Stem: 23,
-  Rocket: 24
+  Rocket: 24,
+  Wellspring: 25
 };
 
 const CELL_FLAG = {
@@ -130,6 +131,24 @@ withUniverse(16, 16, 7, (universe) => {
     if (countKind(readCells(universe), MATERIAL.Stardust) > 0) burst = true;
   }
   assert(burst, "flame-lit rocket powder should fly and burst into stardust");
+});
+
+withUniverse(16, 16, 7, (universe) => {
+  const cells = new Uint8Array(16 * 16 * 8);
+  setCell(cells, 16, 8, 8, MATERIAL.Wellspring);
+  setCell(cells, 16, 8, 7, MATERIAL.Water);
+  const ptr = wasm.alloc(cells.byteLength);
+  new Uint8Array(wasm.memory.buffer, ptr, cells.byteLength).set(cells);
+  assert(wasm.universe_load_cells(universe, ptr, cells.byteLength) === 1, "wellspring test cells should load");
+  wasm.dealloc(ptr, cells.byteLength);
+  let pouring = false;
+  for (let tick = 0; tick < 120 && !pouring; tick++) {
+    wasm.universe_tick(universe);
+    if (countKind(readCells(universe), MATERIAL.Water) > 2) pouring = true;
+  }
+  assert(pouring, "a water-attuned wellspring should keep pouring water");
+  const updated = readCells(universe);
+  assert(readU16(updated, (8 * 16 + 8) * 8 + 4) === MATERIAL.Water, "the wellspring should stay attuned to water");
 });
 
 withUniverse(16, 16, 7, (universe) => {

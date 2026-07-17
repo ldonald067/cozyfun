@@ -57,7 +57,8 @@ const PAINT_DENSITY: Partial<Record<MaterialId, number>> = {
   [MATERIAL.Stone]: 100,
   [MATERIAL.Wood]: 100,
   [MATERIAL.Ice]: 100,
-  [MATERIAL.Moss]: 100
+  [MATERIAL.Moss]: 100,
+  [MATERIAL.Wellspring]: 100
 };
 
 export function App() {

@@ -78,6 +78,7 @@ export function applyShapeLanguage(context: ShapeContext): Rgb {
   else if (kind === MATERIAL.Lava) out = lavaColor(context);
   else if (kind === MATERIAL.Meteor) out = meteorColor(context);
   else if (kind === MATERIAL.Rocket) out = rocketColor(context);
+  else if (kind === MATERIAL.Wellspring) out = wellspringColor(context);
   else if (kind === MATERIAL.Smoke || kind === MATERIAL.Steam) out = vaporColor(context);
   else if (kind === MATERIAL.Seed) out = seedColor(context);
   else if (kind === MATERIAL.Stem) out = stemColor(context);
@@ -329,6 +330,36 @@ function meteorColor({ color, variant, time, cells, width, height, x, y }: Shape
   }
   if (hash % 11 === 0) out = mixRgb(out, [255, 229, 124], 0.36 + (Math.sin(time * 0.02 + x) + 1) * 0.1);
   return out;
+}
+
+// Rune glint tints for an attuned wellspring, keyed by the remembered material id.
+const WELLSPRING_TINTS: Record<number, Rgb> = {
+  [MATERIAL.Water]: [120, 178, 255],
+  [MATERIAL.Moonwater]: [170, 180, 242],
+  [MATERIAL.Lava]: [255, 122, 48],
+  [MATERIAL.Fire]: [255, 214, 120],
+  [MATERIAL.Sand]: [228, 200, 130],
+  [MATERIAL.Soil]: [170, 128, 90],
+  [MATERIAL.Oil]: [140, 160, 128],
+  [MATERIAL.Seed]: [150, 210, 120],
+  [MATERIAL.Stardust]: [180, 140, 255],
+  [MATERIAL.Meteor]: [255, 155, 77],
+  [MATERIAL.Rocket]: [216, 92, 106]
+};
+
+function wellspringColor({ color, variant, energy, time, cells, width, height, x, y }: ShapeContext) {
+  const hash = hashCell(x, y, variant);
+  const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Wellspring);
+  let out = mixRgb(color, [16, 22, 36], (hash & 3) * 0.08);
+  if (edge.count > 0) out = mixRgb(out, [12, 16, 28], 0.3);
+  const rune = (x * 5 + y * 3 + (hash & 7)) % 9 === 0 || ((x ^ y) + (hash >> 2)) % 11 === 0;
+  if (!rune) return out;
+  const tint = WELLSPRING_TINTS[energy & 255];
+  if (tint) {
+    const pulse = (Math.sin(time * 0.006 + hash * 0.9) + 1) * 0.5;
+    return mixRgb(out, tint, 0.45 + pulse * 0.35);
+  }
+  return mixRgb(out, [150, 170, 210], 0.3);
 }
 
 function rocketColor({ color, variant, energy, time, x, y }: ShapeContext) {

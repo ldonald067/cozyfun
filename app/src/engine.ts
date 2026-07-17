@@ -148,7 +148,7 @@ class JsSandboxEngine implements SandboxEngine {
         const py = y + dy;
         if (!this.inBounds(px, py)) continue;
         if (clamped < 100 && this.rand() % 100 >= clamped) continue;
-        const kind = Math.min(material, MATERIAL.Rocket);
+        const kind = Math.min(material, MATERIAL.Wellspring);
         this.writeCell(this.index(px, py), kind, this.variant(px, py, kind), startEnergy(kind), 0);
       }
     }
@@ -206,7 +206,7 @@ class JsSandboxEngine implements SandboxEngine {
     if (bytes.byteLength !== this.cells.byteLength) return false;
     const sanitized = bytes.slice();
     for (let idx = 0; idx < sanitized.byteLength; idx += CELL_STRIDE) {
-      const kind = Math.min(sanitized[idx], MATERIAL.Rocket);
+      const kind = Math.min(sanitized[idx], MATERIAL.Wellspring);
       if (kind === MATERIAL.Empty) {
         sanitized.fill(0, idx, idx + CELL_STRIDE);
         continue;
@@ -303,6 +303,10 @@ class JsSandboxEngine implements SandboxEngine {
       if (!kind) continue;
       const x = (idx / CELL_STRIDE) % this.w;
       const y = Math.floor(idx / CELL_STRIDE / this.w);
+      if (kind === MATERIAL.Wellspring) {
+        this.wellspring(idx, x, y, old, next);
+        continue;
+      }
       let fireDampened = false;
       let lavaCooling = 0;
       for (const nidx of this.neighbors(x, y)) {
@@ -711,6 +715,36 @@ class JsSandboxEngine implements SandboxEngine {
     }
   }
 
+  private wellspring(idx: number, x: number, y: number, old: Uint8Array, next: Uint8Array) {
+    const neighbors = this.neighbors(x, y);
+    const chilled = neighbors.some((nidx) => old[nidx] === MATERIAL.Ice);
+    const energy = readU16(old, idx + 4);
+    if (energy === 0) {
+      // An unattuned wellspring drinks the identity of the first source
+      // material that touches it, consuming that cell.
+      for (const nidx of neighbors) {
+        const other = old[nidx];
+        if (wellspringSource(other) && next[idx] === MATERIAL.Wellspring) {
+          writeU16(next, idx + 4, other);
+          if (next[nidx] === other) next.fill(0, nidx, nidx + CELL_STRIDE);
+          break;
+        }
+      }
+    } else if (!chilled) {
+      // Attuned: gently emit the remembered material from open faces.
+      const source = energy & 255;
+      for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0], [0, 1]]) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (!this.inBounds(nx, ny)) continue;
+        const nidx = this.index(nx, ny);
+        if (old[nidx] === MATERIAL.Empty && next[nidx] === MATERIAL.Empty && this.chance(26)) {
+          writeCellBytes(next, nidx, source, this.rand() & 3, startEnergy(source));
+        }
+      }
+    }
+  }
+
   private rocket(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
     if (next[idx] !== MATERIAL.Rocket || readU16(next, idx + 4) === 0) return;
     writeU16(next, idx + 4, Math.max(0, readU16(next, idx + 4) - 12));
@@ -954,6 +988,22 @@ function startEnergy(kind: number) {
 
 function flammable(kind: number) {
   return kind === MATERIAL.Wood || kind === MATERIAL.Moss || kind === MATERIAL.Seed || kind === MATERIAL.Stem || kind === MATERIAL.Fungus || kind === MATERIAL.Flower || kind === MATERIAL.Oil || kind === MATERIAL.Rocket;
+}
+
+function wellspringSource(kind: number) {
+  return (
+    kind === MATERIAL.Sand ||
+    kind === MATERIAL.Water ||
+    kind === MATERIAL.Soil ||
+    kind === MATERIAL.Fire ||
+    kind === MATERIAL.Lava ||
+    kind === MATERIAL.Oil ||
+    kind === MATERIAL.Seed ||
+    kind === MATERIAL.Stardust ||
+    kind === MATERIAL.Meteor ||
+    kind === MATERIAL.Moonwater ||
+    kind === MATERIAL.Rocket
+  );
 }
 
 function waterLike(kind: number) {

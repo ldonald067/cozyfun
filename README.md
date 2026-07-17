@@ -91,7 +91,7 @@ Current toolbar materials:
 
 ```txt
 Eraser, Wall, Sand, Water, Soil, Fire, Wood, Lava, Stone,
-Moss, Seed, Fungus, Oil, Ice, Stardust, Meteor, Moonwater, Rocket
+Moss, Seed, Fungus, Oil, Ice, Stardust, Meteor, Moonwater, Rocket, Wellspring
 ```
 
 Generated outcomes (created by play, not painted directly):
@@ -120,6 +120,7 @@ Some key reactions:
 - Moss is carpet growth: it spreads over damp soil and wood but does not bloom.
 - Wall and stone are intentionally separate: wall is sealed construction, while stone is natural, weatherable, and easier for moss/condensation to affect.
 - Rocket powder lies inert until any flame lights it; a lit grain climbs skyward trailing smoke and bursts into fire sparks and stardust, chain-lighting neighboring powder.
+- Wellspring blocks drink the identity of the first material to touch them (water, lava, sand, stardust, and more), then pour it back out from open faces forever; nearby ice stills the spring.
 - Stardust, meteor, and moonwater add the cozy/cosmic identity.
 
 ## Architecture

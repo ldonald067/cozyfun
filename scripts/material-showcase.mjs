@@ -6,7 +6,7 @@ export function materialShowcaseScript() {
     const width = 220;
     const height = 140;
     const stride = 8;
-    const material = { Wall: 1, Sand: 2, Water: 3, Soil: 5, Fire: 6, Wood: 7, Lava: 8, Stone: 9, Moss: 10, Seed: 11, Fungus: 12, Oil: 13, Ice: 14, Steam: 15, Stardust: 16, Meteor: 17, Moonwater: 18, Flower: 19, Glass: 20, Ember: 21, Pollen: 22, Stem: 23, Rocket: 24 };
+    const material = { Wall: 1, Sand: 2, Water: 3, Soil: 5, Fire: 6, Wood: 7, Lava: 8, Stone: 9, Moss: 10, Seed: 11, Fungus: 12, Oil: 13, Ice: 14, Steam: 15, Stardust: 16, Meteor: 17, Moonwater: 18, Flower: 19, Glass: 20, Ember: 21, Pollen: 22, Stem: 23, Rocket: 24, Wellspring: 25 };
     const flag = { Wet: 1, Rooted: 2, Cosmic: 4, Frozen: 8, Scorched: 16 };
     const cells = new Uint8Array(width * height * stride);
     const writeU16 = (offset, value) => {
@@ -139,6 +139,13 @@ export function materialShowcaseScript() {
     line(92, 103, 91, material.Water, 80, 28);
     line(96, 104, 90, material.Oil, 70, 22);
     line(88, 93, 92, material.Soil, 120, 28, flag.Wet);
+
+    // Wellspring pair: a water-attuned block pouring into a stone basin, and a dormant block beside it.
+    rect(160, 168, 118, 118, material.Stone);
+    setCell(160, 117, material.Stone); setCell(168, 117, material.Stone);
+    setCell(160, 116, material.Stone); setCell(168, 116, material.Stone);
+    for (const [x, y] of [[163, 112], [164, 112], [165, 112]]) setCell(x, y, material.Wellspring, material.Water, 40, 0, x);
+    setCell(172, 117, material.Wellspring, 0, 40, 0, 1);
 
     // Firework arc: an inert rocket powder charge on stone and a lit grain climbing mid-flight.
     line(126, 134, 108, material.Stone);

@@ -31,6 +31,7 @@ Every toolbar material is a product choice. Each material in `app/src/materials.
 | Stardust | Keep | Cosmic powder. Charges water, energizes life/soil/fungus, and produces visual sparkle. |
 | Meteor | Keep | Falling cosmic heat. Impacts into stone/stardust/fire and reacts with moonwater. |
 | Rocket | Keep | Festival firework powder. Inert until any flame lights it, then it launches skyward and bursts into sparks. |
+| Wellspring | Keep | Identity-drinking carved block. Absorbs the first touching source material and pours it back out from open faces forever. |
 
 ## Interaction Matrix
 
@@ -61,6 +62,7 @@ Every toolbar material is a product choice. Each material in `app/src/materials.
 | Stardust | Charges water into moonwater; energizes life, soil, and fungus with cosmic marks; snuffs fire into sparkle bursts; etches constellation marks onto stone and wall. | Tests: `stardust_charges_water_into_moonwater`, `stardust_snuffs_fire_into_sparkle`, `stardust_etches_constellations_on_stone`; visual QA: `material-identity-showcase`. |
 | Meteor | Falls as impact heat; impacts into stone, stardust, and a fire ring; shocked into scorched stone by water; bursts into stardust against moonwater; vitrifies nearby sand on impact. | Tests: `water_shocks_meteor_into_steam_and_stone`, `meteor_moonwater_contact_bursts_to_stardust`, `meteor_impact_vitrifies_nearby_sand`; source: `update_meteor` owns fall and impact heat. |
 | Rocket | Falls and piles as inert powder so charges and fuse lines can be laid calmly; any flame (fire, lava, hot ember, meteor) lights its fuse instead of burning it in place; a lit grain climbs skyward with sway and a smoke trail; bursts into a ring of brief fire sparks and lingering stardust at fuse end or against a ceiling, chain-lighting neighboring powder. | Tests: `rocket_powder_falls_inert_without_flame`, `flame_launches_rocket_skyward`, `lit_rocket_bursts_into_sparks_and_stardust`, `rocket_bursts_when_it_hits_a_ceiling`; source: `update_rocket` owns flight, `burst_rocket` owns the burst. |
+| Wellspring | Drinks the identity of the first source material that touches it, consuming that cell with a rune-glow attunement; endlessly pours the remembered material from its open faces; blocks flow like sealed construction while dormant or between pours; nearby ice stills the spring until the cold is removed. | Tests: `wellspring_drinks_first_touch_identity`, `attuned_wellspring_emits_its_material`, `unattuned_wellspring_stays_dormant`, `ice_stills_the_spring`; source: the wellspring arm in `apply_reactions` owns absorb and emit. |
 
 ## Current Cuts
 

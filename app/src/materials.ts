@@ -36,7 +36,8 @@ export const MATERIAL = {
   Ember: 21,
   Pollen: 22,
   Stem: 23,
-  Rocket: 24
+  Rocket: 24,
+  Wellspring: 25
 } as const;
 
 export type MaterialId = (typeof MATERIAL)[keyof typeof MATERIAL];
@@ -298,6 +299,16 @@ export const MATERIALS: MaterialDef[] = [
     color: "#ff9b4d",
     palette: ["#f04428", "#ff7a30", "#ffc15f", "#6a4c45", "#2c2630"],
     glow: "#ff7a30",
+    group: "cosmic"
+  },
+  {
+    id: MATERIAL.Wellspring,
+    label: "Wellspring",
+    slug: "wellspring",
+    description: "Carved block that drinks the first material to touch it and pours it back out forever.",
+    identity: ["Identity-drinking carved block", "Endlessly pours its remembered material"],
+    color: "#41598c",
+    palette: ["#2a3a5e", "#354a74", "#1f2c49", "#7e97c4"],
     group: "cosmic"
   },
   {

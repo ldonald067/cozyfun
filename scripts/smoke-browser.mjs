@@ -164,7 +164,7 @@ async function main() {
       status: document.querySelector('[data-testid="status-message"]')?.textContent ?? ""
     }))()`);
     assert(state.title === "Cozy Pixel Sandbox", "unexpected page title");
-    assert(state.materials === 18, `expected exactly 18 selectable material buttons, found ${state.materials}: ${state.materialLabels.join(", ")}`);
+    assert(state.materials === 19, `expected exactly 19 selectable material buttons, found ${state.materials}: ${state.materialLabels.join(", ")}`);
     for (const generatedOnly of ["Flower", "Smoke", "Steam"]) {
       assert(!state.materialLabels.includes(generatedOnly), `generated-only ${generatedOnly} should not be selectable`);
     }

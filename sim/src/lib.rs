@@ -29,6 +29,7 @@ pub enum Material {
     Pollen = 22,
     Stem = 23,
     Rocket = 24,
+    Wellspring = 25,
 }
 
 const FLAG_WET: u16 = 1 << 0;
@@ -145,7 +146,7 @@ impl Universe {
                     continue;
                 }
                 let idx = self.idx(px as u32, py as u32);
-                let kind = material.min(Material::Rocket as u8);
+                let kind = material.min(Material::Wellspring as u8);
                 self.cells[idx] = if kind == Material::Empty as u8 {
                     Cell::empty()
                 } else {
@@ -161,7 +162,7 @@ impl Universe {
             return false;
         }
         for (idx, chunk) in data.chunks_exact(size_of::<Cell>()).enumerate() {
-            let kind = chunk[0].min(Material::Rocket as u8);
+            let kind = chunk[0].min(Material::Wellspring as u8);
             self.cells[idx] = if kind == Material::Empty as u8 {
                 Cell::empty()
             } else {
@@ -459,6 +460,42 @@ impl Universe {
             let (x, y) = self.xy(idx);
             let neighbors = self.neighbor_indices(x, y);
             match cell.kind {
+                x if x == Material::Wellspring as u8 => {
+                    let chilled = neighbors
+                        .iter()
+                        .any(|&nidx| old[nidx].kind == Material::Ice as u8);
+                    if cell.energy == 0 {
+                        // An unattuned wellspring drinks the identity of the first
+                        // source material that touches it, consuming that cell.
+                        for nidx in neighbors {
+                            let other = old[nidx];
+                            if is_wellspring_source(other.kind)
+                                && next[idx].kind == Material::Wellspring as u8
+                            {
+                                next[idx].energy = other.kind as u16;
+                                if next[nidx].kind == other.kind {
+                                    next[nidx] = Cell::empty();
+                                }
+                                break;
+                            }
+                        }
+                    } else if !chilled {
+                        // Attuned: gently emit the remembered material from open faces.
+                        let (cx, cy) = self.xy(idx);
+                        let source = cell.energy as u8;
+                        for (dx, dy) in [(0, -1), (-1, 0), (1, 0), (0, 1)] {
+                            let (nx, ny) = (cx + dx, cy + dy);
+                            if !self.in_bounds(nx, ny) {
+                                continue;
+                            }
+                            let nidx = self.idx(nx as u32, ny as u32);
+                            if old[nidx].is_empty() && next[nidx].is_empty() && self.chance(26) {
+                                let variant = (self.rand() & 3) as u8;
+                                next[nidx] = Cell::new(source, variant, starting_energy(source));
+                            }
+                        }
+                    }
+                }
                 x if x == Material::Fire as u8 => {
                     let mut dampened = false;
                     for nidx in neighbors {
@@ -1372,6 +1409,20 @@ fn ignited_cell(fuel: Cell, energy: u16) -> Cell {
     }
 }
 
+fn is_wellspring_source(kind: u8) -> bool {
+    kind == Material::Sand as u8
+        || kind == Material::Water as u8
+        || kind == Material::Soil as u8
+        || kind == Material::Fire as u8
+        || kind == Material::Lava as u8
+        || kind == Material::Oil as u8
+        || kind == Material::Seed as u8
+        || kind == Material::Stardust as u8
+        || kind == Material::Meteor as u8
+        || kind == Material::Moonwater as u8
+        || kind == Material::Rocket as u8
+}
+
 fn is_water_like(kind: u8) -> bool {
     kind == Material::Water as u8 || kind == Material::Moonwater as u8
 }
@@ -1544,6 +1595,71 @@ mod tests {
         u.tick();
         assert!(kind_at(&u, 8, 3) == Material::Sand as u8 || kind_at(&u, 8, 4) == Material::Sand as u8);
         assert_ne!(kind_at(&u, 8, 6), Material::Sand as u8);
+    }
+
+    #[test]
+    fn wellspring_drinks_first_touch_identity() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 8, 8, Material::Wellspring);
+        set_cell(&mut u, 8, 7, Material::Water);
+        u.tick();
+        assert_eq!(
+            energy_at(&u, 8, 8),
+            Material::Water as u16,
+            "the first touching source should attune the wellspring"
+        );
+        assert_eq!(
+            kind_at(&u, 8, 7),
+            Material::Empty as u8,
+            "the absorbed droplet should be drunk by the block"
+        );
+    }
+
+    #[test]
+    fn attuned_wellspring_emits_its_material() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell_state(&mut u, 8, 8, Material::Wellspring, 0, Material::Water as u16, 0);
+        for _ in 0..120 {
+            u.tick();
+        }
+        let water = u
+            .cells
+            .iter()
+            .filter(|c| c.kind == Material::Water as u8)
+            .count();
+        assert!(water > 2, "an attuned wellspring should keep emitting water, found {water}");
+        assert_eq!(
+            energy_at(&u, 8, 8),
+            Material::Water as u16,
+            "emission should not spend the attunement"
+        );
+    }
+
+    #[test]
+    fn unattuned_wellspring_stays_dormant() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 8, 8, Material::Wellspring);
+        for _ in 0..60 {
+            u.tick();
+        }
+        let occupied = u.cells.iter().filter(|c| !c.is_empty()).count();
+        assert_eq!(occupied, 1, "an unattuned wellspring should create nothing on its own");
+    }
+
+    #[test]
+    fn ice_stills_the_spring() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell_state(&mut u, 8, 8, Material::Wellspring, 0, Material::Water as u16, 0);
+        set_cell(&mut u, 9, 9, Material::Ice);
+        for _ in 0..100 {
+            u.tick();
+        }
+        let water = u
+            .cells
+            .iter()
+            .filter(|c| c.kind == Material::Water as u8)
+            .count();
+        assert_eq!(water, 0, "nearby ice should pause the spring's flow");
     }
 
     #[test]
