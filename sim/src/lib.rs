@@ -27,6 +27,7 @@ pub enum Material {
     Glass = 20,
     Ember = 21,
     Pollen = 22,
+    Stem = 23,
 }
 
 const FLAG_WET: u16 = 1 << 0;
@@ -138,7 +139,7 @@ impl Universe {
                     continue;
                 }
                 let idx = self.idx(px as u32, py as u32);
-                let kind = material.min(Material::Pollen as u8);
+                let kind = material.min(Material::Stem as u8);
                 self.cells[idx] = if kind == Material::Empty as u8 {
                     Cell::empty()
                 } else {
@@ -154,7 +155,7 @@ impl Universe {
             return false;
         }
         for (idx, chunk) in data.chunks_exact(size_of::<Cell>()).enumerate() {
-            let kind = chunk[0].min(Material::Pollen as u8);
+            let kind = chunk[0].min(Material::Stem as u8);
             self.cells[idx] = if kind == Material::Empty as u8 {
                 Cell::empty()
             } else {
@@ -208,6 +209,7 @@ impl Universe {
                 x if x == Material::Steam as u8 => self.update_gas(idx, cell, &old, &mut next, 1),
                 x if x == Material::Fire as u8 => self.update_fire(idx, cell, &old, &mut next),
                 x if x == Material::Seed as u8 => self.update_seed(idx, cell, &old, &mut next),
+                x if x == Material::Stem as u8 => self.update_stem(idx, cell, &old, &mut next),
                 x if x == Material::Moss as u8 => self.update_moss(idx, cell, &old, &mut next),
                 x if x == Material::Fungus as u8 => self.update_fungus(idx, cell, &old, &mut next),
                 _ => {}
@@ -992,11 +994,14 @@ impl Universe {
             }
             if below.kind == Material::Soil as u8 && wet {
                 next[idx].flags |= FLAG_ROOTED;
-                // Blooming waits long enough for the germination shoot to visibly grow first.
-                if (cell.age > 70 && cell.energy > 90)
-                    || (cell.age > 30 && cell.energy > 55 && self.chance(if cosmic { 6 } else { 12 }))
-                {
-                    next[idx] = Cell::new(Material::Flower as u8, cell.variant, if cosmic { 150 } else { 90 });
+                // Germination: a fed, rooted seed becomes the base of a growing stalk.
+                // Its energy is the stalk's height budget, varied per seed by variant.
+                if cell.age > 30 && cell.energy > 70 && self.chance(if cosmic { 4 } else { 8 }) {
+                    next[idx] = Cell::new(
+                        Material::Stem as u8,
+                        cell.variant,
+                        130 + u16::from(cell.variant & 3) * 55,
+                    );
                     next[idx].flags = FLAG_ROOTED | if cosmic { FLAG_COSMIC } else { 0 };
                     return;
                 }
@@ -1006,6 +1011,35 @@ impl Universe {
                 next[idx].flags = FLAG_WET;
             }
         }
+    }
+
+    fn update_stem(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
+        if next[idx].kind != Material::Stem as u8 || next[idx].flags & FLAG_FROZEN != 0 {
+            return;
+        }
+        let (x, y) = self.xy(idx);
+        if y + 1 < self.height as i32 && old[self.idx(x as u32, (y + 1) as u32)].is_empty() {
+            // A stalk segment with nothing under it falls, so cut plants collapse.
+            self.update_powder(idx, cell, old, next, 1);
+            return;
+        }
+        // Only the growing tip carries budget above the mature level.
+        if cell.energy <= 20 || y == 0 {
+            return;
+        }
+        let above = self.idx(x as u32, (y - 1) as u32);
+        if !old[above].is_empty() || !next[above].is_empty() || !self.chance(4) {
+            return;
+        }
+        let cosmic = cell.flags & FLAG_COSMIC != 0;
+        if cell.energy > 75 {
+            next[above] = Cell::new(Material::Stem as u8, cell.variant, cell.energy - 55);
+            next[above].flags = if cosmic { FLAG_COSMIC } else { 0 };
+        } else {
+            next[above] = Cell::new(Material::Flower as u8, cell.variant, if cosmic { 150 } else { 90 });
+            next[above].flags = FLAG_ROOTED | if cosmic { FLAG_COSMIC } else { 0 };
+        }
+        next[idx].energy = 20;
     }
 
     fn update_moss(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
@@ -1301,6 +1335,7 @@ fn is_freezable(kind: u8) -> bool {
         || kind == Material::Stone as u8
         || kind == Material::Wood as u8
         || kind == Material::Seed as u8
+        || kind == Material::Stem as u8
         || kind == Material::Moss as u8
         || kind == Material::Fungus as u8
         || kind == Material::Flower as u8
@@ -1314,6 +1349,7 @@ fn is_scorchable(kind: u8) -> bool {
         || kind == Material::Stone as u8
         || kind == Material::Wood as u8
         || kind == Material::Seed as u8
+        || kind == Material::Stem as u8
         || kind == Material::Moss as u8
         || kind == Material::Fungus as u8
         || kind == Material::Flower as u8
@@ -1353,6 +1389,7 @@ fn is_flammable(kind: u8) -> bool {
     kind == Material::Wood as u8
         || kind == Material::Moss as u8
         || kind == Material::Seed as u8
+        || kind == Material::Stem as u8
         || kind == Material::Fungus as u8
         || kind == Material::Flower as u8
         || kind == Material::Oil as u8
@@ -1473,12 +1510,44 @@ mod tests {
     }
 
     #[test]
-    fn wet_seed_on_soil_blooms() {
+    fn rooted_seed_grows_a_stalk_that_blooms() {
+        let mut u = Universe::new(16, 24, 7);
+        set_cell_state(&mut u, 8, 12, Material::Seed, 40, 180, FLAG_WET);
+        set_cell(&mut u, 8, 13, Material::Soil);
+        for (x, y) in [(7, 13), (9, 13), (7, 14), (8, 14), (9, 14)] {
+            set_cell(&mut u, x, y, Material::Stone);
+        }
+        let mut stalked = false;
+        let mut bloomed = false;
+        for _ in 0..400 {
+            u.tick();
+            if u.cells.iter().any(|cell| cell.kind == Material::Stem as u8) {
+                stalked = true;
+            }
+            if u.cells.iter().any(|cell| cell.kind == Material::Flower as u8) {
+                bloomed = true;
+                break;
+            }
+        }
+        assert!(stalked, "a fed rooted seed should grow a visible stalk");
+        assert!(bloomed, "the stalk should bloom a flower at its tip");
+        assert!(
+            kind_at(&u, 8, 12) == Material::Stem as u8,
+            "the stalk base should stand where the seed was planted"
+        );
+    }
+
+    #[test]
+    fn cut_stalk_segments_fall() {
         let mut u = Universe::new(16, 16, 7);
-        set_cell_state(&mut u, 8, 8, Material::Seed, 80, 180, FLAG_WET);
-        set_cell(&mut u, 8, 9, Material::Soil);
+        set_cell_state(&mut u, 8, 5, Material::Stem, 30, 20, 0);
         u.tick();
-        assert_eq!(kind_at(&u, 8, 8), Material::Flower as u8);
+        u.tick();
+        assert_eq!(kind_at(&u, 8, 5), Material::Empty as u8, "unsupported stalk should fall");
+        assert!(
+            u.cells.iter().any(|cell| cell.kind == Material::Stem as u8),
+            "the fallen segment should land, not vanish"
+        );
     }
 
     #[test]

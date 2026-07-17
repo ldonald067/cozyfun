@@ -62,7 +62,8 @@ const MATERIAL = {
   Moonwater: 18,
   Flower: 19,
   Glass: 20,
-  Ember: 21
+  Ember: 21,
+  Stem: 23
 };
 
 const CELL_FLAG = {
@@ -135,12 +136,28 @@ withEngine(23, (engine) => {
 
 withEngine(7, (engine) => {
   const cells = new Uint8Array(16 * 16 * CELL_STRIDE);
-  setCell(cells, 16, 8, 8, MATERIAL.Seed, { age: 80, energy: 180, flags: CELL_FLAG.Wet });
+  setCell(cells, 16, 8, 8, MATERIAL.Seed, { age: 40, energy: 180, flags: CELL_FLAG.Wet });
   setCell(cells, 16, 8, 9, MATERIAL.Soil);
+  for (const [x, y] of [[7, 9], [9, 9], [7, 10], [8, 10], [9, 10]]) {
+    setCell(cells, 16, x, y, MATERIAL.Stone);
+  }
   loadCells(engine, cells, "seed test cells should load");
-  engine.tick();
-  const updated = engine.getCellBytes();
-  assert(kindAt(updated, 16, 8, 8) === MATERIAL.Flower, "wet rooted seed should bloom into flower");
+  let stalked = false;
+  let bloomed = false;
+  for (let tick = 0; tick < 400 && !bloomed; tick++) {
+    engine.tick();
+    const updated = engine.getCellBytes();
+    let stems = 0;
+    let flowers = 0;
+    for (let offset = 0; offset < updated.byteLength; offset += CELL_STRIDE) {
+      if (updated[offset] === MATERIAL.Stem) stems++;
+      if (updated[offset] === MATERIAL.Flower) flowers++;
+    }
+    if (stems > 0) stalked = true;
+    if (flowers > 0) bloomed = true;
+  }
+  assert(stalked, "wet rooted seed should grow a stalk");
+  assert(bloomed, "the stalk should bloom a flower at its tip");
 });
 
 withEngine(7, (engine) => {

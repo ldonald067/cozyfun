@@ -427,6 +427,7 @@ Watering the garden now answers back at every step of the growth arc:
 
 - Seeds join the dew cue when they first turn wet, play a soft sprout cue at the moment they root, and show a visible germination arc: the shoot climbs and pales toward a bud as the seed feeds toward bloom, so progress reads before the flower pops.
 - Well-watered moss (energy above 150) colonizes two patches per pass instead of one, so a generous watering visibly surges the carpet outward while modest watering keeps the old patient pace, pinned by a sim test.
+- Real stalked plants: rooted, fed seeds germinate into a generated-only Stem that climbs upward cell by cell (height varies per seed, taller with cosmic feeding) and blooms a flower at its tip, so gardens become stands of flowers at different heights that reseed themselves through pollen. Unsupported stalk segments fall, so cut plants collapse; stems burn, freeze, and scorch like living growth. Mature damp moss raises tiny sporophyte tufts, keeping its carpet identity while reading plant-like up close.
 
 Stone and wall are the only reactive-only toolbar elements: everything happens to them and nothing happens because of them. This phase gives the mineral family one circular story instead of bolted-on behaviors.
 

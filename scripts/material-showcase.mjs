@@ -6,7 +6,7 @@ export function materialShowcaseScript() {
     const width = 220;
     const height = 140;
     const stride = 8;
-    const material = { Wall: 1, Sand: 2, Water: 3, Soil: 5, Fire: 6, Wood: 7, Lava: 8, Stone: 9, Moss: 10, Seed: 11, Fungus: 12, Oil: 13, Ice: 14, Steam: 15, Stardust: 16, Meteor: 17, Moonwater: 18, Flower: 19, Glass: 20, Ember: 21, Pollen: 22 };
+    const material = { Wall: 1, Sand: 2, Water: 3, Soil: 5, Fire: 6, Wood: 7, Lava: 8, Stone: 9, Moss: 10, Seed: 11, Fungus: 12, Oil: 13, Ice: 14, Steam: 15, Stardust: 16, Meteor: 17, Moonwater: 18, Flower: 19, Glass: 20, Ember: 21, Pollen: 22, Stem: 23 };
     const flag = { Wet: 1, Rooted: 2, Cosmic: 4, Frozen: 8, Scorched: 16 };
     const cells = new Uint8Array(width * height * stride);
     const writeU16 = (offset, value) => {
@@ -111,6 +111,13 @@ export function materialShowcaseScript() {
     rect(24, 32, 62, 71, material.Wall, 170, 80, flag.Frozen);
     for (const [x, y] of [[22, 63], [22, 66], [22, 69]]) setCell(x, y, material.Ice, 90, 28);
     for (const [x, y] of [[34, 68], [34, 69]]) setCell(x, y, material.Fire, 230, 10);
+
+    // Grown plant: soil base, climbing stalk segments, and a bloom at the tip.
+    setCell(200, 74, material.Soil, 120, 40, flag.Wet);
+    setCell(200, 73, material.Stem, 20, 60, flag.Rooted, 2);
+    setCell(200, 72, material.Stem, 20, 50, 0, 2);
+    setCell(200, 71, material.Stem, 20, 40, 0, 2);
+    setCell(200, 70, material.Flower, 120, 60, flag.Rooted, 3);
 
     // Geology: a larger stone mass with mineral veins and an old patinated wall.
     rect(24, 44, 44, 56, material.Stone, 0, 60);

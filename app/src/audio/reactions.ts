@@ -45,8 +45,11 @@ export function detectReactionCues(before: Uint8Array, after: Uint8Array): React
     if (beforeKind === afterKind && COSMIC_MARK_KINDS.has(afterKind) && gainedFlag(before, after, idx, CELL_FLAG.Cosmic)) {
       found.add("cosmic-charge");
     }
-    if (beforeKind === MATERIAL.Seed && afterKind === MATERIAL.Flower) {
+    if ((beforeKind === MATERIAL.Seed || beforeKind === MATERIAL.Stem) && afterKind === MATERIAL.Flower) {
       found.add("bloom");
+    }
+    if (beforeKind === MATERIAL.Empty && afterKind === MATERIAL.Stem) {
+      found.add("sprout");
     }
     if (afterKind === MATERIAL.Steam && beforeKind !== MATERIAL.Steam && isSteamFlashSource(beforeKind)) {
       found.add("steam-flash");

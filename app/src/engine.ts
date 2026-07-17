@@ -146,7 +146,7 @@ class JsSandboxEngine implements SandboxEngine {
         const px = x + dx;
         const py = y + dy;
         if (!this.inBounds(px, py)) continue;
-        const kind = Math.min(material, MATERIAL.Pollen);
+        const kind = Math.min(material, MATERIAL.Stem);
         this.writeCell(this.index(px, py), kind, this.variant(px, py, kind), startEnergy(kind), 0);
       }
     }
@@ -185,6 +185,7 @@ class JsSandboxEngine implements SandboxEngine {
         if (kind === MATERIAL.Smoke || kind === MATERIAL.Steam) this.gas(idx, x, y, cell, old, next);
         if (kind === MATERIAL.Fire) this.fire(idx, x, y, cell, old, next);
         if (kind === MATERIAL.Seed) this.seed(idx, x, y, cell, old, next);
+        if (kind === MATERIAL.Stem) this.stem(idx, x, y, cell, old, next);
         if (kind === MATERIAL.Moss) this.moss(idx, x, y, cell, old, next);
         if (kind === MATERIAL.Fungus) this.fungus(x, y, old, next);
       }
@@ -201,7 +202,7 @@ class JsSandboxEngine implements SandboxEngine {
     if (bytes.byteLength !== this.cells.byteLength) return false;
     const sanitized = bytes.slice();
     for (let idx = 0; idx < sanitized.byteLength; idx += CELL_STRIDE) {
-      const kind = Math.min(sanitized[idx], MATERIAL.Pollen);
+      const kind = Math.min(sanitized[idx], MATERIAL.Stem);
       if (kind === MATERIAL.Empty) {
         sanitized.fill(0, idx, idx + CELL_STRIDE);
         continue;
@@ -732,8 +733,8 @@ class JsSandboxEngine implements SandboxEngine {
 
     if (below === MATERIAL.Soil && wet) {
       writeU16(next, idx + 6, flags | CELL_FLAG.Rooted);
-      if ((age > 70 && energy > 90) || (age > 30 && energy > 55 && this.chance(cosmic ? 6 : 12))) {
-        writeCellBytes(next, idx, MATERIAL.Flower, cell[1], cosmic ? 150 : 90, 0, CELL_FLAG.Rooted | (cosmic ? CELL_FLAG.Cosmic : 0));
+      if (age > 30 && energy > 70 && this.chance(cosmic ? 4 : 8)) {
+        writeCellBytes(next, idx, MATERIAL.Stem, cell[1], 130 + (cell[1] & 3) * 55, 0, CELL_FLAG.Rooted | (cosmic ? CELL_FLAG.Cosmic : 0));
         return;
       }
     }
@@ -741,6 +742,25 @@ class JsSandboxEngine implements SandboxEngine {
     if (below === MATERIAL.Moss && wet && energy > 110 && this.chance(12)) {
       writeCellBytes(next, idx, MATERIAL.Moss, cell[1], 100, 0, CELL_FLAG.Wet);
     }
+  }
+
+  private stem(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
+    if (next[idx] !== MATERIAL.Stem || readU16(next, idx + 6) & CELL_FLAG.Frozen) return;
+    if (this.inBounds(x, y + 1) && old[this.index(x, y + 1)] === MATERIAL.Empty) {
+      this.powder(idx, x, y, cell, old, next);
+      return;
+    }
+    const energy = readU16(old, idx + 4);
+    if (energy <= 20 || y === 0) return;
+    const above = this.index(x, y - 1);
+    if (old[above] !== MATERIAL.Empty || next[above] !== MATERIAL.Empty || !this.chance(4)) return;
+    const cosmic = Boolean(readU16(old, idx + 6) & CELL_FLAG.Cosmic);
+    if (energy > 75) {
+      writeCellBytes(next, above, MATERIAL.Stem, cell[1], energy - 55, 0, cosmic ? CELL_FLAG.Cosmic : 0);
+    } else {
+      writeCellBytes(next, above, MATERIAL.Flower, cell[1], cosmic ? 150 : 90, 0, CELL_FLAG.Rooted | (cosmic ? CELL_FLAG.Cosmic : 0));
+    }
+    writeU16(next, idx + 4, 20);
   }
 
   private moss(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
@@ -884,7 +904,7 @@ function startEnergy(kind: number) {
 }
 
 function flammable(kind: number) {
-  return kind === MATERIAL.Wood || kind === MATERIAL.Moss || kind === MATERIAL.Seed || kind === MATERIAL.Fungus || kind === MATERIAL.Flower || kind === MATERIAL.Oil;
+  return kind === MATERIAL.Wood || kind === MATERIAL.Moss || kind === MATERIAL.Seed || kind === MATERIAL.Stem || kind === MATERIAL.Fungus || kind === MATERIAL.Flower || kind === MATERIAL.Oil;
 }
 
 function waterLike(kind: number) {
@@ -921,6 +941,7 @@ function freezable(kind: number) {
     kind === MATERIAL.Stone ||
     kind === MATERIAL.Wood ||
     kind === MATERIAL.Seed ||
+    kind === MATERIAL.Stem ||
     kind === MATERIAL.Moss ||
     kind === MATERIAL.Fungus ||
     kind === MATERIAL.Flower ||
@@ -936,6 +957,7 @@ function scorchable(kind: number) {
     kind === MATERIAL.Stone ||
     kind === MATERIAL.Wood ||
     kind === MATERIAL.Seed ||
+    kind === MATERIAL.Stem ||
     kind === MATERIAL.Moss ||
     kind === MATERIAL.Fungus ||
     kind === MATERIAL.Flower

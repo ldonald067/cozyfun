@@ -34,7 +34,8 @@ export const MATERIAL = {
   Flower: 19,
   Glass: 20,
   Ember: 21,
-  Pollen: 22
+  Pollen: 22,
+  Stem: 23
 } as const;
 
 export type MaterialId = (typeof MATERIAL)[keyof typeof MATERIAL];
@@ -195,6 +196,17 @@ export const MATERIALS: MaterialDef[] = [
     color: "#f0c25f",
     palette: ["#75b95e", "#f3cf69", "#f38fbe", "#e8f3a8", "#b98dff", "#fff4c2"],
     glow: "#f7d574",
+    group: "life",
+    userSelectable: false
+  },
+  {
+    id: MATERIAL.Stem,
+    label: "Stem",
+    slug: "stem",
+    description: "Generated plant stalk grown from a rooted seed, blooming at its tip.",
+    identity: ["Climbing plant stalk", "Blooms a flower at its tip"],
+    color: "#7cc258",
+    palette: ["#69b54a", "#84cc5f", "#a4dd7a", "#4c8f38"],
     group: "life",
     userSelectable: false
   },

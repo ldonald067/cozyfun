@@ -29,7 +29,8 @@ const MATERIAL = {
   Moonwater: 18,
   Flower: 19,
   Glass: 20,
-  Ember: 21
+  Ember: 21,
+  Stem: 23
 };
 
 const CELL_FLAG = {
@@ -115,15 +116,23 @@ withUniverse(16, 16, 7, (universe) => {
 
 withUniverse(16, 16, 7, (universe) => {
   const cells = new Uint8Array(16 * 16 * 8);
-  setCell(cells, 16, 8, 8, MATERIAL.Seed, { age: 80, energy: 180, flags: CELL_FLAG.Wet });
+  setCell(cells, 16, 8, 8, MATERIAL.Seed, { age: 40, energy: 180, flags: CELL_FLAG.Wet });
   setCell(cells, 16, 8, 9, MATERIAL.Soil);
+  for (const [x, y] of [[7, 9], [9, 9], [7, 10], [8, 10], [9, 10]]) setCell(cells, 16, x, y, MATERIAL.Stone);
   const ptr = wasm.alloc(cells.byteLength);
   new Uint8Array(wasm.memory.buffer, ptr, cells.byteLength).set(cells);
   assert(wasm.universe_load_cells(universe, ptr, cells.byteLength) === 1, "seed test cells should load");
   wasm.dealloc(ptr, cells.byteLength);
-  wasm.universe_tick(universe);
-  const updated = readCells(universe);
-  assert(kindAt(updated, 16, 8, 8) === MATERIAL.Flower, "wet rooted seed should bloom into flower");
+  let stalked = false;
+  let bloomed = false;
+  for (let tick = 0; tick < 400 && !bloomed; tick++) {
+    wasm.universe_tick(universe);
+    const updated = readCells(universe);
+    if (countKind(updated, MATERIAL.Stem) > 0) stalked = true;
+    if (countKind(updated, MATERIAL.Flower) > 0) bloomed = true;
+  }
+  assert(stalked, "wet rooted seed should grow a stalk");
+  assert(bloomed, "the stalk should bloom a flower at its tip");
 });
 
 withUniverse(16, 16, 7, (universe) => {

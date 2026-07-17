@@ -79,6 +79,7 @@ export function applyShapeLanguage(context: ShapeContext): Rgb {
   else if (kind === MATERIAL.Meteor) out = meteorColor(context);
   else if (kind === MATERIAL.Smoke || kind === MATERIAL.Steam) out = vaporColor(context);
   else if (kind === MATERIAL.Seed) out = seedColor(context);
+  else if (kind === MATERIAL.Stem) out = stemColor(context);
   else if (kind === MATERIAL.Flower) out = flowerColor(context);
   else if (kind === MATERIAL.Ice) out = iceColor(context);
   else if (kind === MATERIAL.Glass) out = glassColor(context);
@@ -398,6 +399,22 @@ function seedColor({ color, variant, age, energy, flags, cells, width, height, x
   return out;
 }
 
+function stemColor({ color, variant, energy, flags, cells, width, height, x, y }: ShapeContext) {
+  const hash = hashCell(x, y, variant);
+  const localX = (x + (hash & 1)) & 3;
+  const above = kindAt(cells, width, height, x, y - 1);
+  const growingTip = energy > 20 && above !== MATERIAL.Stem && above !== MATERIAL.Flower;
+  const leafSide = ((y >> 1) & 1) === 0 ? 0 : 3;
+  let out = mixRgb(color, [76, 143, 56], 0.25);
+  if (localX === 1 || localX === 2) out = mixRgb(out, [151, 219, 108], 0.4);
+  if (localX === leafSide && (y & 1) === 0) out = mixRgb(out, [122, 204, 84], 0.5);
+  if (growingTip) out = mixRgb(out, [214, 244, 160], 0.45);
+  if (flags & CELL_FLAG.Cosmic) out = mixRgb(out, [165, 220, 255], 0.2);
+  if (flags & CELL_FLAG.Scorched) out = mixRgb(out, [52, 40, 26], 0.6);
+  if (flags & CELL_FLAG.Frozen) out = mixRgb(out, [190, 228, 238], 0.55);
+  return out;
+}
+
 function flowerColor({ color, variant, age, energy, flags, time, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
   const localX = (x + (hash & 1)) & 3;
@@ -673,6 +690,10 @@ function growthColor({ kind, color, variant, age, energy, flags, cells, width, h
     if (cosmic) {
       out = mixRgb(out, [143, 238, 177], moonFed ? 0.34 : 0.22);
       if (edge.top && hash % 3 !== 2) out = mixRgb(out, [196, 255, 219], 0.4);
+    }
+    if (edge.top && age > 150 && damp && hash % 5 === 0) {
+      // Mature damp moss raises tiny sporophyte tufts, like the real plant.
+      out = mixRgb(out, [186, 224, 120], 0.5);
     }
     if (oilContact.count > 0) {
       out = mixRgb(out, [32, 42, 27], oilContact.top ? 0.42 : 0.28);
