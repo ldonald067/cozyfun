@@ -125,9 +125,10 @@ impl Universe {
         self.tick_count = 0;
     }
 
-    pub fn paint(&mut self, x: i32, y: i32, radius: u32, material: u8) {
+    pub fn paint(&mut self, x: i32, y: i32, radius: u32, material: u8, density: u32) {
         let radius = radius.max(1) as i32;
         let radius_sq = radius * radius;
+        let density = density.clamp(1, 100);
         for dy in -radius..=radius {
             for dx in -radius..=radius {
                 if dx * dx + dy * dy > radius_sq {
@@ -136,6 +137,10 @@ impl Universe {
                 let px = x + dx;
                 let py = y + dy;
                 if !self.in_bounds(px, py) {
+                    continue;
+                }
+                // Sub-full density sprinkles individual grains, like a real pour.
+                if density < 100 && self.rand() % 100 >= density {
                     continue;
                 }
                 let idx = self.idx(px as u32, py as u32);
@@ -278,9 +283,10 @@ pub unsafe extern "C" fn universe_paint(
     y: i32,
     radius: u32,
     material: u8,
+    density: u32,
 ) {
     if let Some(universe) = ptr.as_mut() {
-        universe.paint(x, y, radius, material);
+        universe.paint(x, y, radius, material, density);
     }
 }
 
@@ -421,8 +427,14 @@ impl Universe {
                 }
             }
 
-            if (cell.kind == Material::Smoke as u8 && cell.age > 180)
-                || (cell.kind == Material::Steam as u8 && cell.age > 150)
+            if cell.kind == Material::Steam as u8 && cell.age > 150 {
+                // A quarter of expiring steam condenses back into a falling droplet.
+                *cell = if cell.variant & 3 == 0 {
+                    Cell::new(Material::Water as u8, cell.variant, 26)
+                } else {
+                    Cell::empty()
+                };
+            } else if (cell.kind == Material::Smoke as u8 && cell.age > 180)
                 || (cell.kind == Material::Pollen as u8 && cell.age > 140)
                 || (cell.kind == Material::Fire as u8 && cell.age > 90 && cell.energy < 24)
             {
@@ -1449,7 +1461,7 @@ mod tests {
     #[test]
     fn sand_falls() {
         let mut u = Universe::new(16, 16, 7);
-        u.paint(8, 2, 1, Material::Sand as u8);
+        u.paint(8, 2, 1, Material::Sand as u8, 100);
         u.tick();
         assert_eq!(kind_at(&u, 8, 3), Material::Sand as u8);
     }
@@ -1477,9 +1489,9 @@ mod tests {
     fn water_spreads_when_blocked() {
         let mut u = Universe::new(16, 16, 7);
         for x in 0..16 {
-            u.paint(x, 10, 1, Material::Stone as u8);
+            u.paint(x, 10, 1, Material::Stone as u8, 100);
         }
-        u.paint(8, 9, 1, Material::Water as u8);
+        u.paint(8, 9, 1, Material::Water as u8, 100);
         u.tick();
         assert!(
             kind_at(&u, 7, 9) == Material::Water as u8
@@ -1490,8 +1502,8 @@ mod tests {
     #[test]
     fn water_fire_creates_steam_glow_instead_of_instant_delete() {
         let mut u = Universe::new(16, 16, 7);
-        u.paint(8, 8, 1, Material::Fire as u8);
-        u.paint(8, 7, 1, Material::Water as u8);
+        u.paint(8, 8, 1, Material::Fire as u8, 100);
+        u.paint(8, 7, 1, Material::Water as u8, 100);
         for _ in 0..8 {
             u.tick();
         }
@@ -1501,8 +1513,8 @@ mod tests {
     #[test]
     fn lava_cools_near_moonwater() {
         let mut u = Universe::new(16, 16, 7);
-        u.paint(8, 8, 1, Material::Lava as u8);
-        u.paint(9, 8, 1, Material::Moonwater as u8);
+        u.paint(8, 8, 1, Material::Lava as u8, 100);
+        u.paint(9, 8, 1, Material::Moonwater as u8, 100);
         for _ in 0..24 {
             u.tick();
         }
@@ -2217,9 +2229,9 @@ mod tests {
         let mut a = Universe::new(24, 18, 42);
         let mut b = Universe::new(24, 18, 42);
         for u in [&mut a, &mut b] {
-            u.paint(10, 2, 2, Material::Sand as u8);
-            u.paint(12, 3, 2, Material::Water as u8);
-            u.paint(7, 12, 2, Material::Fire as u8);
+            u.paint(10, 2, 2, Material::Sand as u8, 100);
+            u.paint(12, 3, 2, Material::Water as u8, 100);
+            u.paint(7, 12, 2, Material::Fire as u8, 100);
             for _ in 0..40 {
                 u.tick();
             }

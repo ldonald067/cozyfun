@@ -50,6 +50,16 @@ const WORLD_HEIGHT = 140;
 const DEFAULT_SEED = 1107;
 const SIM_TICK_MS = 38;
 
+// Powders and liquids sprinkle like a real pour; solids and the eraser paint dense.
+const PAINT_DENSITY: Partial<Record<MaterialId, number>> = {
+  [MATERIAL.Empty]: 100,
+  [MATERIAL.Wall]: 100,
+  [MATERIAL.Stone]: 100,
+  [MATERIAL.Wood]: 100,
+  [MATERIAL.Ice]: 100,
+  [MATERIAL.Moss]: 100
+};
+
 export function App() {
   const audio = useMemo(() => createAudioController(), []);
   const previewBadge = usePreviewBadge();
@@ -73,6 +83,7 @@ export function App() {
   const glowCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const motesCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const pointerDownRef = useRef(false);
+  const lastPaintCellRef = useRef<{ x: number; y: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -226,7 +237,24 @@ export function App() {
       const rect = baseCanvasRef.current.getBoundingClientRect();
       const x = Math.floor(((event.clientX - rect.left) / rect.width) * engine.width());
       const y = Math.floor(((event.clientY - rect.top) / rect.height) * engine.height());
-      engine.paint(x, y, brushSize, selected);
+      const density = PAINT_DENSITY[selected] ?? 55;
+      // Interpolate between pointer events so fast strokes paint continuous lines.
+      const last = lastPaintCellRef.current;
+      if (last) {
+        const steps = Math.max(Math.abs(x - last.x), Math.abs(y - last.y), 1);
+        for (let step = 1; step <= steps; step++) {
+          engine.paint(
+            Math.round(last.x + ((x - last.x) * step) / steps),
+            Math.round(last.y + ((y - last.y) * step) / steps),
+            brushSize,
+            selected,
+            density
+          );
+        }
+      } else {
+        engine.paint(x, y, brushSize, selected, density);
+      }
+      lastPaintCellRef.current = { x, y };
       audio.playPaintCue(selected);
     },
     [audio, brushSize, engine, selected]
@@ -234,6 +262,7 @@ export function App() {
 
   function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
     pointerDownRef.current = true;
+    lastPaintCellRef.current = null;
     event.currentTarget.setPointerCapture(event.pointerId);
     paintAtPointer(event);
   }
@@ -245,6 +274,7 @@ export function App() {
 
   function handlePointerUp(event: PointerEvent<HTMLDivElement>) {
     pointerDownRef.current = false;
+    lastPaintCellRef.current = null;
     event.currentTarget.releasePointerCapture(event.pointerId);
   }
 

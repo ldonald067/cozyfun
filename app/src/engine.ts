@@ -7,7 +7,7 @@ export type SandboxEngine = {
   tickCount(): number;
   tick(): void;
   clear(): void;
-  paint(x: number, y: number, radius: number, material: number): void;
+  paint(x: number, y: number, radius: number, material: number, density?: number): void;
   getCellBytes(): Uint8Array;
   loadCellBytes(bytes: Uint8Array): boolean;
   dispose(): void;
@@ -22,7 +22,7 @@ type WasmModule = {
   universe_tick_count(ptr: number): number;
   universe_tick(ptr: number): void;
   universe_clear(ptr: number): void;
-  universe_paint(ptr: number, x: number, y: number, radius: number, material: number): void;
+  universe_paint(ptr: number, x: number, y: number, radius: number, material: number, density: number): void;
   universe_cells_ptr(ptr: number): number;
   universe_cells_byte_len(ptr: number): number;
   universe_load_cells(ptr: number, dataPtr: number, dataLen: number): number;
@@ -81,8 +81,8 @@ class WasmSandboxEngine implements SandboxEngine {
     this.wasm.universe_clear(this.ptr);
   }
 
-  paint(x: number, y: number, radius: number, material: number) {
-    this.wasm.universe_paint(this.ptr, x, y, radius, material);
+  paint(x: number, y: number, radius: number, material: number, density = 100) {
+    this.wasm.universe_paint(this.ptr, x, y, radius, material, density);
   }
 
   getCellBytes() {
@@ -138,14 +138,16 @@ class JsSandboxEngine implements SandboxEngine {
     this.ticks = 0;
   }
 
-  paint(x: number, y: number, radius: number, material: number) {
+  paint(x: number, y: number, radius: number, material: number, density = 100) {
     const r = Math.max(1, radius | 0);
+    const clamped = Math.min(100, Math.max(1, density | 0));
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {
         if (dx * dx + dy * dy > r * r) continue;
         const px = x + dx;
         const py = y + dy;
         if (!this.inBounds(px, py)) continue;
+        if (clamped < 100 && this.rand() % 100 >= clamped) continue;
         const kind = Math.min(material, MATERIAL.Stem);
         this.writeCell(this.index(px, py), kind, this.variant(px, py, kind), startEnergy(kind), 0);
       }
@@ -277,9 +279,14 @@ class JsSandboxEngine implements SandboxEngine {
       if (energy === 0) {
         writeU16(next, idx + 6, flags & CELL_FLAG.Frozen ? thawedFlags(kind, flags) : flags & ~(CELL_FLAG.Wet | CELL_FLAG.Cosmic));
       }
-      if (
+      if (kind === MATERIAL.Steam && age > 150) {
+        if ((next[idx + 1] & 3) === 0) {
+          writeCellBytes(next, idx, MATERIAL.Water, next[idx + 1], 26);
+        } else {
+          next.fill(0, idx, idx + CELL_STRIDE);
+        }
+      } else if (
         (kind === MATERIAL.Smoke && age > 180) ||
-        (kind === MATERIAL.Steam && age > 150) ||
         (kind === MATERIAL.Pollen && age > 140) ||
         (kind === MATERIAL.Fire && age > 90 && energy < 24)
       ) {

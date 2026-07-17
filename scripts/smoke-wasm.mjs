@@ -92,23 +92,23 @@ function withUniverse(width, height, seed, callback) {
 }
 
 withUniverse(16, 16, 7, (universe) => {
-  wasm.universe_paint(universe, 8, 2, 1, MATERIAL.Sand);
+  wasm.universe_paint(universe, 8, 2, 1, MATERIAL.Sand, 100);
   wasm.universe_tick(universe);
   const cells = readCells(universe);
   assert(kindAt(cells, 16, 8, 3) === MATERIAL.Sand, "sand should fall one cell");
 });
 
 withUniverse(16, 16, 7, (universe) => {
-  wasm.universe_paint(universe, 8, 8, 1, MATERIAL.Fire);
-  wasm.universe_paint(universe, 8, 7, 1, MATERIAL.Water);
+  wasm.universe_paint(universe, 8, 8, 1, MATERIAL.Fire, 100);
+  wasm.universe_paint(universe, 8, 7, 1, MATERIAL.Water, 100);
   for (let tick = 0; tick < 8; tick++) wasm.universe_tick(universe);
   const cells = readCells(universe);
   assert(countKind(cells, MATERIAL.Steam) > 0, "water and fire should create steam");
 });
 
 withUniverse(16, 16, 7, (universe) => {
-  wasm.universe_paint(universe, 8, 8, 1, MATERIAL.Lava);
-  wasm.universe_paint(universe, 9, 8, 1, MATERIAL.Moonwater);
+  wasm.universe_paint(universe, 8, 8, 1, MATERIAL.Lava, 100);
+  wasm.universe_paint(universe, 9, 8, 1, MATERIAL.Moonwater, 100);
   for (let tick = 0; tick < 24; tick++) wasm.universe_tick(universe);
   const cells = readCells(universe);
   assert(countKind(cells, MATERIAL.Stone) > 0, "moonwater should help cool lava into stone");
@@ -414,8 +414,8 @@ withUniverse(16, 16, 13, (universe) => {
 });
 
 withUniverse(16, 16, 17, (universe) => {
-  wasm.universe_paint(universe, 7, 8, 1, MATERIAL.Moonwater);
-  wasm.universe_paint(universe, 8, 8, 1, MATERIAL.Oil);
+  wasm.universe_paint(universe, 7, 8, 1, MATERIAL.Moonwater, 100);
+  wasm.universe_paint(universe, 8, 8, 1, MATERIAL.Oil, 100);
   for (let tick = 0; tick < 24; tick++) wasm.universe_tick(universe);
   const cells = readCells(universe);
   assert(countKind(cells, MATERIAL.Stardust) > 0, "moonwater should clean oil into stardust");
@@ -465,8 +465,8 @@ withUniverse(16, 16, 7, (universe) => {
 });
 
 withUniverse(16, 16, 7, (universe) => {
-  wasm.universe_paint(universe, 7, 8, 1, MATERIAL.Fire);
-  wasm.universe_paint(universe, 9, 8, 1, MATERIAL.Wood);
+  wasm.universe_paint(universe, 7, 8, 1, MATERIAL.Fire, 100);
+  wasm.universe_paint(universe, 9, 8, 1, MATERIAL.Wood, 100);
   let embered = false;
   for (let tick = 0; tick < 40 && !embered; tick++) {
     wasm.universe_tick(universe);
