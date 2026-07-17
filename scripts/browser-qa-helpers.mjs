@@ -93,7 +93,18 @@ export async function startStaticServer(distDir) {
   };
 }
 
-export async function startBrowser({
+export async function startBrowser(options = {}) {
+  try {
+    return await launchBrowserOnce(options);
+  } catch (error) {
+    // Headless startup occasionally times out on CI runners; one clean retry
+    // covers the transient case without masking real launch failures.
+    console.warn(`Browser launch failed (${error.message}); retrying once.`);
+    return launchBrowserOnce(options);
+  }
+}
+
+async function launchBrowserOnce({
   profilePrefix = "cozy-browser-",
   downloadPrefix,
   extraArgs = [],
@@ -126,10 +137,20 @@ export async function startBrowser({
     stderr += chunk.toString();
   });
 
-  await waitUntil(async () => {
-    if (child.exitCode !== null) throw new Error(`Browser exited early:\n${stderr}`);
-    return Boolean(await browserTargets(debugPort).catch(() => null));
-  }, "browser debugger to start", debuggerTimeout);
+  try {
+    await waitUntil(async () => {
+      if (child.exitCode !== null) throw new Error(`Browser exited early:\n${stderr}`);
+      return Boolean(await browserTargets(debugPort).catch(() => null));
+    }, "browser debugger to start", debuggerTimeout);
+  } catch (error) {
+    child.kill();
+    await waitForExit(child);
+    await Promise.allSettled([
+      removeTempDir(userDataDir),
+      downloadDir ? removeTempDir(downloadDir) : Promise.resolve()
+    ]);
+    throw error;
+  }
 
   return {
     debugPort,
