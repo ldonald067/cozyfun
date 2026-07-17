@@ -407,6 +407,31 @@ Interactions grounded in real life or cozy invention, each with a visible or aud
 - Glass chime: meteor impact shatters existing glass back to sand with a bright chime, closing the sand-glass-sand loop.
 - Pollen drift: mature, healthy flowers spend energy releasing rare golden pollen motes that drift, settle, and can take root as seeds on damp soil, letting a tended garden slowly spread on its own.
 - Boiling: water's stored energy is temperature. Sustained flame simmers it (warm bubbling visuals, steam wisps that cool it back), then boils it away to steam; hot water melts ice and resists freezing; lava and meteor keep their instant flash; moonwater never boils. A state, not a new toolbar element.
+- Polish pass: exposed lava crusts into stone edge-inward so nothing stays molten forever, oil surfaces carry an iridescent sheen, fungus decays at twice the old pace and shifted pink-magenta away from stardust, and steam fogs glass panes.
+
+## Phase 15: Geology
+
+Status: planned.
+
+Stone and wall are the only reactive-only toolbar elements: everything happens to them and nothing happens because of them. This phase gives the mineral family one circular story instead of bolted-on behaviors.
+
+The headline cycle: wall weathers into stone (freeze-thaw, shipped), stone erodes into sand (new), sand fuses into glass under heat (shipped), glass shatters back to sand under impact (shipped). Every mineral becomes a stage in one loop the player can push in either direction with water, cold, and heat.
+
+### Phase 15A: Water Erosion
+
+- Stone that stays fully saturated by moving water very slowly wears into sand. The wear accumulator is stone's existing stored dampness: only sustained soaking near the energy cap qualifies, with a rare per-tick chance tuned so erosion takes minutes of continuous flow.
+- Guardrails: standing dampness alone never erodes (buildings beside ponds are safe), wall is exempt entirely (sealed construction; its decay stays freeze-thaw), and eroded sand inherits the stone's variant so a worn cliff sheds matching grains.
+- A soft audio cue and the existing sand-fall motion carry the moment; no new UI.
+
+### Phase 15B: Mineral Veins
+
+- Renderer-only: rare hash-clustered glinting veins run through larger stone masses, so cliffs and caves read as rock strata instead of uniform gray. Natural veins sit beside the cosmic etching marks without competing with them.
+
+### Phase 15C: Wall Patina
+
+- Renderer-only: bricks age visibly using the cell age field: mortar darkens, corners chip, and long-standing walls read as lived-in. Pairs with damp moss crossings for abandoned-garden-wall scenes.
+
+Order: 15A first since it completes the cycle and is the only sim change, then 15B and 15C as one visual pass.
 
 ## Phase 12: Heat Identity + Discovery Moments
 
