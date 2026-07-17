@@ -482,6 +482,7 @@ impl Universe {
                 }
                 x if x == Material::Lava as u8 => {
                     let mut cooling = 0;
+                    let hot_neighbors = neighbors.iter().filter(|&&nidx| is_hot(old[nidx].kind)).count();
                     for nidx in neighbors {
                         let other = old[nidx];
                         if other.kind == Material::Water as u8 || other.kind == Material::Moonwater as u8 {
@@ -507,6 +508,13 @@ impl Universe {
                     if cooling > 0 && next[idx].kind == Material::Lava as u8 {
                         next[idx].energy = next[idx].energy.saturating_sub(cooling);
                         if next[idx].energy < 90 && self.chance(3) {
+                            next[idx] = Cell::new(Material::Stone as u8, cell.variant, 0);
+                        }
+                    } else if next[idx].kind == Material::Lava as u8 && hot_neighbors < 3 && self.chance(8) {
+                        // Exposed lava slowly crusts over on its own, so pools cool edge-inward
+                        // and nothing stays molten forever without a heat source.
+                        next[idx].energy = next[idx].energy.saturating_sub(4);
+                        if next[idx].energy < 60 && self.chance(4) {
                             next[idx] = Cell::new(Material::Stone as u8, cell.variant, 0);
                         }
                     }
@@ -1039,7 +1047,7 @@ impl Universe {
             return;
         }
         let (x, y) = self.xy(idx);
-        if !self.chance(95) {
+        if !self.chance(48) {
             return;
         }
         for nidx in self.neighbor_indices(x, y) {
@@ -1758,6 +1766,24 @@ mod tests {
             }
         }
         assert!(dripped, "saturated overhanging moss should shed a dew droplet");
+    }
+
+    #[test]
+    fn isolated_lava_crusts_into_stone_over_time() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 8, 8, Material::Lava);
+        for (x, y) in [(7, 8), (6, 8), (9, 8), (10, 8), (7, 9), (8, 9), (9, 9)] {
+            set_cell(&mut u, x, y, Material::Stone);
+        }
+        let mut crusted = false;
+        for _ in 0..1200 {
+            u.tick();
+            if kind_at(&u, 8, 8) == Material::Stone as u8 {
+                crusted = true;
+                break;
+            }
+        }
+        assert!(crusted, "exposed lava with no heat source should crust into stone");
     }
 
     #[test]

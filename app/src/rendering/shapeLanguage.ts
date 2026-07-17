@@ -28,6 +28,7 @@ const STARDUST_KINDS = [MATERIAL.Stardust] as const;
 const WATER_KINDS = [MATERIAL.Water] as const;
 const OIL_KINDS = [MATERIAL.Oil] as const;
 const EMBER_KINDS = [MATERIAL.Ember] as const;
+const STEAM_KINDS = [MATERIAL.Steam] as const;
 const EARTH_CONTACT_KINDS = [MATERIAL.Sand, MATERIAL.Soil, MATERIAL.Stone, MATERIAL.Wall, MATERIAL.Wood] as const;
 
 export function emptyCellColor(cells: Uint8Array, width: number, height: number, x: number, y: number, time: number): Rgb {
@@ -467,6 +468,11 @@ function glassColor({ color, variant, age, cells, width, height, x, y }: ShapeCo
   if (edge.top || edge.left) out = mixRgb(out, [234, 255, 246], 0.52);
   if (edge.bottom || edge.right) out = mixRgb(out, [36, 102, 84], 0.44);
   if ((hash & 31) === 5) out = mixRgb(out, [255, 255, 255], 0.6);
+  if (hasNearbyKind(cells, width, height, x, y, STEAM_KINDS)) {
+    // Steam fogs the pane with a soft condensation film.
+    out = mixRgb(out, [214, 226, 230], 0.42);
+    if ((hash & 3) === 1) out = mixRgb(out, [236, 242, 244], 0.3);
+  }
   if (age < 8) out = mixRgb(out, [255, 244, 214], 0.6 * (1 - age / 8));
   if (age < 70) out = mixRgb(out, [255, 176, 96], 0.36 * (1 - age / 70));
   return out;
@@ -544,6 +550,13 @@ function liquidColor({ kind, color, variant, energy, flags, time, cells, width, 
   if (kind === MATERIAL.Water && hasNearbyKind(cells, width, height, x, y, EMBER_KINDS)) {
     // Charcoal ink: water running over char picks up a sooty murk.
     out = mixRgb(out, [31, 29, 27], 0.32);
+  }
+  if (kind === MATERIAL.Oil && top) {
+    // Iridescent slick: real oil films split light into faint green-violet-blue bands.
+    const phase = (x * 2 + y + Math.floor(time * 0.006)) % 9;
+    const sheen: Rgb = phase < 3 ? [96, 122, 90] : phase < 6 ? [110, 92, 128] : [80, 108, 130];
+    out = mixRgb(out, sheen, 0.35);
+    if ((hash + phase) % 7 === 0) out = mixRgb(out, [150, 160, 172], 0.3);
   }
   if (kind === MATERIAL.Water && energy > 120) {
     // Water's energy is temperature: simmering water warms and bubbles, boiling water churns.

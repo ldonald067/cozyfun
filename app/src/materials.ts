@@ -182,8 +182,8 @@ export const MATERIALS: MaterialDef[] = [
     slug: "fungus",
     description: "Decomposer that rots wet seeds, overtakes old moss, and feeds on wood or soil.",
     identity: ["Decay pressure", "Contact-colored caps and spores"],
-    color: "#c58bd2",
-    palette: ["#8f5aa5", "#b775c8", "#d4a0dc", "#e7c0e7", "#704484"],
+    color: "#d283bd",
+    palette: ["#a8508f", "#cc6fb0", "#e39aca", "#f0c2dd", "#83407a"],
     group: "life"
   },
   {

@@ -550,6 +550,17 @@ class JsSandboxEngine implements SandboxEngine {
         if (energy < 90 && this.chance(3)) {
           writeCellBytes(next, idx, MATERIAL.Stone, old[idx + 1]);
         }
+      } else if (kind === MATERIAL.Lava && next[idx] === MATERIAL.Lava) {
+        const hotNeighbors = this.neighbors(x, y).filter((nidx) =>
+          old[nidx] === MATERIAL.Fire || old[nidx] === MATERIAL.Lava || old[nidx] === MATERIAL.Meteor
+        ).length;
+        if (hotNeighbors < 3 && this.chance(8)) {
+          const energy = Math.max(0, readU16(next, idx + 4) - 4);
+          writeU16(next, idx + 4, energy);
+          if (energy < 60 && this.chance(4)) {
+            writeCellBytes(next, idx, MATERIAL.Stone, old[idx + 1]);
+          }
+        }
       }
     }
   }
@@ -761,7 +772,7 @@ class JsSandboxEngine implements SandboxEngine {
 
   private fungus(x: number, y: number, old: Uint8Array, next: Uint8Array) {
     if (readU16(next, this.index(x, y) + 6) & CELL_FLAG.Frozen) return;
-    if (!this.chance(95)) return;
+    if (!this.chance(48)) return;
     for (const nidx of this.neighbors(x, y)) {
       const other = old[nidx];
       const otherWet = Boolean(readU16(old, nidx + 6) & CELL_FLAG.Wet) || readU16(old, nidx + 4) > 70;
