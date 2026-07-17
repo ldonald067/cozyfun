@@ -91,13 +91,13 @@ Current toolbar materials:
 
 ```txt
 Eraser, Wall, Sand, Water, Soil, Fire, Wood, Lava, Stone,
-Moss, Seed, Fungus, Oil, Ice, Stardust, Meteor, Moonwater
+Moss, Seed, Fungus, Oil, Ice, Stardust, Meteor, Moonwater, Rocket
 ```
 
 Generated outcomes (created by play, not painted directly):
 
 ```txt
-Flower, Smoke, Steam, Glass, Ember
+Flower, Smoke, Steam, Glass, Ember, Pollen, Stem
 ```
 
 Some key reactions:
@@ -119,6 +119,7 @@ Some key reactions:
 - Seeds are now potential: wet rooted seeds can bloom into flowers, moss beds can overtake them, and nearby fungus can rot them.
 - Moss is carpet growth: it spreads over damp soil and wood but does not bloom.
 - Wall and stone are intentionally separate: wall is sealed construction, while stone is natural, weatherable, and easier for moss/condensation to affect.
+- Rocket powder lies inert until any flame lights it; a lit grain climbs skyward trailing smoke and bursts into fire sparks and stardust, chain-lighting neighboring powder.
 - Stardust, meteor, and moonwater add the cozy/cosmic identity.
 
 ## Architecture

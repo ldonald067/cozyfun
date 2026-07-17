@@ -30,7 +30,8 @@ const MATERIAL = {
   Flower: 19,
   Glass: 20,
   Ember: 21,
-  Stem: 23
+  Stem: 23,
+  Rocket: 24
 };
 
 const CELL_FLAG = {
@@ -112,6 +113,23 @@ withUniverse(16, 16, 7, (universe) => {
   for (let tick = 0; tick < 24; tick++) wasm.universe_tick(universe);
   const cells = readCells(universe);
   assert(countKind(cells, MATERIAL.Stone) > 0, "moonwater should help cool lava into stone");
+});
+
+withUniverse(16, 16, 7, (universe) => {
+  const cells = new Uint8Array(16 * 16 * 8);
+  for (let x = 0; x < 16; x++) setCell(cells, 16, x, 15, MATERIAL.Stone);
+  setCell(cells, 16, 8, 14, MATERIAL.Rocket);
+  setCell(cells, 16, 7, 14, MATERIAL.Fire, { energy: 240 });
+  const ptr = wasm.alloc(cells.byteLength);
+  new Uint8Array(wasm.memory.buffer, ptr, cells.byteLength).set(cells);
+  assert(wasm.universe_load_cells(universe, ptr, cells.byteLength) === 1, "rocket test cells should load");
+  wasm.dealloc(ptr, cells.byteLength);
+  let burst = false;
+  for (let tick = 0; tick < 80 && !burst; tick++) {
+    wasm.universe_tick(universe);
+    if (countKind(readCells(universe), MATERIAL.Stardust) > 0) burst = true;
+  }
+  assert(burst, "flame-lit rocket powder should fly and burst into stardust");
 });
 
 withUniverse(16, 16, 7, (universe) => {

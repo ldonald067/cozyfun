@@ -77,6 +77,7 @@ export function applyShapeLanguage(context: ShapeContext): Rgb {
   else if (kind === MATERIAL.Fire) out = fireColor(context);
   else if (kind === MATERIAL.Lava) out = lavaColor(context);
   else if (kind === MATERIAL.Meteor) out = meteorColor(context);
+  else if (kind === MATERIAL.Rocket) out = rocketColor(context);
   else if (kind === MATERIAL.Smoke || kind === MATERIAL.Steam) out = vaporColor(context);
   else if (kind === MATERIAL.Seed) out = seedColor(context);
   else if (kind === MATERIAL.Stem) out = stemColor(context);
@@ -327,6 +328,20 @@ function meteorColor({ color, variant, time, cells, width, height, x, y }: Shape
     if (edge.top || edge.left) out = mixRgb(out, [255, 238, 158], 0.4);
   }
   if (hash % 11 === 0) out = mixRgb(out, [255, 229, 124], 0.36 + (Math.sin(time * 0.02 + x) + 1) * 0.1);
+  return out;
+}
+
+function rocketColor({ color, variant, energy, time, x, y }: ShapeContext) {
+  const hash = hashCell(x, y, variant);
+  if (energy > 0) {
+    // A lit grain is the bright climbing head of the firework.
+    const flicker = (Math.sin(time * 0.03 + hash * 1.7) + 1) * 0.5;
+    let out = mixRgb(color, [255, 236, 176], 0.55 + flicker * 0.25);
+    if (hash % 5 === 0) out = [255, 248, 214];
+    return out;
+  }
+  let out = mixRgb(color, [58, 18, 22], (hash & 3) * 0.09);
+  if (hash % 6 === 0) out = mixRgb(out, [232, 220, 210], 0.55);
   return out;
 }
 

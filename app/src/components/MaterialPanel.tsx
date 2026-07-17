@@ -12,6 +12,7 @@ import {
   Moon,
   Mountain,
   Orbit,
+  Rocket,
   Shell,
   Snowflake,
   Sparkle,
@@ -48,7 +49,8 @@ const MATERIAL_ICONS: Record<MaterialId, LucideIcon> = {
   [MATERIAL.Glass]: Grid2x2,
   [MATERIAL.Ember]: Flame,
   [MATERIAL.Pollen]: Sparkle,
-  [MATERIAL.Stem]: Sprout
+  [MATERIAL.Stem]: Sprout,
+  [MATERIAL.Rocket]: Rocket
 };
 
 type MaterialPanelProps = {

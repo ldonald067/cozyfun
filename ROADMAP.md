@@ -442,15 +442,16 @@ A paintable sealed block that drinks the identity of the first material to touch
 - Emission is gentle (rare per-tick chance per open face) so springs feel like sources, not firehoses; eraser clears them like anything else.
 - Toolbar element in the basic family, so it must carry 4 interaction roles: absorbs an identity, emits it, blocks flow like wall, and heat or frost visibly stresses the block without destroying it.
 
-### Phase 17B: Sky Lantern (the cozy rocket)
+### Phase 17B: Rocket (the firework powder)
 
-A paintable little light that rises like the inverse of a meteor: it lifts off gently, drifts with a sway, glows warm, and at its peak releases a soft burst of sparks that fade as they fall. The night-desk answer to fireworks.
+Matching how the inspiration actually plays it: rocket is an inert crimson powder, and fire is the trigger.
 
-- Launch is slow and floaty rather than ballistic; the burst is stardust-adjacent sparks that do not ignite anything, so celebrations stay cozy.
-- Wind of the burst can nudge nearby pollen and stardust for a mingled shimmer.
-- Toolbar element in the cosmic family with 4 roles: rises and sways, bursts into sparks at altitude, extinguishes into a drifting paper scrap if it touches water, and ignites early if it meets open flame.
+- Unlit rocket falls and piles like a powder and does nothing on its own, so charges and fuse lines can be built calmly.
+- Any open flame (fire, lava, hot ember, meteor) lights it: the lit grain launches skyward like an inverse meteor, swaying as it climbs and leaving a smoke trail.
+- At the end of its fuse, or when it hits a ceiling, it bursts: a ring of brief fire sparks, a puff of stardust shimmer, and smoke. Bursts near flammables have real consequences, exactly like the inspiration.
+- Toolbar element in the cosmic family with 4 roles: falls inert, ignites from flame, flies with a trail, bursts at altitude or obstruction.
 
-Order: 17A first (it multiplies every existing element), then 17B as the celebration piece.
+Order: 17B first since it is the piece the inspiration is loved for, then 17A Wellspring.
 
 Stone and wall are the only reactive-only toolbar elements: everything happens to them and nothing happens because of them. This phase gives the mineral family one circular story instead of bolted-on behaviors.
 

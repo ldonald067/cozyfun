@@ -35,7 +35,8 @@ export const MATERIAL = {
   Glass: 20,
   Ember: 21,
   Pollen: 22,
-  Stem: 23
+  Stem: 23,
+  Rocket: 24
 } as const;
 
 export type MaterialId = (typeof MATERIAL)[keyof typeof MATERIAL];
@@ -297,6 +298,16 @@ export const MATERIALS: MaterialDef[] = [
     color: "#ff9b4d",
     palette: ["#f04428", "#ff7a30", "#ffc15f", "#6a4c45", "#2c2630"],
     glow: "#ff7a30",
+    group: "cosmic"
+  },
+  {
+    id: MATERIAL.Rocket,
+    label: "Rocket",
+    slug: "rocket",
+    description: "Festival powder that lies quiet until flame lights it, then leaps skyward and bursts.",
+    identity: ["Inert firework powder", "Flame sends it up into a spark burst"],
+    color: "#c23a4a",
+    palette: ["#9c2838", "#c23a4a", "#7a1e2c", "#e8dcd2"],
     group: "cosmic"
   },
   {

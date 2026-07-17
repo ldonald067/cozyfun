@@ -36,6 +36,9 @@ export function detectReactionCues(before: Uint8Array, after: Uint8Array): React
     if (beforeKind === MATERIAL.Moonwater && afterKind === MATERIAL.Stardust) {
       found.add("impact-burst");
     }
+    if (beforeKind === MATERIAL.Rocket && afterKind === MATERIAL.Stardust) {
+      found.add("impact-burst");
+    }
     if (beforeKind === MATERIAL.Oil && afterKind === MATERIAL.Stardust) {
       found.add("cleanse");
     }

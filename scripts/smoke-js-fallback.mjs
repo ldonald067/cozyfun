@@ -63,7 +63,8 @@ const MATERIAL = {
   Flower: 19,
   Glass: 20,
   Ember: 21,
-  Stem: 23
+  Stem: 23,
+  Rocket: 24
 };
 
 const CELL_FLAG = {
@@ -132,6 +133,23 @@ withEngine(23, (engine) => {
   assert((flags & CELL_FLAG.Wet) !== 0, "known imported wet flag should stay");
   assert((flags & CELL_FLAG.Unknown) === 0, "unknown imported flag should be masked");
   assert(energy === 255, `imported energy should be clamped to 255, got ${energy}`);
+});
+
+withEngine(7, (engine) => {
+  const cells = new Uint8Array(16 * 16 * CELL_STRIDE);
+  for (let x = 0; x < 16; x++) setCell(cells, 16, x, 15, MATERIAL.Stone);
+  setCell(cells, 16, 8, 14, MATERIAL.Rocket);
+  setCell(cells, 16, 7, 14, MATERIAL.Fire, { energy: 240 });
+  loadCells(engine, cells, "rocket test cells should load");
+  let burst = false;
+  for (let tick = 0; tick < 80 && !burst; tick++) {
+    engine.tick();
+    const updated = engine.getCellBytes();
+    for (let offset = 0; offset < updated.byteLength; offset += CELL_STRIDE) {
+      if (updated[offset] === MATERIAL.Stardust) burst = true;
+    }
+  }
+  assert(burst, "flame-lit rocket powder should fly and burst into stardust");
 });
 
 withEngine(7, (engine) => {

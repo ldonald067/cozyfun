@@ -6,7 +6,7 @@ export function materialShowcaseScript() {
     const width = 220;
     const height = 140;
     const stride = 8;
-    const material = { Wall: 1, Sand: 2, Water: 3, Soil: 5, Fire: 6, Wood: 7, Lava: 8, Stone: 9, Moss: 10, Seed: 11, Fungus: 12, Oil: 13, Ice: 14, Steam: 15, Stardust: 16, Meteor: 17, Moonwater: 18, Flower: 19, Glass: 20, Ember: 21, Pollen: 22, Stem: 23 };
+    const material = { Wall: 1, Sand: 2, Water: 3, Soil: 5, Fire: 6, Wood: 7, Lava: 8, Stone: 9, Moss: 10, Seed: 11, Fungus: 12, Oil: 13, Ice: 14, Steam: 15, Stardust: 16, Meteor: 17, Moonwater: 18, Flower: 19, Glass: 20, Ember: 21, Pollen: 22, Stem: 23, Rocket: 24 };
     const flag = { Wet: 1, Rooted: 2, Cosmic: 4, Frozen: 8, Scorched: 16 };
     const cells = new Uint8Array(width * height * stride);
     const writeU16 = (offset, value) => {
@@ -139,6 +139,11 @@ export function materialShowcaseScript() {
     line(92, 103, 91, material.Water, 80, 28);
     line(96, 104, 90, material.Oil, 70, 22);
     line(88, 93, 92, material.Soil, 120, 28, flag.Wet);
+
+    // Firework arc: an inert rocket powder charge on stone and a lit grain climbing mid-flight.
+    line(126, 134, 108, material.Stone);
+    for (const [x, y] of [[128, 107], [129, 107], [130, 107], [131, 107], [129, 106], [130, 106]]) setCell(x, y, material.Rocket, 0, 30, 0, x);
+    setCell(130, 96, material.Rocket, 180, 6, 0, 2);
 
     let binary = "";
     for (let i = 0; i < cells.length; i += 0x8000) binary += String.fromCharCode(...cells.slice(i, i + 0x8000));

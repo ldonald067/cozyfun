@@ -28,6 +28,7 @@ pub enum Material {
     Ember = 21,
     Pollen = 22,
     Stem = 23,
+    Rocket = 24,
 }
 
 const FLAG_WET: u16 = 1 << 0;
@@ -144,7 +145,7 @@ impl Universe {
                     continue;
                 }
                 let idx = self.idx(px as u32, py as u32);
-                let kind = material.min(Material::Stem as u8);
+                let kind = material.min(Material::Rocket as u8);
                 self.cells[idx] = if kind == Material::Empty as u8 {
                     Cell::empty()
                 } else {
@@ -160,7 +161,7 @@ impl Universe {
             return false;
         }
         for (idx, chunk) in data.chunks_exact(size_of::<Cell>()).enumerate() {
-            let kind = chunk[0].min(Material::Stem as u8);
+            let kind = chunk[0].min(Material::Rocket as u8);
             self.cells[idx] = if kind == Material::Empty as u8 {
                 Cell::empty()
             } else {
@@ -196,6 +197,9 @@ impl Universe {
                 }
                 x if x == Material::Pollen as u8 => self.update_pollen(idx, cell, &old, &mut next),
                 x if x == Material::Meteor as u8 => self.update_meteor(idx, cell, &old, &mut next),
+                x if x == Material::Rocket as u8 && cell.energy == 0 => {
+                    self.update_powder(idx, cell, &old, &mut next, 1)
+                }
                 x if x == Material::Water as u8 => self.update_liquid(idx, cell, &old, &mut next, 1),
                 x if x == Material::Moonwater as u8 => {
                     self.update_liquid(idx, cell, &old, &mut next, 1)
@@ -213,6 +217,9 @@ impl Universe {
                 x if x == Material::Smoke as u8 => self.update_gas(idx, cell, &old, &mut next, 1),
                 x if x == Material::Steam as u8 => self.update_gas(idx, cell, &old, &mut next, 1),
                 x if x == Material::Fire as u8 => self.update_fire(idx, cell, &old, &mut next),
+                x if x == Material::Rocket as u8 && cell.energy > 0 => {
+                    self.update_rocket(idx, cell, &old, &mut next)
+                }
                 x if x == Material::Seed as u8 => self.update_seed(idx, cell, &old, &mut next),
                 x if x == Material::Stem as u8 => self.update_stem(idx, cell, &old, &mut next),
                 x if x == Material::Moss as u8 => self.update_moss(idx, cell, &old, &mut next),
@@ -1223,6 +1230,54 @@ impl Universe {
         }
     }
 
+    fn update_rocket(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
+        if next[idx].kind != Material::Rocket as u8 || next[idx].energy == 0 {
+            return;
+        }
+        let (x, y) = self.xy(idx);
+        next[idx].energy = next[idx].energy.saturating_sub(12);
+        if next[idx].energy <= 96 || y == 0 {
+            self.burst_rocket(idx, x, y, cell, old, next);
+            return;
+        }
+        let sway = if self.chance(3) {
+            if self.tick_count % 2 == 0 { 1 } else { -1 }
+        } else {
+            0
+        };
+        let flying = next[idx];
+        let mut moved = false;
+        for (dx, dy) in [(sway, -1), (0, -1), (-sway, -1)] {
+            if self.try_move(idx, x + dx, y + dy, flying, old, next, true) {
+                moved = true;
+                break;
+            }
+        }
+        if !moved {
+            self.burst_rocket(idx, x, y, cell, old, next);
+            return;
+        }
+        if next[idx].is_empty() && self.chance(2) {
+            next[idx] = Cell::new(Material::Smoke as u8, cell.variant, 70);
+        }
+    }
+
+    fn burst_rocket(&mut self, idx: usize, x: i32, y: i32, cell: Cell, old: &[Cell], next: &mut [Cell]) {
+        next[idx] = Cell::new(Material::Stardust as u8, cell.variant, 200);
+        for nidx in self.neighbor_indices(x, y) {
+            let other = old[nidx];
+            if other.is_empty() && next[nidx].is_empty() {
+                next[nidx] = if self.chance(3) {
+                    Cell::new(Material::Stardust as u8, cell.variant, 170)
+                } else {
+                    Cell::new(Material::Fire as u8, cell.variant, 150)
+                };
+            } else if is_flammable(other.kind) && self.chance(3) {
+                next[nidx] = ignited_cell(other, 200);
+            }
+        }
+    }
+
     fn fall_dirs(&self) -> [(i32, i32); 3] {
         if self.tick_count % 2 == 0 {
             [(0, 1), (-1, 1), (1, 1)]
@@ -1308,6 +1363,10 @@ fn is_hot(kind: u8) -> bool {
 fn ignited_cell(fuel: Cell, energy: u16) -> Cell {
     if fuel.kind == Material::Wood as u8 {
         Cell::new(Material::Ember as u8, fuel.variant, 230)
+    } else if fuel.kind == Material::Rocket as u8 {
+        // Rocket powder does not burn in place: lighting it starts the fuse
+        // (energy > 0 marks a lit grain) and it launches skyward instead.
+        Cell::new(Material::Rocket as u8, fuel.variant, 220)
     } else {
         Cell::new(Material::Fire as u8, fuel.variant, energy)
     }
@@ -1405,11 +1464,13 @@ fn is_flammable(kind: u8) -> bool {
         || kind == Material::Fungus as u8
         || kind == Material::Flower as u8
         || kind == Material::Oil as u8
+        || kind == Material::Rocket as u8
 }
 
 fn burn_chance(kind: u8) -> u32 {
     match kind {
         x if x == Material::Oil as u8 => 2,
+        x if x == Material::Rocket as u8 => 3,
         x if x == Material::Fungus as u8 => 5,
         x if x == Material::Flower as u8 => 5,
         x if x == Material::Moss as u8 => 7,
@@ -1483,6 +1544,84 @@ mod tests {
         u.tick();
         assert!(kind_at(&u, 8, 3) == Material::Sand as u8 || kind_at(&u, 8, 4) == Material::Sand as u8);
         assert_ne!(kind_at(&u, 8, 6), Material::Sand as u8);
+    }
+
+    #[test]
+    fn rocket_powder_falls_inert_without_flame() {
+        let mut u = Universe::new(16, 32, 7);
+        for x in 0..16 {
+            set_cell(&mut u, x, 20, Material::Stone);
+        }
+        set_cell(&mut u, 8, 4, Material::Rocket);
+        for _ in 0..40 {
+            u.tick();
+        }
+        let landed = (0..16).any(|x| {
+            kind_at(&u, x, 19) == Material::Rocket as u8 && energy_at(&u, x, 19) == 0
+        });
+        assert!(landed, "unlit rocket powder should pile on the floor, still unlit");
+    }
+
+    #[test]
+    fn flame_launches_rocket_skyward() {
+        let mut u = Universe::new(16, 48, 7);
+        for x in 0..16 {
+            set_cell(&mut u, x, 40, Material::Stone);
+        }
+        set_cell(&mut u, 8, 39, Material::Rocket);
+        set_cell(&mut u, 7, 39, Material::Fire);
+        let mut lifted = false;
+        for _ in 0..60 {
+            u.tick();
+            for y in 0..36 {
+                for x in 0..16 {
+                    if kind_at(&u, x, y) == Material::Rocket as u8 && energy_at(&u, x, y) > 0 {
+                        lifted = true;
+                    }
+                }
+            }
+            if lifted {
+                break;
+            }
+        }
+        assert!(lifted, "a lit rocket should climb well above its launch pad");
+    }
+
+    #[test]
+    fn lit_rocket_bursts_into_sparks_and_stardust() {
+        let mut u = Universe::new(16, 48, 7);
+        set_cell_state(&mut u, 8, 30, Material::Rocket, 0, 220, 0);
+        for _ in 0..30 {
+            u.tick();
+        }
+        assert!(
+            !u.cells
+                .iter()
+                .any(|c| c.kind == Material::Rocket as u8),
+            "the lit rocket should have burst by the end of its fuse"
+        );
+        assert!(
+            u.cells.iter().any(|c| c.kind == Material::Stardust as u8),
+            "a burst should leave a shimmer of stardust"
+        );
+    }
+
+    #[test]
+    fn rocket_bursts_when_it_hits_a_ceiling() {
+        let mut u = Universe::new(16, 48, 7);
+        for x in 0..16 {
+            set_cell(&mut u, x, 24, Material::Stone);
+        }
+        set_cell_state(&mut u, 8, 27, Material::Rocket, 0, 220, 0);
+        for _ in 0..12 {
+            u.tick();
+        }
+        assert!(
+            !u.cells
+                .iter()
+                .any(|c| c.kind == Material::Rocket as u8 && c.energy > 0),
+            "a lit rocket pinned under stone should burst instead of hovering"
+        );
     }
 
     #[test]
