@@ -992,8 +992,9 @@ impl Universe {
             }
             if below.kind == Material::Soil as u8 && wet {
                 next[idx].flags |= FLAG_ROOTED;
-                if (cell.age > 16 && cell.energy > 90)
-                    || (cell.age > 6 && cell.energy > 55 && self.chance(if cosmic { 3 } else { 5 }))
+                // Blooming waits long enough for the germination shoot to visibly grow first.
+                if (cell.age > 70 && cell.energy > 90)
+                    || (cell.age > 30 && cell.energy > 55 && self.chance(if cosmic { 6 } else { 12 }))
                 {
                     next[idx] = Cell::new(Material::Flower as u8, cell.variant, if cosmic { 150 } else { 90 });
                     next[idx].flags = FLAG_ROOTED | if cosmic { FLAG_COSMIC } else { 0 };
@@ -1474,7 +1475,7 @@ mod tests {
     #[test]
     fn wet_seed_on_soil_blooms() {
         let mut u = Universe::new(16, 16, 7);
-        set_cell_state(&mut u, 8, 8, Material::Seed, 20, 180, FLAG_WET);
+        set_cell_state(&mut u, 8, 8, Material::Seed, 80, 180, FLAG_WET);
         set_cell(&mut u, 8, 9, Material::Soil);
         u.tick();
         assert_eq!(kind_at(&u, 8, 8), Material::Flower as u8);
@@ -1505,7 +1506,7 @@ mod tests {
     #[test]
     fn frozen_seed_waits_instead_of_blooming() {
         let mut u = Universe::new(16, 16, 7);
-        set_cell_state(&mut u, 8, 8, Material::Seed, 20, 180, FLAG_WET | FLAG_FROZEN);
+        set_cell_state(&mut u, 8, 8, Material::Seed, 80, 180, FLAG_WET | FLAG_FROZEN);
         set_cell(&mut u, 8, 9, Material::Soil);
         u.tick();
         assert_eq!(kind_at(&u, 8, 8), Material::Seed as u8);

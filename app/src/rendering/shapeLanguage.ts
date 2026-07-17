@@ -381,10 +381,11 @@ function seedColor({ color, variant, age, energy, flags, cells, width, height, x
   if (rooted && localY === 0 && hash % 4 === 0) out = mixRgb(out, [174, 227, 115], 0.32);
   if (rooted && wet) {
     // Germination arc: the shoot visibly climbs and pales toward a bud as the seed feeds.
-    const growth = Math.min(1, (energy - 40) / 160) * Math.min(1, age / 20);
-    if (growth > 0.25 && localY <= 1) out = mixRgb(out, [126, 205, 96], 0.3 + growth * 0.3);
-    if (growth > 0.55 && localY === 0) out = mixRgb(out, [186, 235, 128], 0.35 + growth * 0.3);
-    if (growth > 0.8 && localY === 0 && (hash & 3) !== 1) out = mixRgb(out, [235, 250, 180], 0.5);
+    const growth = Math.min(1, (energy - 40) / 160) * Math.min(1, age / 60);
+    if (growth > 0.15) out = mixRgb(out, [104, 178, 84], 0.25 + growth * 0.3);
+    if (growth > 0.35 && localY <= 1) out = mixRgb(out, [138, 214, 102], 0.4 + growth * 0.3);
+    if (growth > 0.6 && localY === 0) out = mixRgb(out, [196, 240, 134], 0.45 + growth * 0.3);
+    if (growth > 0.85 && (localY === 0 || localX === 1) && (hash & 3) !== 1) out = mixRgb(out, [240, 252, 186], 0.55);
   }
   if (cosmic) out = mixRgb(out, [184, 211, 255], moonContact.bottom ? 0.3 : 0.24);
   if (oilContact.count > 0) {
@@ -662,7 +663,11 @@ function growthColor({ kind, color, variant, age, energy, flags, cells, width, h
       out = mixRgb(out, [102, 180, 83], 0.22);
       if (edge.top || hash % 11 === 0) out = mixRgb(out, [207, 241, 153], 0.38);
     }
-    if (Boolean(flags & CELL_FLAG.Wet) && energy > 110 && (hash % 6 === 0 || (edge.top && hash % 3 === 0))) {
+    if (Boolean(flags & CELL_FLAG.Wet) && energy > 150) {
+      // Deeply hydrated moss reads vividly lush, so a generous watering shows at a glance.
+      out = mixRgb(out, [96, 214, 118], 0.28);
+    }
+    if (Boolean(flags & CELL_FLAG.Wet) && energy > 110 && (hash % 4 === 0 || (edge.top && hash % 3 === 0))) {
       out = mixRgb(out, [222, 248, 255], 0.55);
     }
     if (cosmic) {

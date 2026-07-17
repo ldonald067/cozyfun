@@ -135,7 +135,7 @@ withEngine(23, (engine) => {
 
 withEngine(7, (engine) => {
   const cells = new Uint8Array(16 * 16 * CELL_STRIDE);
-  setCell(cells, 16, 8, 8, MATERIAL.Seed, { age: 20, energy: 180, flags: CELL_FLAG.Wet });
+  setCell(cells, 16, 8, 8, MATERIAL.Seed, { age: 80, energy: 180, flags: CELL_FLAG.Wet });
   setCell(cells, 16, 8, 9, MATERIAL.Soil);
   loadCells(engine, cells, "seed test cells should load");
   engine.tick();
@@ -145,7 +145,7 @@ withEngine(7, (engine) => {
 
 withEngine(7, (engine) => {
   const cells = new Uint8Array(16 * 16 * CELL_STRIDE);
-  setCell(cells, 16, 8, 8, MATERIAL.Seed, { age: 20, energy: 180, flags: CELL_FLAG.Wet | CELL_FLAG.Frozen });
+  setCell(cells, 16, 8, 8, MATERIAL.Seed, { age: 80, energy: 180, flags: CELL_FLAG.Wet | CELL_FLAG.Frozen });
   setCell(cells, 16, 8, 9, MATERIAL.Soil);
   loadCells(engine, cells, "frozen seed cells should load");
   engine.tick();

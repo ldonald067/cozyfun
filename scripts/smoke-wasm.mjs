@@ -115,7 +115,7 @@ withUniverse(16, 16, 7, (universe) => {
 
 withUniverse(16, 16, 7, (universe) => {
   const cells = new Uint8Array(16 * 16 * 8);
-  setCell(cells, 16, 8, 8, MATERIAL.Seed, { age: 20, energy: 180, flags: CELL_FLAG.Wet });
+  setCell(cells, 16, 8, 8, MATERIAL.Seed, { age: 80, energy: 180, flags: CELL_FLAG.Wet });
   setCell(cells, 16, 8, 9, MATERIAL.Soil);
   const ptr = wasm.alloc(cells.byteLength);
   new Uint8Array(wasm.memory.buffer, ptr, cells.byteLength).set(cells);
@@ -128,7 +128,7 @@ withUniverse(16, 16, 7, (universe) => {
 
 withUniverse(16, 16, 7, (universe) => {
   const cells = new Uint8Array(16 * 16 * 8);
-  setCell(cells, 16, 8, 8, MATERIAL.Seed, { age: 20, energy: 180, flags: CELL_FLAG.Wet | CELL_FLAG.Frozen });
+  setCell(cells, 16, 8, 8, MATERIAL.Seed, { age: 80, energy: 180, flags: CELL_FLAG.Wet | CELL_FLAG.Frozen });
   setCell(cells, 16, 8, 9, MATERIAL.Soil);
   const ptr = wasm.alloc(cells.byteLength);
   new Uint8Array(wasm.memory.buffer, ptr, cells.byteLength).set(cells);

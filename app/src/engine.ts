@@ -732,7 +732,7 @@ class JsSandboxEngine implements SandboxEngine {
 
     if (below === MATERIAL.Soil && wet) {
       writeU16(next, idx + 6, flags | CELL_FLAG.Rooted);
-      if ((age > 16 && energy > 90) || (age > 6 && energy > 55 && this.chance(cosmic ? 3 : 5))) {
+      if ((age > 70 && energy > 90) || (age > 30 && energy > 55 && this.chance(cosmic ? 6 : 12))) {
         writeCellBytes(next, idx, MATERIAL.Flower, cell[1], cosmic ? 150 : 90, 0, CELL_FLAG.Rooted | (cosmic ? CELL_FLAG.Cosmic : 0));
         return;
       }
