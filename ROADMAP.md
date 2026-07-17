@@ -428,6 +428,29 @@ Watering the garden now answers back at every step of the growth arc:
 - Seeds join the dew cue when they first turn wet, play a soft sprout cue at the moment they root, and show a visible germination arc: the shoot climbs and pales toward a bud as the seed feeds toward bloom, so progress reads before the flower pops.
 - Well-watered moss (energy above 150) colonizes two patches per pass instead of one, so a generous watering visibly surges the carpet outward while modest watering keeps the old patient pace, pinned by a sim test.
 - Real stalked plants: rooted, fed seeds germinate into a generated-only Stem that climbs upward cell by cell (height varies per seed, taller with cosmic feeding) and blooms a flower at its tip, so gardens become stands of flowers at different heights that reseed themselves through pollen. Unsupported stalk segments fall, so cut plants collapse; stems burn, freeze, and scorch like living growth. Mature damp moss raises tiny sporophyte tufts, keeping its carpet identity while reading plant-like up close.
+- Sandbox-classic feel, learned from the game that inspired this project: paint strokes interpolate into continuous lines, powders and liquids sprinkle as grains while solids paint dense, and a quarter of expiring steam condenses back into falling droplets.
+
+## Phase 17: Wellspring and Sky Lantern
+
+Status: planned. Cozy translations of the two classic sandbox elements the project's inspiration is loved for: the cloner and the rocket.
+
+### Phase 17A: Wellspring (the cozy cloner)
+
+A paintable sealed block that drinks the identity of the first material to touch it, then gently emits that material from its open faces forever. Eternal waterfalls, everlasting campfires, endless sand pours: persistent scenes stop needing the player's constant hand.
+
+- Identity stored in the cell's energy field as a material id; an unclaimed wellspring reads as a carved, rune-marked block, and a claimed one tints toward its material with a slow pulse.
+- Emission is gentle (rare per-tick chance per open face) so springs feel like sources, not firehoses; eraser clears them like anything else.
+- Toolbar element in the basic family, so it must carry 4 interaction roles: absorbs an identity, emits it, blocks flow like wall, and heat or frost visibly stresses the block without destroying it.
+
+### Phase 17B: Sky Lantern (the cozy rocket)
+
+A paintable little light that rises like the inverse of a meteor: it lifts off gently, drifts with a sway, glows warm, and at its peak releases a soft burst of sparks that fade as they fall. The night-desk answer to fireworks.
+
+- Launch is slow and floaty rather than ballistic; the burst is stardust-adjacent sparks that do not ignite anything, so celebrations stay cozy.
+- Wind of the burst can nudge nearby pollen and stardust for a mingled shimmer.
+- Toolbar element in the cosmic family with 4 roles: rises and sways, bursts into sparks at altitude, extinguishes into a drifting paper scrap if it touches water, and ignites early if it meets open flame.
+
+Order: 17A first (it multiplies every existing element), then 17B as the celebration piece.
 
 Stone and wall are the only reactive-only toolbar elements: everything happens to them and nothing happens because of them. This phase gives the mineral family one circular story instead of bolted-on behaviors.
 
