@@ -755,20 +755,24 @@ class JsSandboxEngine implements SandboxEngine {
       }
     }
     if (!(wet || this.chance(120))) return;
+    let spreadsLeft = energy > 150 ? 2 : 1;
     for (const nidx of this.neighbors(x, y)) {
       const other = old[nidx];
       const dampSubstrate = Boolean(readU16(old, nidx + 6) & CELL_FLAG.Wet) || readU16(old, nidx + 4) > 40;
+      let spread = false;
       if ((other === MATERIAL.Soil || other === MATERIAL.Wood) && (energy > 110 || dampSubstrate || this.chance(8))) {
         writeCellBytes(next, nidx, MATERIAL.Moss, cell[1], 70, 0, wet ? CELL_FLAG.Wet : 0);
-        return;
-      }
-      if (other === MATERIAL.Stone && dampSubstrate && (energy > 120 || this.chance(10))) {
+        spread = true;
+      } else if (other === MATERIAL.Stone && dampSubstrate && (energy > 120 || this.chance(10))) {
         writeCellBytes(next, nidx, MATERIAL.Moss, cell[1], 58, 0, CELL_FLAG.Wet);
-        return;
-      }
-      if (other === MATERIAL.Wall && dampSubstrate && energy > 150) {
+        spread = true;
+      } else if (other === MATERIAL.Wall && dampSubstrate && energy > 150) {
         writeCellBytes(next, nidx, MATERIAL.Moss, cell[1], 48, 0, CELL_FLAG.Wet);
-        return;
+        spread = true;
+      }
+      if (spread) {
+        spreadsLeft -= 1;
+        if (spreadsLeft === 0) return;
       }
     }
   }

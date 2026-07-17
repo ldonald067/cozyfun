@@ -128,6 +128,10 @@ export function playReactionCue(audio: RunningAudio, cue: ReactionCue, time: num
       playNoise(audio, time, { duration: 0.14, frequency: 760, gain: 0.0022, type: "bandpass", q: 0.3 });
       playNoise(audio, time + 0.06, { duration: 0.09, frequency: 420, gain: 0.0012, type: "lowpass", q: 0.3 });
       return;
+    case "sprout":
+      playNoise(audio, time, { duration: 0.04, frequency: 620, gain: 0.001, type: "bandpass", q: 0.4 });
+      playTone(audio, time + 0.015, { duration: 0.09, frequency: 240, endFrequency: 340, gain: 0.0024, type: "triangle" });
+      return;
   }
 }
 

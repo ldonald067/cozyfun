@@ -379,6 +379,13 @@ function seedColor({ color, variant, age, energy, flags, cells, width, height, x
   if (below === MATERIAL.Soil && localY === 3) out = mixRgb(out, [39, 27, 18], 0.24);
   if (rooted && (localY === 3 || soilContact.bottom)) out = mixRgb(out, [35, 73, 32], 0.46);
   if (rooted && localY === 0 && hash % 4 === 0) out = mixRgb(out, [174, 227, 115], 0.32);
+  if (rooted && wet) {
+    // Germination arc: the shoot visibly climbs and pales toward a bud as the seed feeds.
+    const growth = Math.min(1, (energy - 40) / 160) * Math.min(1, age / 20);
+    if (growth > 0.25 && localY <= 1) out = mixRgb(out, [126, 205, 96], 0.3 + growth * 0.3);
+    if (growth > 0.55 && localY === 0) out = mixRgb(out, [186, 235, 128], 0.35 + growth * 0.3);
+    if (growth > 0.8 && localY === 0 && (hash & 3) !== 1) out = mixRgb(out, [235, 250, 180], 0.5);
+  }
   if (cosmic) out = mixRgb(out, [184, 211, 255], moonContact.bottom ? 0.3 : 0.24);
   if (oilContact.count > 0) {
     out = mixRgb(out, [38, 42, 27], oilContact.top ? 0.56 : 0.42);

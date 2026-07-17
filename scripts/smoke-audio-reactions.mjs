@@ -195,6 +195,16 @@ expectCues("watered moss beads with dew", (before, after) => {
   setCell(after, 1, 1, MATERIAL.Moss, { flags: CELL_FLAG.Wet });
 }, ["dew"]);
 
+expectCues("seed roots with a sprout", (before, after) => {
+  setCell(before, 1, 1, MATERIAL.Seed, { flags: CELL_FLAG.Wet });
+  setCell(after, 1, 1, MATERIAL.Seed, { flags: CELL_FLAG.Wet | CELL_FLAG.Rooted });
+}, ["sprout"]);
+
+expectCues("watered seed beads with dew", (before, after) => {
+  setCell(before, 1, 1, MATERIAL.Seed);
+  setCell(after, 1, 1, MATERIAL.Seed, { flags: CELL_FLAG.Wet });
+}, ["dew"]);
+
 expectCues("already wet moss stays silent", (before, after) => {
   setCell(before, 1, 1, MATERIAL.Moss, { flags: CELL_FLAG.Wet });
   setCell(after, 1, 1, MATERIAL.Moss, { flags: CELL_FLAG.Wet });

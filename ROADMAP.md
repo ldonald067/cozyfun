@@ -419,6 +419,15 @@ Completed:
 - 15B: larger stone masses carry rare clustered mineral vein glints, so cliffs read as strata instead of uniform gray; single pebbles stay plain.
 - 15C: walls age visibly through the cell age field: mortar darkens, faces stain, and corners chip on long-standing builds.
 
+## Phase 16: Watering Payoff
+
+Status: complete.
+
+Watering the garden now answers back at every step of the growth arc:
+
+- Seeds join the dew cue when they first turn wet, play a soft sprout cue at the moment they root, and show a visible germination arc: the shoot climbs and pales toward a bud as the seed feeds toward bloom, so progress reads before the flower pops.
+- Well-watered moss (energy above 150) colonizes two patches per pass instead of one, so a generous watering visibly surges the carpet outward while modest watering keeps the old patient pace, pinned by a sim test.
+
 Stone and wall are the only reactive-only toolbar elements: everything happens to them and nothing happens because of them. This phase gives the mineral family one circular story instead of bolted-on behaviors.
 
 The headline cycle: wall weathers into stone (freeze-thaw, shipped), stone erodes into sand (new), sand fuses into glass under heat (shipped), glass shatters back to sand under impact (shipped). Every mineral becomes a stage in one loop the player can push in either direction with water, cold, and heat.

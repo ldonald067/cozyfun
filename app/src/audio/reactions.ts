@@ -14,7 +14,8 @@ export const REACTION_CUES = [
   "frost",
   "dew",
   "shatter",
-  "erode"
+  "erode",
+  "sprout"
 ] as const;
 
 export type ReactionCue = (typeof REACTION_CUES)[number];
@@ -76,10 +77,13 @@ export function detectReactionCues(before: Uint8Array, after: Uint8Array): React
     }
     if (
       beforeKind === afterKind &&
-      (afterKind === MATERIAL.Moss || afterKind === MATERIAL.Soil) &&
+      (afterKind === MATERIAL.Moss || afterKind === MATERIAL.Soil || afterKind === MATERIAL.Seed) &&
       gainedFlag(before, after, idx, CELL_FLAG.Wet)
     ) {
       found.add("dew");
+    }
+    if (beforeKind === MATERIAL.Seed && afterKind === MATERIAL.Seed && gainedFlag(before, after, idx, CELL_FLAG.Rooted)) {
+      found.add("sprout");
     }
 
     if (found.size === REACTION_CUES.length) break;

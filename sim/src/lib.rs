@@ -1024,30 +1024,33 @@ impl Universe {
         if !(wet || self.chance(120)) {
             return;
         }
+        // Well-watered moss colonizes in a visible burst instead of one patch at a time.
+        let mut spreads_left = if cell.energy > 150 { 2 } else { 1 };
         for nidx in self.neighbor_indices(x, y) {
             let other = old[nidx];
             let damp_substrate = other.flags & FLAG_WET != 0 || other.energy > 40;
             let soft_substrate = other.kind == Material::Soil as u8 || other.kind == Material::Wood as u8;
             let stone_substrate = other.kind == Material::Stone as u8;
             let wall_substrate = other.kind == Material::Wall as u8;
-            if soft_substrate && (cell.energy > 110 || damp_substrate || self.chance(8))
-            {
+            let mut spread = false;
+            if soft_substrate && (cell.energy > 110 || damp_substrate || self.chance(8)) {
                 next[nidx] = Cell::new(Material::Moss as u8, other.variant, 70);
                 next[nidx].flags = if wet { FLAG_WET } else { 0 };
-                return;
-            }
-            if stone_substrate
-                && damp_substrate
-                && (cell.energy > 120 || self.chance(10))
-            {
+                spread = true;
+            } else if stone_substrate && damp_substrate && (cell.energy > 120 || self.chance(10)) {
                 next[nidx] = Cell::new(Material::Moss as u8, other.variant, 58);
                 next[nidx].flags = FLAG_WET;
-                return;
-            }
-            if wall_substrate && damp_substrate && cell.energy > 150 {
+                spread = true;
+            } else if wall_substrate && damp_substrate && cell.energy > 150 {
                 next[nidx] = Cell::new(Material::Moss as u8, other.variant, 48);
                 next[nidx].flags = FLAG_WET;
-                return;
+                spread = true;
+            }
+            if spread {
+                spreads_left -= 1;
+                if spreads_left == 0 {
+                    return;
+                }
             }
         }
     }
@@ -1776,6 +1779,28 @@ mod tests {
             }
         }
         assert!(dripped, "saturated overhanging moss should shed a dew droplet");
+    }
+
+    #[test]
+    fn well_watered_moss_spreads_in_a_burst() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell_state(&mut u, 8, 8, Material::Moss, 12, 200, FLAG_WET);
+        set_cell_state(&mut u, 7, 8, Material::Soil, 12, 60, FLAG_WET);
+        set_cell_state(&mut u, 9, 8, Material::Soil, 12, 60, FLAG_WET);
+        u.tick();
+        assert_eq!(kind_at(&u, 7, 8), Material::Moss as u8);
+        assert_eq!(kind_at(&u, 9, 8), Material::Moss as u8);
+
+        let mut modest = Universe::new(16, 16, 7);
+        set_cell_state(&mut modest, 8, 8, Material::Moss, 12, 90, FLAG_WET);
+        set_cell_state(&mut modest, 7, 8, Material::Soil, 12, 60, FLAG_WET);
+        set_cell_state(&mut modest, 9, 8, Material::Soil, 12, 60, FLAG_WET);
+        modest.tick();
+        let colonized = [kind_at(&modest, 7, 8), kind_at(&modest, 9, 8)]
+            .iter()
+            .filter(|&&kind| kind == Material::Moss as u8)
+            .count();
+        assert_eq!(colonized, 1, "modestly watered moss should still spread one patch at a time");
     }
 
     #[test]
