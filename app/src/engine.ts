@@ -772,7 +772,7 @@ class JsSandboxEngine implements SandboxEngine {
     const climbed = this.index(nx, y - 1);
     this.move(climbed, nx, y - 2, cell, old, next);
     if ((next[idx] as number) === MATERIAL.Empty) {
-      if (this.chance(3)) writeCellBytes(next, idx, MATERIAL.Spark, 4, 110);
+      if (this.chance(3)) writeCellBytes(next, idx, MATERIAL.Spark, SPARK_DOWN, 110);
       else if (this.chance(2)) writeCellBytes(next, idx, MATERIAL.Smoke, cell[1], 70);
     }
   }
@@ -995,6 +995,9 @@ const SPARK_DIRS: ReadonlyArray<readonly [number, number]> = [
   [-1, 0],
   [-1, -1]
 ];
+
+// SPARK_DIRS index for straight down, used by trail sparks shed in flight.
+const SPARK_DOWN = 4;
 
 function range(start: number, endExclusive: number) {
   const out: number[] = [];

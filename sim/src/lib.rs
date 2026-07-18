@@ -45,6 +45,9 @@ const SPARK_DIRS: [(i32, i32); 8] = [
     (-1, -1),
 ];
 
+/// SPARK_DIRS index for straight down, used by trail sparks shed in flight.
+const SPARK_DOWN: u8 = 4;
+
 const FLAG_WET: u16 = 1 << 0;
 const FLAG_ROOTED: u16 = 1 << 1;
 const FLAG_COSMIC: u16 = 1 << 2;
@@ -1316,7 +1319,7 @@ impl Universe {
         self.try_move(climbed, nx, y - 2, flying, old, next, true);
         if next[idx].is_empty() {
             if self.chance(3) {
-                next[idx] = Cell::new(Material::Spark as u8, 4, 110);
+                next[idx] = Cell::new(Material::Spark as u8, SPARK_DOWN, 110);
             } else if self.chance(2) {
                 next[idx] = Cell::new(Material::Smoke as u8, cell.variant, 70);
             }

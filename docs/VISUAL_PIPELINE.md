@@ -1,11 +1,11 @@
 # Visual Pipeline
 
-The sandbox still renders as a grid of cells, but the grid does not need to look flat. Phase 2 used neighbor-aware color rules to make materials recognizable by texture and silhouette before adding heavier art systems. Phase 4 builds on the same renderer boundary with stronger facets, puffs, heat seams, liquid surfaces, and subtle local light.
+The sandbox renders as a grid of cells, but the grid does not need to look flat. Neighbor-aware color rules make materials recognizable by texture and silhouette, with facets, puffs, heat seams, liquid surfaces, and subtle local light layered on the same renderer boundary.
 
 ## Layers
 
 - Base canvas: crisp pixel data for the simulation.
-- Glow canvas: blurred additive-feeling light for fire, lava, steam, stardust, meteor, and moonwater.
+- Glow canvas: blurred additive-feeling light for fire, lava, ember, steam, stardust, meteor, moonwater, pollen, flowers, cosmic moss, and firework sparks.
 - Motes canvas: full-screen room dust and atmosphere, separate from the simulation.
 
 ## Cell Rendering
@@ -31,7 +31,13 @@ Shape language is intentionally procedural:
 - Stardust: bright twinkles, nearby star glints, and a brighter violet treatment near moonwater.
 - Fire/Lava/Meteor: heat cores, exposed flame tips, cooling crust, glowing seams, and ember-dark edges.
 - Moss/Fungus/Wood: leafy clusters, fungus cap/gill/spore role colors, oil/heat/cosmic contact cues, damp moonwater tint, char/damp contact cues, end-grain, and woodgrain lines.
-- Nearby light: hot and cosmic materials can tint adjacent cells without changing simulation state.
+- Ember: pulsing heat cores that dim into cold char, with spark flecks above hot beds.
+- Glass: teal translucency, fresh warm flash, and fog film near steam.
+- Pollen/Stem/Flower: bobbing golden motes, leaf-nubbed climbing stalks with pale growing tips, and petal variety on blooms.
+- Rocket: crimson grains with paper flecks when inert, a bright white-gold firework head when lit.
+- Spark: white-hot birth, per-cell firework hue (gold, rose, mint, sky, violet), glitter blinks, and an ember-red fade.
+- Wellspring: dark rune-carved block; dormant runes shimmer silver, attuned runes pulse in the remembered material's tint.
+- Nearby light: hot and cosmic materials (including flying sparks) can tint adjacent cells without changing simulation state.
 - Interaction cues: water near heat brightens toward steam, ordinary water picks up earth/plant/oil contact, oil warms at hot edges, lava near cool liquids darkens into crust, moonwater near life or hard surfaces becomes pearly blue-violet, and newly cooled stone picks up a faint wet edge.
 
 Rules can inspect neighboring cells through `cells.ts`, but they should not modify simulation state. Shared edge/contact helpers such as `edgeInfo` and `contactInfo` belong in `cells.ts`; material-specific palette choices stay in `shapeLanguage.ts`.
@@ -72,6 +78,8 @@ Current cosmic rules:
 - Stardust touching ordinary water charges it into moonwater.
 - Moonwater can clean oil into stardust instead of being blocked like ordinary water.
 - Meteor contact with moonwater produces a stardust burst, giving cosmic materials a visible special-case outcome.
+- Rocket powder is inert until any flame lights its fuse; the lit grain climbs fast and bursts into a spark shell that droops, twinkles out, and can light more powder.
+- Wellspring blocks drink the first touching source material and pour it back out from open faces; nearby ice stills the flow.
 
 Visual state polish:
 
@@ -115,22 +123,12 @@ npm run visual:qa
 npm run test:browser
 ```
 
-## Phase 2 Baseline
-
-The current baseline covers the first readability batch: sand, soil, wall, smoke, steam, seed, ice, stone, water, moonwater, and stardust all have renderer-level shape treatment. More realistic silhouettes, local lighting, and high-detail experiments belong in Phase 4 so Phase 3 can keep moving on atmosphere without destabilizing the simulation.
+## QA Contract
 
 `npm run visual:qa` saves a controlled current-material capture to `.tmp/visual-qa/current-materials.png`, a deterministic material identity showcase to `.tmp/visual-qa/material-identity-showcase.png`, responsive layout metrics to `.tmp/visual-qa/current-layout.json`, and room backdrop captures for every scene environment.
 
-The material showcase is shared by visual, Chrome, and Firefox QA through `scripts/material-showcase.mjs`. It should cover oil-over-water, wet/dry/scorched/frozen sand, damp/frozen/scorched hard materials, wet wood steam, ordinary water/lava and water/meteor shock, water/moonwater contact contrast, oil-smothered plants, and distinct fungus life/cosmic/heat clusters.
+The material showcase is shared by visual, Chrome, and Firefox QA through `scripts/material-showcase.mjs`. It should cover oil-over-water, wet/dry/scorched/frozen sand, damp/frozen/scorched hard materials, wet wood steam, ordinary water/lava and water/meteor shock, water/moonwater contact contrast, oil-smothered plants, distinct fungus life/cosmic/heat clusters, freeze-thaw wall stress, a grown stalked plant, veined stone and patinated wall, constellation etching, a pouring wellspring basin beside a dormant block, and a rocket charge with a lit grain in flight.
 
 The room captures are part of the visual QA contract. They should stay calm behind the sandbox and panels: if a photo becomes too busy, literal, or high-contrast, tune the scene metadata in `sceneEnvironments.ts` or replace the asset and update `ASSET_CREDITS.md` in the same change.
 
-## Phase 4 Completion
-
-Phase 4 keeps rendering inside `shapeLanguage.ts` and avoids changing simulation behavior. It adds reusable helpers for exposed edges and nearby light, then applies them to ice, stone, wall, fire, lava, meteor, smoke, steam, water, moonwater, oil, moss, fungus, wood, sand, soil, seed, and stardust.
-
-This is still procedural pixel art, not photorealism. The target is faster material recognition at normal play zoom: ice should feel faceted, lava should read as hot cracked crust, vapor should feel soft and puffy, and liquids should have connected surfaces.
-
-The completion pass expands visual interaction language. These cues are renderer-only: they describe contact between materials without adding new simulation state. Use this for gentle, readable feedback; keep actual chemistry and movement rules in Rust/engine code.
-
-Phase 4 is closed when build, browser smoke, WASM smoke, and visual QA all pass. Future realism work should be treated as targeted polish, not as a reason to keep widening the renderer surface.
+This is still procedural pixel art, not photorealism. The target is fast material recognition at normal play zoom: ice should feel faceted, lava should read as hot cracked crust, vapor should feel soft and puffy, and liquids should have connected surfaces. Contact cues are renderer-only: they describe interaction between materials without adding new simulation state. Keep actual chemistry and movement rules in Rust/engine code, and treat realism work as targeted polish rather than a reason to keep widening the renderer surface.

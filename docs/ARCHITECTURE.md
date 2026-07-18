@@ -20,9 +20,9 @@ The built app is static. There is no server, account system, database, cloud sav
 The simulation stores each cell in an 8-byte record:
 
 - kind/material id
-- visual variant
+- visual variant (also a spark's flight direction)
 - age
-- energy
+- energy (dual-purposed per material: water temperature, stem growth budget, stone dampness, wall freeze-thaw stress, rocket fuse, wellspring's remembered material id)
 - state flags (wet, rooted, cosmic, frozen, scorched) shared by sim, fallback, and renderer
 
 Rendering is allowed to inspect these bytes, but it should not mutate them. Visual polish belongs in the renderer unless a real behavior change is needed.

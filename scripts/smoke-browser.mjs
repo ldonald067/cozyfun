@@ -165,7 +165,7 @@ async function main() {
     }))()`);
     assert(state.title === "Cozy Pixel Sandbox", "unexpected page title");
     assert(state.materials === 19, `expected exactly 19 selectable material buttons, found ${state.materials}: ${state.materialLabels.join(", ")}`);
-    for (const generatedOnly of ["Flower", "Smoke", "Steam"]) {
+    for (const generatedOnly of ["Flower", "Smoke", "Steam", "Spark"]) {
       assert(!state.materialLabels.includes(generatedOnly), `generated-only ${generatedOnly} should not be selectable`);
     }
     assert(state.audioInfos === 2, `expected two audio info icons, found ${state.audioInfos}`);
