@@ -97,7 +97,7 @@ Moss, Seed, Fungus, Oil, Ice, Stardust, Meteor, Moonwater, Rocket, Wellspring
 Generated outcomes (created by play, not painted directly):
 
 ```txt
-Flower, Smoke, Steam, Glass, Ember, Pollen, Stem
+Flower, Smoke, Steam, Glass, Ember, Pollen, Stem, Spark
 ```
 
 Some key reactions:
@@ -119,7 +119,7 @@ Some key reactions:
 - Seeds are now potential: wet rooted seeds can bloom into flowers, moss beds can overtake them, and nearby fungus can rot them.
 - Moss is carpet growth: it spreads over damp soil and wood but does not bloom.
 - Wall and stone are intentionally separate: wall is sealed construction, while stone is natural, weatherable, and easier for moss/condensation to affect.
-- Rocket powder lies inert until any flame lights it; a lit grain climbs skyward trailing smoke and bursts into fire sparks and stardust, chain-lighting neighboring powder.
+- Rocket powder lies inert until any flame lights it; a lit grain whooshes skyward trailing glitter and bursts into a multicolor firework shell of sparks that droop, twinkle, and fade, chain-lighting neighboring powder.
 - Wellspring blocks drink the identity of the first material to touch them (water, lava, sand, stardust, and more), then pour it back out from open faces forever; nearby ice stills the spring.
 - Stardust, meteor, and moonwater add the cozy/cosmic identity.
 

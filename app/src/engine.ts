@@ -148,7 +148,7 @@ class JsSandboxEngine implements SandboxEngine {
         const py = y + dy;
         if (!this.inBounds(px, py)) continue;
         if (clamped < 100 && this.rand() % 100 >= clamped) continue;
-        const kind = Math.min(material, MATERIAL.Wellspring);
+        const kind = Math.min(material, MATERIAL.Spark);
         this.writeCell(this.index(px, py), kind, this.variant(px, py, kind), startEnergy(kind), 0);
       }
     }
@@ -188,6 +188,7 @@ class JsSandboxEngine implements SandboxEngine {
         if (kind === MATERIAL.Smoke || kind === MATERIAL.Steam) this.gas(idx, x, y, cell, old, next);
         if (kind === MATERIAL.Fire) this.fire(idx, x, y, cell, old, next);
         if (kind === MATERIAL.Rocket && readU16(cell, 4) > 0) this.rocket(idx, x, y, cell, old, next);
+        if (kind === MATERIAL.Spark) this.spark(idx, x, y, cell, old, next);
         if (kind === MATERIAL.Seed) this.seed(idx, x, y, cell, old, next);
         if (kind === MATERIAL.Stem) this.stem(idx, x, y, cell, old, next);
         if (kind === MATERIAL.Moss) this.moss(idx, x, y, cell, old, next);
@@ -206,7 +207,7 @@ class JsSandboxEngine implements SandboxEngine {
     if (bytes.byteLength !== this.cells.byteLength) return false;
     const sanitized = bytes.slice();
     for (let idx = 0; idx < sanitized.byteLength; idx += CELL_STRIDE) {
-      const kind = Math.min(sanitized[idx], MATERIAL.Wellspring);
+      const kind = Math.min(sanitized[idx], MATERIAL.Spark);
       if (kind === MATERIAL.Empty) {
         sanitized.fill(0, idx, idx + CELL_STRIDE);
         continue;
@@ -290,6 +291,7 @@ class JsSandboxEngine implements SandboxEngine {
       } else if (
         (kind === MATERIAL.Smoke && age > 180) ||
         (kind === MATERIAL.Pollen && age > 140) ||
+        (kind === MATERIAL.Spark && age > 60) ||
         (kind === MATERIAL.Fire && age > 90 && energy < 24)
       ) {
         next.fill(0, idx, idx + CELL_STRIDE);
@@ -747,16 +749,18 @@ class JsSandboxEngine implements SandboxEngine {
 
   private rocket(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
     if (next[idx] !== MATERIAL.Rocket || readU16(next, idx + 4) === 0) return;
-    writeU16(next, idx + 4, Math.max(0, readU16(next, idx + 4) - 12));
+    writeU16(next, idx + 4, Math.max(0, readU16(next, idx + 4) - 10));
     if (readU16(next, idx + 4) <= 96 || y === 0) {
       this.burstRocket(idx, x, y, cell, old, next);
       return;
     }
     const sway = this.chance(3) ? (this.ticks % 2 === 0 ? 1 : -1) : 0;
     let moved = false;
+    let nx = x;
     for (const [dx, dy] of [[sway, -1], [0, -1], [-sway, -1]]) {
       if (this.move(idx, x + dx, y + dy, cell, old, next)) {
         moved = true;
+        nx = x + dx;
         break;
       }
     }
@@ -764,20 +768,63 @@ class JsSandboxEngine implements SandboxEngine {
       this.burstRocket(idx, x, y, cell, old, next);
       return;
     }
-    if ((next[idx] as number) === MATERIAL.Empty && this.chance(2)) {
-      writeCellBytes(next, idx, MATERIAL.Smoke, cell[1], 70);
+    // A second straight-up step per tick gives the ascent a real whoosh.
+    const climbed = this.index(nx, y - 1);
+    this.move(climbed, nx, y - 2, cell, old, next);
+    if ((next[idx] as number) === MATERIAL.Empty) {
+      if (this.chance(3)) writeCellBytes(next, idx, MATERIAL.Spark, 4, 110);
+      else if (this.chance(2)) writeCellBytes(next, idx, MATERIAL.Smoke, cell[1], 70);
     }
   }
 
   private burstRocket(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
     writeCellBytes(next, idx, MATERIAL.Stardust, cell[1], 200);
-    for (const nidx of this.neighbors(x, y)) {
-      const other = old[nidx];
-      if (other === MATERIAL.Empty && next[nidx] === MATERIAL.Empty) {
-        if (this.chance(3)) writeCellBytes(next, nidx, MATERIAL.Stardust, cell[1], 170);
-        else writeCellBytes(next, nidx, MATERIAL.Fire, cell[1], 150);
-      } else if (flammable(other) && this.chance(3)) {
-        writeIgnitedCell(next, nidx, other, old[nidx + 1], 200);
+    for (let dir = 0; dir < SPARK_DIRS.length; dir++) {
+      const [dx, dy] = SPARK_DIRS[dir];
+      for (let dist = 1; dist <= 2; dist++) {
+        const nx = x + dx * dist;
+        const ny = y + dy * dist;
+        if (!this.inBounds(nx, ny)) continue;
+        const nidx = this.index(nx, ny);
+        const other = old[nidx];
+        if (other === MATERIAL.Empty && next[nidx] === MATERIAL.Empty) {
+          writeCellBytes(next, nidx, MATERIAL.Spark, dir, dist === 1 ? 235 : 215);
+        } else if (dist === 1 && flammable(other) && this.chance(3)) {
+          writeIgnitedCell(next, nidx, other, old[nidx + 1], 200);
+        }
+      }
+    }
+  }
+
+  private spark(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
+    if (next[idx] !== MATERIAL.Spark) return;
+    writeU16(next, idx + 4, Math.max(0, readU16(next, idx + 4) - 10));
+    if (readU16(next, idx + 4) < 30) {
+      if (this.chance(6)) writeCellBytes(next, idx, MATERIAL.Stardust, cell[1], 120);
+      else next.fill(0, idx, idx + CELL_STRIDE);
+      return;
+    }
+    const age = readU16(cell, 2);
+    if (age < 6) {
+      // Shell expansion: the spark keeps flying along its birth direction.
+      const [dx, dy] = SPARK_DIRS[cell[1] & 7];
+      if (!this.move(idx, x + dx, y + dy, cell, old, next)) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (this.inBounds(nx, ny)) {
+          const nidx = this.index(nx, ny);
+          // Sparks landing on rocket powder light its fuse.
+          if (old[nidx] === MATERIAL.Rocket && readU16(old, nidx + 4) === 0 && next[nidx] === MATERIAL.Rocket) {
+            writeU16(next, nidx + 4, 220);
+          }
+        }
+        writeU16(next, idx + 4, Math.max(0, readU16(next, idx + 4) - 30));
+      }
+    } else if (this.ticks % 2 === 0) {
+      // Droop: spent sparks drift down, wobbling as they fade.
+      const side = this.chance(2) ? 1 : -1;
+      for (const [dx, dy] of [[0, 1], [side, 1]]) {
+        if (this.move(idx, x + dx, y + dy, cell, old, next)) break;
       }
     }
   }
@@ -936,6 +983,18 @@ class JsSandboxEngine implements SandboxEngine {
 }
 
 const HOT_MATERIALS = [MATERIAL.Fire, MATERIAL.Lava, MATERIAL.Meteor] as const;
+
+// Eight compass directions; a spark's variant indexes its birth direction.
+const SPARK_DIRS: ReadonlyArray<readonly [number, number]> = [
+  [0, -1],
+  [1, -1],
+  [1, 0],
+  [1, 1],
+  [0, 1],
+  [-1, 1],
+  [-1, 0],
+  [-1, -1]
+];
 
 function range(start: number, endExclusive: number) {
   const out: number[] = [];

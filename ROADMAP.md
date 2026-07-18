@@ -438,7 +438,7 @@ Status: complete. Cozy translations of the two classic sandbox elements the proj
 
 - Inert crimson powder with paper flecks that falls and piles calmly, so charges and fuse lines can be laid without accidents.
 - Any flame (fire, lava, hot ember, meteor) lights a grain's fuse instead of burning it: the lit grain climbs skyward with sway and a smoke trail, rendered as a bright firework head.
-- Bursts at fuse end or against a ceiling into a ring of brief fire sparks and lingering stardust, reusing the impact-burst cue; bursts chain-light neighboring powder so a lit pile erupts grain by grain.
+- Bursts at fuse end or against a ceiling into a real firework: a multicolor shell of generated-only Spark cells (direction stored in the variant) that fly outward, droop with gravity, twinkle in gold/rose/mint/sky/violet, cast warm light, and fade — occasionally leaving a stardust glint. Sparks landing on rocket powder light its fuse, so bursts chain-light piles grain by grain. The burst center stays stardust, keeping the impact-burst cue.
 
 ### Phase 17A: Wellspring (the cozy cloner)
 

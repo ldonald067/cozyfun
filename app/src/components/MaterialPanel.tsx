@@ -52,7 +52,8 @@ const MATERIAL_ICONS: Record<MaterialId, LucideIcon> = {
   [MATERIAL.Pollen]: Sparkle,
   [MATERIAL.Stem]: Sprout,
   [MATERIAL.Rocket]: Rocket,
-  [MATERIAL.Wellspring]: CircleDot
+  [MATERIAL.Wellspring]: CircleDot,
+  [MATERIAL.Spark]: Sparkle
 };
 
 type MaterialPanelProps = {

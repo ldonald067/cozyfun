@@ -18,7 +18,7 @@ export type ShapeContext = {
   y: number;
 };
 
-const HOT_LIGHT_KINDS = [MATERIAL.Fire, MATERIAL.Lava, MATERIAL.Meteor] as const;
+const HOT_LIGHT_KINDS = [MATERIAL.Fire, MATERIAL.Lava, MATERIAL.Meteor, MATERIAL.Spark] as const;
 const COSMIC_LIGHT_KINDS = [MATERIAL.Stardust, MATERIAL.Moonwater] as const;
 const COOL_LIQUID_KINDS = [MATERIAL.Water, MATERIAL.Moonwater, MATERIAL.Ice] as const;
 const LIFE_KINDS = [MATERIAL.Moss, MATERIAL.Seed, MATERIAL.Fungus, MATERIAL.Flower, MATERIAL.Soil] as const;
@@ -78,6 +78,7 @@ export function applyShapeLanguage(context: ShapeContext): Rgb {
   else if (kind === MATERIAL.Lava) out = lavaColor(context);
   else if (kind === MATERIAL.Meteor) out = meteorColor(context);
   else if (kind === MATERIAL.Rocket) out = rocketColor(context);
+  else if (kind === MATERIAL.Spark) out = sparkColor(context);
   else if (kind === MATERIAL.Wellspring) out = wellspringColor(context);
   else if (kind === MATERIAL.Smoke || kind === MATERIAL.Steam) out = vaporColor(context);
   else if (kind === MATERIAL.Seed) out = seedColor(context);
@@ -105,7 +106,8 @@ function frostFerns(out: Rgb, hash: number, x: number, y: number): Rgb {
 }
 
 function nearbyLight({ kind, cells, width, height, x, y }: ShapeContext, color: Rgb): Rgb {
-  if (kind === MATERIAL.Fire || kind === MATERIAL.Lava || kind === MATERIAL.Meteor || kind === MATERIAL.Stardust) return color;
+  if (kind === MATERIAL.Fire || kind === MATERIAL.Lava || kind === MATERIAL.Meteor || kind === MATERIAL.Stardust || kind === MATERIAL.Spark)
+    return color;
   let out = color;
   if (hasNearbyKind(cells, width, height, x, y, HOT_LIGHT_KINDS)) {
     out = mixRgb(out, [255, 166, 82], kind === MATERIAL.Smoke || kind === MATERIAL.Steam ? 0.2 : 0.11);
@@ -360,6 +362,27 @@ function wellspringColor({ color, variant, energy, time, cells, width, height, x
     return mixRgb(out, tint, 0.45 + pulse * 0.35);
   }
   return mixRgb(out, [150, 170, 210], 0.3);
+}
+
+// Classic firework hues; each spark picks one deterministically, so every
+// burst blooms as a multicolor shell.
+const FIREWORK_HUES: Rgb[] = [
+  [255, 210, 126],
+  [255, 133, 173],
+  [127, 230, 189],
+  [164, 198, 255],
+  [200, 155, 255]
+];
+
+function sparkColor({ variant, age, energy, time, x, y }: ShapeContext) {
+  const hash = hashCell(x, y, variant);
+  const hue = FIREWORK_HUES[hash % FIREWORK_HUES.length];
+  if (age < 3) return mixRgb([255, 250, 230], hue, 0.25);
+  const life = Math.min(1, energy / 235);
+  let out = mixRgb([96, 44, 34], hue, 0.2 + life * 0.8);
+  const blink = (hash + age + Math.floor(time * 0.02)) % 5 === 0;
+  if (blink) out = mixRgb(out, [255, 255, 240], 0.55);
+  return out;
 }
 
 function rocketColor({ color, variant, energy, time, x, y }: ShapeContext) {

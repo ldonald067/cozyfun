@@ -6,7 +6,7 @@ export function materialShowcaseScript() {
     const width = 220;
     const height = 140;
     const stride = 8;
-    const material = { Wall: 1, Sand: 2, Water: 3, Soil: 5, Fire: 6, Wood: 7, Lava: 8, Stone: 9, Moss: 10, Seed: 11, Fungus: 12, Oil: 13, Ice: 14, Steam: 15, Stardust: 16, Meteor: 17, Moonwater: 18, Flower: 19, Glass: 20, Ember: 21, Pollen: 22, Stem: 23, Rocket: 24, Wellspring: 25 };
+    const material = { Wall: 1, Sand: 2, Water: 3, Soil: 5, Fire: 6, Wood: 7, Lava: 8, Stone: 9, Moss: 10, Seed: 11, Fungus: 12, Oil: 13, Ice: 14, Steam: 15, Stardust: 16, Meteor: 17, Moonwater: 18, Flower: 19, Glass: 20, Ember: 21, Pollen: 22, Stem: 23, Rocket: 24, Wellspring: 25, Spark: 26 };
     const flag = { Wet: 1, Rooted: 2, Cosmic: 4, Frozen: 8, Scorched: 16 };
     const cells = new Uint8Array(width * height * stride);
     const writeU16 = (offset, value) => {

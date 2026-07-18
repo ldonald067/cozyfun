@@ -32,7 +32,8 @@ const MATERIAL = {
   Ember: 21,
   Stem: 23,
   Rocket: 24,
-  Wellspring: 25
+  Wellspring: 25,
+  Spark: 26
 };
 
 const CELL_FLAG = {

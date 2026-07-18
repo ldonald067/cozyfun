@@ -37,7 +37,8 @@ export const MATERIAL = {
   Pollen: 22,
   Stem: 23,
   Rocket: 24,
-  Wellspring: 25
+  Wellspring: 25,
+  Spark: 26
 } as const;
 
 export type MaterialId = (typeof MATERIAL)[keyof typeof MATERIAL];
@@ -320,6 +321,18 @@ export const MATERIALS: MaterialDef[] = [
     color: "#c23a4a",
     palette: ["#9c2838", "#c23a4a", "#7a1e2c", "#e8dcd2"],
     group: "cosmic"
+  },
+  {
+    id: MATERIAL.Spark,
+    label: "Spark",
+    slug: "spark",
+    description: "Generated firework spark that flies out from a rocket burst, twinkles, and fades.",
+    identity: ["Flying firework spark", "Twinkles out in falling color"],
+    color: "#ec96d0",
+    palette: ["#ff79b8", "#b98cff", "#6fe0d8", "#ff9ad2"],
+    glow: "#ffb4dc",
+    group: "cosmic",
+    userSelectable: false
   },
   {
     id: MATERIAL.Moonwater,

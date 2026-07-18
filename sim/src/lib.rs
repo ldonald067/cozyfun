@@ -30,7 +30,20 @@ pub enum Material {
     Stem = 23,
     Rocket = 24,
     Wellspring = 25,
+    Spark = 26,
 }
+
+/// Eight compass directions; a spark's variant indexes its birth direction.
+const SPARK_DIRS: [(i32, i32); 8] = [
+    (0, -1),
+    (1, -1),
+    (1, 0),
+    (1, 1),
+    (0, 1),
+    (-1, 1),
+    (-1, 0),
+    (-1, -1),
+];
 
 const FLAG_WET: u16 = 1 << 0;
 const FLAG_ROOTED: u16 = 1 << 1;
@@ -146,7 +159,7 @@ impl Universe {
                     continue;
                 }
                 let idx = self.idx(px as u32, py as u32);
-                let kind = material.min(Material::Wellspring as u8);
+                let kind = material.min(Material::Spark as u8);
                 self.cells[idx] = if kind == Material::Empty as u8 {
                     Cell::empty()
                 } else {
@@ -162,7 +175,7 @@ impl Universe {
             return false;
         }
         for (idx, chunk) in data.chunks_exact(size_of::<Cell>()).enumerate() {
-            let kind = chunk[0].min(Material::Wellspring as u8);
+            let kind = chunk[0].min(Material::Spark as u8);
             self.cells[idx] = if kind == Material::Empty as u8 {
                 Cell::empty()
             } else {
@@ -221,6 +234,7 @@ impl Universe {
                 x if x == Material::Rocket as u8 && cell.energy > 0 => {
                     self.update_rocket(idx, cell, &old, &mut next)
                 }
+                x if x == Material::Spark as u8 => self.update_spark(idx, cell, &old, &mut next),
                 x if x == Material::Seed as u8 => self.update_seed(idx, cell, &old, &mut next),
                 x if x == Material::Stem as u8 => self.update_stem(idx, cell, &old, &mut next),
                 x if x == Material::Moss as u8 => self.update_moss(idx, cell, &old, &mut next),
@@ -444,6 +458,7 @@ impl Universe {
                 };
             } else if (cell.kind == Material::Smoke as u8 && cell.age > 180)
                 || (cell.kind == Material::Pollen as u8 && cell.age > 140)
+                || (cell.kind == Material::Spark as u8 && cell.age > 60)
                 || (cell.kind == Material::Fire as u8 && cell.age > 90 && cell.energy < 24)
             {
                 *cell = Cell::empty();
@@ -1272,7 +1287,7 @@ impl Universe {
             return;
         }
         let (x, y) = self.xy(idx);
-        next[idx].energy = next[idx].energy.saturating_sub(12);
+        next[idx].energy = next[idx].energy.saturating_sub(10);
         if next[idx].energy <= 96 || y == 0 {
             self.burst_rocket(idx, x, y, cell, old, next);
             return;
@@ -1284,9 +1299,11 @@ impl Universe {
         };
         let flying = next[idx];
         let mut moved = false;
+        let mut nx = x;
         for (dx, dy) in [(sway, -1), (0, -1), (-sway, -1)] {
             if self.try_move(idx, x + dx, y + dy, flying, old, next, true) {
                 moved = true;
+                nx = x + dx;
                 break;
             }
         }
@@ -1294,23 +1311,77 @@ impl Universe {
             self.burst_rocket(idx, x, y, cell, old, next);
             return;
         }
-        if next[idx].is_empty() && self.chance(2) {
-            next[idx] = Cell::new(Material::Smoke as u8, cell.variant, 70);
+        // A second straight-up step per tick gives the ascent a real whoosh.
+        let climbed = self.idx(nx as u32, (y - 1) as u32);
+        self.try_move(climbed, nx, y - 2, flying, old, next, true);
+        if next[idx].is_empty() {
+            if self.chance(3) {
+                next[idx] = Cell::new(Material::Spark as u8, 4, 110);
+            } else if self.chance(2) {
+                next[idx] = Cell::new(Material::Smoke as u8, cell.variant, 70);
+            }
         }
     }
 
     fn burst_rocket(&mut self, idx: usize, x: i32, y: i32, cell: Cell, old: &[Cell], next: &mut [Cell]) {
         next[idx] = Cell::new(Material::Stardust as u8, cell.variant, 200);
-        for nidx in self.neighbor_indices(x, y) {
-            let other = old[nidx];
-            if other.is_empty() && next[nidx].is_empty() {
-                next[nidx] = if self.chance(3) {
-                    Cell::new(Material::Stardust as u8, cell.variant, 170)
-                } else {
-                    Cell::new(Material::Fire as u8, cell.variant, 150)
-                };
-            } else if is_flammable(other.kind) && self.chance(3) {
-                next[nidx] = ignited_cell(other, 200);
+        for (dir, (dx, dy)) in SPARK_DIRS.iter().enumerate() {
+            for dist in 1..=2 {
+                let (nx, ny) = (x + dx * dist, y + dy * dist);
+                if !self.in_bounds(nx, ny) {
+                    continue;
+                }
+                let nidx = self.idx(nx as u32, ny as u32);
+                let other = old[nidx];
+                if other.is_empty() && next[nidx].is_empty() {
+                    next[nidx] =
+                        Cell::new(Material::Spark as u8, dir as u8, if dist == 1 { 235 } else { 215 });
+                } else if dist == 1 && is_flammable(other.kind) && self.chance(3) {
+                    next[nidx] = ignited_cell(other, 200);
+                }
+            }
+        }
+    }
+
+    fn update_spark(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
+        if next[idx].kind != Material::Spark as u8 {
+            return;
+        }
+        next[idx].energy = next[idx].energy.saturating_sub(10);
+        if next[idx].energy < 30 {
+            next[idx] = if self.chance(6) {
+                Cell::new(Material::Stardust as u8, cell.variant, 120)
+            } else {
+                Cell::empty()
+            };
+            return;
+        }
+        let (x, y) = self.xy(idx);
+        let flying = next[idx];
+        if cell.age < 6 {
+            // Shell expansion: the spark keeps flying along its birth direction.
+            let (dx, dy) = SPARK_DIRS[(cell.variant & 7) as usize];
+            if !self.try_move(idx, x + dx, y + dy, flying, old, next, true) {
+                let (nx, ny) = (x + dx, y + dy);
+                if self.in_bounds(nx, ny) {
+                    let nidx = self.idx(nx as u32, ny as u32);
+                    // Sparks landing on rocket powder light its fuse.
+                    if old[nidx].kind == Material::Rocket as u8
+                        && old[nidx].energy == 0
+                        && next[nidx].kind == Material::Rocket as u8
+                    {
+                        next[nidx].energy = 220;
+                    }
+                }
+                next[idx].energy = next[idx].energy.saturating_sub(30);
+            }
+        } else if self.tick_count % 2 == 0 {
+            // Droop: spent sparks drift down, wobbling as they fade.
+            let side = if self.chance(2) { 1 } else { -1 };
+            for (dx, dy) in [(0, 1), (side, 1)] {
+                if self.try_move(idx, x + dx, y + dy, flying, old, next, true) {
+                    break;
+                }
             }
         }
     }
@@ -1720,6 +1791,32 @@ mod tests {
             u.cells.iter().any(|c| c.kind == Material::Stardust as u8),
             "a burst should leave a shimmer of stardust"
         );
+    }
+
+    #[test]
+    fn rocket_burst_blooms_a_spark_shell_that_fades() {
+        let mut u = Universe::new(32, 48, 7);
+        set_cell_state(&mut u, 16, 30, Material::Rocket, 0, 220, 0);
+        let mut peak = 0;
+        for _ in 0..40 {
+            u.tick();
+            let sparks = u
+                .cells
+                .iter()
+                .filter(|c| c.kind == Material::Spark as u8)
+                .count();
+            peak = peak.max(sparks);
+        }
+        assert!(peak >= 6, "a burst should bloom a shell of sparks, saw at most {peak}");
+        for _ in 0..80 {
+            u.tick();
+        }
+        let lingering = u
+            .cells
+            .iter()
+            .filter(|c| c.kind == Material::Spark as u8)
+            .count();
+        assert_eq!(lingering, 0, "sparks should twinkle out instead of lingering");
     }
 
     #[test]
