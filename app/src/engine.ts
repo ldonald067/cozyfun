@@ -156,6 +156,8 @@ class JsSandboxEngine implements SandboxEngine {
 
   tick() {
     this.ticks++;
+    // Match the Rust sim's per-tick RNG perturbation so identical seeds stay in lockstep.
+    this.rng = (this.rng + 0x9e3779b9) | 0;
     const old = this.cells.slice();
     const next = this.cells.slice();
     this.ageAndDecay(next);
@@ -232,7 +234,10 @@ class JsSandboxEngine implements SandboxEngine {
   }
 
   private variant(x: number, y: number, material: number) {
-    return (x * 17 + y * 31 + material * 13 + this.rng) & 7;
+    // Mirror the Rust variant_for hash exactly (wrapping u32 math) so both engines
+    // assign the same visual variant, which also feeds behavior via `variant & 3`.
+    const mix = (Math.imul(x, 73856093) + Math.imul(y, 19349663) + Math.imul(material, 83492791) + this.rng) >>> 0;
+    return mix % 8;
   }
 
   private rand() {
@@ -309,6 +314,19 @@ class JsSandboxEngine implements SandboxEngine {
         this.wellspring(idx, x, y, old, next);
         continue;
       }
+      if (kind === MATERIAL.Ice) {
+        this.ice(idx, x, y, old, next);
+        continue;
+      }
+      if (kind === MATERIAL.Oil) {
+        this.oilReact(idx, x, y, old, next);
+        continue;
+      }
+      // Simmering water vents a wisp before reacting with neighbors, matching the Rust arm order.
+      if (kind === MATERIAL.Water && readU16(old, idx + 4) > 150 && this.chance(20)) {
+        this.emitVaporFrom(idx, old, next, MATERIAL.Steam, old[idx + 1], 120);
+        writeU16(next, idx + 4, Math.max(0, readU16(next, idx + 4) - 40));
+      }
       let fireDampened = false;
       let lavaCooling = 0;
       for (const nidx of this.neighbors(x, y)) {
@@ -364,30 +382,6 @@ class JsSandboxEngine implements SandboxEngine {
           if (flammable(other) && this.chance(3)) {
             writeIgnitedCell(next, nidx, other, old[nidx + 1], 240);
           }
-        }
-        if (kind === MATERIAL.Ice && (other === MATERIAL.Fire || other === MATERIAL.Lava || other === MATERIAL.Meteor)) {
-          writeCellBytes(next, idx, MATERIAL.Water, old[idx + 1], 70);
-          continue;
-        }
-        if (kind === MATERIAL.Ice && other === MATERIAL.Water && readU16(old, nidx + 4) < 120 && this.chance(5)) {
-          writeCellBytes(next, nidx, MATERIAL.Ice, old[nidx + 1], 90);
-        }
-        if (kind === MATERIAL.Ice && other === MATERIAL.Moonwater && this.chance(10)) {
-          writeCellBytes(next, nidx, MATERIAL.Ice, old[nidx + 1], 110, 0, CELL_FLAG.Cosmic);
-        }
-        if (kind === MATERIAL.Ice && other === MATERIAL.Steam && this.chance(4)) {
-          writeCellBytes(next, nidx, MATERIAL.Ice, old[nidx + 1], 70);
-        }
-        if (
-          kind === MATERIAL.Ice &&
-          (other === MATERIAL.Stone || other === MATERIAL.Wall) &&
-          ((readU16(old, nidx + 6) & CELL_FLAG.Wet) || readU16(old, nidx + 4) > 40)
-        ) {
-          writeU16(next, nidx + 4, Math.max(88, readU16(next, nidx + 4)));
-          writeU16(next, nidx + 6, (readU16(next, nidx + 6) | CELL_FLAG.Frozen) & ~CELL_FLAG.Scorched);
-        } else if (kind === MATERIAL.Ice && freezable(other) && this.chance(4)) {
-          writeU16(next, nidx + 4, Math.max(72, readU16(next, nidx + 4)));
-          writeU16(next, nidx + 6, readU16(next, nidx + 6) | CELL_FLAG.Frozen);
         }
         if (kind === MATERIAL.Steam && other === MATERIAL.Ice && this.chance(5)) {
           writeCellBytes(next, idx, MATERIAL.Ice, old[idx + 1], 70);
@@ -508,16 +502,6 @@ class JsSandboxEngine implements SandboxEngine {
             writeIgnitedCell(next, nidx, other, old[nidx + 1], 210);
           }
         }
-        if (kind === MATERIAL.Oil) {
-          if (other === MATERIAL.Fire || other === MATERIAL.Lava || other === MATERIAL.Meteor) {
-            writeCellBytes(next, idx, MATERIAL.Fire, old[idx + 1], 240);
-            continue;
-          }
-          if (hydratable(other)) {
-            writeU16(next, nidx + 4, Math.max(0, readU16(next, nidx + 4) - 28));
-            writeU16(next, nidx + 6, readU16(next, nidx + 6) & ~CELL_FLAG.Wet);
-          }
-        }
         if (
           kind === MATERIAL.Steam &&
           (other === MATERIAL.Stone || other === MATERIAL.Wall) &&
@@ -542,10 +526,6 @@ class JsSandboxEngine implements SandboxEngine {
       }
       if (kind === MATERIAL.Ember && readU16(old, idx + 4) > 90 && this.chance(9)) {
         this.emitVaporFrom(idx, old, next, MATERIAL.Smoke, old[idx + 1], 80);
-      }
-      if (kind === MATERIAL.Water && readU16(old, idx + 4) > 150 && this.chance(20)) {
-        this.emitVaporFrom(idx, old, next, MATERIAL.Steam, old[idx + 1], 120);
-        writeU16(next, idx + 4, Math.max(0, readU16(next, idx + 4) - 40));
       }
       if (kind === MATERIAL.Flower) {
         const flowerAge = readU16(old, idx + 2);
@@ -611,7 +591,7 @@ class JsSandboxEngine implements SandboxEngine {
     if (this.ticks % 2 === 0) this.powder(idx, x, y, cell, old, next);
     const flags = readU16(next, idx + 6);
     if (flags & CELL_FLAG.Frozen) return;
-    if (next[idx] === MATERIAL.Soil && readU16(next, idx + 4) > 140 && readU16(next, idx + 2) > 10 && this.chance(flags & CELL_FLAG.Cosmic ? 7 : 12)) {
+    if (next[idx] === MATERIAL.Soil && readU16(next, idx + 4) > 140 && readU16(cell, 2) > 10 && this.chance(flags & CELL_FLAG.Cosmic ? 7 : 12)) {
       writeCellBytes(next, idx, MATERIAL.Moss, cell[1], 90, 0, CELL_FLAG.Wet);
     }
   }
@@ -747,6 +727,49 @@ class JsSandboxEngine implements SandboxEngine {
     }
   }
 
+  private oilReact(idx: number, x: number, y: number, old: Uint8Array, next: Uint8Array) {
+    const neighbors = this.neighbors(x, y);
+    // Whole-arm ignition: any hot neighbor sets the whole slick alight before it dehydrates anything.
+    if (neighbors.some((nidx) => HOT_MATERIALS.includes(old[nidx] as (typeof HOT_MATERIALS)[number]))) {
+      writeCellBytes(next, idx, MATERIAL.Fire, old[idx + 1], 240);
+      return;
+    }
+    for (const nidx of neighbors) {
+      if (hydratable(old[nidx])) {
+        writeU16(next, nidx + 4, Math.max(0, readU16(next, nidx + 4) - 28));
+        writeU16(next, nidx + 6, readU16(next, nidx + 6) & ~CELL_FLAG.Wet);
+      }
+    }
+  }
+
+  private ice(idx: number, x: number, y: number, old: Uint8Array, next: Uint8Array) {
+    const neighbors = this.neighbors(x, y);
+    // Whole-arm melt: any hot neighbor thaws the ice before it can freeze anything.
+    if (neighbors.some((nidx) => HOT_MATERIALS.includes(old[nidx] as (typeof HOT_MATERIALS)[number]))) {
+      writeCellBytes(next, idx, MATERIAL.Water, old[idx + 1], 70);
+      return;
+    }
+    for (const nidx of neighbors) {
+      const other = old[nidx];
+      if (other === MATERIAL.Water && readU16(old, nidx + 4) < 120 && this.chance(5)) {
+        writeCellBytes(next, nidx, MATERIAL.Ice, old[nidx + 1], 90);
+      } else if (other === MATERIAL.Moonwater && this.chance(10)) {
+        writeCellBytes(next, nidx, MATERIAL.Ice, old[nidx + 1], 110, 0, CELL_FLAG.Cosmic);
+      } else if (other === MATERIAL.Steam && this.chance(4)) {
+        writeCellBytes(next, nidx, MATERIAL.Ice, old[nidx + 1], 70);
+      } else if (
+        (other === MATERIAL.Stone || other === MATERIAL.Wall) &&
+        ((readU16(old, nidx + 6) & CELL_FLAG.Wet) || readU16(old, nidx + 4) > 40)
+      ) {
+        writeU16(next, nidx + 4, Math.max(88, readU16(next, nidx + 4)));
+        writeU16(next, nidx + 6, (readU16(next, nidx + 6) | CELL_FLAG.Frozen) & ~CELL_FLAG.Scorched);
+      } else if (freezable(other) && this.chance(4)) {
+        writeU16(next, nidx + 4, Math.max(72, readU16(next, nidx + 4)));
+        writeU16(next, nidx + 6, readU16(next, nidx + 6) | CELL_FLAG.Frozen);
+      }
+    }
+  }
+
   private rocket(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
     if (next[idx] !== MATERIAL.Rocket || readU16(next, idx + 4) === 0) return;
     writeU16(next, idx + 4, Math.max(0, readU16(next, idx + 4) - 10));
@@ -841,16 +864,20 @@ class JsSandboxEngine implements SandboxEngine {
   }
 
   private seed(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
-    const below = this.inBounds(x, y + 1) ? old[this.index(x, y + 1)] : MATERIAL.Wall;
-    if (below === MATERIAL.Empty) this.powder(idx, x, y, cell, old, next);
-    if (next[idx] !== MATERIAL.Seed) return;
-
-    const flags = readU16(next, idx + 6);
-    if (flags & CELL_FLAG.Frozen) return;
-    const age = readU16(next, idx + 2);
-    const energy = readU16(next, idx + 4);
-    const wet = Boolean(flags & CELL_FLAG.Wet) || energy > 70;
+    if (!this.inBounds(x, y + 1)) return;
+    const below = old[this.index(x, y + 1)];
+    if (below === MATERIAL.Empty) {
+      this.powder(idx, x, y, cell, old, next);
+      return;
+    }
+    // Frozen is read from next (this tick's freezing counts); everything else reads
+    // the old cell state so same-tick hydration does not root or germinate early.
+    if (readU16(next, idx + 6) & CELL_FLAG.Frozen) return;
     const neighborKinds = this.neighbors(x, y).map((nidx) => old[nidx]);
+    const flags = readU16(cell, 6);
+    const age = readU16(cell, 2);
+    const energy = readU16(cell, 4);
+    const wet = Boolean(flags & CELL_FLAG.Wet) || energy > 70;
     const cosmic = Boolean(flags & CELL_FLAG.Cosmic) || neighborKinds.includes(MATERIAL.Moonwater) || neighborKinds.includes(MATERIAL.Stardust);
 
     if (wet && energy > 80 && neighborKinds.includes(MATERIAL.Fungus) && this.chance(10)) {
@@ -859,7 +886,7 @@ class JsSandboxEngine implements SandboxEngine {
     }
 
     if (below === MATERIAL.Soil && wet) {
-      writeU16(next, idx + 6, flags | CELL_FLAG.Rooted);
+      writeU16(next, idx + 6, readU16(next, idx + 6) | CELL_FLAG.Rooted);
       if (age > 30 && energy > 70 && this.chance(cosmic ? 4 : 8)) {
         writeCellBytes(next, idx, MATERIAL.Stem, cell[1], 130 + (cell[1] & 3) * 55 + (cosmic ? 55 : 0), 0, CELL_FLAG.Rooted | (cosmic ? CELL_FLAG.Cosmic : 0));
         return;
@@ -891,30 +918,33 @@ class JsSandboxEngine implements SandboxEngine {
   }
 
   private moss(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
-    const energy = readU16(next, idx + 4);
-    const wet = Boolean(readU16(next, idx + 6) & CELL_FLAG.Wet) || energy > 70;
     if (readU16(next, idx + 6) & CELL_FLAG.Frozen) return;
-    if (Boolean(readU16(old, idx + 6) & CELL_FLAG.Wet) && readU16(old, idx + 4) > 90 && this.inBounds(x, y + 1)) {
+    // Growth reads the old cell state; only the frozen guard above reflects this tick.
+    const oldEnergy = readU16(cell, 4);
+    const oldFlags = readU16(cell, 6);
+    if (oldFlags & CELL_FLAG.Wet && oldEnergy > 90 && this.inBounds(x, y + 1)) {
       const below = this.index(x, y + 1);
       if (old[below] === MATERIAL.Empty && next[below] === MATERIAL.Empty && this.chance(60)) {
         writeCellBytes(next, below, MATERIAL.Water, cell[1], 26);
         writeU16(next, idx + 4, Math.max(0, readU16(next, idx + 4) - 24));
       }
     }
+    const wet = Boolean(oldFlags & CELL_FLAG.Wet) || oldEnergy > 70;
     if (!(wet || this.chance(120))) return;
-    let spreadsLeft = energy > 150 ? 2 : 1;
+    let spreadsLeft = oldEnergy > 150 ? 2 : 1;
     for (const nidx of this.neighbors(x, y)) {
       const other = old[nidx];
       const dampSubstrate = Boolean(readU16(old, nidx + 6) & CELL_FLAG.Wet) || readU16(old, nidx + 4) > 40;
+      // Spreading moss inherits the substrate's variant, not the parent moss's.
       let spread = false;
-      if ((other === MATERIAL.Soil || other === MATERIAL.Wood) && (energy > 110 || dampSubstrate || this.chance(8))) {
-        writeCellBytes(next, nidx, MATERIAL.Moss, cell[1], 70, 0, wet ? CELL_FLAG.Wet : 0);
+      if ((other === MATERIAL.Soil || other === MATERIAL.Wood) && (oldEnergy > 110 || dampSubstrate || this.chance(8))) {
+        writeCellBytes(next, nidx, MATERIAL.Moss, old[nidx + 1], 70, 0, wet ? CELL_FLAG.Wet : 0);
         spread = true;
-      } else if (other === MATERIAL.Stone && dampSubstrate && (energy > 120 || this.chance(10))) {
-        writeCellBytes(next, nidx, MATERIAL.Moss, cell[1], 58, 0, CELL_FLAG.Wet);
+      } else if (other === MATERIAL.Stone && dampSubstrate && (oldEnergy > 120 || this.chance(10))) {
+        writeCellBytes(next, nidx, MATERIAL.Moss, old[nidx + 1], 58, 0, CELL_FLAG.Wet);
         spread = true;
-      } else if (other === MATERIAL.Wall && dampSubstrate && energy > 150) {
-        writeCellBytes(next, nidx, MATERIAL.Moss, cell[1], 48, 0, CELL_FLAG.Wet);
+      } else if (other === MATERIAL.Wall && dampSubstrate && oldEnergy > 150) {
+        writeCellBytes(next, nidx, MATERIAL.Moss, old[nidx + 1], 48, 0, CELL_FLAG.Wet);
         spread = true;
       }
       if (spread) {
@@ -1157,7 +1187,8 @@ function heatSoftens(next: Uint8Array, idx: number, old: Uint8Array, heat: numbe
   }
   if (scorchable(kind) && flags & CELL_FLAG.Wet) {
     writeU16(next, idx + 4, Math.max(0, readU16(next, idx + 4) - heat));
-    writeU16(next, idx + 6, (flags & ~CELL_FLAG.Wet) | CELL_FLAG.Scorched);
+    // Scorch off the accumulated next-state flags, not old, so flags set earlier this tick survive.
+    writeU16(next, idx + 6, (readU16(next, idx + 6) & ~CELL_FLAG.Wet) | CELL_FLAG.Scorched);
     return true;
   }
   return false;
