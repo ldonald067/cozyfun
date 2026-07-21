@@ -322,6 +322,10 @@ class JsSandboxEngine implements SandboxEngine {
         this.oilReact(idx, x, y, old, next);
         continue;
       }
+      if (kind === MATERIAL.Steam) {
+        this.steamReact(idx, x, y, old, next);
+        continue;
+      }
       // Simmering water vents a wisp before reacting with neighbors, matching the Rust arm order.
       if (kind === MATERIAL.Water && readU16(old, idx + 4) > 150 && this.chance(20)) {
         this.emitVaporFrom(idx, old, next, MATERIAL.Steam, old[idx + 1], 120);
@@ -382,9 +386,6 @@ class JsSandboxEngine implements SandboxEngine {
           if (flammable(other) && this.chance(3)) {
             writeIgnitedCell(next, nidx, other, old[nidx + 1], 240);
           }
-        }
-        if (kind === MATERIAL.Steam && other === MATERIAL.Ice && this.chance(5)) {
-          writeCellBytes(next, idx, MATERIAL.Ice, old[idx + 1], 70);
         }
         if (kind === MATERIAL.Stardust && (other === MATERIAL.Seed || other === MATERIAL.Moss || other === MATERIAL.Flower) && this.chance(12)) {
           writeU16(next, nidx + 4, Math.min(255, readU16(next, nidx + 4) + 24));
@@ -502,19 +503,6 @@ class JsSandboxEngine implements SandboxEngine {
             writeIgnitedCell(next, nidx, other, old[nidx + 1], 210);
           }
         }
-        if (
-          kind === MATERIAL.Steam &&
-          (other === MATERIAL.Stone || other === MATERIAL.Wall) &&
-          !this.neighborHasKind(old, idx, MATERIAL.Ice) &&
-          !this.neighborHasAnyKind(old, idx, HOT_MATERIALS)
-        ) {
-          const condensation = other === MATERIAL.Stone ? 58 : 26;
-          writeU16(next, nidx + 4, Math.min(255, readU16(next, nidx + 4) + condensation));
-          writeU16(next, nidx + 6, (readU16(next, nidx + 6) | CELL_FLAG.Wet) & ~CELL_FLAG.Scorched);
-          if (other === MATERIAL.Stone && this.chance(4)) {
-            writeCellBytes(next, idx, MATERIAL.Water, old[idx + 1], 50);
-          }
-        }
         if (kind === MATERIAL.Smoke && sootable(other)) {
           const otherFlags = readU16(old, nidx + 6);
           const smokeEnergy = readU16(old, idx + 4);
@@ -566,9 +554,10 @@ class JsSandboxEngine implements SandboxEngine {
 
   private sand(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
     const wet = Boolean(readU16(old, idx + 6) & CELL_FLAG.Wet) || readU16(old, idx + 4) > 35;
-    if (wet && this.ticks % 2 !== 0) return;
+    // Gate only wet-sand movement on odd ticks (sluggishness 2); the WET-flag
+    // reapplication below still runs every tick, matching Rust's update_sand.
     if (wet) {
-      this.powder(idx, x, y, cell, old, next);
+      if (this.ticks % 2 === 0) this.powder(idx, x, y, cell, old, next);
     } else if (this.move(idx, x, y + 1, cell, old, next)) {
       this.move(this.index(x, y + 1), x, y + 2, cell, old, next);
     } else {
@@ -712,8 +701,9 @@ class JsSandboxEngine implements SandboxEngine {
           break;
         }
       }
-    } else if (!chilled) {
+    } else if (!chilled && wellspringSource(energy & 255)) {
       // Attuned: gently emit the remembered material from open faces.
+      // The source guard rejects out-of-range ids from imported scenes.
       const source = energy & 255;
       for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0], [0, 1]]) {
         const nx = x + dx;
@@ -722,6 +712,29 @@ class JsSandboxEngine implements SandboxEngine {
         const nidx = this.index(nx, ny);
         if (old[nidx] === MATERIAL.Empty && next[nidx] === MATERIAL.Empty && this.chance(26)) {
           writeCellBytes(next, nidx, source, this.rand() & 3, startEnergy(source));
+        }
+      }
+    }
+  }
+
+  private steamReact(idx: number, x: number, y: number, old: Uint8Array, next: Uint8Array) {
+    const neighbors = this.neighbors(x, y);
+    const iceNearby = neighbors.some((nidx) => old[nidx] === MATERIAL.Ice);
+    // One freeze roll for the whole cell, matching Rust (not one per ice neighbor).
+    if (iceNearby && this.chance(5)) {
+      writeCellBytes(next, idx, MATERIAL.Ice, old[idx + 1], 70);
+    }
+    const hotNearby = neighbors.some((nidx) => HOT_MATERIALS.includes(old[nidx] as (typeof HOT_MATERIALS)[number]));
+    if (!iceNearby && !hotNearby) {
+      for (const nidx of neighbors) {
+        const other = old[nidx];
+        if (other === MATERIAL.Stone || other === MATERIAL.Wall) {
+          const condensation = other === MATERIAL.Stone ? 58 : 26;
+          writeU16(next, nidx + 4, Math.min(255, readU16(next, nidx + 4) + condensation));
+          writeU16(next, nidx + 6, (readU16(next, nidx + 6) | CELL_FLAG.Wet) & ~CELL_FLAG.Scorched);
+          if (other === MATERIAL.Stone && this.chance(4)) {
+            writeCellBytes(next, idx, MATERIAL.Water, old[idx + 1], 50);
+          }
         }
       }
     }
@@ -1008,12 +1021,6 @@ class JsSandboxEngine implements SandboxEngine {
     return this.neighbors(x, y).some((nidx) => cells[nidx] === kind);
   }
 
-  private neighborHasAnyKind(cells: Uint8Array, idx: number, kinds: readonly number[]) {
-    const cellNumber = idx / CELL_STRIDE;
-    const x = cellNumber % this.w;
-    const y = Math.floor(cellNumber / this.w);
-    return this.neighbors(x, y).some((nidx) => kinds.includes(cells[nidx]));
-  }
 }
 
 const HOT_MATERIALS = [MATERIAL.Fire, MATERIAL.Lava, MATERIAL.Meteor] as const;

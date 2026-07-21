@@ -497,8 +497,9 @@ impl Universe {
                                 break;
                             }
                         }
-                    } else if !chilled {
+                    } else if !chilled && is_wellspring_source(cell.energy as u8) {
                         // Attuned: gently emit the remembered material from open faces.
+                        // The source guard rejects out-of-range ids from imported scenes.
                         let (cx, cy) = self.xy(idx);
                         let source = cell.energy as u8;
                         for (dx, dy) in [(0, -1), (-1, 0), (1, 0), (0, 1)] {

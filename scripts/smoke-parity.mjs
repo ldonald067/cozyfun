@@ -154,6 +154,19 @@ const scenarios = [
     },
   },
   {
+    name: "steam rising through an ice chamber",
+    w: 20, h: 20, seed: 71, ticks: 120,
+    paint(p) {
+      // Ice ceiling and walls form a pocket; lava under a water pool boils steam up
+      // into it, so steam cells touch two or more ice neighbors (the freeze path).
+      for (let x = 6; x <= 13; x++) p(x, 7, 1, M.Ice);
+      for (let y = 8; y <= 11; y++) { p(6, y, 1, M.Ice); p(13, y, 1, M.Ice); }
+      for (let y = 8; y <= 10; y++) for (let x = 7; x <= 12; x++) p(x, y, 1, M.Water);
+      for (let x = 6; x <= 13; x++) p(x, 11, 1, M.Lava);
+      for (let x = 4; x <= 15; x++) p(x, 13, 1, M.Wall);
+    },
+  },
+  {
     name: "isolated lava crusting to stone",
     w: 36, h: 40, seed: 616, ticks: 260,
     paint(p) {
