@@ -436,9 +436,33 @@ input:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding: 0 4px;
   color: #99b8c8;
   font-size: 13px;
+}
+
+.status-bar [data-testid="status-message"] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.status-paused {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(255, 196, 110, 0.16);
+  color: #ffcf87;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .control-row {

@@ -6,6 +6,7 @@ import {
   Droplet,
   Eraser,
   Flame,
+  FlameKindling,
   Flower2,
   Gem,
   Grid2x2,
@@ -35,7 +36,7 @@ const MATERIAL_ICONS: Record<MaterialId, LucideIcon> = {
   [MATERIAL.Soil]: Mountain,
   [MATERIAL.Fire]: Flame,
   [MATERIAL.Wood]: TreePine,
-  [MATERIAL.Lava]: Flame,
+  [MATERIAL.Lava]: FlameKindling,
   [MATERIAL.Stone]: Gem,
   [MATERIAL.Moss]: Leaf,
   [MATERIAL.Seed]: Sprout,
@@ -83,6 +84,7 @@ export function MaterialPanel({ groupedMaterials, selected, onSelect }: Material
                   key={material.id}
                   type="button"
                   aria-label={materialHint}
+                  aria-pressed={selected === material.id}
                   title={materialHint}
                   style={{ "--material-color": material.color } as CSSProperties}
                   onClick={() => onSelect(material)}

@@ -281,7 +281,9 @@ export function App() {
 
   function handleSelectMaterial(material: MaterialDef) {
     setSelected(material.id);
-    setStatus(`${material.label} ready`);
+    // Teach the material's behavior in the status line, so touch and keyboard
+    // players (who never see the hover tooltip) learn how each one plays.
+    setStatus(`${material.label}: ${material.description}`);
   }
 
   function applySnapshotMetadata(metadata: SceneSnapshotMetadata | null) {
@@ -518,8 +520,11 @@ export function App() {
             <div className="glass-sheen" aria-hidden="true" />
           </div>
           <div className="status-bar">
-            <span data-testid="status-message">{status}</span>
-            <span>{engine?.source ?? "loading"} - {fps} fps</span>
+            <span data-testid="status-message" role="status" aria-live="polite">{status}</span>
+            <span className="status-meta">
+              {paused && <span className="status-paused">paused</span>}
+              {engine?.source ?? "loading"} - {fps} fps
+            </span>
           </div>
         </section>
 
