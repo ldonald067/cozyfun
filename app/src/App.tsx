@@ -513,8 +513,8 @@ export function App() {
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
           >
-            <canvas ref={glowCanvasRef} className="sandbox-canvas glow-canvas" />
             <canvas ref={baseCanvasRef} className="sandbox-canvas base-canvas" />
+            <canvas ref={glowCanvasRef} className="sandbox-canvas glow-canvas" />
             <div className="glass-sheen" aria-hidden="true" />
           </div>
           <div className="status-bar">

@@ -56,7 +56,9 @@ export function detectReactionCues(before: Uint8Array, after: Uint8Array): React
     ) {
       found.add("cosmic-charge");
     }
-    if ((beforeKind === MATERIAL.Seed || beforeKind === MATERIAL.Stem) && afterKind === MATERIAL.Flower) {
+    // A stalk blooms by writing a Flower into the empty cell above its tip, so the
+    // real transition is Empty->Flower; also covers any in-place Seed/Stem->Flower.
+    if (afterKind === MATERIAL.Flower && beforeKind !== MATERIAL.Flower) {
       found.add("bloom");
     }
     if (beforeKind === MATERIAL.Empty && afterKind === MATERIAL.Stem) {

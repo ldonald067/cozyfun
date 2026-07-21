@@ -406,6 +406,8 @@ input:focus-visible {
   filter: blur(16px) saturate(1.35);
   opacity: 0.9;
   transform: scale(1.025);
+  mix-blend-mode: screen;
+  pointer-events: none;
 }
 
 .glass-sheen {

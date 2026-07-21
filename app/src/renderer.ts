@@ -88,8 +88,14 @@ export async function exportPostcard(engine: SandboxEngine, base: HTMLCanvasElem
   ctx.fill();
   ctx.strokeStyle = "rgba(255, 224, 170, 0.18)";
   ctx.stroke();
-  ctx.drawImage(glow, margin, margin, width, height);
   ctx.drawImage(base, margin, margin, width, height);
+  // Glow blooms additively over the base, matching the live .glow-canvas layer.
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.globalAlpha = 0.9;
+  ctx.filter = "blur(6px)";
+  ctx.drawImage(glow, margin, margin, width, height);
+  ctx.restore();
 
   const footerY = margin + height + 48;
   ctx.fillStyle = "#f4dfb8";
@@ -197,10 +203,14 @@ function drawClipFrame(
   ctx.fillStyle = "#0d121b";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.imageSmoothingEnabled = false;
-  ctx.globalAlpha = 0.72;
-  ctx.drawImage(glow, 0, 0, canvas.width, sceneHeight);
-  ctx.globalAlpha = 1;
   ctx.drawImage(base, 0, 0, canvas.width, sceneHeight);
+  // Glow blooms additively over the base, matching the live .glow-canvas layer.
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.globalAlpha = 0.9;
+  ctx.filter = "blur(5px)";
+  ctx.drawImage(glow, 0, 0, canvas.width, sceneHeight);
+  ctx.restore();
   ctx.fillStyle = "rgba(13, 18, 27, 0.92)";
   ctx.fillRect(0, sceneHeight, canvas.width, 74);
   ctx.fillStyle = "#f4dfb8";

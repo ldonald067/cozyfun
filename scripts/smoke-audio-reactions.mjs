@@ -115,6 +115,11 @@ expectCues("seed bloom", (before, after) => {
   setCell(after, 1, 1, MATERIAL.Flower);
 }, ["bloom"]);
 
+// The real sim blooms by writing a Flower into the empty cell above the stalk tip.
+expectCues("stalk tip bloom", (_before, after) => {
+  setCell(after, 1, 1, MATERIAL.Flower);
+}, ["bloom"]);
+
 expectCues("cosmic water charge", (before, after) => {
   setCell(before, 1, 1, MATERIAL.Water);
   setCell(after, 1, 1, MATERIAL.Moonwater, { flags: CELL_FLAG.Cosmic });

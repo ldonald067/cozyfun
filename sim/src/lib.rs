@@ -1074,7 +1074,7 @@ impl Universe {
                     next[idx] = Cell::new(
                         Material::Stem as u8,
                         cell.variant,
-                        130 + u16::from(cell.variant & 3) * 55,
+                        130 + u16::from(cell.variant & 3) * 55 + if cosmic { 55 } else { 0 },
                     );
                     next[idx].flags = FLAG_ROOTED | if cosmic { FLAG_COSMIC } else { 0 };
                     return;
@@ -2216,6 +2216,40 @@ mod tests {
             }
         }
         assert!(dripped, "saturated overhanging moss should shed a dew droplet");
+    }
+
+    #[test]
+    fn cosmic_fed_seed_grows_a_taller_stalk() {
+        fn grow_height(cosmic: bool) -> u32 {
+            let mut u = Universe::new(16, 40, 7);
+            let flags = FLAG_WET | if cosmic { FLAG_COSMIC } else { 0 };
+            set_cell_state(&mut u, 8, 30, Material::Seed, 40, 180, flags);
+            set_cell(&mut u, 8, 31, Material::Soil);
+            for (x, y) in [(7, 31), (9, 31), (7, 32), (8, 32), (9, 32)] {
+                set_cell(&mut u, x, y, Material::Stone);
+            }
+            for _ in 0..600 {
+                u.tick();
+            }
+            // Tallest plant cell is the smallest y holding a Stem or Flower, measured up from the base.
+            let mut top = 30;
+            for y in 0..30 {
+                for x in 0..16 {
+                    let k = kind_at(&u, x, y);
+                    if k == Material::Stem as u8 || k == Material::Flower as u8 {
+                        top = top.min(y);
+                    }
+                }
+            }
+            30 - top
+        }
+        let plain = grow_height(false);
+        let cosmic = grow_height(true);
+        assert!(plain >= 2, "a plain fed seed should still grow a visible stalk, got {plain}");
+        assert!(
+            cosmic > plain,
+            "cosmic feeding should grow a taller stalk (cosmic {cosmic} vs plain {plain})"
+        );
     }
 
     #[test]

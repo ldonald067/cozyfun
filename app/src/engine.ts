@@ -651,7 +651,7 @@ class JsSandboxEngine implements SandboxEngine {
   private gas(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
     const side = this.ticks % 2 === 0 ? 1 : -1;
     for (const [dx, dy] of [[0, -1], [side, -1], [-side, -1], [side, 0], [-side, 0]]) {
-      if (this.move(idx, x + dx, y + dy, cell, old, next)) return;
+      if (this.move(idx, x + dx, y + dy, cell, old, next, false)) return;
     }
   }
 
@@ -861,7 +861,7 @@ class JsSandboxEngine implements SandboxEngine {
     if (below === MATERIAL.Soil && wet) {
       writeU16(next, idx + 6, flags | CELL_FLAG.Rooted);
       if (age > 30 && energy > 70 && this.chance(cosmic ? 4 : 8)) {
-        writeCellBytes(next, idx, MATERIAL.Stem, cell[1], 130 + (cell[1] & 3) * 55, 0, CELL_FLAG.Rooted | (cosmic ? CELL_FLAG.Cosmic : 0));
+        writeCellBytes(next, idx, MATERIAL.Stem, cell[1], 130 + (cell[1] & 3) * 55 + (cosmic ? 55 : 0), 0, CELL_FLAG.Rooted | (cosmic ? CELL_FLAG.Cosmic : 0));
         return;
       }
     }
@@ -945,12 +945,16 @@ class JsSandboxEngine implements SandboxEngine {
     }
   }
 
-  private move(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
+  private move(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array, canSinkThroughGas = true) {
     if (!this.inBounds(x, y)) return false;
     const movingCell = next.slice(idx, idx + CELL_STRIDE);
     if (movingCell[0] !== cell[0]) return false;
     const target = this.index(x, y);
-    if (old[target] !== MATERIAL.Empty && next[target] !== MATERIAL.Empty && old[target] !== MATERIAL.Smoke && old[target] !== MATERIAL.Steam) return false;
+    const canMove =
+      old[target] === MATERIAL.Empty ||
+      next[target] === MATERIAL.Empty ||
+      (canSinkThroughGas && (old[target] === MATERIAL.Smoke || old[target] === MATERIAL.Steam));
+    if (!canMove) return false;
     next.fill(0, idx, idx + CELL_STRIDE);
     next.set(movingCell, target);
     return true;
