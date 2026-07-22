@@ -152,6 +152,13 @@ export function materialShowcaseScript() {
     for (const [x, y] of [[128, 107], [129, 107], [130, 107], [131, 107], [129, 106], [130, 106]]) setCell(x, y, material.Rocket, 0, 30, 0, x);
     setCell(130, 96, material.Rocket, 180, 6, 0, 2);
 
+    // Firework burst: a spark shell in festive hues (gold, rose, mint, sky, magenta) that
+    // reads apart from cool Stardust. Ages past the white-hot birth so the hues show.
+    for (const [x, y] of [
+      [130, 86], [127, 88], [133, 88], [125, 90], [135, 90], [128, 91],
+      [132, 91], [130, 89], [124, 92], [136, 92], [126, 94], [134, 94],
+    ]) setCell(x, y, material.Spark, 190, 8, 0, x);
+
     let binary = "";
     for (let i = 0; i < cells.length; i += 0x8000) binary += String.fromCharCode(...cells.slice(i, i + 0x8000));
     localStorage.setItem("cozy-pixel-sandbox:scene:v1", JSON.stringify({

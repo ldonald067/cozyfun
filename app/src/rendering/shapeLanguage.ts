@@ -366,12 +366,14 @@ function wellspringColor({ color, variant, energy, time, cells, width, height, x
 
 // Classic firework hues; each spark picks one deterministically, so every
 // burst blooms as a multicolor shell.
+// Warm-leaning festive hues (gold, rose, mint, sky, magenta) that read apart from
+// Stardust's cool blue-violet. Keep app/src/materials.ts Spark.palette in sync.
 const FIREWORK_HUES: Rgb[] = [
   [255, 210, 126],
   [255, 133, 173],
   [127, 230, 189],
   [164, 198, 255],
-  [200, 155, 255]
+  [224, 122, 246]
 ];
 
 function sparkColor({ variant, age, energy, time, x, y }: ShapeContext) {

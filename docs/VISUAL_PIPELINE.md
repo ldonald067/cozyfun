@@ -35,7 +35,7 @@ Shape language is intentionally procedural:
 - Glass: teal translucency, fresh warm flash, and fog film near steam.
 - Pollen/Stem/Flower: bobbing golden motes, leaf-nubbed climbing stalks with pale growing tips, and petal variety on blooms.
 - Rocket: crimson grains with paper flecks when inert, a bright white-gold firework head when lit.
-- Spark: white-hot birth, per-cell firework hue (gold, rose, mint, sky, violet), glitter blinks, and an ember-red fade.
+- Spark: white-hot birth, per-cell firework hue (gold, rose, mint, sky, magenta) that reads apart from cool Stardust, glitter blinks, and an ember-red fade.
 - Wellspring: dark rune-carved block; dormant runes shimmer silver, attuned runes pulse in the remembered material's tint.
 - Nearby light: hot and cosmic materials (including flying sparks) can tint adjacent cells without changing simulation state.
 - Interaction cues: water near heat brightens toward steam, ordinary water picks up earth/plant/oil contact, oil warms at hot edges, lava near cool liquids darkens into crust, moonwater near life or hard surfaces becomes pearly blue-violet, and newly cooled stone picks up a faint wet edge.

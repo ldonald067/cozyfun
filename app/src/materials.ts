@@ -329,7 +329,7 @@ export const MATERIALS: MaterialDef[] = [
     description: "Generated firework spark that flies out from a rocket burst, twinkles, and fades.",
     identity: ["Flying firework spark", "Twinkles out in falling color"],
     color: "#ec96d0",
-    palette: ["#ff79b8", "#b98cff", "#6fe0d8", "#ff9ad2"],
+    palette: ["#ffd27e", "#ff85ad", "#7fe6bd", "#a4c6ff", "#e07af6"],
     glow: "#ffb4dc",
     group: "cosmic",
     userSelectable: false
