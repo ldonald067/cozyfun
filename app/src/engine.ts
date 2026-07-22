@@ -519,8 +519,14 @@ class JsSandboxEngine implements SandboxEngine {
         const flowerAge = readU16(old, idx + 2);
         const flowerEnergy = readU16(old, idx + 4);
         const flowerFlags = readU16(old, idx + 6);
-        if (flowerAge > 120 && flowerEnergy > 80 && !(flowerFlags & CELL_FLAG.Frozen) && this.chance(300)) {
-          this.emitVaporFrom(idx, old, next, MATERIAL.Pollen, old[idx + 1], 150);
+        // Gate tracks the bloom's energy arc so untended flowers still seed gently;
+        // cosmic blooms release more often and their motes carry the spark onward.
+        const flowerCosmic = Boolean(flowerFlags & CELL_FLAG.Cosmic);
+        if (flowerAge > 20 && flowerEnergy > 40 && !(flowerFlags & CELL_FLAG.Frozen) && this.chance(flowerCosmic ? 60 : 120)) {
+          const mote = this.emitVaporFrom(idx, old, next, MATERIAL.Pollen, old[idx + 1], 150);
+          if (flowerCosmic && mote >= 0) {
+            writeU16(next, mote + 6, readU16(next, mote + 6) | CELL_FLAG.Cosmic);
+          }
           writeU16(next, idx + 4, Math.max(0, readU16(next, idx + 4) - 30));
         }
       }
@@ -643,7 +649,8 @@ class JsSandboxEngine implements SandboxEngine {
       const below = this.index(x, y + 1);
       const belowWet = Boolean(readU16(old, below + 6) & CELL_FLAG.Wet) || readU16(old, below + 4) > 60;
       if (old[below] === MATERIAL.Soil && belowWet && this.chance(8)) {
-        writeCellBytes(next, idx, MATERIAL.Seed, cell[1], 40);
+        // Cosmic pollen roots into a cosmic seed, so moonlit gardens breed true.
+        writeCellBytes(next, idx, MATERIAL.Seed, cell[1], 40, 0, readU16(cell, 6) & CELL_FLAG.Cosmic);
         return;
       }
     }
@@ -865,15 +872,19 @@ class JsSandboxEngine implements SandboxEngine {
     }
   }
 
+  // Emits a vapor cell above the source when that cell is open, returning the
+  // emitted index (or -1) so callers can stamp extra state (e.g. cosmic pollen).
   private emitVaporFrom(sourceIdx: number, old: Uint8Array, next: Uint8Array, vaporKind: number, variant: number, energy: number) {
     const cellNumber = sourceIdx / CELL_STRIDE;
     const x = cellNumber % this.w;
     const y = Math.floor(cellNumber / this.w);
-    if (y <= 0) return;
+    if (y <= 0) return -1;
     const above = this.index(x, y - 1);
     if (old[above] === MATERIAL.Empty && next[above] === MATERIAL.Empty) {
       writeCellBytes(next, above, vaporKind, variant, energy);
+      return above;
     }
+    return -1;
   }
 
   private seed(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {

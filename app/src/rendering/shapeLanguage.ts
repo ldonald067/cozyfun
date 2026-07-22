@@ -272,11 +272,13 @@ function soilColor({ color, variant, energy, flags, cells, width, height, x, y }
   return out;
 }
 
-function pollenColor({ color, variant, age, time, x, y }: ShapeContext) {
+function pollenColor({ color, variant, age, flags, time, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
   const bob = (Math.sin(time * 0.01 + hash * 1.3 + x) + 1) * 0.5;
   let out = mixRgb(color, [255, 246, 214], 0.3 + bob * 0.25);
   if ((hash & 7) === 2) out = mixRgb(out, [232, 194, 106], 0.4);
+  // Cosmic pollen carries a moonlit sheen so the cosmic lineage reads mid-flight.
+  if (flags & CELL_FLAG.Cosmic) out = mixRgb(out, [178, 190, 255], 0.35 + bob * 0.15);
   const fade = Math.max(0, 1 - age / 150);
   return mixRgb([9, 14, 20], out, 0.55 + fade * 0.45);
 }

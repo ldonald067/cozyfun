@@ -808,9 +808,23 @@ impl Universe {
                     }
                 }
                 x if x == Material::Flower as u8 => {
-                    // Mature, healthy flowers spend stored energy to release rare pollen motes.
-                    if cell.age > 120 && cell.energy > 80 && cell.flags & FLAG_FROZEN == 0 && self.chance(300) {
-                        self.emit_vapor_from(idx, old, next, Material::Pollen as u8, cell.variant, 150);
+                    // Fed flowers spend stored energy to release pollen motes. The gate
+                    // tracks the bloom's energy arc (90 at bloom, draining 1/tick), so an
+                    // untended flower still seeds gently; cosmic blooms release more often
+                    // and their motes carry the cosmic spark to the next generation.
+                    let cosmic = cell.flags & FLAG_COSMIC != 0;
+                    if cell.age > 20
+                        && cell.energy > 40
+                        && cell.flags & FLAG_FROZEN == 0
+                        && self.chance(if cosmic { 60 } else { 120 })
+                    {
+                        let mote =
+                            self.emit_vapor_from(idx, old, next, Material::Pollen as u8, cell.variant, 150);
+                        if cosmic {
+                            if let Some(mote) = mote {
+                                next[mote].flags |= FLAG_COSMIC;
+                            }
+                        }
                         next[idx].energy = next[idx].energy.saturating_sub(30);
                     }
                 }
@@ -1231,6 +1245,8 @@ impl Universe {
                 && self.chance(8)
             {
                 next[idx] = Cell::new(Material::Seed as u8, cell.variant, 40);
+                // Cosmic pollen roots into a cosmic seed, so moonlit gardens breed true.
+                next[idx].flags = cell.flags & FLAG_COSMIC;
                 return;
             }
         }
@@ -1430,6 +1446,8 @@ impl Universe {
         true
     }
 
+    /// Emits a vapor cell above the source when that cell is open, returning the
+    /// emitted index so callers can stamp extra state (e.g. cosmic pollen).
     fn emit_vapor_from(
         &self,
         source_idx: usize,
@@ -1438,15 +1456,17 @@ impl Universe {
         vapor_kind: u8,
         variant: u8,
         energy: u16,
-    ) {
+    ) -> Option<usize> {
         let (x, y) = self.xy(source_idx);
         if y <= 0 {
-            return;
+            return None;
         }
         let above = self.idx(x as u32, (y - 1) as u32);
         if old[above].is_empty() && next[above].is_empty() {
             next[above] = Cell::new(vapor_kind, variant, energy);
+            return Some(above);
         }
+        None
     }
 }
 
@@ -2138,6 +2158,76 @@ mod tests {
             }
         }
         assert!(released, "a mature healthy flower should release pollen motes");
+    }
+
+    #[test]
+    fn untended_garden_still_releases_pollen_within_its_energy_arc() {
+        // Fresh blooms (energy 90, draining 1/tick) must be able to seed the next
+        // generation without continuous hand-watering: the pollen loop is dead if
+        // the gate outlives the blooms' own energy. Seeding is gentle per bloom,
+        // so the assertion is per garden, not per flower.
+        let mut u = Universe::new(24, 16, 7);
+        for x in (3..21).step_by(2) {
+            set_cell_state(&mut u, x, 8, Material::Flower, 0, 90, FLAG_ROOTED);
+        }
+        for x in 0..24 {
+            set_cell(&mut u, x, 9, Material::Stone);
+        }
+        let mut released = false;
+        for _ in 0..90 {
+            u.tick();
+            if u.cells.iter().any(|cell| cell.kind == Material::Pollen as u8) {
+                released = true;
+                break;
+            }
+        }
+        assert!(
+            released,
+            "an untended garden of blooms should release pollen before their energy runs out"
+        );
+    }
+
+    #[test]
+    fn cosmic_flower_pollen_breeds_a_cosmic_seed() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell_state(&mut u, 8, 8, Material::Flower, 30, 150, FLAG_ROOTED | FLAG_COSMIC);
+        for (x, y) in [(7, 8), (9, 8), (7, 9), (8, 9), (9, 9)] {
+            set_cell(&mut u, x, y, Material::Stone);
+        }
+        let mut cosmic_mote = false;
+        for _ in 0..300 {
+            u.tick();
+            if u
+                .cells
+                .iter()
+                .any(|cell| cell.kind == Material::Pollen as u8 && cell.flags & FLAG_COSMIC != 0)
+            {
+                cosmic_mote = true;
+                break;
+            }
+        }
+        assert!(cosmic_mote, "a cosmic flower's pollen should carry the cosmic flag");
+
+        // And a cosmic mote rooting on damp soil produces a cosmic seed.
+        let mut u = Universe::new(16, 16, 7);
+        set_cell_state(&mut u, 8, 8, Material::Pollen, 10, 150, FLAG_COSMIC);
+        set_cell_state(&mut u, 8, 9, Material::Soil, 10, 120, FLAG_WET);
+        for (x, y) in [(7, 9), (9, 9), (7, 10), (8, 10), (9, 10)] {
+            set_cell(&mut u, x, y, Material::Stone);
+        }
+        let mut rooted_cosmic = false;
+        for _ in 0..200 {
+            u.tick();
+            if u
+                .cells
+                .iter()
+                .any(|cell| cell.kind == Material::Seed as u8 && cell.flags & FLAG_COSMIC != 0)
+            {
+                rooted_cosmic = true;
+                break;
+            }
+        }
+        assert!(rooted_cosmic, "cosmic pollen should root into a cosmic seed");
     }
 
     #[test]
