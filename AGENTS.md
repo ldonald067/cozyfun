@@ -51,6 +51,7 @@ Use `.\scripts\app-npm.ps1` for app-level npm commands when needed:
 - Do not add a backend, account system, API key, scraper, hidden music playback, or automatic YouTube search/playlist selection. Desk Radio stays visible and user-controlled.
 - If adding or changing a material interaction, update Rust sim behavior, JS fallback behavior, tests, and visual QA coverage together.
 - If changing renderer visuals, keep behavior out of the renderer and capture a fresh visual QA scene.
+- Colors are reviewed on pixels, not numbers. `material:contrast` only enforces a floor on each material's averaged palette; it cannot see per-variant or interaction-state colors, or the glow/shape/animation cues that also separate materials. So any change to `app/src/materials.ts` palettes/glows, `app/src/rendering/`, or the reaction rules must regenerate `npm run visual:qa` and confirm on `.tmp/visual-qa/material-identity-showcase.png` that every material and cell state reads distinctly — including the newest ones and their interaction outcomes. `material:audit` guarantees that board renders every material and every state, so nothing can be silently absent from what you review.
 - If changing scene format, keep import validation strict and preserve legacy compatibility unless the user agrees to a breaking change.
 - When the same issue appears twice in review or QA, promote it into a harness: a script, deterministic scene, smoke assertion, checklist item, or source-of-truth doc.
 

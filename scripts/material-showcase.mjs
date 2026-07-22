@@ -6,7 +6,7 @@ export function materialShowcaseScript() {
     const width = 220;
     const height = 140;
     const stride = 8;
-    const material = { Wall: 1, Sand: 2, Water: 3, Soil: 5, Fire: 6, Wood: 7, Lava: 8, Stone: 9, Moss: 10, Seed: 11, Fungus: 12, Oil: 13, Ice: 14, Steam: 15, Stardust: 16, Meteor: 17, Moonwater: 18, Flower: 19, Glass: 20, Ember: 21, Pollen: 22, Stem: 23, Rocket: 24, Wellspring: 25, Spark: 26 };
+    const material = { Wall: 1, Sand: 2, Water: 3, Smoke: 4, Soil: 5, Fire: 6, Wood: 7, Lava: 8, Stone: 9, Moss: 10, Seed: 11, Fungus: 12, Oil: 13, Ice: 14, Steam: 15, Stardust: 16, Meteor: 17, Moonwater: 18, Flower: 19, Glass: 20, Ember: 21, Pollen: 22, Stem: 23, Rocket: 24, Wellspring: 25, Spark: 26 };
     const flag = { Wet: 1, Rooted: 2, Cosmic: 4, Frozen: 8, Scorched: 16 };
     const cells = new Uint8Array(width * height * stride);
     const writeU16 = (offset, value) => {
@@ -106,6 +106,9 @@ export function materialShowcaseScript() {
     line(68, 74, 76, material.Ember, 0, 200);
     line(76, 80, 76, material.Ember, 0, 220, flag.Wet);
     setCell(59, 75, material.Fire, 220, 10);
+
+    // Smoke: dry vapor rising off open flame (generated-only), above the heat lineup.
+    for (const [x, y] of [[28, 24], [30, 23], [31, 25], [29, 22]]) setCell(x, y, material.Smoke, 80, 40, 0, x);
 
     // Freeze-thaw weathering: frost-stressed wall with visible stress cracks beside ice and fire.
     rect(24, 32, 62, 71, material.Wall, 170, 80, flag.Frozen);

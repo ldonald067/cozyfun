@@ -5,8 +5,10 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const sourcePath = path.join(root, "app", "src", "materials.ts");
 const auditPath = path.join(root, "docs", "MATERIAL_AUDIT.md");
+const showcasePath = path.join(root, "scripts", "material-showcase.mjs");
 const source = await readFile(sourcePath, "utf8");
 const audit = await readFile(auditPath, "utf8");
+const showcase = await readFile(showcasePath, "utf8");
 
 const materialEnum = source.match(/export const MATERIAL = \{([\s\S]*?)\} as const;/);
 if (!materialEnum) throw new Error("Could not find MATERIAL enum in app/src/materials.ts");
@@ -51,6 +53,7 @@ if (seen.size !== expectedIds.length) {
 
 if (/\bPhase\s+\d+\b/i.test(audit)) failures.push("docs/MATERIAL_AUDIT.md still contains stale phase labels");
 auditInteractionMatrix(audit, labels, failures);
+auditShowcaseCoverage(source, showcase, expectedIds, failures);
 
 if (failures.length > 0) {
   console.error("Material identity audit failed:");
@@ -59,8 +62,36 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `Material identity audit passed: ${seen.size - generatedLabels.size} toolbar materials carry 4+ documented interaction roles and ${generatedLabels.size} generated materials carry 1-3.`
+  `Material identity audit passed: ${seen.size - generatedLabels.size} toolbar materials carry 4+ documented interaction roles and ${generatedLabels.size} generated materials carry 1-3; every material and cell state appears in the visual review board.`
 );
+
+function auditShowcaseCoverage(materialsSource, showcaseSource, materialIds, failures) {
+  // The deterministic showcase (scripts/material-showcase.mjs) is the visual review
+  // board: it renders through the real material renderer, and visual QA captures it.
+  // We can only guarantee the board is COMPLETE here — that every material and every
+  // cell state actually appears — so a color/interaction change can never ship a
+  // material or state no capture renders. Whether two things are distinct enough is a
+  // human/agent judgment on the capture (it accounts for glow, shape, and animation
+  // that no averaged-color number can see); this check just makes sure nothing is
+  // missing from the picture the reviewer looks at.
+  for (const id of materialIds) {
+    if (id === "Empty") continue;
+    if (!new RegExp(`material\\.${id}\\b`).test(showcaseSource)) {
+      failures.push(
+        `material.${id} is not rendered in the visual review board (scripts/material-showcase.mjs); add it so visual QA shows it beside its neighbors`,
+      );
+    }
+  }
+  const flagBlock = materialsSource.match(/export const CELL_FLAG = \{([\s\S]*?)\} as const;/);
+  const flagNames = flagBlock ? [...flagBlock[1].matchAll(/^\s+([A-Za-z]+):/gm)].map((match) => match[1]) : [];
+  for (const flag of flagNames) {
+    if (!new RegExp(`flag\\.${flag}\\b`).test(showcaseSource)) {
+      failures.push(
+        `cell state flag.${flag} is not shown in the visual review board; add a cell carrying it so its interaction color is reviewable`,
+      );
+    }
+  }
+}
 
 function auditInteractionMatrix(markdown, materialLabels, failures) {
   const section = markdown.match(/## Interaction Matrix\s+([\s\S]*?)(?:\n## |\s*$)/);
