@@ -509,3 +509,22 @@ The sandbox now has dozens of distinct interactions, but nothing tells the playe
 - Strictly opt-in so room backdrops stay non-destructive; painting remains the core verb.
 
 Order: 12A first (it answers the live-session feedback directly), 12B alongside it since flashes reuse the same transition detection, 12C as the headline gameplay feature, and 12D last as the atmosphere bonus.
+
+## Phase 18: Living-World Batch (design-feedback pass)
+
+A roster-wide design review (interaction depth, visual identity, uniqueness, combos)
+produced 12 owner-approved items in four gated commits. Full specs, grounding, status,
+and gotchas live in `docs/PHASE_18_HANDOFF.md` — read that to resume.
+
+- Batch 1 (garden lineage) — shipped `fbaafae`: revive the dead pollen loop; cosmic
+  flowers breed cosmic pollen into cosmic seeds so moonlit gardens breed true.
+- Batch 2 (terrarium & hearth) — shipped `e5cfebe`: glass dew re-waters a sealed
+  terrarium; hearth walls dry/thaw their nook beside a flame; sparks hiss to steam over water.
+- Batch 3 (geology) — TODO: unsupported Stone falls (Wall never moves) as the Wall/Stone
+  debate-ender and to make erosion/crust/meteor-stone visible drama; freeze-thaw crumble
+  retune 200->150 + a distinct crack sprite.
+- Batch 4 (cycles & rituals) — TODO: wellspring re-attunement via ice; fairy-ring cosmic
+  fungus; fungus->soil collapse; meteor spark trail; ember doc-honesty note.
+
+Deferred (needs owner sign-off): visual-lens renderer polish — wellspring/lit-rocket/glass
+visibility and a glow-layer rebalance (see the handoff's "Not approved (yet)" section).
