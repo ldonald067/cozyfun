@@ -43,7 +43,7 @@ const STRIDE = 8;
 const M = {
   Wall: 1, Sand: 2, Water: 3, Soil: 5, Fire: 6, Wood: 7, Lava: 8, Stone: 9, Moss: 10,
   Seed: 11, Fungus: 12, Oil: 13, Ice: 14, Stardust: 16, Meteor: 17, Moonwater: 18,
-  Rocket: 24, Wellspring: 25,
+  Glass: 20, Rocket: 24, Wellspring: 25,
 };
 const BYTE_NAME = ["kind", "variant", "age.lo", "age.hi", "energy.lo", "energy.hi", "flags.lo", "flags.hi"];
 
@@ -151,6 +151,29 @@ const scenarios = [
       for (let x = 0; x < 28; x++) p(x, 4, 1, M.Wall);
       p(14, 54, 5, M.Rocket); p(9, 54, 1, M.Fire);
       p(20, 40, 2, M.Wood);
+    },
+  },
+  {
+    name: "glass terrarium over a hearth",
+    w: 28, h: 26, seed: 313, ticks: 160,
+    paint(p) {
+      // A glass dome ceiling over a boiling pool: steam should dew the glass and
+      // bead back to water. A hearth wall beside the flame dries/thaws its nook.
+      for (let x = 6; x <= 20; x++) p(x, 6, 1, M.Glass);
+      for (let y = 7; y <= 21; y++) { p(6, y, 1, M.Wall); p(20, y, 1, M.Wall); }
+      for (let x = 6; x <= 20; x++) p(x, 22, 1, M.Wall);
+      for (let x = 9; x <= 17; x++) { p(x, 19, 1, M.Water); p(x, 18, 1, M.Water); }
+      for (let x = 9; x <= 17; x++) p(x, 20, 1, M.Fire);
+      p(8, 18, 1, M.Soil); p(8, 19, 1, M.Ice);
+    },
+  },
+  {
+    name: "fireworks over a pond",
+    w: 30, h: 40, seed: 606, ticks: 200,
+    paint(p) {
+      for (let x = 0; x < 30; x++) p(x, 30, 1, M.Wall);
+      for (let x = 2; x <= 27; x++) { p(x, 29, 1, M.Water); p(x, 28, 1, M.Water); }
+      p(15, 22, 5, M.Rocket); p(10, 22, 1, M.Fire);
     },
   },
   {

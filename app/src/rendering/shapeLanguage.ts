@@ -564,7 +564,7 @@ function emberColor({ variant, energy, flags, time, x, y }: ShapeContext) {
   return out;
 }
 
-function glassColor({ color, variant, age, cells, width, height, x, y }: ShapeContext) {
+function glassColor({ color, variant, age, energy, flags, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x >> 1, y >> 1, variant);
   const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Glass);
   let out = mixRgb(color, [198, 246, 230], 0.3);
@@ -577,6 +577,13 @@ function glassColor({ color, variant, age, cells, width, height, x, y }: ShapeCo
     // Steam fogs the pane with a soft condensation film.
     out = mixRgb(out, [214, 226, 230], 0.42);
     if ((hash & 3) === 1) out = mixRgb(out, [236, 242, 244], 0.3);
+  }
+  if (flags & CELL_FLAG.Wet) {
+    // Dewed glass: persistent condensation that fades as the pane dries, with
+    // bright droplet runs down the vertical grain.
+    const fog = Math.min(1, energy / 46);
+    out = mixRgb(out, [206, 224, 232], 0.2 + fog * 0.3);
+    if ((x * 3 + (hash & 7)) % 9 === 0) out = mixRgb(out, [240, 250, 255], 0.35 + fog * 0.3);
   }
   if (age < 8) out = mixRgb(out, [255, 244, 214], 0.6 * (1 - age / 8));
   if (age < 70) out = mixRgb(out, [255, 176, 96], 0.36 * (1 - age / 70));

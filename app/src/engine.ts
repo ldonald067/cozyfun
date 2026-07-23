@@ -326,6 +326,10 @@ class JsSandboxEngine implements SandboxEngine {
         this.steamReact(idx, x, y, old, next);
         continue;
       }
+      if (kind === MATERIAL.Wall) {
+        this.wallReact(idx, x, y, old, next);
+        continue;
+      }
       // Simmering water vents a wisp before reacting with neighbors, matching the Rust arm order.
       if (kind === MATERIAL.Water && readU16(old, idx + 4) > 150 && this.chance(20)) {
         this.emitVaporFrom(idx, old, next, MATERIAL.Steam, old[idx + 1], 120);
@@ -724,6 +728,30 @@ class JsSandboxEngine implements SandboxEngine {
     }
   }
 
+  // Hearth masonry: a wall beside a live flame radiates gentle warmth, thawing
+  // and drying its nook. It only clears flags — a hearth never ignites anything
+  // or creates cells.
+  private wallReact(idx: number, x: number, y: number, old: Uint8Array, next: Uint8Array) {
+    if (readU16(old, idx + 6) & CELL_FLAG.Frozen) return;
+    const neighbors = this.neighbors(x, y);
+    const hearth = neighbors.some((nidx) => {
+      const other = old[nidx];
+      return (
+        HOT_MATERIALS.includes(other as (typeof HOT_MATERIALS)[number]) ||
+        (other === MATERIAL.Ember && readU16(old, nidx + 4) > 90)
+      );
+    });
+    if (!hearth) return;
+    for (const nidx of neighbors) {
+      const otherFlags = readU16(old, nidx + 6);
+      if (otherFlags & CELL_FLAG.Frozen && this.chance(6)) {
+        writeU16(next, nidx + 6, thawedFlags(old[nidx], readU16(next, nidx + 6)));
+      } else if (otherFlags & CELL_FLAG.Wet && this.chance(10)) {
+        writeU16(next, nidx + 6, readU16(next, nidx + 6) & ~CELL_FLAG.Wet);
+      }
+    }
+  }
+
   private steamReact(idx: number, x: number, y: number, old: Uint8Array, next: Uint8Array) {
     const neighbors = this.neighbors(x, y);
     const iceNearby = neighbors.some((nidx) => old[nidx] === MATERIAL.Ice);
@@ -740,6 +768,14 @@ class JsSandboxEngine implements SandboxEngine {
           writeU16(next, nidx + 4, Math.min(255, readU16(next, nidx + 4) + condensation));
           writeU16(next, nidx + 6, (readU16(next, nidx + 6) | CELL_FLAG.Wet) & ~CELL_FLAG.Scorched);
           if (other === MATERIAL.Stone && this.chance(4)) {
+            writeCellBytes(next, idx, MATERIAL.Water, old[idx + 1], 50);
+          }
+        } else if (other === MATERIAL.Glass) {
+          // Glass dew: steam fogs the pane and beads back into water, so a
+          // sealed glass terrarium keeps its moisture cycling.
+          writeU16(next, nidx + 4, Math.min(255, readU16(next, nidx + 4) + 46));
+          writeU16(next, nidx + 6, readU16(next, nidx + 6) | CELL_FLAG.Wet);
+          if (this.chance(4)) {
             writeCellBytes(next, idx, MATERIAL.Water, old[idx + 1], 50);
           }
         }
@@ -845,6 +881,12 @@ class JsSandboxEngine implements SandboxEngine {
     if (readU16(next, idx + 4) < 30) {
       if (this.chance(6)) writeCellBytes(next, idx, MATERIAL.Stardust, cell[1], 120);
       else next.fill(0, idx, idx + CELL_STRIDE);
+      return;
+    }
+    // A spark meeting water hisses out into a wisp of steam — fireworks sizzle
+    // over a pond instead of raining fire on it.
+    if (this.neighbors(x, y).some((nidx) => waterLike(old[nidx]))) {
+      writeCellBytes(next, idx, MATERIAL.Steam, cell[1], 60);
       return;
     }
     const age = readU16(cell, 2);
@@ -1125,7 +1167,7 @@ function waterLike(kind: number) {
 }
 
 function absorbent(kind: number) {
-  return kind === MATERIAL.Wall || kind === MATERIAL.Sand || kind === MATERIAL.Wood || kind === MATERIAL.Stone;
+  return kind === MATERIAL.Wall || kind === MATERIAL.Sand || kind === MATERIAL.Wood || kind === MATERIAL.Stone || kind === MATERIAL.Glass;
 }
 
 function hydratable(kind: number) {

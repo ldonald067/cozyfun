@@ -515,6 +515,30 @@ impl Universe {
                         }
                     }
                 }
+                x if x == Material::Wall as u8 => {
+                    // Hearth masonry: a wall beside a live flame radiates gentle warmth,
+                    // thawing and drying its nook. It only clears flags — a hearth never
+                    // ignites anything or creates cells.
+                    if cell.flags & FLAG_FROZEN != 0 {
+                        continue;
+                    }
+                    let hearth = neighbors.iter().any(|&nidx| {
+                        let other = old[nidx];
+                        is_hot(other.kind)
+                            || (other.kind == Material::Ember as u8 && other.energy > 90)
+                    });
+                    if !hearth {
+                        continue;
+                    }
+                    for nidx in neighbors {
+                        let other = old[nidx];
+                        if other.flags & FLAG_FROZEN != 0 && self.chance(6) {
+                            next[nidx].flags = thawed_flags(other.kind, next[nidx].flags);
+                        } else if other.flags & FLAG_WET != 0 && self.chance(10) {
+                            next[nidx].flags &= !FLAG_WET;
+                        }
+                    }
+                }
                 x if x == Material::Fire as u8 => {
                     let mut dampened = false;
                     for nidx in neighbors {
@@ -790,6 +814,14 @@ impl Universe {
                                 next[nidx].energy = next[nidx].energy.saturating_add(condensation).min(255);
                                 next[nidx].flags = (next[nidx].flags | FLAG_WET) & !FLAG_SCORCHED;
                                 if other.kind == Material::Stone as u8 && self.chance(4) {
+                                    next[idx] = Cell::new(Material::Water as u8, cell.variant, 50);
+                                }
+                            } else if other.kind == Material::Glass as u8 {
+                                // Glass dew: steam fogs the pane and beads back into water,
+                                // so a sealed glass terrarium keeps its moisture cycling.
+                                next[nidx].energy = next[nidx].energy.saturating_add(46).min(255);
+                                next[nidx].flags |= FLAG_WET;
+                                if self.chance(4) {
                                     next[idx] = Cell::new(Material::Water as u8, cell.variant, 50);
                                 }
                             }
@@ -1377,6 +1409,16 @@ impl Universe {
             return;
         }
         let (x, y) = self.xy(idx);
+        // A spark meeting water hisses out into a wisp of steam — fireworks sizzle
+        // over a pond instead of raining fire on it.
+        if self
+            .neighbor_indices(x, y)
+            .iter()
+            .any(|&nidx| is_water_like(old[nidx].kind))
+        {
+            next[idx] = Cell::new(Material::Steam as u8, cell.variant, 60);
+            return;
+        }
         let flying = next[idx];
         if cell.age < 6 {
             // Shell expansion: the spark keeps flying along its birth direction.
@@ -1527,6 +1569,7 @@ fn is_absorbent(kind: u8) -> bool {
         || kind == Material::Sand as u8
         || kind == Material::Wood as u8
         || kind == Material::Stone as u8
+        || kind == Material::Glass as u8
 }
 
 fn is_hydratable(kind: u8) -> bool {
@@ -1755,6 +1798,96 @@ mod tests {
             .filter(|c| c.kind == Material::Water as u8)
             .count();
         assert_eq!(water, 0, "nearby ice should pause the spring's flow");
+    }
+
+    #[test]
+    fn glass_dew_fogs_the_pane_and_beads_into_water() {
+        let mut u = Universe::new(16, 16, 7);
+        // A steam pocket trapped under a glass ceiling, sealed by walls.
+        for x in 6..=10 {
+            set_cell(&mut u, x, 6, Material::Glass);
+        }
+        for y in 7..=9 {
+            set_cell(&mut u, 6, y, Material::Wall);
+            set_cell(&mut u, 10, y, Material::Wall);
+        }
+        for x in 6..=10 {
+            set_cell(&mut u, x, 10, Material::Wall);
+        }
+        set_cell_state(&mut u, 8, 7, Material::Steam, 0, 160, 0);
+        set_cell_state(&mut u, 9, 7, Material::Steam, 0, 160, 0);
+        let mut fogged = false;
+        let mut beaded = false;
+        for _ in 0..120 {
+            u.tick();
+            if (6..=10).any(|x| {
+                kind_at(&u, x, 6) == Material::Glass as u8 && flags_at(&u, x, 6) & FLAG_WET != 0
+            }) {
+                fogged = true;
+            }
+            if u.cells.iter().any(|c| c.kind == Material::Water as u8) {
+                beaded = true;
+            }
+            if fogged && beaded {
+                break;
+            }
+        }
+        assert!(fogged, "steam under a glass pane should fog it with a wet film");
+        assert!(beaded, "fogged glass should bead steam back into water droplets");
+    }
+
+    #[test]
+    fn hearth_wall_dries_and_thaws_its_nook() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 8, 8, Material::Wall);
+        // Flame on one side of the wall; the damp and frozen cells sit on the
+        // far side, out of the flame's own reach.
+        set_cell_state(&mut u, 9, 8, Material::Fire, 0, 240, 0);
+        set_cell_state(&mut u, 7, 8, Material::Soil, 10, 80, FLAG_WET);
+        set_cell_state(&mut u, 7, 9, Material::Soil, 10, 80, FLAG_FROZEN);
+        set_cell(&mut u, 7, 10, Material::Wall);
+        set_cell(&mut u, 8, 9, Material::Wall);
+        let mut dried = false;
+        let mut thawed = false;
+        for _ in 0..60 {
+            u.tick();
+            if flags_at(&u, 7, 8) & FLAG_WET == 0 {
+                dried = true;
+            }
+            if flags_at(&u, 7, 9) & FLAG_FROZEN == 0 {
+                thawed = true;
+            }
+            if dried && thawed {
+                break;
+            }
+        }
+        assert!(dried, "a hearth wall should dry the damp cell in its nook");
+        assert!(thawed, "a hearth wall should thaw the frozen cell in its nook");
+    }
+
+    #[test]
+    fn spark_hisses_into_steam_on_water() {
+        let mut u = Universe::new(16, 16, 7);
+        for x in 6..=10 {
+            set_cell(&mut u, x, 10, Material::Wall);
+        }
+        // Basin walls seal the pond against liquid side-hops.
+        set_cell(&mut u, 6, 9, Material::Wall);
+        set_cell(&mut u, 10, 9, Material::Wall);
+        for x in 7..=9 {
+            set_cell(&mut u, x, 9, Material::Water);
+        }
+        // A drooping spark (past its expansion phase) resting on the pond.
+        set_cell_state(&mut u, 8, 8, Material::Spark, 10, 200, 0);
+        let mut hissed = false;
+        for _ in 0..20 {
+            u.tick();
+            if u.cells.iter().any(|c| c.kind == Material::Steam as u8) {
+                hissed = true;
+                break;
+            }
+        }
+        assert!(hissed, "a spark settling onto water should hiss out as steam");
     }
 
     #[test]
