@@ -3,8 +3,9 @@
 Status snapshot for resuming in a fresh session. Phase 18 applies a roster-wide
 design-feedback pass (four lenses: interaction depth, visual identity, uniqueness,
 combos — each item fact-checked against the code before it made this list). The
-owner approved **12 items**, split into four gated commits. **Batches 1, 2, and 3 are
-shipped; batch 4 remains.**
+owner approved **12 items**, split into four gated commits. **All four batches are
+shipped.** The only Phase 18 work left is the not-approved visual-lens list below,
+which still needs an owner yes.
 
 ## Working conventions (do not skip)
 
@@ -75,46 +76,32 @@ shipped; batch 4 remains.**
   hash flecks, and the showcase carries a frost-stressed near-crumble wall so it is
   reviewable on the visual board.
 
-## TODO — Batch 4: cycles & rituals (one commit)
+## Done — Batch 4: cycles & rituals
 
-3. **Wellspring re-attunement via ice (small).** Attunement is currently permanent
-   (absorb branch only runs while `energy == 0`). While the spring is **chilled by ice**
-   (the existing `chilled` check, `sim/src/lib.rs:482-484`), a touching wellspring-source
-   should re-attune it — consuming that source cell exactly like first attunement
-   (`493-496`). The rune glow shifts hue (already keyed off energy in `wellspringColor`);
-   remove the ice and it pours the new material. Self-limiting: deliberate two-step,
-   consumes one cell, creates nothing. Fixes irreversible first-touch mis-attunement.
-
-4. **Fairy ring (small).** Stardust/moonwater set FLAG_COSMIC on fungus (`614-619`,
-   `688-697`) but `update_fungus` (`sim/src/lib.rs:1214`, signature currently
-   `(idx, _cell, old, next)` — rename `_cell` to `cell`) never reads it. When a cosmic
-   fungus performs its existing wood/soil/moss conversion, at ~1-in-10 chance the
-   digested cell becomes a **Stardust** grain instead of Fungus, and the fungus clears
-   its own cosmic flag. Self-limiting: one grain per cosmic charge, yield below stardust
-   invested. Gives the roster's least-loved corner a gift and a reason to charge it.
-
-5. **Fungus → soil collapse (small).** Fungus is the only dead-end (everything converts
-   INTO fungus; nothing converts it onward except fire). Starved fungus — past ~600 age
-   with **no** adjacent seed/moss/wood/soil to eat — collapses into fresh **Soil** at low
-   chance, closing soil→moss→fungus→soil. Note: fungus is NOT in the age-expiry list and
-   energy 0 only strips flags, so add a starvation check in `update_fungus`. Self-limiting:
-   only fires with nothing left to eat; produces inert substrate.
-
-6. **Meteor spark trail (small).** Meteor's flight is one bare falling pixel
-   (`update_meteor`, `sim/src/lib.rs:1303`, fall step ~1260-1263 region). After each
-   successful fall step, `chance(3)` leaves a **Spark** (variant `SPARK_DOWN`, energy ~90)
-   in the vacated cell — borrow the rocket's trail shape. Trail sparks already light
-   rocket powder, so a meteor shower over a rocket field becomes a festival. Self-limiting:
-   sparks age out at 60 ticks and (via `is_hot` excluding Spark) ignite nothing but rocket
-   fuses. Confirm the spark-over-water hiss from batch 2 still composes.
-
-7. **Ember doc honesty (tiny, doc-only).** Ember has 5 *felt* roles (glow-spread,
-   cool-char, relight, quench, char-wash) but is generated-only so its matrix row
-   (`docs/MATERIAL_AUDIT.md:60`) documents 3 to satisfy the 1-3 cap. Add a short note
-   (Decisions section or prose, **NOT** a 4th matrix clause — that breaks the gate) that
-   Ember intentionally exceeds the generated bar in felt depth, and that paintable
-   **Char/Coal** (slow hearth heat, distinct from Fire's flash and Lava's flood) is the
-   strongest candidate if a 20th toolbar slot is ever wanted.
+- **Wellspring re-attunement via ice.** The absorb branch now runs when
+  `energy == 0 || chilled`, so a spring held under ice re-drinks a touching source
+  (consuming it) exactly like first attunement; remove the ice and it pours the new
+  material. Emission still only happens unchilled and attuned, so `ice_stills_the_spring`
+  is unchanged. Fixes irreversible first-touch misattunement. Tests:
+  `ice_lets_a_wellspring_be_reattuned`, `an_unchilled_spring_keeps_its_first_identity`.
+- **Fairy ring.** `update_fungus` takes `cell` (was `_cell`) and reads FLAG_COSMIC: on its
+  wood/moss/soil conversion a charged fungus at `chance(10)` sows a **Stardust** grain
+  instead of Fungus and clears its own cosmic flag. Test:
+  `a_cosmic_fungus_sows_a_stardust_grain_as_it_digests`.
+- **Fungus → soil collapse.** A fungus past age 600 with no adjacent seed/moss/wood/soil
+  collapses into fresh **Soil** at `chance(20)`, closing soil→moss→fungus→soil. Tests:
+  `a_starved_old_fungus_collapses_into_soil`, `a_young_starved_fungus_holds_instead_of_collapsing`.
+- **Meteor spark trail.** After each successful fall step `leave_meteor_trail` drops a
+  `SPARK_DOWN` spark (energy 90) at `chance(3)` in the vacated cell, so showers streak and
+  can light rocket fuses; the batch-2 spark-over-water hiss still composes. Test:
+  `a_falling_meteor_streaks_a_spark_trail`.
+- **Ember doc honesty.** Added a prose note (Decisions row + a dedicated section) that
+  Ember's 3 documented roles respect the generated cap while it carries five felt beats,
+  and that paintable **Char/Coal** is the strongest 20th-slot candidate. No 4th matrix
+  clause — that would break the gate.
+- Parity scenarios: "meteor shower over rockets and a pond", "cosmic fungus grove",
+  "wellspring re-attuned under ice". All three were confirmed non-vacuous (sparks shed,
+  stardust count rose from the fairy ring, springs observed going water → sand under ice).
 
 ## Not approved (yet) — visual-lens findings worth surfacing to the owner
 

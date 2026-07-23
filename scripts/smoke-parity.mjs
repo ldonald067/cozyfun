@@ -231,6 +231,43 @@ const scenarios = [
       p(27, 20, 2, M.Steam);
     },
   },
+  {
+    // Meteor spark trail: falling meteors shed downward sparks that light a rocket
+    // field and hiss to steam over a pond. Exercises the trail plus its compositions.
+    name: "meteor shower over rockets and a pond",
+    w: 26, h: 40, seed: 909, ticks: 130,
+    paint(p) {
+      for (let x = 0; x < 26; x++) p(x, 38, 1, M.Wall);
+      for (let x = 3; x <= 11; x++) { p(x, 37, 1, M.Water); p(x, 36, 1, M.Water); }
+      for (let x = 15; x <= 23; x += 2) p(x, 37, 1, M.Rocket);
+      p(6, 2, 1, M.Meteor); p(18, 4, 1, M.Meteor); p(21, 1, 1, M.Meteor);
+    },
+  },
+  {
+    // Fairy ring + starvation: a wood grove sown with stardust-charged fungi, so the
+    // cosmic-digest and starve-to-soil branches both run each tick in both engines.
+    name: "cosmic fungus grove",
+    w: 20, h: 20, seed: 4321, ticks: 220,
+    paint(p) {
+      for (let y = 3; y <= 15; y++) for (let x = 3; x <= 16; x++) p(x, y, 1, M.Wood);
+      for (let y = 4; y <= 14; y += 3) for (let x = 4; x <= 15; x += 3) p(x, y, 1, M.Stardust);
+      p(6, 6, 1, M.Fungus); p(12, 9, 1, M.Fungus); p(9, 13, 1, M.Fungus);
+    },
+  },
+  {
+    // Wellspring re-attunement: a water-attuned spring stilled by ice re-drinks a sand
+    // source. Paints (radius-1 plusses) are spaced so the spring cell survives intact,
+    // with water above, ice on one flank, and sand on the other.
+    name: "wellspring re-attuned under ice",
+    w: 22, h: 20, seed: 2025, ticks: 120,
+    paint(p) {
+      for (let x = 0; x < 22; x++) p(x, 16, 1, M.Wall);
+      p(11, 7, 1, M.Water);
+      p(8, 10, 1, M.Ice);
+      p(14, 10, 1, M.Sand);
+      p(11, 10, 1, M.Wellspring);
+    },
+  },
 ];
 
 for (const s of scenarios) runScenario(s);

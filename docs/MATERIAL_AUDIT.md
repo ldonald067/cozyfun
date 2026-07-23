@@ -23,15 +23,15 @@ Every toolbar material is a product choice. Each material in `app/src/materials.
 | Seed | Keep | Rooting growth unit. Needs water plus soil to produce generated flowers. |
 | Flower | Generated only | Outcome of successful seeded growth; not selectable. |
 | Glass | Generated only | Outcome of strong heat fusing dry sand; translucent pane, not selectable. |
-| Ember | Generated only | Outcome of burning wood; glowing remains that cool into relightable char, not selectable. |
+| Ember | Generated only | Outcome of burning wood; glowing remains that cool into relightable char, not selectable. Its matrix row documents 3 roles to respect the generated cap, but see the note below — Ember carries more felt depth than that bar implies. |
 | Pollen | Generated only | Golden motes released by mature flowers; drift, settle, and can seed damp soil, not selectable. |
 | Stem | Generated only | Plant stalk grown from a rooted seed; climbs cell by cell and blooms a flower at its tip, not selectable. |
-| Fungus | Keep | Decomposer. Rots wet seeds, overtakes old/wet moss, and feeds on wood/soil. |
+| Fungus | Keep | Decomposer. Rots wet seeds, overtakes old/wet moss, feeds on wood/soil, sows a stardust fairy ring while cosmically charged, and finally collapses into soil once starved, so decay is no longer a dead end. |
 | Oil | Keep | Floating smothering liquid. Blocks hydration, strips wet flags, burns readily. |
 | Stardust | Keep | Cosmic powder. Charges water, energizes life/soil/fungus, and produces visual sparkle. |
-| Meteor | Keep | Falling cosmic heat. Impacts into stone/stardust/fire and reacts with moonwater. |
+| Meteor | Keep | Falling cosmic heat. Impacts into stone/stardust/fire, reacts with moonwater, and streaks a spark trail on the way down. |
 | Rocket | Keep | Festival firework powder. Inert until any flame lights it, then it launches skyward and bursts into sparks. |
-| Wellspring | Keep | Identity-drinking carved block. Absorbs the first touching source material and pours it back out from open faces forever. |
+| Wellspring | Keep | Identity-drinking carved block. Absorbs the first touching source material and pours it back out from open faces forever; chilling it with ice reopens that identity so a misattuned spring can be re-taught. |
 | Spark | Generated only | Firework spark thrown by a rocket burst; flies outward, droops, twinkles out, not selectable. |
 
 ## Interaction Matrix
@@ -46,7 +46,7 @@ Every toolbar material is a product choice. Each material in `app/src/materials.
 | Moonwater | Moves like water with supercharged growth; marks touched cells cosmic; cleans oil into stardust; bursts meteor contact into stardust; freezes into cosmic ice. | Tests: `moonwater_cleans_oil_into_stardust`, `meteor_moonwater_contact_bursts_to_stardust`, `lava_cools_near_moonwater`; visual QA: `material-identity-showcase`. |
 | Smoke | Rises and fades; soots hard surfaces. | Tests: `smoke_leaves_soot_instead_of_condensation`; source: `update_gas` owns rise/fade. |
 | Steam | Rises and fades; condenses on hard surfaces; frosts near ice. | Tests: `steam_condenses_on_hard_surfaces`, `steam_frosts_against_ice`, `water_fire_creates_steam_glow_instead_of_instant_delete`; source: `update_gas` owns rise/fade. |
-| Soil | Falls as organic substrate; stores moisture and greens into moss; breathes a petrichor mist when watered after a long dry spell; roots wet seeds for blooming; feeds fungus decomposition. | Tests: `watered_soil_greens_up`, `rooted_seed_grows_a_stalk_that_blooms`, `first_water_on_dry_soil_breathes_mist`; source: `update_soil` and `update_fungus` own substrate behavior. |
+| Soil | Falls as organic substrate; stores moisture and greens into moss; breathes a petrichor mist when watered after a long dry spell; roots wet seeds for blooming; feeds fungus decomposition; reborn where a starved fungus collapses, closing the soil to moss to fungus to soil loop. | Tests: `watered_soil_greens_up`, `rooted_seed_grows_a_stalk_that_blooms`, `first_water_on_dry_soil_breathes_mist`, `a_starved_old_fungus_collapses_into_soil`; source: `update_soil` and `update_fungus` own substrate behavior. |
 | Wood | Burns through the wet, dry, ember, char arc instead of vanishing; wet wood vents steam before igniting; hosts moss spread; feeds fungus digestion. | Tests: `heat_steams_wet_wood_before_burning`, `wood_ignites_into_ember_instead_of_bare_flame`; source: `update_moss` and `update_fungus` handle organic contact; visual QA: damp/char states. |
 | Fire | Ignites fuel with per-material burn odds; dries and scorches wet cells first; softens into steam against water; thaws frozen cells; vitrifies dry sand while young and hot. | Tests: `heat_dries_wet_growth_before_burning`, `water_fire_creates_steam_glow_instead_of_instant_delete`, `heat_steams_wet_wood_before_burning`, `wet_sand_takes_scorch_before_vitrifying`; source: `update_fire`. |
 | Lava | Flows slowly and ignites fuel; quenched by water into scorched stone; vitrifies dry sand into glass; dries, scorches, and thaws its neighbors; cools into a stone crust on its own once its edges lose heat. | Tests: `lava_cools_near_moonwater`, `water_quenches_lava_into_steam_and_stone`, `lava_vitrifies_dry_sand_into_glass`, `isolated_lava_crusts_into_stone_over_time`; source: `update_liquid` owns movement. |
@@ -58,13 +58,13 @@ Every toolbar material is a product choice. Each material in `app/src/materials.
 | Stem | Climbs upward cell by cell from a rooted seed and blooms a flower at its tip; unsupported segments fall so cut plants collapse; burns and freezes like living growth. | Tests: `rooted_seed_grows_a_stalk_that_blooms`, `cut_stalk_segments_fall`; visual QA: `material-identity-showcase`. |
 | Glass | Forms as a translucent pane where strong heat fuses dry sand; fogs with dew and beads steam back into water so a sealed glass terrarium keeps its moisture cycling; shatters back to sand with a chime under meteor impact. | Tests: `lava_vitrifies_dry_sand_into_glass`, `meteor_impact_vitrifies_nearby_sand`, `meteor_impact_shatters_glass_to_sand`, `glass_dew_fogs_the_pane_and_beads_into_water`; visual QA: `material-identity-showcase`. |
 | Ember | Glows while hot and weakly spreads fire; cools into inert char that relights near heat; quenches wet under water, and running water washes crumbling cold char away with an inky murk. | Tests: `wood_ignites_into_ember_instead_of_bare_flame`, `ember_cools_into_inert_char`, `water_quenches_hot_ember`, `water_washes_cold_char_away`; visual QA: `material-identity-showcase`. |
-| Fungus | Rots wet seeds; overtakes old or wet moss; digests wood and soil; charges cosmic near stardust and moonwater. | Tests: `fungus_can_rot_wet_seed`; source: `update_fungus` handles moss/wood/soil contact; visual QA: contact-colored states. |
+| Fungus | Rots wet seeds; overtakes old or wet moss; digests wood and soil; charges cosmic near stardust and moonwater; a charged fungus occasionally sows a stardust grain where it would digest, spending the charge on that fairy-ring gift; an ancient fungus with nothing edible left beside it collapses back into fresh soil. | Tests: `fungus_can_rot_wet_seed`, `a_cosmic_fungus_sows_a_stardust_grain_as_it_digests`, `a_starved_old_fungus_collapses_into_soil`, `a_young_starved_fungus_holds_instead_of_collapsing`; source: `update_fungus` handles moss/wood/soil contact; visual QA: contact-colored states. |
 | Oil | Floats above water and sheets sideways when supported; smothers hydration and strips wet state; ignites readily near heat; cleaned into stardust by moonwater. | Tests: `oil_rises_above_water`, `oil_blocks_plain_water_hydration`, `moonwater_cleans_oil_into_stardust`; source: `update_oil` owns burn readiness. |
 | Stardust | Charges water into moonwater; energizes life, soil, and fungus with cosmic marks; snuffs fire into sparkle bursts; etches constellation marks onto stone and wall. | Tests: `stardust_charges_water_into_moonwater`, `stardust_snuffs_fire_into_sparkle`, `stardust_etches_constellations_on_stone`; visual QA: `material-identity-showcase`. |
-| Meteor | Falls as impact heat; impacts into stone, stardust, and a fire ring; shocked into scorched stone by water; bursts into stardust against moonwater; vitrifies nearby sand on impact. | Tests: `water_shocks_meteor_into_steam_and_stone`, `meteor_moonwater_contact_bursts_to_stardust`, `meteor_impact_vitrifies_nearby_sand`; source: `update_meteor` owns fall and impact heat. |
+| Meteor | Falls as impact heat; impacts into stone, stardust, and a fire ring; shocked into scorched stone by water; bursts into stardust against moonwater; vitrifies nearby sand on impact; sheds a downward spark trail as it falls, so a shower streaks and can light rocket fuses it passes. | Tests: `water_shocks_meteor_into_steam_and_stone`, `meteor_moonwater_contact_bursts_to_stardust`, `meteor_impact_vitrifies_nearby_sand`, `a_falling_meteor_streaks_a_spark_trail`; source: `update_meteor` owns fall and impact heat. |
 | Rocket | Falls and piles as inert powder so charges and fuse lines can be laid calmly; any flame (fire, lava, hot ember, meteor) lights its fuse instead of burning it in place; a lit grain climbs fast with sway and a glittering smoke trail; bursts at fuse end or against a ceiling into a multicolor firework shell of sparks plus stardust, chain-lighting neighboring powder. | Tests: `rocket_powder_falls_inert_without_flame`, `flame_launches_rocket_skyward`, `lit_rocket_bursts_into_sparks_and_stardust`, `rocket_burst_blooms_a_spark_shell_that_fades`, `rocket_bursts_when_it_hits_a_ceiling`; source: `update_rocket` owns flight, `burst_rocket` owns the burst. |
 | Spark | Flies outward from a rocket burst then droops and fades, twinkling in firework hues and casting warm light; reaching rocket powder during its outward flight lights its fuse; hisses out into a wisp of steam when it meets water, so fireworks sizzle over a pond. | Tests: `rocket_burst_blooms_a_spark_shell_that_fades`, `spark_hisses_into_steam_on_water`; source: `update_spark` owns expansion, droop, and fade. |
-| Wellspring | Drinks the identity of the first source material that touches it, consuming that cell with a rune-glow attunement; endlessly pours the remembered material from its open faces; blocks flow like sealed construction while dormant or between pours; nearby ice stills the spring until the cold is removed. | Tests: `wellspring_drinks_first_touch_identity`, `attuned_wellspring_emits_its_material`, `unattuned_wellspring_stays_dormant`, `ice_stills_the_spring`; source: the wellspring arm in `apply_reactions` owns absorb and emit. |
+| Wellspring | Drinks the identity of the first source material that touches it, consuming that cell with a rune-glow attunement; endlessly pours the remembered material from its open faces; blocks flow like sealed construction while dormant or between pours; nearby ice stills the spring until the cold is removed; a spring held under that chill re-drinks a touching source, so a first-touch misattunement can be re-taught instead of being permanent. | Tests: `wellspring_drinks_first_touch_identity`, `attuned_wellspring_emits_its_material`, `unattuned_wellspring_stays_dormant`, `ice_stills_the_spring`, `ice_lets_a_wellspring_be_reattuned`, `an_unchilled_spring_keeps_its_first_identity`; source: the wellspring arm in `apply_reactions` owns absorb and emit. |
 
 ## Current Cuts
 
@@ -75,6 +75,17 @@ Smoke and Steam left the toolbar in the element depth pass: they share the same 
 - Moss and seed remain separate. Moss is surface spread; seed is rooted bloom.
 - Water and moonwater remain separate. Water is practical hydration/cooling; moonwater is cosmic transformation.
 - Fungus remains separate from moss because it is decay pressure, not carpet growth, and now has explicit contact-colored role states.
+
+## A note on Ember's documented depth
+
+Ember's interaction row lists 3 roles because generated-only materials are capped at
+1-3, but in play it carries five distinct felt beats: glow-spread, cool-to-char,
+relight near heat, quench under water, and char-wash by running water. That is
+deliberate — Ember exceeds the generated bar in depth while staying unpaintable,
+because it is earned by burning wood rather than chosen from the tray. If a 20th
+toolbar slot is ever wanted, a paintable **Char/Coal** is the strongest candidate:
+slow, banked hearth heat that is honestly distinct from Fire's flash and Lava's
+flood, and it would give Ember's best beats a deliberate home in the tray.
 
 ## Future Removal Triggers
 

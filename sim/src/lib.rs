@@ -483,9 +483,11 @@ impl Universe {
                     let chilled = neighbors
                         .iter()
                         .any(|&nidx| old[nidx].kind == Material::Ice as u8);
-                    if cell.energy == 0 {
-                        // An unattuned wellspring drinks the identity of the first
-                        // source material that touches it, consuming that cell.
+                    if cell.energy == 0 || chilled {
+                        // An unattuned wellspring drinks the identity of the first source
+                        // material that touches it, consuming that cell. A spring stilled
+                        // by ice can be re-taught the same way, so a first-touch misattunement
+                        // is fixable — remove the ice and it pours the newly drunk material.
                         for nidx in neighbors {
                             let other = old[nidx];
                             if is_wellspring_source(other.kind)
@@ -498,7 +500,7 @@ impl Universe {
                                 break;
                             }
                         }
-                    } else if !chilled && is_wellspring_source(cell.energy as u8) {
+                    } else if is_wellspring_source(cell.energy as u8) {
                         // Attuned: gently emit the remembered material from open faces.
                         // The source guard rejects out-of-range ids from imported scenes.
                         let (cx, cy) = self.xy(idx);
@@ -1220,7 +1222,7 @@ impl Universe {
         }
     }
 
-    fn update_fungus(&mut self, idx: usize, _cell: Cell, old: &[Cell], next: &mut [Cell]) {
+    fn update_fungus(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
         if next[idx].flags & FLAG_FROZEN != 0 {
             return;
         }
@@ -1228,8 +1230,19 @@ impl Universe {
         if !self.chance(48) {
             return;
         }
+        let mut has_food = false;
         for nidx in self.neighbor_indices(x, y) {
             let other = old[nidx];
+            let edible = matches!(
+                other.kind,
+                k if k == Material::Seed as u8
+                    || k == Material::Moss as u8
+                    || k == Material::Wood as u8
+                    || k == Material::Soil as u8
+            );
+            if edible && other.flags & FLAG_FROZEN == 0 {
+                has_food = true;
+            }
             if other.kind == Material::Seed as u8
                 && other.flags & FLAG_FROZEN == 0
                 && (other.flags & FLAG_WET != 0 || other.energy > 70)
@@ -1254,9 +1267,21 @@ impl Universe {
                 && other.flags & FLAG_FROZEN == 0
                 && self.chance(5)
             {
-                next[nidx] = Cell::new(Material::Fungus as u8, other.variant, 80);
+                // Fairy ring: a cosmic-charged fungus occasionally sows a stardust grain
+                // where it would digest, spending its charge on the gift instead of spreading.
+                if cell.flags & FLAG_COSMIC != 0 && self.chance(10) {
+                    next[nidx] = Cell::new(Material::Stardust as u8, other.variant, 180);
+                    next[idx].flags &= !FLAG_COSMIC;
+                } else {
+                    next[nidx] = Cell::new(Material::Fungus as u8, other.variant, 80);
+                }
                 return;
             }
+        }
+        // Starvation collapse: an old fungus with nothing left to digest crumbles back
+        // into fresh soil, closing the soil -> moss -> fungus -> soil loop.
+        if cell.age > 600 && !has_food && self.chance(20) {
+            next[idx] = Cell::new(Material::Soil as u8, cell.variant, 0);
         }
     }
 
@@ -1315,9 +1340,11 @@ impl Universe {
         }
         let (x, y) = self.xy(idx);
         if self.try_move(idx, x, y + 1, cell, old, next, true) {
+            self.leave_meteor_trail(idx, next);
             return;
         }
         if self.try_move(idx, x + if self.tick_count % 2 == 0 { 1 } else { -1 }, y + 1, cell, old, next, true) {
+            self.leave_meteor_trail(idx, next);
             return;
         }
 
@@ -1340,6 +1367,15 @@ impl Universe {
             } else if is_flammable(old[nidx].kind) {
                 next[nidx] = ignited_cell(old[nidx], 230);
             }
+        }
+    }
+
+    /// A meteor occasionally sheds a downward spark from the cell it just left, so a
+    /// shower streaks a glittering tail. Trail sparks age out fast and light nothing but
+    /// rocket fuses (Spark is excluded from `is_hot`), and hiss to steam over water.
+    fn leave_meteor_trail(&mut self, vacated: usize, next: &mut [Cell]) {
+        if next[vacated].is_empty() && self.chance(3) {
+            next[vacated] = Cell::new(Material::Spark as u8, SPARK_DOWN, 90);
         }
     }
 
@@ -2905,5 +2941,101 @@ mod tests {
             }
         }
         assert_eq!(a.cells, b.cells);
+    }
+
+    #[test]
+    fn ice_lets_a_wellspring_be_reattuned() {
+        let mut u = Universe::new(16, 16, 7);
+        // A spring already attuned to water, stilled by ice, re-drinks a touching sand
+        // source and forgets the water — the fix for an irreversible first-touch mistake.
+        set_cell_state(&mut u, 8, 8, Material::Wellspring, 0, Material::Water as u16, 0);
+        set_cell(&mut u, 8, 7, Material::Ice);
+        set_cell(&mut u, 9, 8, Material::Sand);
+        u.tick();
+        assert_eq!(energy_at(&u, 8, 8), Material::Sand as u16, "a chilled spring re-drinks a touching source");
+        assert_eq!(kind_at(&u, 9, 8), Material::Empty as u8, "re-attunement consumes the new source cell");
+    }
+
+    #[test]
+    fn an_unchilled_spring_keeps_its_first_identity() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell_state(&mut u, 8, 8, Material::Wellspring, 0, Material::Water as u16, 0);
+        set_cell(&mut u, 9, 8, Material::Sand);
+        u.tick();
+        assert_eq!(energy_at(&u, 8, 8), Material::Water as u16, "without ice the spring ignores new sources");
+        assert!(
+            u.cells.iter().any(|c| c.kind == Material::Sand as u8),
+            "an unchilled spring never consumes a touching source"
+        );
+    }
+
+    #[test]
+    fn a_cosmic_fungus_sows_a_stardust_grain_as_it_digests() {
+        let mut u = Universe::new(16, 16, 7);
+        // Fill the grid with wood, then charge a lattice of fungi cosmic. No stardust is
+        // present at the start, so any grain that appears was sown by the fairy-ring path.
+        for y in 0..16 {
+            for x in 0..16 {
+                set_cell(&mut u, x, y, Material::Wood);
+            }
+        }
+        for y in (2..14).step_by(3) {
+            for x in (2..14).step_by(3) {
+                set_cell_state(&mut u, x, y, Material::Fungus, 40, 255, FLAG_COSMIC);
+            }
+        }
+        let mut sowed = false;
+        for _ in 0..600 {
+            u.tick();
+            if u.cells.iter().any(|c| c.kind == Material::Stardust as u8) {
+                sowed = true;
+                break;
+            }
+        }
+        assert!(sowed, "a charged fungus should occasionally sow a stardust grain instead of spreading");
+    }
+
+    #[test]
+    fn a_starved_old_fungus_collapses_into_soil() {
+        let mut u = Universe::new(16, 16, 7);
+        // A lone, ancient fungus with nothing left to eat crumbles back into fresh soil,
+        // closing the soil -> moss -> fungus -> soil loop.
+        set_cell_state(&mut u, 8, 8, Material::Fungus, 601, 60, 0);
+        let mut collapsed = false;
+        for _ in 0..10000 {
+            u.tick();
+            if u.cells.iter().any(|c| c.kind == Material::Soil as u8) {
+                collapsed = true;
+                break;
+            }
+        }
+        assert!(collapsed, "a starved old fungus should eventually collapse into soil");
+    }
+
+    #[test]
+    fn a_young_starved_fungus_holds_instead_of_collapsing() {
+        let mut u = Universe::new(16, 16, 7);
+        // Starved but not yet ancient (age stays below the ~600 threshold): the
+        // loop-closing collapse is gated on old age, so this fungus must hold.
+        set_cell_state(&mut u, 8, 8, Material::Fungus, 100, 60, 0);
+        for _ in 0..400 {
+            u.tick();
+        }
+        assert_eq!(kind_at(&u, 8, 8), Material::Fungus as u8, "a young starved fungus should stay fungus");
+    }
+
+    #[test]
+    fn a_falling_meteor_streaks_a_spark_trail() {
+        let mut u = Universe::new(16, 32, 7);
+        set_cell(&mut u, 8, 2, Material::Meteor);
+        let mut sparked = false;
+        for _ in 0..40 {
+            u.tick();
+            if u.cells.iter().any(|c| c.kind == Material::Spark as u8) {
+                sparked = true;
+                break;
+            }
+        }
+        assert!(sparked, "a meteor should shed sparks from the cells it falls through");
     }
 }

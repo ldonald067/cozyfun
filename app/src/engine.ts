@@ -684,8 +684,8 @@ class JsSandboxEngine implements SandboxEngine {
 
   private meteor(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
     if (next[idx] !== MATERIAL.Meteor) return;
-    if (this.move(idx, x, y + 1, cell, old, next)) return;
-    if (this.move(idx, x + (this.ticks % 2 === 0 ? 1 : -1), y + 1, cell, old, next)) return;
+    if (this.move(idx, x, y + 1, cell, old, next)) return this.leaveMeteorTrail(idx, next);
+    if (this.move(idx, x + (this.ticks % 2 === 0 ? 1 : -1), y + 1, cell, old, next)) return this.leaveMeteorTrail(idx, next);
     if (this.chance(2)) writeCellBytes(next, idx, MATERIAL.Stardust, cell[1], 180);
     else writeCellBytes(next, idx, MATERIAL.Stone, cell[1]);
     for (const nidx of this.neighbors(x, y)) {
@@ -704,13 +704,23 @@ class JsSandboxEngine implements SandboxEngine {
     }
   }
 
+  // A meteor occasionally sheds a downward spark from the cell it just left, so a
+  // shower streaks a glittering tail. Trail sparks age out fast and hiss over water.
+  private leaveMeteorTrail(vacated: number, next: Uint8Array) {
+    if (next[vacated] === MATERIAL.Empty && this.chance(3)) {
+      writeCellBytes(next, vacated, MATERIAL.Spark, SPARK_DOWN, 90);
+    }
+  }
+
   private wellspring(idx: number, x: number, y: number, old: Uint8Array, next: Uint8Array) {
     const neighbors = this.neighbors(x, y);
     const chilled = neighbors.some((nidx) => old[nidx] === MATERIAL.Ice);
     const energy = readU16(old, idx + 4);
-    if (energy === 0) {
-      // An unattuned wellspring drinks the identity of the first source
-      // material that touches it, consuming that cell.
+    if (energy === 0 || chilled) {
+      // An unattuned wellspring drinks the identity of the first source material
+      // that touches it, consuming that cell. A spring stilled by ice can be
+      // re-taught the same way, so a first-touch misattunement is fixable — remove
+      // the ice and it pours the newly drunk material.
       for (const nidx of neighbors) {
         const other = old[nidx];
         if (wellspringSource(other) && next[idx] === MATERIAL.Wellspring) {
@@ -719,7 +729,7 @@ class JsSandboxEngine implements SandboxEngine {
           break;
         }
       }
-    } else if (!chilled && wellspringSource(energy & 255)) {
+    } else if (wellspringSource(energy & 255)) {
       // Attuned: gently emit the remembered material from open faces.
       // The source guard rejects out-of-range ids from imported scenes.
       const source = energy & 255;
@@ -1028,10 +1038,14 @@ class JsSandboxEngine implements SandboxEngine {
   }
 
   private fungus(x: number, y: number, old: Uint8Array, next: Uint8Array) {
-    if (readU16(next, this.index(x, y) + 6) & CELL_FLAG.Frozen) return;
+    const idx = this.index(x, y);
+    if (readU16(next, idx + 6) & CELL_FLAG.Frozen) return;
     if (!this.chance(48)) return;
+    let hasFood = false;
     for (const nidx of this.neighbors(x, y)) {
       const other = old[nidx];
+      const edible = other === MATERIAL.Seed || other === MATERIAL.Moss || other === MATERIAL.Wood || other === MATERIAL.Soil;
+      if (edible && !(readU16(old, nidx + 6) & CELL_FLAG.Frozen)) hasFood = true;
       const otherWet = Boolean(readU16(old, nidx + 6) & CELL_FLAG.Wet) || readU16(old, nidx + 4) > 70;
       if (other === MATERIAL.Seed && !(readU16(old, nidx + 6) & CELL_FLAG.Frozen) && otherWet && this.chance(4)) {
         writeCellBytes(next, nidx, MATERIAL.Fungus, old[nidx + 1], 90, 0, CELL_FLAG.Wet);
@@ -1042,9 +1056,21 @@ class JsSandboxEngine implements SandboxEngine {
         return;
       }
       if ((other === MATERIAL.Wood || other === MATERIAL.Moss || other === MATERIAL.Soil) && !(readU16(old, nidx + 6) & CELL_FLAG.Frozen) && this.chance(5)) {
-        writeCellBytes(next, nidx, MATERIAL.Fungus, old[nidx + 1], 80);
+        // Fairy ring: a cosmic-charged fungus occasionally sows a stardust grain
+        // where it would digest, spending its charge on the gift instead of spreading.
+        if (readU16(old, idx + 6) & CELL_FLAG.Cosmic && this.chance(10)) {
+          writeCellBytes(next, nidx, MATERIAL.Stardust, old[nidx + 1], 180);
+          writeU16(next, idx + 6, readU16(next, idx + 6) & ~CELL_FLAG.Cosmic);
+        } else {
+          writeCellBytes(next, nidx, MATERIAL.Fungus, old[nidx + 1], 80);
+        }
         return;
       }
+    }
+    // Starvation collapse: an old fungus with nothing left to digest crumbles back
+    // into fresh soil, closing the soil -> moss -> fungus -> soil loop.
+    if (readU16(old, idx + 2) > 600 && !hasFood && this.chance(20)) {
+      writeCellBytes(next, idx, MATERIAL.Soil, old[idx + 1], 0);
     }
   }
 
