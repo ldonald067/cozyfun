@@ -50,13 +50,15 @@ export function materialShowcaseScript() {
     rect(104, 112, 99, 105, material.Sand, 0, 80, flag.Scorched);
     rect(74, 82, 94, 101, material.Sand, 70, 34, flag.Frozen);
 
-    // Stone and wall thermal states: damp, frost, scorched, and cosmic-tinted cracks.
+    // Stone and wall thermal states: damp, frost, scorched, and freeze-thaw fracture.
     line(116, 154, 107, material.Stone);
     rect(119, 127, 96, 106, material.Stone, 80, 52, flag.Wet);
     rect(130, 138, 94, 106, material.Stone, 72, 64, flag.Frozen | flag.Wet);
     rect(141, 151, 97, 106, material.Stone, 30, 90, flag.Scorched);
     rect(154, 166, 91, 106, material.Wall, 70, 44, flag.Wet);
     rect(168, 179, 92, 106, material.Wall, 28, 76, flag.Scorched);
+    // A frost-stressed wall carrying near-crumble melt heat: it should read as cracked.
+    rect(154, 166, 77, 89, material.Wall, 145, 60, flag.Frozen);
     for (const [x, y] of [[121, 93], [123, 92], [133, 91], [157, 90], [170, 90]]) setCell(x, y, material.Ice, 90, 28);
     for (const [x, y] of [[145, 93], [146, 92], [147, 93]]) setCell(x, y, material.Fire, 230, 14);
     for (const [x, y] of [[161, 89], [162, 89]]) setCell(x, y, material.Stardust, 180, 20);

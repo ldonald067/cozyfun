@@ -171,6 +171,7 @@ class JsSandboxEngine implements SandboxEngine {
         const cell = old.slice(idx, idx + CELL_STRIDE);
         if (kind === MATERIAL.Sand) this.sand(idx, x, y, cell, old, next);
         if (kind === MATERIAL.Soil) this.soil(idx, x, y, cell, old, next);
+        if (kind === MATERIAL.Stone) this.stone(idx, x, y, cell, old, next);
         if (kind === MATERIAL.Water || kind === MATERIAL.Moonwater) this.liquid(idx, x, y, cell, old, next, 1);
         if (kind === MATERIAL.Oil) this.oil(idx, x, y, cell, old, next);
         if (kind === MATERIAL.Lava) this.liquid(idx, x, y, cell, old, next, 2);
@@ -584,6 +585,12 @@ class JsSandboxEngine implements SandboxEngine {
     for (const [dx, dy] of this.ticks % 2 === 0 ? [[0, 1], [-1, 1], [1, 1]] : [[0, 1], [1, 1], [-1, 1]]) {
       if (this.move(idx, x + dx, y + dy, cell, old, next)) return;
     }
+  }
+
+  // Unsupported stone drops straight down one cell per tick — no diagonal slip, so
+  // pillars, floors, and shelves hold and only true overhangs fall. Wall never moves.
+  private stone(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
+    this.move(idx, x, y + 1, cell, old, next);
   }
 
   private soil(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
@@ -1237,7 +1244,9 @@ function heatSoftens(next: Uint8Array, idx: number, old: Uint8Array, heat: numbe
   const flags = readU16(old, idx + 6);
   if (!freezable(kind) && !scorchable(kind)) return false;
   if (flags & CELL_FLAG.Frozen) {
-    if (kind === MATERIAL.Wall && readU16(next, idx + 4) + heat > 200) {
+    // Two hot rounds should crack a frost-stressed wall: lava's heat 72 crumbles
+    // it in two, and fire (heat 42) in three, once the melt heat has accumulated.
+    if (kind === MATERIAL.Wall && readU16(next, idx + 4) + heat > 150) {
       writeCellBytes(next, idx, MATERIAL.Stone, old[idx + 1], 40);
       return true;
     }

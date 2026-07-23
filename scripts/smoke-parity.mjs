@@ -41,8 +41,8 @@ const wasm = instance.exports;
 
 const STRIDE = 8;
 const M = {
-  Wall: 1, Sand: 2, Water: 3, Soil: 5, Fire: 6, Wood: 7, Lava: 8, Stone: 9, Moss: 10,
-  Seed: 11, Fungus: 12, Oil: 13, Ice: 14, Stardust: 16, Meteor: 17, Moonwater: 18,
+  Wall: 1, Sand: 2, Water: 3, Smoke: 4, Soil: 5, Fire: 6, Wood: 7, Lava: 8, Stone: 9, Moss: 10,
+  Seed: 11, Fungus: 12, Oil: 13, Ice: 14, Steam: 15, Stardust: 16, Meteor: 17, Moonwater: 18,
   Glass: 20, Rocket: 24, Wellspring: 25,
 };
 const BYTE_NAME = ["kind", "variant", "age.lo", "age.hi", "energy.lo", "energy.hi", "flags.lo", "flags.hi"];
@@ -211,9 +211,24 @@ const scenarios = [
     name: "wellspring fountains",
     w: 40, h: 40, seed: 2024, ticks: 260,
     paint(p) {
-      for (let x = 0; x < 40; x++) p(x, 38, 1, M.Stone);
+      for (let x = 0; x < 40; x++) p(x, 38, 1, M.Wall);
       p(10, 30, 1, M.Wellspring); p(10, 29, 1, M.Sand);
       p(30, 30, 1, M.Wellspring); p(30, 29, 1, M.Water);
+    },
+  },
+  {
+    // Stone gravity: a cliff block resting on bedrock holds, its overhanging ledge
+    // slumps straight down, and a sky boulder drops through air, steam, and into a
+    // pool. Wall bedrock never moves. Both engines must agree on every settling cell.
+    name: "cliff slump and a dropping boulder",
+    w: 32, h: 30, seed: 5150, ticks: 150,
+    paint(p) {
+      for (let x = 0; x < 32; x++) p(x, 28, 1, M.Wall);
+      for (let y = 18; y <= 27; y++) for (let x = 4; x <= 8; x++) p(x, y, 1, M.Stone);
+      for (let x = 9; x <= 22; x++) p(x, 18, 1, M.Stone);
+      p(26, 4, 3, M.Stone);
+      for (let x = 24; x <= 30; x++) { p(x, 27, 1, M.Water); p(x, 26, 1, M.Water); }
+      p(27, 20, 2, M.Steam);
     },
   },
 ];

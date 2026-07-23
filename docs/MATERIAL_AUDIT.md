@@ -7,8 +7,8 @@ Every toolbar material is a product choice. Each material in `app/src/materials.
 | Material | Decision | Reason |
 | --- | --- | --- |
 | Eraser | Keep | Tool action, not a simulation material. |
-| Wall | Specialize | Built barrier. Blocks flow, stains slowly, resists casual moss, radiates hearth warmth beside a live flame, and exists for deliberate construction. |
-| Stone | Specialize | Natural hard material. Blocks flow like wall, but weathers harder, condenses steam harder, hosts damp moss more readily, and is produced by cooled lava/meteor impact. |
+| Wall | Specialize | Built barrier. Blocks flow, stains slowly, resists casual moss, radiates hearth warmth beside a live flame, exists for deliberate construction, and stays absolutely anchored — it never falls, so it is the only true fixed scaffold. |
+| Stone | Specialize | Natural hard material. Blocks flow like wall, but weathers harder, condenses steam harder, hosts damp moss more readily, is produced by cooled lava/meteor impact, and slumps under gravity when left unsupported — the falling behavior that finally separates it from wall. |
 | Sand | Keep | Falling powder with wet clumping and drying behavior. |
 | Water | Keep | Ordinary flowing hydration/cooling liquid. Blocked by oil. |
 | Moonwater | Keep | Cosmic liquid. Stronger growth, cosmic flags, oil cleaning into stardust, and moonwater/meteor outcomes. |
@@ -39,8 +39,8 @@ Every toolbar material is a product choice. Each material in `app/src/materials.
 | Material | Interaction roles | Coverage |
 | --- | --- | --- |
 | Eraser | Clears cells without adding state. | Browser smoke: `clear, save, and load update scene state`; not a simulation material. |
-| Wall | Blocks flow as sealed construction; resists casual moss crossing; takes damp, soot, and frost stains; as hearth masonry beside a live flame or hot ember it dries and thaws its neighbors without ever igniting them; accumulated freeze-thaw stress cracks and crumbles it into stone. | Tests: `water_weathers_stone_more_than_sealed_wall`, `moss_needs_extra_energy_to_cross_wall`, `ice_frost_stresses_damp_hard_materials`, `hearth_wall_dries_and_thaws_its_nook`, `accumulated_freeze_thaw_crumbles_wall_into_stone`, `first_thaw_keeps_wall_standing`. |
-| Stone | Blocks flow as natural hard substrate; weathers and condenses harder than sealed wall; hosts damp moss colonization; born from cooled lava, shocked meteor, and crumbled wall; sustained soaking by water slowly erodes it into wet sand. | Tests: `water_weathers_stone_more_than_sealed_wall`, `moss_colonizes_damp_stone`, `water_quenches_lava_into_steam_and_stone`, `accumulated_freeze_thaw_crumbles_wall_into_stone`, `sustained_water_erodes_saturated_stone_into_sand`, `damp_stone_without_water_contact_never_erodes`. |
+| Wall | Blocks flow as sealed construction; stays absolutely anchored where built and never falls, unlike natural stone; resists casual moss crossing; takes damp, soot, and frost stains; as hearth masonry beside a live flame or hot ember it dries and thaws its neighbors without ever igniting them; accumulated freeze-thaw stress cracks and crumbles it into stone. | Tests: `wall_stays_anchored_in_midair`, `moss_needs_extra_energy_to_cross_wall`, `ice_frost_stresses_damp_hard_materials`, `hearth_wall_dries_and_thaws_its_nook`, `accumulated_freeze_thaw_crumbles_wall_into_stone`, `first_thaw_keeps_wall_standing`. |
+| Stone | Blocks flow as natural hard substrate; slumps straight down when left unsupported, so cliffs and crusts collapse while pillars, floors, and shelves hold; weathers and condenses harder than sealed wall; hosts damp moss colonization; born from cooled lava, shocked meteor, and crumbled wall; sustained soaking by water slowly erodes it into wet sand. | Tests: `unsupported_stone_falls_straight_to_the_floor`, `supported_stone_holds_and_overhangs_drop_without_slipping`, `moss_colonizes_damp_stone`, `accumulated_freeze_thaw_crumbles_wall_into_stone`, `sustained_water_erodes_saturated_stone_into_sand`, `damp_stone_without_water_contact_never_erodes`. |
 | Sand | Pours fast as dry powder, two cells per tick; clumps and slows when wet; drains dry back to loose grains; strong heat fuses dry grains into glass. | Tests: `sand_falls`, `dry_sand_falls_two_cells_when_clear`, `wet_sand_still_falls_slowly`, `water_wets_sand_into_clumps`, `lava_vitrifies_dry_sand_into_glass`. |
 | Water | Flows and pools; hydrates soil, sand, and life; quenches lava and shocks meteor into scorched stone; simmers, bubbles, and boils away to steam over sustained flame, while hot water melts ice instead of freezing; rinses soot from scorched wall and stone; blocked from feeding life by oil coating. | Tests: `water_spreads_when_blocked`, `rooted_seed_grows_a_stalk_that_blooms`, `water_quenches_lava_into_steam_and_stone`, `sustained_flame_simmers_then_boils_water`, `hot_water_melts_ice_and_resists_freezing`, `water_rinses_soot_from_hard_surfaces`. |
 | Moonwater | Moves like water with supercharged growth; marks touched cells cosmic; cleans oil into stardust; bursts meteor contact into stardust; freezes into cosmic ice. | Tests: `moonwater_cleans_oil_into_stardust`, `meteor_moonwater_contact_bursts_to_stardust`, `lava_cools_near_moonwater`; visual QA: `material-identity-showcase`. |
@@ -70,7 +70,7 @@ Every toolbar material is a product choice. Each material in `app/src/materials.
 
 Smoke and Steam left the toolbar in the element depth pass: they share the same gas movement, each had only one or two interactions, and both appear naturally from fire and water play. They remain full simulation materials and generated outcomes, like Flower. Earlier passes preferred specialization:
 
-- Wall and stone are no longer equal hard blocks. Wall is sealed construction; stone is natural, weatherable substrate.
+- Wall and stone are no longer equal hard blocks. Wall is sealed construction that stays absolutely anchored; stone is natural, weatherable substrate that slumps under gravity when undermined. That falling-vs-fixed split is the decisive separator between them.
 - Smoke and steam stayed distinct as sim materials. Smoke soots; steam condenses and frosts.
 - Moss and seed remain separate. Moss is surface spread; seed is rooted bloom.
 - Water and moonwater remain separate. Water is practical hydration/cooling; moonwater is cosmic transformation.
@@ -88,4 +88,4 @@ Remove or merge a material when one of these becomes true:
 Likely future review targets:
 
 - Meteor: keep only if falling impact remains fun and readable.
-- Wall: downgrade to a build mode only if stone becomes the sole hard material after the freeze-thaw weathering work.
+- Wall: the Wall/stone overlap is now settled by stone gravity (wall is the only fixed scaffold; stone slumps), so a downgrade is no longer on the table unless that split is removed.

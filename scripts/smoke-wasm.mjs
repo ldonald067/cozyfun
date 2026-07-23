@@ -156,7 +156,7 @@ withUniverse(16, 16, 7, (universe) => {
   const cells = new Uint8Array(16 * 16 * 8);
   setCell(cells, 16, 8, 8, MATERIAL.Seed, { age: 40, energy: 180, flags: CELL_FLAG.Wet });
   setCell(cells, 16, 8, 9, MATERIAL.Soil);
-  for (const [x, y] of [[7, 9], [9, 9], [7, 10], [8, 10], [9, 10]]) setCell(cells, 16, x, y, MATERIAL.Stone);
+  for (const [x, y] of [[7, 9], [9, 9], [7, 10], [8, 10], [9, 10]]) setCell(cells, 16, x, y, MATERIAL.Wall);
   const ptr = wasm.alloc(cells.byteLength);
   new Uint8Array(wasm.memory.buffer, ptr, cells.byteLength).set(cells);
   assert(wasm.universe_load_cells(universe, ptr, cells.byteLength) === 1, "seed test cells should load");
@@ -205,7 +205,7 @@ withUniverse(16, 16, 5, (universe) => {
   const cells = new Uint8Array(16 * 16 * 8);
   setCell(cells, 16, 7, 8, MATERIAL.Fire, { energy: 240 });
   setCell(cells, 16, 8, 8, MATERIAL.Moss, { age: 20, energy: 140, flags: CELL_FLAG.Wet });
-  setCell(cells, 16, 8, 9, MATERIAL.Stone);
+  setCell(cells, 16, 8, 9, MATERIAL.Wall);
   const ptr = wasm.alloc(cells.byteLength);
   new Uint8Array(wasm.memory.buffer, ptr, cells.byteLength).set(cells);
   assert(wasm.universe_load_cells(universe, ptr, cells.byteLength) === 1, "wet moss cells should load");
@@ -220,7 +220,7 @@ withUniverse(16, 16, 5, (universe) => {
 withUniverse(16, 16, 7, (universe) => {
   const cells = new Uint8Array(16 * 16 * 8);
   setCell(cells, 16, 8, 8, MATERIAL.Seed, { age: 12, energy: 80 });
-  setCell(cells, 16, 8, 9, MATERIAL.Stone);
+  setCell(cells, 16, 8, 9, MATERIAL.Wall);
   setCell(cells, 16, 7, 8, MATERIAL.Water);
   setCell(cells, 16, 9, 8, MATERIAL.Oil);
   const ptr = wasm.alloc(cells.byteLength);
@@ -237,7 +237,7 @@ withUniverse(16, 16, 7, (universe) => {
   const cells = new Uint8Array(16 * 16 * 8);
   setCell(cells, 16, 8, 7, MATERIAL.Water);
   setCell(cells, 16, 8, 8, MATERIAL.Oil);
-  for (const [x, y] of [[6, 7], [7, 7], [9, 7], [10, 7], [7, 8], [9, 8], [8, 9]]) setCell(cells, 16, x, y, MATERIAL.Stone);
+  for (const [x, y] of [[6, 7], [7, 7], [9, 7], [10, 7], [7, 8], [9, 8], [8, 9]]) setCell(cells, 16, x, y, MATERIAL.Wall);
   const ptr = wasm.alloc(cells.byteLength);
   new Uint8Array(wasm.memory.buffer, ptr, cells.byteLength).set(cells);
   assert(wasm.universe_load_cells(universe, ptr, cells.byteLength) === 1, "oil float cells should load");
@@ -252,9 +252,9 @@ withUniverse(16, 16, 7, (universe) => {
 withUniverse(16, 16, 7, (universe) => {
   const cells = new Uint8Array(16 * 16 * 8);
   setCell(cells, 16, 8, 8, MATERIAL.Sand, { energy: 4, flags: CELL_FLAG.Wet });
-  setCell(cells, 16, 7, 9, MATERIAL.Stone);
-  setCell(cells, 16, 8, 9, MATERIAL.Stone);
-  setCell(cells, 16, 9, 9, MATERIAL.Stone);
+  setCell(cells, 16, 7, 9, MATERIAL.Wall);
+  setCell(cells, 16, 8, 9, MATERIAL.Wall);
+  setCell(cells, 16, 9, 9, MATERIAL.Wall);
   const ptr = wasm.alloc(cells.byteLength);
   new Uint8Array(wasm.memory.buffer, ptr, cells.byteLength).set(cells);
   assert(wasm.universe_load_cells(universe, ptr, cells.byteLength) === 1, "wet sand drying cells should load");
@@ -307,7 +307,7 @@ withUniverse(16, 16, 7, (universe) => {
   const cells = new Uint8Array(16 * 16 * 8);
   setCell(cells, 16, 7, 8, MATERIAL.Water);
   setCell(cells, 16, 8, 8, MATERIAL.Meteor, { energy: 255 });
-  setCell(cells, 16, 8, 9, MATERIAL.Stone);
+  setCell(cells, 16, 8, 9, MATERIAL.Wall);
   const ptr = wasm.alloc(cells.byteLength);
   new Uint8Array(wasm.memory.buffer, ptr, cells.byteLength).set(cells);
   assert(wasm.universe_load_cells(universe, ptr, cells.byteLength) === 1, "water meteor shock cells should load");
@@ -324,6 +324,7 @@ withUniverse(16, 16, 7, (universe) => {
   const cells = new Uint8Array(16 * 16 * 8);
   setCell(cells, 16, 7, 8, MATERIAL.Ice);
   setCell(cells, 16, 8, 8, MATERIAL.Stone, { age: 12, energy: 60, flags: CELL_FLAG.Wet });
+  setCell(cells, 16, 8, 9, MATERIAL.Wall);
   setCell(cells, 16, 7, 9, MATERIAL.Wall, { age: 12, energy: 60, flags: CELL_FLAG.Wet });
   const ptr = wasm.alloc(cells.byteLength);
   new Uint8Array(wasm.memory.buffer, ptr, cells.byteLength).set(cells);
@@ -360,6 +361,7 @@ withUniverse(16, 16, 7, (universe) => {
   const cells = new Uint8Array(16 * 16 * 8);
   setCell(cells, 16, 7, 8, MATERIAL.Water);
   setCell(cells, 16, 8, 8, MATERIAL.Stone);
+  setCell(cells, 16, 8, 9, MATERIAL.Wall);
   setCell(cells, 16, 7, 9, MATERIAL.Wall);
   const ptr = wasm.alloc(cells.byteLength);
   new Uint8Array(wasm.memory.buffer, ptr, cells.byteLength).set(cells);
@@ -380,6 +382,7 @@ withUniverse(16, 16, 19, (universe) => {
   const cells = new Uint8Array(16 * 16 * 8);
   setCell(cells, 16, 7, 8, MATERIAL.Steam);
   setCell(cells, 16, 8, 8, MATERIAL.Stone);
+  setCell(cells, 16, 8, 9, MATERIAL.Wall);
   setCell(cells, 16, 7, 9, MATERIAL.Wall);
   const ptr = wasm.alloc(cells.byteLength);
   new Uint8Array(wasm.memory.buffer, ptr, cells.byteLength).set(cells);
@@ -441,7 +444,7 @@ withUniverse(16, 16, 13, (universe) => {
   const cells = new Uint8Array(16 * 16 * 8);
   setCell(cells, 16, 8, 8, MATERIAL.Water);
   setCell(cells, 16, 7, 8, MATERIAL.Stardust, { energy: 190 });
-  for (const [x, y] of [[7, 7], [8, 7], [9, 7], [9, 8], [7, 9], [8, 9], [9, 9]]) setCell(cells, 16, x, y, MATERIAL.Stone);
+  for (const [x, y] of [[7, 7], [8, 7], [9, 7], [9, 8], [7, 9], [8, 9], [9, 9]]) setCell(cells, 16, x, y, MATERIAL.Wall);
   const ptr = wasm.alloc(cells.byteLength);
   new Uint8Array(wasm.memory.buffer, ptr, cells.byteLength).set(cells);
   assert(wasm.universe_load_cells(universe, ptr, cells.byteLength) === 1, "stardust water cells should load");
@@ -463,7 +466,7 @@ withUniverse(16, 16, 7, (universe) => {
   const cells = new Uint8Array(16 * 16 * 8);
   setCell(cells, 16, 7, 8, MATERIAL.Lava, { energy: 255 });
   setCell(cells, 16, 8, 8, MATERIAL.Sand);
-  for (const [x, y] of [[7, 9], [8, 9], [9, 9], [9, 8], [6, 8], [5, 8], [6, 9]]) setCell(cells, 16, x, y, MATERIAL.Stone);
+  for (const [x, y] of [[7, 9], [8, 9], [9, 9], [9, 8], [6, 8], [5, 8], [6, 9]]) setCell(cells, 16, x, y, MATERIAL.Wall);
   const ptr = wasm.alloc(cells.byteLength);
   new Uint8Array(wasm.memory.buffer, ptr, cells.byteLength).set(cells);
   assert(wasm.universe_load_cells(universe, ptr, cells.byteLength) === 1, "vitrification cells should load");
@@ -517,7 +520,7 @@ withUniverse(16, 16, 7, (universe) => {
   const cells = new Uint8Array(16 * 16 * 8);
   setCell(cells, 16, 7, 8, MATERIAL.Fire, { energy: 240 });
   setCell(cells, 16, 8, 8, MATERIAL.Water);
-  for (const [x, y] of [[6, 8], [5, 8], [9, 8], [10, 8], [6, 9], [7, 9], [8, 9], [9, 9]]) setCell(cells, 16, x, y, MATERIAL.Stone);
+  for (const [x, y] of [[6, 8], [5, 8], [9, 8], [10, 8], [6, 9], [7, 9], [8, 9], [9, 9]]) setCell(cells, 16, x, y, MATERIAL.Wall);
   const ptr = wasm.alloc(cells.byteLength);
   new Uint8Array(wasm.memory.buffer, ptr, cells.byteLength).set(cells);
   assert(wasm.universe_load_cells(universe, ptr, cells.byteLength) === 1, "boiling cells should load");

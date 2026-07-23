@@ -169,8 +169,15 @@ function wallColor({ color, variant, age, energy, flags, cells, width, height, x
     out = frostFerns(out, hash, x, y);
   }
   if (energy > 130) {
-    if ((hash + brickX * 5 + brickY * 3) % 6 === 0) out = mixRgb(out, [15, 18, 24], 0.5);
-    if ((brickX === 2 || brickY === 2) && hash % 7 === 0) out = mixRgb(out, [11, 13, 18], 0.42);
+    // High freeze-thaw stress: the wall is about to crumble into stone. Draw
+    // spatially coherent fracture veins — a dark fissure with a pale relief lip —
+    // that thread continuously across neighboring cells, so a cracking wall reads
+    // distinctly from the flat bluish damp tint above. Deepens as it nears crumble.
+    const stress = Math.min(1, (energy - 130) / 40);
+    const vein = (x * 3 + y * 2) % 9;
+    const branch = (x * 2 - y * 3 + 33) % 11;
+    if (vein === 0 || branch === 0) out = mixRgb(out, [4, 6, 10], 0.58 + 0.28 * stress);
+    else if (vein === 1 || branch === 1) out = mixRgb(out, [172, 180, 194], 0.32 + 0.2 * stress);
   }
   if (cosmic) {
     out = mixRgb(out, [119, 139, 211], 0.24);

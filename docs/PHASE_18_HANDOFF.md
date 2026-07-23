@@ -3,8 +3,8 @@
 Status snapshot for resuming in a fresh session. Phase 18 applies a roster-wide
 design-feedback pass (four lenses: interaction depth, visual identity, uniqueness,
 combos — each item fact-checked against the code before it made this list). The
-owner approved **12 items**, split into four gated commits. **Batches 1 and 2 are
-shipped; batches 3 and 4 remain.**
+owner approved **12 items**, split into four gated commits. **Batches 1, 2, and 3 are
+shipped; batch 4 remains.**
 
 ## Working conventions (do not skip)
 
@@ -50,37 +50,30 @@ shipped; batches 3 and 4 remain.**
   `spark_hisses_into_steam_on_water`. Parity scenarios: "glass terrarium over a hearth",
   "fireworks over a pond".
 
-## TODO — Batch 3: geology (the churny one; do it in its own commit)
+## Done — Batch 3: geology
 
-1. **Stone gravity (medium).** A Stone cell with an empty/gas cell **directly below**
-   falls straight down one cell per tick — **no diagonal slip** (pillars, floors,
-   shelves stay put; only true overhangs drop). Wall **never** moves. Add a
-   `update_stone` mover dispatched in the bottom-up pass (mirror in JS `stone()`),
-   using `try_move` straight down only. Self-limiting: no spawns, motion halts on
-   contact, supported cells never move.
-   - **Payoff:** makes three existing rare events visible — erosion undercuts a cliff
-     and it slumps, lava crusts collapse into rubble, meteor stone lands.
-   - **GOTCHAS:** several parity scenarios and the material showcase place **floating
-     stone rows** that will now fall (e.g. `scripts/smoke-parity.mjs` scenes use stone
-     floors — those sit on walls/floor, fine; but "isolated lava crusting to stone"
-     produces mid-air crust that will now drop, and cargo tests / showcase with
-     floating stone need grounding). Grep `Material::Stone`/`M.Stone`/`material.Stone`
-     across `sim/src/lib.rs` tests, `scripts/*.mjs`, and fix fixtures so intended-static
-     stone rests on a support. Update audit rows: Stone gains a "falls when
-     unsupported" role; Wall's row makes "never moves / stays absolutely anchored"
-     explicit (this is the debate-ender for the Wall/Stone overlap the uniqueness lens
-     flagged). Grounding: erosion `sim/src/lib.rs:730-739`, crust `590-596`,
-     `docs/MATERIAL_AUDIT.md:91`.
-
-2. **Crumble retune (small).** Freeze-thaw wall crumble currently needs ~3 ice+fire
-   rounds: the threshold is `next.energy + heat > 200` in `heat_softens_cell`
-   (**`sim/src/lib.rs:1632`**, and the JS mirror in `heatSoftens`). Lower to **150** so
-   two fire rounds suffice (lava's heat 72 already does it in two). Also give the
-   high-stress tier a **distinct crack sprite**: `shapeLanguage.ts` currently draws
-   dark flecks past energy>130 (~line 171-174) that read the same as the damp tint
-   starting energy>30 (~line 147) — add a visible fracture cue at the 130+ tier so the
-   wall looks cracked *before* it falls. Update the `accumulated_freeze_thaw_crumbles_wall_into_stone`
-   test if its round count assumptions change.
+- **Stone gravity.** `update_stone` (`sim/src/lib.rs`, mirrored in JS `stone()`) drops
+  an unsupported Stone cell straight down one cell per tick via `try_move` down only —
+  no diagonal slip, so pillars/floors/shelves hold and only true overhangs fall. Wall
+  never moves. Freshly-created stone (lava/meteor→stone) is dispatched on its *old*
+  kind, so it settles the tick after it forms, not the tick it appears. Tests:
+  `unsupported_stone_falls_straight_to_the_floor`, `supported_stone_holds_and_overhangs_drop_without_slipping`,
+  `wall_stays_anchored_in_midair`. Parity scenario: "cliff slump and a dropping boulder".
+  - **Fixture fallout (resolved).** ~26 cargo tests plus the wasm/js-fallback/parity
+    smokes placed floating stone that now falls. Fixes: floors that can be the bottom
+    row were grounded by height (rocket/cosmic-seed scenes); mid-air frames, basins,
+    ceilings, and substrates became **Wall** (Wall is the only true fixed scaffold now);
+    subject-stones compared against wall got a Wall placed directly beneath. `Universe::new`
+    clamps height to ≥16, so shrinking below 16 is a no-op — grounding used Wall instead.
+    The material **showcase is a static render** (`tick: 0`), so it needed no grounding.
+- **Crumble retune.** Freeze-thaw wall crumble threshold lowered `200 → 150` in
+  `heat_softens_cell` (and JS `heatSoftens`), so lava (heat 72) crumbles a stressed wall
+  in two rounds and fire (42) in three. Existing crumble tests set energy 190 directly,
+  so their outcomes were unchanged. The high-stress tier (`energy > 130`) in `wallColor`
+  (`shapeLanguage.ts`) now draws spatially coherent **fracture veins** (dark fissure +
+  pale relief lip, position-based so cracks thread across neighboring cells) instead of
+  hash flecks, and the showcase carries a frost-stressed near-crumble wall so it is
+  reviewable on the visual board.
 
 ## TODO — Batch 4: cycles & rituals (one commit)
 

@@ -209,6 +209,7 @@ impl Universe {
             match cell.kind {
                 x if x == Material::Sand as u8 => self.update_sand(idx, cell, &old, &mut next),
                 x if x == Material::Soil as u8 => self.update_soil(idx, cell, &old, &mut next),
+                x if x == Material::Stone as u8 => self.update_stone(idx, cell, &old, &mut next),
                 x if x == Material::Stardust as u8 => {
                     self.update_stardust(idx, cell, &old, &mut next)
                 }
@@ -973,6 +974,14 @@ impl Universe {
         }
     }
 
+    /// Unsupported stone drops straight down one cell per tick — no diagonal slip, so
+    /// pillars, floors, and shelves hold and only true overhangs fall. Motion halts the
+    /// instant anything (stone, wall, liquid, growth) sits directly below. Wall never moves.
+    fn update_stone(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
+        let (x, y) = self.xy(idx);
+        self.try_move(idx, x, y + 1, cell, old, next, true);
+    }
+
     fn update_soil(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
         self.update_powder(idx, cell, old, next, 2);
         if next[idx].flags & FLAG_FROZEN != 0 {
@@ -1629,7 +1638,9 @@ fn heat_softens_cell(next: &mut [Cell], idx: usize, other: Cell, heat: u16) -> b
         return false;
     }
     if other.flags & FLAG_FROZEN != 0 {
-        if other.kind == Material::Wall as u8 && next[idx].energy as u32 + heat as u32 > 200 {
+        // Two hot rounds should crack a frost-stressed wall: lava's heat 72 crumbles
+        // it in two, and fire (heat 42) in three, once the melt heat has accumulated.
+        if other.kind == Material::Wall as u8 && next[idx].energy as u32 + heat as u32 > 150 {
             next[idx] = Cell::new(Material::Stone as u8, other.variant, 40);
             return true;
         }
@@ -1892,7 +1903,7 @@ mod tests {
 
     #[test]
     fn rocket_powder_falls_inert_without_flame() {
-        let mut u = Universe::new(16, 32, 7);
+        let mut u = Universe::new(16, 21, 7);
         for x in 0..16 {
             set_cell(&mut u, x, 20, Material::Stone);
         }
@@ -1908,7 +1919,7 @@ mod tests {
 
     #[test]
     fn flame_launches_rocket_skyward() {
-        let mut u = Universe::new(16, 48, 7);
+        let mut u = Universe::new(16, 41, 7);
         for x in 0..16 {
             set_cell(&mut u, x, 40, Material::Stone);
         }
@@ -1980,7 +1991,7 @@ mod tests {
     fn rocket_bursts_when_it_hits_a_ceiling() {
         let mut u = Universe::new(16, 48, 7);
         for x in 0..16 {
-            set_cell(&mut u, x, 24, Material::Stone);
+            set_cell(&mut u, x, 24, Material::Wall);
         }
         set_cell_state(&mut u, 8, 27, Material::Rocket, 0, 220, 0);
         for _ in 0..12 {
@@ -1998,7 +2009,7 @@ mod tests {
     fn water_spreads_when_blocked() {
         let mut u = Universe::new(16, 16, 7);
         for x in 0..16 {
-            u.paint(x, 10, 1, Material::Stone as u8, 100);
+            u.paint(x, 10, 1, Material::Wall as u8, 100);
         }
         u.paint(8, 9, 1, Material::Water as u8, 100);
         u.tick();
@@ -2036,7 +2047,7 @@ mod tests {
         set_cell_state(&mut u, 8, 12, Material::Seed, 40, 180, FLAG_WET);
         set_cell(&mut u, 8, 13, Material::Soil);
         for (x, y) in [(7, 13), (9, 13), (7, 14), (8, 14), (9, 14)] {
-            set_cell(&mut u, x, y, Material::Stone);
+            set_cell(&mut u, x, y, Material::Wall);
         }
         let mut stalked = false;
         let mut bloomed = false;
@@ -2085,7 +2096,7 @@ mod tests {
     fn fungus_can_rot_wet_seed() {
         let mut u = Universe::new(16, 16, 3);
         set_cell_state(&mut u, 8, 8, Material::Seed, 12, 150, FLAG_WET);
-        set_cell(&mut u, 8, 9, Material::Stone);
+        set_cell(&mut u, 8, 9, Material::Wall);
         set_cell(&mut u, 7, 8, Material::Fungus);
         for _ in 0..24 {
             u.tick();
@@ -2109,7 +2120,7 @@ mod tests {
         set_cell(&mut u, 7, 8, Material::Ice);
         set_cell(&mut u, 8, 8, Material::Water);
         for (x, y) in [(7, 7), (8, 7), (9, 7), (7, 9), (8, 9), (9, 9), (9, 8), (6, 8), (10, 8)] {
-            set_cell(&mut u, x, y, Material::Stone);
+            set_cell(&mut u, x, y, Material::Wall);
         }
         for _ in 0..36 {
             u.tick();
@@ -2135,7 +2146,7 @@ mod tests {
         set_cell(&mut u, 8, 7, Material::Ice);
         set_cell(&mut u, 8, 8, Material::Steam);
         for (x, y) in [(7, 7), (9, 7), (7, 8), (9, 8), (7, 9), (8, 9), (9, 9)] {
-            set_cell(&mut u, x, y, Material::Stone);
+            set_cell(&mut u, x, y, Material::Wall);
         }
         for _ in 0..36 {
             u.tick();
@@ -2147,9 +2158,9 @@ mod tests {
     fn water_wets_sand_into_clumps() {
         let mut u = Universe::new(16, 16, 7);
         set_cell(&mut u, 8, 8, Material::Sand);
-        set_cell(&mut u, 7, 9, Material::Stone);
-        set_cell(&mut u, 8, 9, Material::Stone);
-        set_cell(&mut u, 9, 9, Material::Stone);
+        set_cell(&mut u, 7, 9, Material::Wall);
+        set_cell(&mut u, 8, 9, Material::Wall);
+        set_cell(&mut u, 9, 9, Material::Wall);
         set_cell(&mut u, 7, 8, Material::Water);
         u.tick();
         assert_eq!(kind_at(&u, 8, 8), Material::Sand as u8);
@@ -2185,7 +2196,7 @@ mod tests {
         set_cell(&mut u, 8, 7, Material::Water);
         set_cell(&mut u, 8, 8, Material::Oil);
         for (x, y) in [(6, 7), (7, 7), (9, 7), (10, 7), (7, 8), (9, 8), (8, 9)] {
-            set_cell(&mut u, x, y, Material::Stone);
+            set_cell(&mut u, x, y, Material::Wall);
         }
         for _ in 0..2 {
             u.tick();
@@ -2198,9 +2209,9 @@ mod tests {
     fn wet_sand_drains_back_to_loose_sand() {
         let mut u = Universe::new(16, 16, 7);
         set_cell_state(&mut u, 8, 8, Material::Sand, 0, 4, FLAG_WET);
-        set_cell(&mut u, 7, 9, Material::Stone);
-        set_cell(&mut u, 8, 9, Material::Stone);
-        set_cell(&mut u, 9, 9, Material::Stone);
+        set_cell(&mut u, 7, 9, Material::Wall);
+        set_cell(&mut u, 8, 9, Material::Wall);
+        set_cell(&mut u, 9, 9, Material::Wall);
         for _ in 0..8 {
             u.tick();
         }
@@ -2252,6 +2263,7 @@ mod tests {
         let mut u = Universe::new(16, 16, 7);
         set_cell(&mut u, 7, 8, Material::Ice);
         set_cell_state(&mut u, 8, 8, Material::Stone, 12, 60, FLAG_WET);
+        set_cell(&mut u, 8, 9, Material::Wall); // bedrock so the frost-stressed stone stays put
         set_cell_state(&mut u, 7, 9, Material::Wall, 12, 60, FLAG_WET);
         u.tick();
         assert_eq!(kind_at(&u, 8, 8), Material::Stone as u8);
@@ -2325,7 +2337,7 @@ mod tests {
         let mut u = Universe::new(16, 16, 7);
         set_cell_state(&mut u, 8, 8, Material::Flower, 30, 150, FLAG_ROOTED | FLAG_COSMIC);
         for (x, y) in [(7, 8), (9, 8), (7, 9), (8, 9), (9, 9)] {
-            set_cell(&mut u, x, y, Material::Stone);
+            set_cell(&mut u, x, y, Material::Wall);
         }
         let mut cosmic_mote = false;
         for _ in 0..300 {
@@ -2346,7 +2358,7 @@ mod tests {
         set_cell_state(&mut u, 8, 8, Material::Pollen, 10, 150, FLAG_COSMIC);
         set_cell_state(&mut u, 8, 9, Material::Soil, 10, 120, FLAG_WET);
         for (x, y) in [(7, 9), (9, 9), (7, 10), (8, 10), (9, 10)] {
-            set_cell(&mut u, x, y, Material::Stone);
+            set_cell(&mut u, x, y, Material::Wall);
         }
         let mut rooted_cosmic = false;
         for _ in 0..200 {
@@ -2369,7 +2381,7 @@ mod tests {
         set_cell(&mut u, 8, 8, Material::Pollen);
         set_cell_state(&mut u, 8, 9, Material::Soil, 12, 90, FLAG_WET);
         for (x, y) in [(7, 9), (9, 9), (7, 10), (8, 10), (9, 10)] {
-            set_cell(&mut u, x, y, Material::Stone);
+            set_cell(&mut u, x, y, Material::Wall);
         }
         let mut seeded = false;
         for _ in 0..120 {
@@ -2388,7 +2400,7 @@ mod tests {
         set_cell_state(&mut u, 8, 8, Material::Ember, 200, 10, 0);
         set_cell(&mut u, 7, 8, Material::Water);
         for (x, y) in [(6, 8), (5, 8), (9, 8), (6, 9), (7, 9), (8, 9), (9, 9)] {
-            set_cell(&mut u, x, y, Material::Stone);
+            set_cell(&mut u, x, y, Material::Wall);
         }
         let mut washed = false;
         for _ in 0..80 {
@@ -2405,9 +2417,9 @@ mod tests {
     fn meteor_impact_shatters_glass_to_sand() {
         let mut u = Universe::new(16, 16, 7);
         set_cell(&mut u, 8, 8, Material::Meteor);
-        set_cell(&mut u, 8, 9, Material::Stone);
+        set_cell(&mut u, 8, 9, Material::Wall);
         set_cell(&mut u, 7, 8, Material::Glass);
-        set_cell(&mut u, 7, 9, Material::Stone);
+        set_cell(&mut u, 7, 9, Material::Wall);
         u.tick();
         assert_eq!(kind_at(&u, 7, 8), Material::Sand as u8, "impact should shatter glass back to sand");
     }
@@ -2445,7 +2457,7 @@ mod tests {
     #[test]
     fn cosmic_fed_seed_grows_a_taller_stalk() {
         fn grow_height(cosmic: bool) -> u32 {
-            let mut u = Universe::new(16, 40, 7);
+            let mut u = Universe::new(16, 33, 7);
             let flags = FLAG_WET | if cosmic { FLAG_COSMIC } else { 0 };
             set_cell_state(&mut u, 8, 30, Material::Seed, 40, 180, flags);
             set_cell(&mut u, 8, 31, Material::Soil);
@@ -2522,11 +2534,52 @@ mod tests {
     #[test]
     fn damp_stone_without_water_contact_never_erodes() {
         let mut u = Universe::new(16, 16, 7);
-        set_cell_state(&mut u, 8, 8, Material::Stone, 12, 200, FLAG_WET);
+        set_cell_state(&mut u, 8, 15, Material::Stone, 12, 200, FLAG_WET);
         for _ in 0..5000 {
             u.tick();
         }
-        assert_eq!(kind_at(&u, 8, 8), Material::Stone as u8, "damp stone alone should stay stone");
+        assert_eq!(kind_at(&u, 8, 15), Material::Stone as u8, "damp stone alone should stay stone");
+    }
+
+    #[test]
+    fn unsupported_stone_falls_straight_to_the_floor() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 8, 4, Material::Stone);
+        u.tick();
+        assert_eq!(kind_at(&u, 8, 4), Material::Empty as u8, "the vacated cell clears");
+        assert_eq!(kind_at(&u, 8, 5), Material::Stone as u8, "stone drops one cell per tick");
+        for _ in 0..20 {
+            u.tick();
+        }
+        assert_eq!(kind_at(&u, 8, 15), Material::Stone as u8, "stone settles on the floor");
+    }
+
+    #[test]
+    fn supported_stone_holds_and_overhangs_drop_without_slipping() {
+        let mut u = Universe::new(16, 16, 7);
+        // A three-wide shelf whose center rests on a lone wall pillar; both ends
+        // overhang open air. Only true overhangs may drop, and always straight down.
+        set_cell(&mut u, 8, 15, Material::Wall);
+        set_cell(&mut u, 7, 14, Material::Stone);
+        set_cell(&mut u, 8, 14, Material::Stone);
+        set_cell(&mut u, 9, 14, Material::Stone);
+        for _ in 0..20 {
+            u.tick();
+        }
+        assert_eq!(kind_at(&u, 8, 15), Material::Wall as u8, "the pillar never moves");
+        assert_eq!(kind_at(&u, 8, 14), Material::Stone as u8, "stone over the pillar holds");
+        assert_eq!(kind_at(&u, 7, 15), Material::Stone as u8, "left overhang drops straight, no diagonal slip");
+        assert_eq!(kind_at(&u, 9, 15), Material::Stone as u8, "right overhang drops straight, no diagonal slip");
+    }
+
+    #[test]
+    fn wall_stays_anchored_in_midair() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 8, 4, Material::Wall);
+        for _ in 0..20 {
+            u.tick();
+        }
+        assert_eq!(kind_at(&u, 8, 4), Material::Wall as u8, "wall never falls, unlike stone");
     }
 
     #[test]
@@ -2534,7 +2587,7 @@ mod tests {
         let mut u = Universe::new(16, 16, 7);
         set_cell(&mut u, 8, 8, Material::Lava);
         for (x, y) in [(7, 8), (6, 8), (9, 8), (10, 8), (7, 9), (8, 9), (9, 9)] {
-            set_cell(&mut u, x, y, Material::Stone);
+            set_cell(&mut u, x, y, Material::Wall);
         }
         let mut crusted = false;
         for _ in 0..1200 {
@@ -2553,7 +2606,7 @@ mod tests {
         set_cell(&mut u, 7, 8, Material::Fire);
         set_cell(&mut u, 8, 8, Material::Water);
         for (x, y) in [(6, 8), (5, 8), (9, 8), (10, 8), (6, 9), (7, 9), (8, 9), (9, 9)] {
-            set_cell(&mut u, x, y, Material::Stone);
+            set_cell(&mut u, x, y, Material::Wall);
         }
         u.tick();
         u.tick();
@@ -2595,7 +2648,7 @@ mod tests {
         set_cell(&mut u, 7, 8, Material::Water);
         set_cell_state(&mut u, 8, 8, Material::Stone, 12, 40, FLAG_SCORCHED);
         for (x, y) in [(6, 8), (5, 8), (9, 8), (6, 9), (7, 9), (8, 9)] {
-            set_cell(&mut u, x, y, Material::Stone);
+            set_cell(&mut u, x, y, Material::Wall);
         }
         let mut rinsed = false;
         for _ in 0..40 {
@@ -2614,6 +2667,7 @@ mod tests {
         let mut u = Universe::new(16, 16, 7);
         set_cell(&mut u, 7, 8, Material::Water);
         set_cell(&mut u, 8, 8, Material::Stone);
+        set_cell(&mut u, 8, 9, Material::Wall); // bedrock so the weathered stone stays put
         set_cell(&mut u, 7, 9, Material::Wall);
         u.tick();
         assert!(flags_at(&u, 8, 8) & FLAG_WET != 0);
@@ -2626,6 +2680,7 @@ mod tests {
         let mut u = Universe::new(16, 16, 19);
         set_cell(&mut u, 7, 8, Material::Steam);
         set_cell(&mut u, 8, 8, Material::Stone);
+        set_cell(&mut u, 8, 9, Material::Wall); // bedrock so the dewed stone stays put
         set_cell(&mut u, 7, 9, Material::Wall);
         u.tick();
         assert!(flags_at(&u, 8, 8) & FLAG_WET != 0);
@@ -2675,7 +2730,7 @@ mod tests {
         let mut u = Universe::new(16, 16, 17);
         set_cell(&mut u, 7, 8, Material::Moonwater);
         set_cell(&mut u, 8, 8, Material::Oil);
-        set_cell(&mut u, 8, 9, Material::Stone);
+        set_cell(&mut u, 8, 9, Material::Wall);
         for _ in 0..24 {
             u.tick();
         }
@@ -2687,9 +2742,9 @@ mod tests {
         let mut u = Universe::new(16, 16, 7);
         set_cell(&mut u, 8, 8, Material::Meteor);
         set_cell(&mut u, 7, 8, Material::Moonwater);
-        set_cell(&mut u, 7, 9, Material::Stone);
-        set_cell(&mut u, 8, 9, Material::Stone);
-        set_cell(&mut u, 9, 9, Material::Stone);
+        set_cell(&mut u, 7, 9, Material::Wall);
+        set_cell(&mut u, 8, 9, Material::Wall);
+        set_cell(&mut u, 9, 9, Material::Wall);
         u.tick();
         assert_eq!(kind_at(&u, 7, 8), Material::Stardust as u8);
     }
@@ -2815,11 +2870,11 @@ mod tests {
     fn meteor_impact_vitrifies_nearby_sand() {
         let mut u = Universe::new(16, 16, 7);
         set_cell(&mut u, 8, 8, Material::Meteor);
-        set_cell(&mut u, 8, 9, Material::Stone);
+        set_cell(&mut u, 8, 9, Material::Wall);
         set_cell(&mut u, 7, 8, Material::Sand);
-        set_cell(&mut u, 7, 9, Material::Stone);
+        set_cell(&mut u, 7, 9, Material::Wall);
         set_cell(&mut u, 9, 8, Material::Sand);
-        set_cell(&mut u, 9, 9, Material::Stone);
+        set_cell(&mut u, 9, 9, Material::Wall);
         for _ in 0..4 {
             u.tick();
         }
