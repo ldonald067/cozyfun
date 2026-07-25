@@ -607,17 +607,32 @@ function glassColor({ color, variant, age, energy, flags, time, cells, width, he
   if (edge.top || edge.left) out = mixRgb(out, [234, 255, 246], 0.5);
   if (edge.bottom || edge.right) out = mixRgb(out, [46, 116, 98], 0.42);
   if ((hash & 31) === 5) out = mixRgb(out, [255, 255, 255], 0.6);
-  if (hasNearbyKind(cells, width, height, x, y, STEAM_KINDS)) {
-    // Steam fogs the pane with a soft condensation film.
-    out = mixRgb(out, [214, 226, 230], 0.42);
-    if ((hash & 3) === 1) out = mixRgb(out, [236, 242, 244], 0.3);
-  }
-  if (flags & CELL_FLAG.Wet) {
-    // Dewed glass: persistent condensation that fades as the pane dries, with
-    // bright droplet runs down the vertical grain.
-    const fog = Math.min(1, energy / 46);
-    out = mixRgb(out, [206, 224, 232], 0.2 + fog * 0.3);
-    if ((x * 3 + (hash & 7)) % 9 === 0) out = mixRgb(out, [240, 250, 255], 0.35 + fog * 0.3);
+  const misting = hasNearbyKind(cells, width, height, x, y, STEAM_KINDS);
+  const dewed = (flags & CELL_FLAG.Wet) !== 0;
+  if (misting || dewed) {
+    // Condensation is a field of micro-droplets, not a coat of paint. Two flat
+    // washes used to stack here and turn a steamy dome back into grey chalk, so
+    // instead: keep the dark see-through body under only a breath of haze, scatter
+    // beads that catch the light, and — once there is enough water to move — carve
+    // the vertical tracks where drops have slid down and wiped the pane clear.
+    // Bright speckle over dark glass, streaked by even darker runs, is a texture
+    // nothing else in the roster wears.
+    const dew = dewed ? Math.min(1, energy / 46) : 0;
+    const drop = hashCell(x, y, variant + 5);
+    // The haze stays deliberately thin — most of the pane must still read through.
+    out = mixRgb(out, [188, 214, 220], (misting ? 0.11 : 0.05) + dew * 0.07);
+    const running = dew > 0.35 && (x * 7 + (hash & 3)) % 9 === 0;
+    if (running) {
+      // A track reads DARKER than the fog around it: the glass behind it has been
+      // wiped clear, so the night shows through the runs.
+      out = mixRgb(out, [11, 19, 25], 0.38 + dew * 0.24);
+      // The bead riding down that track is the brightest thing on the pane.
+      if (((y * 5 + (drop >> 2)) & 7) === 0) out = mixRgb(out, [238, 250, 255], 0.72);
+    } else if ((drop & 3) === 1) {
+      out = mixRgb(out, [224, 240, 244], 0.24 + dew * 0.32);
+    } else if ((drop & 7) === 4) {
+      out = mixRgb(out, [198, 222, 228], 0.12 + dew * 0.14);
+    }
   }
   if (age < 8) out = mixRgb(out, [255, 244, 214], 0.6 * (1 - age / 8));
   if (age < 70) out = mixRgb(out, [255, 176, 96], 0.36 * (1 - age / 70));

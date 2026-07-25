@@ -125,8 +125,16 @@ landed. No sim rules changed, so parity was never at risk; the risk here was the
 - **Glass reads as glass.** The pane interior now starts from the night sky and takes
   only a whisper of mint (`mix(night, color, 0.18)`), with a drifting diagonal sheen band
   and strong rims carrying the identity. Interior luminance dropped ~71%, so a pane is
-  see-through while its frame keeps it findable. Dew/fog layering rides on top and got
-  *more* legible (delta 98 -> 228).
+  see-through while its frame keeps it findable.
+- **Fogged glass is a droplet field, not a wash.** Two flat washes (steam-nearby and
+  the WET flag) used to stack and drive a steamy dome to luminance 186 in a 63-wide
+  band — no cell read through, i.e. the chalk complaint in grey. Condensation is now
+  a thin haze plus scattered beads, streaked by vertical **clear runs** that read
+  *darker* than the fog because the drop has wiped the pane behind it. Full dew now
+  averages 97 across a 176-wide bimodal spread, with 40% of cells still see-through
+  and 24% bright beads. Dew intensity still reads (beads 4% dry -> 9% light -> 24%
+  full), and bright-speckle-over-dark-glass-with-dark-streaks is a texture nothing
+  else in the roster wears.
 - **Vitrify flash blooms.** Fresh glass now reaches the glow layer (`age < 70`), amber
   cooling to the pane's mint. Intensity is two decays — a 70-tick cooling plus an 8-tick
   flash — deliberately mirroring the base layer's own pair, so the bloom fades
