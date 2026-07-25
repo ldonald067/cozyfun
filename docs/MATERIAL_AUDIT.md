@@ -76,6 +76,18 @@ Smoke and Steam left the toolbar in the element depth pass: they share the same 
 - Water and moonwater remain separate. Water is practical hydration/cooling; moonwater is cosmic transformation.
 - Fungus remains separate from moss because it is decay pressure, not carpet growth, and now has explicit contact-colored role states.
 
+## Night lights (the glow layer)
+
+Some materials also paint into the additive glow layer, and for several of them the
+glow is **state-gated**, so the light itself is information rather than decoration:
+an attuned wellspring glows in the hue of the material it remembers while a dormant
+one stays dark; a lit rocket grain glows while inert powder does not; freshly fused
+glass blooms with the vitrify flash and fades to an unlit pane by age 70; stardust-
+etched stone carries a faint starfield. Sources (fire, lava, meteor, spark, ember)
+dominate that layer by design — anything merely *lit by* a source, steam above all,
+must stay well under them, or a kettle outshines its own flame. `hasGlow` takes full
+cell state deliberately: defaulting energy/age would fail open and light everything.
+
 ## A note on Ember's documented depth
 
 Ember's interaction row lists 3 roles because generated-only materials are capped at

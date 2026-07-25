@@ -3,19 +3,19 @@
 Status snapshot for resuming in a fresh session. Phase 18 applies a roster-wide
 design-feedback pass (four lenses: interaction depth, visual identity, uniqueness,
 combos — each item fact-checked against the code before it made this list). The
-owner approved **12 items**, split into four gated commits. **All four batches are
-shipped.** The only Phase 18 work left is the not-approved visual-lens list below,
-which still needs an owner yes.
+owner approved **12 items**, split into four gated commits, then approved the
+visual-lens findings as a fifth. **All five batches are shipped; Phase 18 is
+complete.**
 
 ## Working conventions (do not skip)
 
 - Every sim rule lives in **both** `sim/src/lib.rs` (source of truth) and
   `app/src/engine.ts` (JS fallback). They must stay **byte-for-byte identical** —
-  `npm run test:parity` (`scripts/smoke-parity.mjs`) runs 13 scenarios through both
+  `npm run test:parity` (`scripts/smoke-parity.mjs`) runs 17 scenarios through both
   engines and asserts every cell byte matches each tick. Add a scenario for each new
   rule and confirm it isn't vacuous (that it actually exercises the path).
 - Full gate: `npm run check` (from repo root; `source "$HOME/.cargo/env"` first for
-  cargo). It runs material audit, contrast floor, 71 cargo tests, both engine smokes,
+  cargo). It runs material audit, contrast floor, 80 cargo tests, both engine smokes,
   the parity harness, audio + browser smoke, and visual QA.
 - `docs/MATERIAL_AUDIT.md` interaction matrix: **toolbar materials document 4–6
   roles, generated-only materials 1–3** (semicolon-separated clauses). The
@@ -103,18 +103,54 @@ which still needs an owner yes.
   "wellspring re-attuned under ice". All three were confirmed non-vacuous (sparks shed,
   stardust count rose from the fairy ring, springs observed going water → sand under ice).
 
-## Not approved (yet) — visual-lens findings worth surfacing to the owner
+## Done — Batch 5: visual lens (renderer only)
 
-The visual-identity lens (grounded on real captures) flagged renderer-only gaps beyond
-the 12 approved items. Mention these; they're small and cozy but need a yes:
-- **Wellspring is nearly invisible** on the `#091018` night background, and attuned-vs-
-  dormant fails at small placements — needs a brighter carved-rune base + a glow when attuned.
-- **Lit rocket head** climbs as a single un-glowing pixel — deserves a glow.
-- **Glass reads as flat mint chalk**, not transparent — wants a see-through treatment.
-- **Vitrify flash** lives only in the base layer and never blooms into the glow.
-- **Steam out-glows its own source** (inherits fire's 120-alpha floor) — dial it down;
-  and give night-light glow to attuned wellspring, lit rocket grain, fresh glass, and
-  constellation-etched stone.
+The visual-identity lens's five renderer-only findings, approved after the sim batches
+landed. No sim rules changed, so parity was never at risk; the risk here was the
+**review pipeline itself**, which turned out to be lying (see the QA fix below).
+
+- **Wellspring night visibility.** The block was camouflaged against `#091018` and its
+  rune predicate only fired on ~19% of cells, so a lone spring often rendered as bare
+  dark stone. `wellspringColor` now lifts the body to moonlit slate, carves a bright
+  top/left rim against a deep bottom/right shadow, and **always** runes a mostly-exposed
+  cell (`edge.count >= 3`), so one-cell placements still read as carved. Attuned springs
+  add near-white lit rune cores plus a glow-layer halo tinted by the remembered material.
+  Worst-case one-cell contrast went from 1.19:1 to 4.24:1.
+- **Dormant runes are pewter, not silver.** The first pass used a cool silver that sat
+  only 27.6 RGB from Moonwater's attuned lavender — the palest attunement was mistakable
+  for "unlit". Dormant is now deliberately desaturated (`[176,178,174]`), lifting the
+  worst-case attuned-vs-dormant separation to 40.3 (every other material was already 32+).
+- **Lit rocket head glows.** `hasGlow(Rocket)` is gated on `energy > 0`, so only a lit
+  grain blooms (alpha ~104-192 across its 96-235 fuse range); inert powder stays dark.
+- **Glass reads as glass.** The pane interior now starts from the night sky and takes
+  only a whisper of mint (`mix(night, color, 0.18)`), with a drifting diagonal sheen band
+  and strong rims carrying the identity. Interior luminance dropped ~71%, so a pane is
+  see-through while its frame keeps it findable. Dew/fog layering rides on top and got
+  *more* legible (delta 98 -> 228).
+- **Vitrify flash blooms.** Fresh glass now reaches the glow layer (`age < 70`), amber
+  cooling to the pane's mint. Intensity is two decays — a 70-tick cooling plus an 8-tick
+  flash — deliberately mirroring the base layer's own pair, so the bloom fades
+  continuously; the first draft's `age < 8 ? 150 : 95` switch popped 51 alpha in one frame.
+- **Steam stops out-glowing its source.** Steam had been inheriting the shared 120 floor
+  and reaching alpha 219-255 — brighter than the fire boiling it. It now has its own
+  branch (`16 + energy*0.06 + pulse*8 - age*0.2`), peaking at 38 against fire's 228-255.
+- **Constellation-etched stone** gets a faint violet starfield (24-40), and glow lookups
+  for the wellspring are gated on the shared tint table, so a hand-authored scene holding
+  a non-pourable id can't light a spring that could never pour.
+
+**The QA pipeline was the real bug.** `saveSandboxComposite` in `scripts/visual-qa.mjs`
+drew the glow layer *underneath* the opaque base canvas, so every capture reviewed the
+night lights as if they did not exist — which is how four of these findings survived
+earlier passes. It now composites glow over base with the live layer's own settings
+(screen blend, `blur(16px) saturate(1.35)`, alpha 0.9); keep those in sync with
+`.glow-canvas` in `styles.css`.
+
+Showcase exhibits added so each fix is reviewable: a one-cell attuned/dormant wellspring
+pair (Moonwater — the closest hue pair, i.e. the honest worst case), an age-0 vitrify
+flash beside a cooled pane **clear of the lava pool** (the lava-side pane sits inside
+lava's own halo and cannot evidence a glass bloom), a deeper aged pane that actually has
+non-edge interior, and a dewed pane. Stone stands became Wall throughout — since batch 3,
+Wall is the only fixed scaffold, and stone display stands drift.
 
 ## Roster health (for context)
 

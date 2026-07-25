@@ -188,10 +188,19 @@ async function saveSandboxComposite(cdp, fileName) {
       context.imageSmoothingEnabled = false;
       context.fillStyle = "#091018";
       context.fillRect(0, 0, canvas.width, canvas.height);
-      context.globalAlpha = 0.72;
-      context.drawImage(glow, 0, 0, canvas.width, canvas.height);
-      context.globalAlpha = 1;
       context.drawImage(base, 0, 0, canvas.width, canvas.height);
+      // Glow blooms additively over the base, mirroring the live .glow-canvas layer
+      // in styles.css (screen blend, blur 16px, saturate 1.35, opacity 0.9) so a
+      // reviewer judges the same bloom players see. The old order drew the glow
+      // underneath the opaque base, so captures reviewed night lights as if they
+      // did not exist. Keep these values in sync with .glow-canvas.
+      context.globalCompositeOperation = "screen";
+      context.globalAlpha = 0.9;
+      context.filter = "blur(16px) saturate(1.35)";
+      context.drawImage(glow, 0, 0, canvas.width, canvas.height);
+      context.globalCompositeOperation = "source-over";
+      context.globalAlpha = 1;
+      context.filter = "none";
       return canvas.toDataURL("image/png");
     })()`
   );

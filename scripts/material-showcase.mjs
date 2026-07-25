@@ -50,8 +50,8 @@ export function materialShowcaseScript() {
     rect(104, 112, 99, 105, material.Sand, 0, 80, flag.Scorched);
     rect(74, 82, 94, 101, material.Sand, 70, 34, flag.Frozen);
 
-    // Stone and wall thermal states: damp, frost, scorched, and freeze-thaw fracture.
-    line(116, 154, 107, material.Stone);
+    // Stone and wall thermal states on a wall shelf (stone stands would fall now).
+    line(116, 154, 107, material.Wall);
     rect(119, 127, 96, 106, material.Stone, 80, 52, flag.Wet);
     rect(130, 138, 94, 106, material.Stone, 72, 64, flag.Frozen | flag.Wet);
     rect(141, 151, 97, 106, material.Stone, 30, 90, flag.Scorched);
@@ -88,16 +88,18 @@ export function materialShowcaseScript() {
     setCell(132, 61, material.Water, 80, 12);
     setCell(134, 61, material.Steam, 220, 18);
     setCell(135, 62, material.Stone, 0, 80, flag.Scorched);
+    setCell(135, 63, material.Wall, 0, 20);
     setCell(136, 60, material.Meteor, 255, 6, 0, 3);
     rect(139, 151, 65, 72, material.Lava, 250, 18);
     line(140, 150, 63, material.Steam, 130, 18);
     setCell(152, 66, material.Water, 80, 16);
     setCell(153, 65, material.Steam, 220, 18);
     setCell(154, 66, material.Stone, 0, 80, flag.Scorched);
+    setCell(154, 67, material.Wall, 0, 20);
     rect(160, 174, 62, 71, material.Ice, 90, 24);
 
     // Heat family lineup: airy fire, crusted lava, glowing ember, and a streaking meteor side by side.
-    line(26, 62, 32, material.Stone, 0, 40);
+    line(26, 62, 32, material.Wall, 0, 40);
     rect(27, 33, 27, 31, material.Fire, 230, 6);
     rect(39, 49, 28, 31, material.Lava, 250, 20);
     line(54, 61, 31, material.Ember, 220, 20);
@@ -126,17 +128,40 @@ export function materialShowcaseScript() {
 
     // Geology: a larger stone mass with mineral veins and an old patinated wall.
     rect(24, 44, 44, 56, material.Stone, 0, 60);
+    line(24, 44, 57, material.Wall);
     rect(208, 217, 96, 106, material.Wall, 0, 20000);
 
     // Constellation etching: stardust resting on stone/wall leaves cosmic glitter veins.
     rect(184, 196, 100, 106, material.Stone, 36, 90, flag.Cosmic);
+    line(184, 196, 107, material.Wall);
     rect(198, 206, 98, 106, material.Wall, 36, 90, flag.Cosmic);
     for (const [x, y] of [[186, 98], [191, 97], [200, 96]]) setCell(x, y, material.Stardust, 190, 30, 0, x);
 
-    // Vitrified glass: fresh warm pane beside the lava pool and a cooled pane over sand.
+    // Vitrified glass: a fresh warm pane beside the lava pool, and a cooled pane deep
+    // enough to show true interior (see-through) against open night, not just its rims.
     rect(139, 151, 74, 75, material.Glass, 0, 12);
-    rect(96, 110, 106, 108, material.Glass, 0, 220);
+    rect(96, 110, 100, 108, material.Glass, 0, 220);
     line(96, 110, 109, material.Sand, 0, 60);
+    line(96, 110, 110, material.Wall);
+    // Dewed pane: a fogged, wet terrarium wall so the condensation film and droplet
+    // runs are reviewable over the new transparent base.
+    rect(84, 90, 100, 108, material.Glass, 40, 90, flag.Wet);
+    setCell(85, 99, material.Steam, 200, 20);
+    line(84, 90, 109, material.Wall);
+
+    // Vitrify flash, clear of the lava pool so the bloom is attributable to the glass
+    // itself: an age-0 pane still white-hot from fusing, beside the same pane cooled.
+    // (The lava-side exhibit sits inside lava's own halo and cannot evidence this.)
+    rect(178, 184, 64, 70, material.Glass, 0, 0);
+    rect(187, 191, 64, 70, material.Glass, 0, 220);
+    line(178, 191, 71, material.Wall);
+
+    // Attunement legibility at the smallest placement: a single attuned block beside a
+    // single dormant one. Moonwater is the closest attuned hue to the dormant pewter,
+    // so this pair is the honest worst case for telling lit from unlit at one cell.
+    setCell(180, 76, material.Wellspring, material.Moonwater, 40, 0, 3);
+    setCell(184, 76, material.Wellspring, 0, 40, 0, 3);
+    setCell(180, 77, material.Wall); setCell(184, 77, material.Wall);
 
     // Water-type contrast: ordinary water picks up earth/oil/life contact, moonwater lights hard surfaces.
     line(118, 127, 90, material.Moonwater, 140, 22, flag.Cosmic);
@@ -145,17 +170,17 @@ export function materialShowcaseScript() {
     line(96, 104, 90, material.Oil, 70, 22);
     line(88, 93, 92, material.Soil, 120, 28, flag.Wet);
 
-    // Wellspring pair: a water-attuned block pouring into a stone basin, and a dormant block beside it.
-    rect(160, 168, 118, 118, material.Stone);
-    setCell(160, 117, material.Stone); setCell(168, 117, material.Stone);
-    setCell(160, 116, material.Stone); setCell(168, 116, material.Stone);
+    // Wellspring pair: a water-attuned block pouring into a walled basin, and a dormant block beside it.
+    rect(160, 168, 118, 118, material.Wall);
+    setCell(160, 117, material.Wall); setCell(168, 117, material.Wall);
+    setCell(160, 116, material.Wall); setCell(168, 116, material.Wall);
     for (const [x, y] of [[163, 112], [164, 112], [165, 112]]) setCell(x, y, material.Wellspring, material.Water, 40, 0, x);
     setCell(172, 117, material.Wellspring, 0, 40, 0, 1);
 
     // Firework arc: an inert rocket powder charge on stone and a lit grain climbing mid-flight.
-    line(126, 134, 108, material.Stone);
+    line(126, 134, 108, material.Wall);
     for (const [x, y] of [[128, 107], [129, 107], [130, 107], [131, 107], [129, 106], [130, 106]]) setCell(x, y, material.Rocket, 0, 30, 0, x);
-    setCell(130, 96, material.Rocket, 180, 6, 0, 2);
+    setCell(122, 96, material.Rocket, 235, 6, 0, 2);
 
     // Firework burst: a spark shell in festive hues (gold, rose, mint, sky, magenta) that
     // reads apart from cool Stardust. Ages past the white-hot birth so the hues show.

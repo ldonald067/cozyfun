@@ -344,7 +344,10 @@ function meteorColor({ color, variant, time, cells, width, height, x, y }: Shape
 }
 
 // Rune glint tints for an attuned wellspring, keyed by the remembered material id.
-const WELLSPRING_TINTS: Record<number, Rgb> = {
+// The hue a wellspring shows for each material it can remember. Shared with the glow
+// layer (materialColor.ts) so the carved rune and its night bloom can never drift
+// apart, and so the key set stays the single source of truth for "is this attuned".
+export const WELLSPRING_TINTS: Record<number, Rgb> = {
   [MATERIAL.Water]: [120, 178, 255],
   [MATERIAL.Moonwater]: [170, 180, 242],
   [MATERIAL.Lava]: [255, 122, 48],
@@ -361,16 +364,33 @@ const WELLSPRING_TINTS: Record<number, Rgb> = {
 function wellspringColor({ color, variant, energy, time, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
   const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Wellspring);
-  let out = mixRgb(color, [16, 22, 36], (hash & 3) * 0.08);
-  if (edge.count > 0) out = mixRgb(out, [12, 16, 28], 0.3);
-  const rune = (x * 5 + y * 3 + (hash & 7)) % 9 === 0 || ((x ^ y) + (hash >> 2)) % 11 === 0;
+  // Moonlit carved stone, not night-camouflage: lift the body toward slate-silver so
+  // the block silhouettes against the #091018 sky instead of melting into it.
+  let out = mixRgb(color, [96, 112, 148], 0.3 - (hash & 3) * 0.05);
+  // Chiselled rim: bright top/left, deep shadow bottom/right — a carved block reads
+  // from its edges even at a two-cell placement.
+  if (edge.top || edge.left) out = mixRgb(out, [168, 186, 218], 0.42);
+  if (edge.bottom || edge.right) out = mixRgb(out, [8, 12, 22], 0.44);
+  // Small placements (1-2 cells, mostly exposed) always carve: a lone block must
+  // still read as runed stone, and attuned-vs-dormant must survive at that size.
+  const rune =
+    edge.count >= 3 ||
+    (x * 5 + y * 3 + (hash & 7)) % 9 === 0 ||
+    ((x ^ y) + (hash >> 2)) % 11 === 0;
   if (!rune) return out;
   const tint = WELLSPRING_TINTS[energy & 255];
   if (tint) {
     const pulse = (Math.sin(time * 0.006 + hash * 0.9) + 1) * 0.5;
-    return mixRgb(out, tint, 0.45 + pulse * 0.35);
+    out = mixRgb(out, tint, 0.55 + pulse * 0.3);
+    // Lit rune cores: a few near-white pixels make attunement legible when the
+    // spring is only a couple of cells on screen.
+    if (hash % 5 === 0) out = mixRgb(out, [255, 253, 244], 0.4 + pulse * 0.2);
+    return out;
   }
-  return mixRgb(out, [150, 170, 210], 0.3);
+  // Dormant runes sleep in colourless pewter. Deliberately desaturated rather than
+  // blue-silver: an unlit rune must not be mistakable for the palest attunement
+  // (Moonwater's lavender), which a cool silver was too close to at one-cell sizes.
+  return mixRgb(out, [176, 178, 174], 0.5);
 }
 
 // Classic firework hues; each spark picks one deterministically, so every
@@ -571,14 +591,21 @@ function emberColor({ variant, energy, flags, time, x, y }: ShapeContext) {
   return out;
 }
 
-function glassColor({ color, variant, age, energy, flags, cells, width, height, x, y }: ShapeContext) {
+function glassColor({ color, variant, age, energy, flags, time, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x >> 1, y >> 1, variant);
   const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Glass);
-  let out = mixRgb(color, [198, 246, 230], 0.3);
-  out = mixRgb(out, [9, 14, 20], 0.24);
-  if (((x + y * 2 + (hash & 3)) & 7) === 0) out = mixRgb(out, [216, 252, 240], 0.44);
-  if (edge.top || edge.left) out = mixRgb(out, [234, 255, 246], 0.52);
-  if (edge.bottom || edge.right) out = mixRgb(out, [36, 102, 84], 0.44);
+  // A pane is mostly the night behind it: start from the sky and lay only a whisper
+  // of mint film over it, so glass reads transparent instead of as solid chalk.
+  let out = mixRgb([9, 14, 20], color, 0.18);
+  // A slow diagonal sheen drifts across the pane — the moving band of caught light
+  // that says "glass" even where the interior is nearly see-through.
+  const band = (x + y + Math.floor(time * 0.004)) % 11;
+  if (band === 0) out = mixRgb(out, [214, 240, 236], 0.3);
+  else if (band === 1) out = mixRgb(out, [214, 240, 236], 0.14);
+  if (((x + y * 2 + (hash & 3)) & 7) === 0) out = mixRgb(out, [216, 252, 240], 0.3);
+  // The frame carries the identity: bright lit rim up top, deep teal shadow below.
+  if (edge.top || edge.left) out = mixRgb(out, [234, 255, 246], 0.5);
+  if (edge.bottom || edge.right) out = mixRgb(out, [46, 116, 98], 0.42);
   if ((hash & 31) === 5) out = mixRgb(out, [255, 255, 255], 0.6);
   if (hasNearbyKind(cells, width, height, x, y, STEAM_KINDS)) {
     // Steam fogs the pane with a soft condensation film.

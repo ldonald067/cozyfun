@@ -1,6 +1,6 @@
 import { CELL_FLAG, GLOW_MATERIALS, MATERIAL, MATERIAL_BY_ID, type MaterialId } from "../materials";
 import { clampColor, hexToRgb, type Rgb } from "./color";
-import { applyShapeLanguage, emptyCellColor } from "./shapeLanguage";
+import { applyShapeLanguage, emptyCellColor, WELLSPRING_TINTS } from "./shapeLanguage";
 
 export function colorForCell(options: {
   kind: number;
@@ -69,8 +69,15 @@ export function colorForCell(options: {
   return applyShapeLanguage({ kind, color: [r, g, b], variant, age, energy, flags, time, cells, width, height, x, y });
 }
 
-export function hasGlow(kind: number, flags = 0) {
-  if (kind === MATERIAL.Moss && (flags & CELL_FLAG.Cosmic) !== 0) return true;
+// State-gated night lights: these materials glow only in a particular state, so the
+// glow itself carries information (attuned, lit, freshly fused, star-etched).
+// Every argument is required on purpose: defaulting energy/age to 0 would fail OPEN
+// (a glass cell would read as freshly fused), so a caller must pass real cell state.
+export function hasGlow(kind: number, flags: number, energy: number, age: number) {
+  if (kind === MATERIAL.Moss || kind === MATERIAL.Stone) return (flags & CELL_FLAG.Cosmic) !== 0;
+  if (kind === MATERIAL.Wellspring) return WELLSPRING_TINTS[energy & 255] !== undefined;
+  if (kind === MATERIAL.Rocket) return energy > 0;
+  if (kind === MATERIAL.Glass) return age < 70;
   return GLOW_MATERIALS.has(kind as MaterialId);
 }
 
@@ -80,12 +87,38 @@ export function glowIntensity(kind: number, energy: number, age: number, time: n
   if (kind === MATERIAL.Moss) return clampColor(46 + energy * 0.28 + pulse * 26);
   if (kind === MATERIAL.Pollen) return clampColor(30 + energy * 0.25 + pulse * 20);
   if (kind === MATERIAL.Spark) return clampColor(50 + energy * 0.6 + pulse * 45);
+  // Steam is lit BY sources, it is not one: a faint moonlit sheen that fades as the
+  // wisp ages, far below fire's floor so a kettle never outshines its own flame.
+  if (kind === MATERIAL.Steam) return clampColor(16 + energy * 0.06 + pulse * 8 - age * 0.2);
+  // A wellspring's energy stores a material id, not a magnitude — steady rune light.
+  if (kind === MATERIAL.Wellspring) return clampColor(56 + pulse * 30);
+  if (kind === MATERIAL.Rocket) return clampColor(70 + energy * 0.35 + pulse * 40);
+  // Fresh glass blooms with the vitrify flash, then cools back to an unlit pane.
+  // Two decays, mirroring the base layer's own flash/cooling pair, so the bloom
+  // fades continuously instead of stepping when the white-hot moment ends.
+  if (kind === MATERIAL.Glass) {
+    const cooling = Math.max(0, 1 - age / 70);
+    const flash = Math.max(0, 1 - age / 8);
+    return clampColor(cooling * (95 + pulse * 18) + flash * 55);
+  }
+  // Constellation-etched stone: a soft starfield, not a lamp.
+  if (kind === MATERIAL.Stone) return clampColor(24 + pulse * 16);
   const base = kind === MATERIAL.Stardust || kind === MATERIAL.Moonwater || kind === MATERIAL.Flower ? 80 : 120;
   return clampColor(base + energy * 0.45 + pulse * 55);
 }
 
-export function glowColorFor(kind: number, flags = 0): Rgb {
+export function glowColorFor(kind: number, flags: number, energy: number, age: number): Rgb {
   if (kind === MATERIAL.Moss && (flags & CELL_FLAG.Cosmic) !== 0) return [159, 232, 196];
+  if (kind === MATERIAL.Stone) return [199, 188, 255];
+  // The rune glow takes the hue of the remembered material, so attunement reads at night.
+  if (kind === MATERIAL.Wellspring) return WELLSPRING_TINTS[energy & 255];
+  if (kind === MATERIAL.Rocket) return [255, 223, 154];
+  // Vitrify amber cooling into the pane's own mint as the flash fades.
+  if (kind === MATERIAL.Glass) {
+    const cool = Math.min(1, age / 70);
+    return [255 - (255 - 149) * cool, 190 + (224 - 190) * cool, 110 + (208 - 110) * cool];
+  }
   const material = MATERIAL_BY_ID.get(kind as MaterialId);
   return hexToRgb(material?.glow ?? material?.color ?? "#ffffff");
 }
+
