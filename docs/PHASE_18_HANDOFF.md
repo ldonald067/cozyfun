@@ -127,14 +127,28 @@ landed. No sim rules changed, so parity was never at risk; the risk here was the
   and strong rims carrying the identity. Interior luminance dropped ~71%, so a pane is
   see-through while its frame keeps it findable.
 - **Fogged glass is a droplet field, not a wash.** Two flat washes (steam-nearby and
-  the WET flag) used to stack and drive a steamy dome to luminance 186 in a 63-wide
-  band — no cell read through, i.e. the chalk complaint in grey. Condensation is now
-  a thin haze plus scattered beads, streaked by vertical **clear runs** that read
-  *darker* than the fog because the drop has wiped the pane behind it. Full dew now
-  averages 97 across a 176-wide bimodal spread, with 40% of cells still see-through
-  and 24% bright beads. Dew intensity still reads (beads 4% dry -> 9% light -> 24%
-  full), and bright-speckle-over-dark-glass-with-dark-streaks is a texture nothing
-  else in the roster wears.
+  the WET flag) used to stack and drive a steamy dome to a narrow bright band in which
+  no cell read through — the chalk complaint in grey. Condensation is now a thin haze
+  plus scattered beads, streaked by vertical **clear runs** that read *darker* than the
+  fog because the drop has wiped the pane behind it.
+
+  Measured on a 32x32 pane (interior sampled excluding the edge ring, `variant =
+  (x*3+y)&7` as the showcase assigns it, `age` 220 so no vitrify flash, `time` 0,
+  Rec.709 luminance): dry averages 63 and full dew 97, both across a ~175-wide bimodal
+  spread; the see-through share falls 72% -> 39% while beads rise 4% -> 24% as dew
+  builds. Quote that recipe with the numbers — they are properties of *this* sample,
+  not of `glassColor`, and the see-through share in particular is bin-sensitive: a
+  population of bead cells sits near the luminance-70 line and crosses it together,
+  which moves the percentage several points while no cell changes by more than ~2/255.
+
+  Two bugs an adversarial review caught here, both worth remembering: the first version
+  seeded the run mask on the 2x2 block hash, which changes every two rows, so the
+  "vertical tracks" were really 1.3-cell flecks (they are now column-stable and average
+  12 cells, jogging one column every eight rows like a real drip); and the runs switched
+  on at a hard `dew > 0.35`, so one extra unit of water darkened a ninth of the pane at
+  once — the wipe now ramps continuously. Track spacing is modular rather than hashed
+  because hashed columns clump: at the old 1-in-9 hash rate, 41% of 7-cell-wide panes
+  contained no track at all, versus 2% now.
 - **Vitrify flash blooms.** Fresh glass now reaches the glow layer (`age < 70`), amber
   cooling to the pane's mint. Intensity is two decays — a 70-tick cooling plus an 8-tick
   flash — deliberately mirroring the base layer's own pair, so the bloom fades

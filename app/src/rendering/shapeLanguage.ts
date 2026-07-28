@@ -621,17 +621,30 @@ function glassColor({ color, variant, age, energy, flags, time, cells, width, he
     const drop = hashCell(x, y, variant + 5);
     // The haze stays deliberately thin — most of the pane must still read through.
     out = mixRgb(out, [188, 214, 220], (misting ? 0.11 : 0.05) + dew * 0.07);
-    const running = dew > 0.35 && (x * 7 + (hash & 3)) % 9 === 0;
-    if (running) {
+    // Beads first, over the whole pane, so a track cell is a wiped bead rather than a
+    // cell that took a different branch. Keeping these independent is what lets the
+    // track fade in continuously below.
+    if ((drop & 3) === 1) out = mixRgb(out, [224, 240, 244], 0.24 + dew * 0.32);
+    else if ((drop & 7) === 4) out = mixRgb(out, [198, 222, 228], 0.12 + dew * 0.14);
+    // A track has to be stable down a column or it reads as speckle instead of a run,
+    // so it can only be seeded on x: both `variant` and the 2x2 block hash change as y
+    // advances, and folding either one in chops the track into two-row dashes. Spacing
+    // is modular rather than a hash test, because hashed columns clump and leave gaps
+    // wide enough for a small pane to contain no track at all; the jitter keeps that
+    // spacing from looking ruled, and the jog lets a track wander a column every eight
+    // rows the way a real drip does.
+    const jog = hashCell(0, y >> 3, 7) & 1;
+    const jitter = hashCell(x >> 3, 0, 11) & 3;
+    const track = (x + jog + jitter) % 5 === 0;
+    // Wipe strength ramps with dew rather than switching on at a threshold, so a pane
+    // does not darken all at once when one more unit of water lands on it.
+    const wipe = Math.max(0, Math.min(1, (dew - 0.2) / 0.45));
+    if (track && wipe > 0) {
       // A track reads DARKER than the fog around it: the glass behind it has been
       // wiped clear, so the night shows through the runs.
-      out = mixRgb(out, [11, 19, 25], 0.38 + dew * 0.24);
+      out = mixRgb(out, [11, 19, 25], (0.38 + dew * 0.24) * wipe);
       // The bead riding down that track is the brightest thing on the pane.
-      if (((y * 5 + (drop >> 2)) & 7) === 0) out = mixRgb(out, [238, 250, 255], 0.72);
-    } else if ((drop & 3) === 1) {
-      out = mixRgb(out, [224, 240, 244], 0.24 + dew * 0.32);
-    } else if ((drop & 7) === 4) {
-      out = mixRgb(out, [198, 222, 228], 0.12 + dew * 0.14);
+      if (((y * 5 + (drop >> 2)) & 7) === 0) out = mixRgb(out, [238, 250, 255], 0.72 * wipe);
     }
   }
   if (age < 8) out = mixRgb(out, [255, 244, 214], 0.6 * (1 - age / 8));

@@ -9,3 +9,6 @@ app/public/sim/
 *.log
 .env
 .env.*
+
+# Personal Claude Code permission allowlist — machine-local, not shared.
+.claude/settings.local.json
