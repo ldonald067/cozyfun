@@ -1,4 +1,4 @@
-import { AMBIENT_AUDIO_ASSETS, loadAmbientAudioBuffer, type AmbientAudioAssetId } from "./assets";
+import { AMBIENT_AUDIO_ASSETS, ambientAudioUrl, loadAmbientAudioBuffer, type AmbientAudioAssetId } from "./assets";
 import { getAudioMoodDef } from "./moods";
 import { DEFAULT_AUDIO_ROOM, getRoomAmbienceDef } from "./rooms";
 import type { AudioLayerHandle, AudioMood, RunningAudio } from "./types";
@@ -139,7 +139,7 @@ function recordNativeAmbienceStart(id: AmbientAudioAssetId, source: AudioBufferS
   if (!probe.starts) probe.starts = [];
   probe.starts.push({
     id,
-    url: AMBIENT_AUDIO_ASSETS[id].url,
+    url: ambientAudioUrl(id),
     duration: source.buffer?.duration ?? 0,
     gain: gain.gain.value,
     loop: source.loop,

@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Night Desk Terrarium — a cozy pixel sandbox</title>
+    <meta name="robots" content="noindex" />
+    <!--
+      Click-to-load shell for embedding the sandbox in a page on another site.
+
+      The point is weight. The app is ~9 MB with its ambience beds, and an embed that
+      autoloads makes every visitor who scrolls past pay for it. This poster is a few KB
+      and pulls in nothing until someone actually asks to play.
+
+      Every path here is relative, so this file works unchanged at a domain root or under
+      a subpath — it always sits next to the index.html it launches, whatever COZY_BASE
+      was set to at build time.
+
+      Host this on the SAME ORIGIN as the page embedding it. Served cross-origin (from
+      itch.io, say) the sandbox becomes a third-party frame, and Safari blocks its
+      localStorage outright while Chrome partitions it — which silently breaks saving a
+      terrarium, the one thing players want to keep.
+    -->
+    <style>
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        background: #091018;
+        color: #e8ecf2;
+        font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+      }
+      .poster {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border: 0;
+        padding: clamp(1.25rem, 5vw, 3rem);
+        display: grid;
+        place-content: center;
+        gap: 0.85rem;
+        text-align: center;
+        cursor: pointer;
+        background: radial-gradient(120% 90% at 50% 15%, #1b2534 0%, #0d1421 55%, #070c13 100%);
+        color: inherit;
+        font: inherit;
+      }
+      .poster::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          radial-gradient(1.5px 1.5px at 18% 24%, rgba(255, 233, 189, 0.55), transparent 60%),
+          radial-gradient(1.5px 1.5px at 72% 18%, rgba(198, 214, 255, 0.5), transparent 60%),
+          radial-gradient(1.5px 1.5px at 44% 66%, rgba(255, 226, 177, 0.4), transparent 60%),
+          radial-gradient(1.5px 1.5px at 86% 72%, rgba(190, 236, 214, 0.4), transparent 60%),
+          radial-gradient(1.5px 1.5px at 28% 82%, rgba(226, 205, 255, 0.4), transparent 60%);
+      }
+      h1 {
+        margin: 0;
+        font: 600 clamp(1.35rem, 3.4vw, 2rem)/1.2 Georgia, "Iowan Old Style", serif;
+        color: #f4dfb8;
+        letter-spacing: 0.01em;
+      }
+      p {
+        margin: 0 auto;
+        max-width: 46ch;
+        color: #9fb3c4;
+        font-size: clamp(0.9rem, 1.6vw, 1rem);
+      }
+      .play {
+        justify-self: center;
+        margin-top: 0.5rem;
+        padding: 0.7rem 1.6rem;
+        border: 1px solid rgba(244, 223, 184, 0.42);
+        border-radius: 999px;
+        background: rgba(244, 223, 184, 0.1);
+        color: #f4dfb8;
+        font: 600 1rem/1 inherit;
+        letter-spacing: 0.02em;
+        transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+      }
+      .poster:hover .play,
+      .poster:focus-visible .play {
+        background: rgba(244, 223, 184, 0.19);
+        border-color: rgba(244, 223, 184, 0.75);
+        transform: translateY(-1px);
+      }
+      .poster:focus-visible { outline: 2px solid #f4dfb8; outline-offset: -4px; }
+      .hint { font-size: 0.78rem; color: #6f8496; }
+      iframe { width: 100%; height: 100%; border: 0; display: block; }
+      @media (prefers-reduced-motion: reduce) { .play { transition: none; } }
+    </style>
+  </head>
+  <body>
+    <button class="poster" id="poster" type="button">
+      <h1>Night Desk Terrarium</h1>
+      <p>
+        A cozy pixel sandbox. Pour sand and water, light a hearth, grow moss and
+        moonlit flowers — no score, no timer, nothing to win.
+      </p>
+      <span class="play">Enter the terrarium</span>
+      <span class="hint">Loads on click · sound is off until you turn it on</span>
+    </button>
+
+    <script>
+      // Swap the poster for the real app only once the visitor asks for it. Same-origin,
+      // so the sandbox keeps normal access to localStorage and can save scenes.
+      document.getElementById("poster").addEventListener(
+        "click",
+        () => {
+          const frame = document.createElement("iframe");
+          frame.src = "index.html";
+          frame.title = "Night Desk Terrarium";
+          frame.allow = "autoplay; fullscreen";
+          document.body.replaceChildren(frame);
+          frame.focus();
+        },
+        { once: true }
+      );
+    </script>
+  </body>
+</html>

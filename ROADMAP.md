@@ -301,7 +301,7 @@ Started:
 
 - The generated lo-fi music experiment was removed after listening review because it stayed too boring for the toy.
 - Mood presets now focus on concrete ambience: Rain, Purr, and Fire.
-- Native ambience now uses local credited recordings (`rain.mp3`, `cat-purr.mp3`, `fire-crackle.wav`) with generated room tone, fallback layers, and sparse drips.
+- Native ambience now uses local credited recordings (`rain.mp3`, `cat-purr.mp3`, `fire-crackle.mp3`) with generated room tone, fallback layers, and sparse drips.
 - Painting now produces subtle native material cues through the ambience channel, throttled so drag-painting does not flood the audio graph.
 - Desk Radio now accepts regular YouTube URLs, `youtu.be` links, raw 11-character video IDs, playlists, embed/live/shorts links, `youtube-nocookie.com` links, and timestamped video links.
 - Timestamped video sources are preserved in local Desk Radio state and passed into the YouTube player.

@@ -13,6 +13,7 @@ import {
   type AudioPrefs,
   type AudioProvider
 } from "./audio";
+import { assetUrl } from "./assetUrl";
 import { detectReactionCues } from "./audio/reactions";
 import { SegmentedControl, type SegmentOption } from "./components/SegmentedControl";
 import { AudioPanel } from "./components/AudioPanel";
@@ -90,7 +91,7 @@ export function App() {
   useEffect(() => {
     let active = true;
     let createdEngine: SandboxEngine | null = null;
-    createEngine(WORLD_WIDTH, WORLD_HEIGHT, DEFAULT_SEED).then((created) => {
+    createEngine(WORLD_WIDTH, WORLD_HEIGHT, DEFAULT_SEED, assetUrl("sim/cozy_sandbox_sim.wasm")).then((created) => {
       if (!active) {
         created.dispose();
         return;
@@ -201,7 +202,7 @@ export function App() {
   const sceneShellStyle = useMemo(
     () =>
       ({
-        "--room-image": `url("${activeSceneEnvironment.image}")`,
+        "--room-image": `url("${assetUrl(activeSceneEnvironment.image)}")`,
         "--room-image-position": activeSceneEnvironment.imagePosition,
         "--room-image-opacity": activeSceneEnvironment.imageOpacity,
         "--room-image-filter": activeSceneEnvironment.imageFilter,

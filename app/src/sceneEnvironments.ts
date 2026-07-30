@@ -26,7 +26,7 @@ export const SCENE_ENVIRONMENTS: SceneEnvironment[] = [
     status: "rain desk backdrop on",
     mood: "rain",
     className: "scene-rain-desk",
-    image: "/rooms/rain-desk.jpg",
+    image: "rooms/rain-desk.jpg",
     imagePosition: "center center",
     imageOpacity: 0.54,
     imageFilter: "saturate(0.74) contrast(0.84) brightness(0.58)"
@@ -38,7 +38,7 @@ export const SCENE_ENVIRONMENTS: SceneEnvironment[] = [
     status: "moonlit garden backdrop on",
     mood: "rain",
     className: "scene-moonwater-garden",
-    image: "/rooms/moonwater-garden.jpg",
+    image: "rooms/moonwater-garden.jpg",
     imagePosition: "center 38%",
     imageOpacity: 0.7,
     imageFilter: "saturate(0.86) contrast(0.98) brightness(0.82)"
@@ -50,7 +50,7 @@ export const SCENE_ENVIRONMENTS: SceneEnvironment[] = [
     status: "stardust hearth backdrop on",
     mood: "fire",
     className: "scene-stardust-hearth",
-    image: "/rooms/stardust-hearth.jpg",
+    image: "rooms/stardust-hearth.jpg",
     imagePosition: "center 45%",
     imageOpacity: 0.58,
     imageFilter: "saturate(0.72) contrast(0.86) brightness(0.62)"
@@ -62,7 +62,7 @@ export const SCENE_ENVIRONMENTS: SceneEnvironment[] = [
     status: "cozy fireplace backdrop on",
     mood: "fire",
     className: "scene-cozy-fireplace",
-    image: "/rooms/cozy-fireplace.jpg",
+    image: "rooms/cozy-fireplace.jpg",
     imagePosition: "center 48%",
     imageOpacity: 0.62,
     imageFilter: "saturate(0.78) contrast(0.86) brightness(0.6)"
@@ -74,7 +74,7 @@ export const SCENE_ENVIRONMENTS: SceneEnvironment[] = [
     status: "forest hut backdrop on",
     mood: "rain",
     className: "scene-forest-hut",
-    image: "/rooms/forest-hut.jpg",
+    image: "rooms/forest-hut.jpg",
     imagePosition: "center 52%",
     imageOpacity: 0.6,
     imageFilter: "saturate(0.8) contrast(0.9) brightness(0.56)"
@@ -86,7 +86,7 @@ export const SCENE_ENVIRONMENTS: SceneEnvironment[] = [
     status: "snow window backdrop on",
     mood: "purr",
     className: "scene-snow-window",
-    image: "/rooms/snow-window.jpg",
+    image: "rooms/snow-window.jpg",
     imagePosition: "center 46%",
     imageOpacity: 0.64,
     imageFilter: "saturate(0.78) contrast(0.88) brightness(0.62)"

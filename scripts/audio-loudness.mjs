@@ -30,7 +30,7 @@ try {
       const beds = [
         { id: "rain", url: "/audio/rain.mp3", filter: { type: "lowpass", frequency: 3800, q: 0.38 } },
         { id: "purr", url: "/audio/cat-purr.mp3", filter: { type: "lowpass", frequency: 480, q: 0.34 } },
-        { id: "fire", url: "/audio/fire-crackle.wav", filter: { type: "highpass", frequency: 120, q: 0.28 } }
+        { id: "fire", url: "/audio/fire-crackle.mp3", filter: { type: "highpass", frequency: 120, q: 0.28 } }
       ];
       const out = [];
       for (const bed of beds) {

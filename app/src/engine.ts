@@ -30,8 +30,18 @@ type WasmModule = {
   dealloc(ptr: number, len: number): void;
 };
 
-export async function createEngine(width: number, height: number, seed: number): Promise<SandboxEngine> {
-  const wasm = await loadRawWasm();
+// wasmUrl is passed in rather than derived here: this module is compiled to CommonJS by the
+// parity harness, where `import.meta.env.BASE_URL` is a compile error, so the app layer
+// resolves the deploy base and hands the URL down. It is required on purpose — defaulting it
+// to the domain root would fail OPEN under a subpath deploy, and this particular failure is
+// invisible: a 404 here does not throw, it quietly drops the sandbox to the JS engine.
+export async function createEngine(
+  width: number,
+  height: number,
+  seed: number,
+  wasmUrl: string
+): Promise<SandboxEngine> {
+  const wasm = await loadRawWasm(wasmUrl);
   if (wasm) {
     return new WasmSandboxEngine(wasm, width, height, seed);
   }
@@ -42,9 +52,9 @@ export function createFallbackEngine(width: number, height: number, seed: number
   return new JsSandboxEngine(width, height, seed);
 }
 
-async function loadRawWasm(): Promise<WasmModule | null> {
+async function loadRawWasm(wasmUrl: string): Promise<WasmModule | null> {
   try {
-    const response = await fetch("/sim/cozy_sandbox_sim.wasm");
+    const response = await fetch(wasmUrl);
     if (!response.ok) return null;
     const { instance } = await WebAssembly.instantiateStreaming(response, {});
     return instance.exports as unknown as WasmModule;

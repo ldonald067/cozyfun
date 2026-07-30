@@ -192,10 +192,12 @@ async function main() {
     const assets = await evaluate(
       cdp,
       `(async () => {
+        // 400k floor catches a missing or truncated recording without failing on a
+        // properly compressed one (the purr is ~0.89 MB since the beds were encoded down).
         const checks = [
-          { url: "/audio/cat-purr.mp3", minBytes: 1000000 },
-          { url: "/audio/rain.mp3", minBytes: 1000000 },
-          { url: "/audio/fire-crackle.wav", minBytes: 1000000 }
+          { url: "/audio/cat-purr.mp3", minBytes: 400000, minSeconds: 110 },
+          { url: "/audio/rain.mp3", minBytes: 400000, minSeconds: 260 },
+          { url: "/audio/fire-crackle.mp3", minBytes: 400000, minSeconds: 110 }
         ];
         return Promise.all(checks.map(async (asset) => {
           const response = await fetch(asset.url, { cache: "no-store" });
@@ -211,6 +213,7 @@ async function main() {
           }
           return {
             url: asset.url,
+            minSeconds: asset.minSeconds,
             ok: response.ok,
             status: response.status,
             bytes: bytes.byteLength,
@@ -225,6 +228,13 @@ async function main() {
       assert(asset.ok, `${asset.url} was not served: HTTP ${asset.status}`);
       assert(asset.bytes >= asset.minBytes, `${asset.url} was too small: ${asset.bytes} bytes`);
       assert(asset.duration > 0.05, `${asset.url} did not decode as browser audio: ${asset.decodeError}`);
+      // Guard the recording itself, not just that bytes decoded: runtime loop extension
+      // would happily stretch a one-second clip into a 120s bed, so a truncated or
+      // substituted source has to be caught here at its true length.
+      assert(
+        asset.duration >= asset.minSeconds,
+        `${asset.url} decoded to ${asset.duration.toFixed(2)}s, expected at least ${asset.minSeconds}s of source recording`
+      );
     }
   });
 
@@ -327,7 +337,7 @@ async function main() {
       })),
       nativeStarts: window.__cozyNativeAmbienceProbe?.starts ?? []
     }))()`);
-    for (const path of ["/audio/cat-purr.mp3", "/audio/rain.mp3", "/audio/fire-crackle.wav"]) {
+    for (const path of ["/audio/cat-purr.mp3", "/audio/rain.mp3", "/audio/fire-crackle.mp3"]) {
       assert(nativeAmbience.fetches.includes(path), `native ambience did not fetch ${path}: ${nativeAmbience.fetches.join(", ")}`);
     }
     assertLoopSource(nativeAmbience.loopSources, "cat purr", 120);
@@ -335,7 +345,7 @@ async function main() {
     assertLoopSource(nativeAmbience.loopSources, "fire crackle", 120);
     assertNativeStart(nativeAmbience.nativeStarts, "catPurr", "/audio/cat-purr.mp3", 120, { minGain: 0.001 });
     assertNativeStart(nativeAmbience.nativeStarts, "rainFall", "/audio/rain.mp3", 150, { minGain: 0.01 });
-    assertNativeStart(nativeAmbience.nativeStarts, "fireCrackle", "/audio/fire-crackle.wav", 120, { minGain: 0.0001 });
+    assertNativeStart(nativeAmbience.nativeStarts, "fireCrackle", "/audio/fire-crackle.mp3", 120, { minGain: 0.0001 });
 
     await evaluate(cdp, `window.__cozyNativeAmbienceProbe = { starts: [] }`);
     await click(cdp, '[data-testid="audio-mood-purr"]');
@@ -356,12 +366,12 @@ async function main() {
     await waitUntil(
       () => evaluate(
         cdp,
-        `(() => (window.__cozyNativeAmbienceProbe?.starts ?? []).some((start) => start.id === "fireCrackle" && start.url === "/audio/fire-crackle.wav" && start.duration >= 119 && start.gain >= 0.05))()`
+        `(() => (window.__cozyNativeAmbienceProbe?.starts ?? []).some((start) => start.id === "fireCrackle" && start.url === "/audio/fire-crackle.mp3" && start.duration >= 119 && start.gain >= 0.05))()`
       ),
       "hearth fire crackle native loop to start"
     );
     const hearthAmbience = await evaluate(cdp, `window.__cozyNativeAmbienceProbe?.starts ?? []`);
-    assertNativeStart(hearthAmbience, "fireCrackle", "/audio/fire-crackle.wav", 120, { minGain: 0.05 });
+    assertNativeStart(hearthAmbience, "fireCrackle", "/audio/fire-crackle.mp3", 120, { minGain: 0.05 });
     await click(cdp, '[data-testid="audio-mood-fire"]');
     await waitForStatus(cdp, "fireplace crackle on");
     await click(cdp, '[data-testid="audio-mute"]');

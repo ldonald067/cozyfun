@@ -6,10 +6,14 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outputDir = path.join(root, ".tmp", "audio-qa");
 const ambienceSourcePath = path.join(root, "app", "src", "audio", "ambience.ts");
+// Guards against a missing or truncated recording (a 404 page or a stub is orders of
+// magnitude smaller), not against a well-compressed one. The floor sat at 1 MB when the
+// beds shipped uncompressed at ~19 MB total; they are now ~5 MB, with the purr at 0.89 MB,
+// so a 1 MB floor would fail on a perfectly good file.
 const minimumAssetBytes = {
-  catPurr: 1_000_000,
-  rainFall: 1_000_000,
-  fireCrackle: 1_000_000
+  catPurr: 400_000,
+  rainFall: 400_000,
+  fireCrackle: 400_000
 };
 const generatedAmbiencePatterns = [
   { pattern: /\bcreateNoiseBuffer\b/, label: "createNoiseBuffer" },
