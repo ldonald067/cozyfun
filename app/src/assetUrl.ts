@@ -3,7 +3,7 @@
 // real imports. A bare "/audio/rain.mp3" therefore 404s the moment the app is served from
 // a subpath instead of a domain root — and the wasm case fails silently, dropping the
 // sandbox to the JS fallback engine with no error. Prefixing with the configured base
-// keeps one build working at "/" and at "/greenhouse/" alike.
+// keeps one build working at "/" and at "/pixelfun/" alike.
 //
 // Note this module uses `import.meta`, so it must never be imported by `engine.ts` or
 // `materials.ts`: the parity harness compiles those two to CommonJS, where `import.meta`

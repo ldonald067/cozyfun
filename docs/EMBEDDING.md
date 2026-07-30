@@ -6,7 +6,7 @@ served from** and **what path it is served under**.
 
 ## How this one is deployed
 
-`greenhouse.littlealbumclub.net` is its own Railway service built from this repo, so a push
+`pixelfun.littlealbumclub.net` is its own Railway service built from this repo, so a push
 to `main` redeploys the game and the site repo is never touched. `littlealbumclub.net`
 simply iframes it.
 
@@ -30,7 +30,7 @@ Host the build on the same origin as the page that embeds it, or on a subdomain 
 registrable domain. Do not embed it from a third-party host such as itch.io.
 
 A subdomain is enough: Chrome partitions storage by registrable domain and Safari's ITP
-treats third-party by registrable domain too, so `greenhouse.example.net` inside a page on
+treats third-party by registrable domain too, so `pixelfun.example.net` inside a page on
 `example.net` is not a third party and keeps its storage. A wholly different domain is.
 
 The sandbox keeps everything in `localStorage`: saved scenes, the chosen room, audio
@@ -48,7 +48,7 @@ not be the thing your own site iframes. One build serves both.
 Asset URLs are resolved from Vite's `base`, which comes from `COZY_BASE`:
 
 ```bash
-COZY_BASE=/greenhouse/ npm run build
+COZY_BASE=/pixelfun/ npm run build
 ```
 
 Leave `COZY_BASE` unset for a domain root. Include both slashes on a subpath.
@@ -73,9 +73,11 @@ visitor clicks, then swaps itself for the app. Point the iframe at it rather tha
 `index.html` directly — the full build is roughly 9 MB, and without the poster every visitor
 who scrolls past pays for it.
 
+For the deploy described above, where the game owns its own hostname:
+
 ```html
 <iframe
-  src="/greenhouse/embed.html"
+  src="https://pixelfun.littlealbumclub.net/embed.html"
   title="Night Desk Terrarium"
   width="100%"
   height="620"
@@ -84,6 +86,9 @@ who scrolls past pays for it.
   loading="lazy"
 ></iframe>
 ```
+
+If the build is instead mounted under a path on the same site, the only change is a relative
+`src` — `src="/pixelfun/embed.html"` — and a matching `COZY_BASE` at build time.
 
 `allow="autoplay; fullscreen"` is needed for ambience and Desk Radio. Do not add a `sandbox`
 attribute unless you know what you are re-granting: the default omission is what lets the
