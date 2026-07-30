@@ -4,10 +4,34 @@ The sandbox is a static build with no backend, so it can be dropped onto any hos
 serves files. The two things that actually decide whether an embed works are **where it is
 served from** and **what path it is served under**.
 
+## How this one is deployed
+
+`greenhouse.littlealbumclub.net` is its own Railway service built from this repo, so a push
+to `main` redeploys the game and the site repo is never touched. `littlealbumclub.net`
+simply iframes it.
+
+The pieces: `Dockerfile` builds both toolchains (cargo compiles the sim to wasm32, then Vite
+bundles the app around it) and `scripts/serve-static.mjs` serves the result.
+`railway.json` pins the Dockerfile builder so Railway does not try to guess.
+
+That server is hand-written for one reason: `.wasm` must be served as `application/wasm` or
+`instantiateStreaming` refuses it, and the app does not report that — it quietly falls back
+to the JS engine. Several hosts default unknown extensions to `application/octet-stream`, so
+the MIME table there is the guarantee. It also caches fingerprinted `/assets/*` immutably
+while making everything else revalidate, and deliberately has no SPA catch-all: a missing
+asset should 404 loudly rather than return a page of HTML.
+
+Because the service owns its whole hostname, the app sits at that host's root and
+`COZY_BASE` stays unset. Set it only to mount the build under a path on a larger site.
+
 ## Serve it from your own origin
 
-Host the build on the same origin as the page that embeds it — `yoursite.net/greenhouse/`,
-or a subdomain you control. Do not embed it from a third-party host such as itch.io.
+Host the build on the same origin as the page that embeds it, or on a subdomain of the same
+registrable domain. Do not embed it from a third-party host such as itch.io.
+
+A subdomain is enough: Chrome partitions storage by registrable domain and Safari's ITP
+treats third-party by registrable domain too, so `greenhouse.example.net` inside a page on
+`example.net` is not a third party and keeps its storage. A wholly different domain is.
 
 The sandbox keeps everything in `localStorage`: saved scenes, the chosen room, audio
 preferences, Desk Radio settings. In a cross-origin iframe that storage is either blocked

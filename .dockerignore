@@ -1,0 +1,14 @@
+# Keep the build context small and force a clean build inside the image: never ship host
+# build output, and never let a stale local artifact stand in for a fresh compile.
+.git
+.github
+node_modules
+app/node_modules
+app/dist
+app/public/sim
+sim/target
+.tmp
+.claude
+docs
+*.md
+!package.json
