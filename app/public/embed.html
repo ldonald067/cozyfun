@@ -144,25 +144,26 @@
          The wide soft stroke underneath is the glow; the thin bright one is the channel. */
       .bolt {
         position: absolute;
-        top: -3%;
         opacity: 0;
         pointer-events: none;
-        /* Sized by HEIGHT, not width. The viewBox is 44x200, so a 165px width would render
-           a bolt 750px tall — taller than the card, straight through the title. */
-        width: auto;
-        /* The halo carries the violet; the strokes carry blue into white. */
-        filter: drop-shadow(0 0 10px rgba(150, 112, 246, 0.55)) drop-shadow(0 0 4px rgba(150, 190, 255, 0.85));
+        overflow: visible;
+        /* Violet bloom outside, blue nearer in — the halo does the colour work that a
+           stroke this thin cannot. */
+        filter: drop-shadow(0 0 9px rgba(150, 112, 246, 0.5)) drop-shadow(0 0 3px rgba(150, 190, 255, 0.8));
       }
-      .bolt--1 { left: 7%;  height: clamp(96px, 40%, 240px); animation: strike 13s ease-out infinite; }
-      .bolt--2 { left: 39%; height: clamp(68px, 28%, 168px); animation: strike 13s ease-out 4.2s infinite; }
-      .bolt--3 { right: 6%; height: clamp(84px, 34%, 205px); animation: strike 13s ease-out 8.6s infinite; }
-      /* Three stacked strokes make the purple-blue-white gradient a bolt actually has:
-         a wide violet bloom, a blue sheath inside it, and a white-hot channel down the
-         middle. Painting order is widest first so each sits inside the last. */
-      .bolt .halo    { stroke: rgba(158, 116, 250, 0.42); stroke-width: 9; }
-      .bolt .glow    { stroke: rgba(126, 176, 255, 0.62); stroke-width: 4.5; }
-      .bolt .channel { stroke: rgba(247, 250, 255, 0.96); stroke-width: 1.7; }
-      .bolt path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+      /* One bolt, placed three times at different scales and angles — the reference does
+         exactly this with three copies of a single image, and it is why the markup stays
+         small: the 44 branches are written once and referenced. */
+      .bolt--1 { top: -6%; left: 4%;  height: clamp(150px, 62%, 380px); transform: rotate(-4deg); animation: strike 13s ease-out infinite; }
+      .bolt--2 { top: -10%; left: 34%; height: clamp(110px, 46%, 280px); transform: rotate(9deg) scaleX(-1); animation: strike 13s ease-out 4.2s infinite; }
+      .bolt--3 { top: -4%; right: 2%; height: clamp(130px, 54%, 330px); transform: rotate(6deg); animation: strike 13s ease-out 8.6s infinite; }
+      /* Hairlines. The reference's branches are barely a pixel wide and read as light
+         rather than as drawn lines, so the channel is thin and the colour comes from the
+         two wider passes underneath it and the halo around it. */
+      .bolt .halo    { stroke: rgba(158, 116, 250, 0.34); stroke-width: 3.4; }
+      .bolt .glow    { stroke: rgba(132, 178, 255, 0.52); stroke-width: 1.5; }
+      .bolt .channel { stroke: rgba(246, 249, 255, 0.94); stroke-width: 0.6; }
+      .bolt use { fill: none; stroke-linecap: round; stroke-linejoin: round; }
 
       /* A real strike is over in a blink and usually flickers twice. Most of the 13s cycle
          is dark, so it stays weather rather than a strobe. */
@@ -266,9 +267,9 @@
   <body>
     <div class="poster" id="poster">
       <span class="flash" aria-hidden="true"></span>
-      <svg class="bolt bolt--1" viewBox="0 0 44 200" aria-hidden="true"><path class="halo" d="M32 0 L19 58 L35 62 L14 132 L31 137 L9 200"/><path class="halo" d="M19 58 L3 92"/><path class="halo" d="M14 132 L34 168"/><path class="glow" d="M32 0 L19 58 L35 62 L14 132 L31 137 L9 200"/><path class="glow" d="M19 58 L3 92"/><path class="glow" d="M14 132 L34 168"/><path class="channel" d="M32 0 L19 58 L35 62 L14 132 L31 137 L9 200"/><path class="channel" d="M19 58 L3 92"/><path class="channel" d="M14 132 L34 168"/></svg>
-      <svg class="bolt bolt--2" viewBox="0 0 44 200" aria-hidden="true"><path class="halo" d="M32 0 L19 58 L35 62 L14 132 L31 137 L9 200"/><path class="halo" d="M19 58 L3 92"/><path class="halo" d="M14 132 L34 168"/><path class="glow" d="M32 0 L19 58 L35 62 L14 132 L31 137 L9 200"/><path class="glow" d="M19 58 L3 92"/><path class="glow" d="M14 132 L34 168"/><path class="channel" d="M32 0 L19 58 L35 62 L14 132 L31 137 L9 200"/><path class="channel" d="M19 58 L3 92"/><path class="channel" d="M14 132 L34 168"/></svg>
-      <svg class="bolt bolt--3" viewBox="0 0 44 200" aria-hidden="true"><path class="halo" d="M32 0 L19 58 L35 62 L14 132 L31 137 L9 200"/><path class="halo" d="M19 58 L3 92"/><path class="halo" d="M14 132 L34 168"/><path class="glow" d="M32 0 L19 58 L35 62 L14 132 L31 137 L9 200"/><path class="glow" d="M19 58 L3 92"/><path class="glow" d="M14 132 L34 168"/><path class="channel" d="M32 0 L19 58 L35 62 L14 132 L31 137 L9 200"/><path class="channel" d="M19 58 L3 92"/><path class="channel" d="M14 132 L34 168"/></svg>
+      <svg class="bolt bolt--1" viewBox="0 0 200 400" aria-hidden="true"><defs><g id="lb"><path d="M110 55 L109 63 L107 72 L102 79 L100 87"/><path d="M121 100 L115 104 L111 110 L106 116 L102 122"/><path d="M101 41 L110 55 L116 69 L120 84 L121 100 L120 115"/><path d="M83 139 L91 152 L97 166 L100 181 L100 196"/><path d="M69 163 L57 172 L48 184 L39 196 L32 210"/><path d="M97 14 L101 27 L101 41 L99 55 L97 69 L93 83 L92 97 L90 111 L87 125 L83 139 L77 151 L69 163"/><path d="M99 94 L96 98 L92 101 L88 103 L85 107"/><path d="M88 121 L87 125 L86 130 L86 135 L85 140"/><path d="M104 80 L99 94 L95 108 L88 121 L80 133"/><path d="M162 212 L165 215 L169 217 L172 220 L175 223"/><path d="M148 190 L157 200 L162 212 L167 224 L176 235"/><path d="M152 204 L164 213 L176 224 L186 236 L197 247"/><path d="M94 69 L104 80 L112 93 L118 106 L123 120 L126 135 L132 149 L137 162 L142 176 L148 190 L152 204"/><path d="M95 109 L100 121 L107 132 L116 141 L125 151"/><path d="M87 120 L76 128 L65 137 L56 148 L45 158"/><path d="M76 174 L71 179 L65 184 L61 189 L58 196"/><path d="M70 144 L75 158 L76 174 L79 189 L85 203 L94 216"/><path d="M24 231 L26 237 L28 244 L28 250 L32 256"/><path d="M45 210 L35 220 L24 231 L18 244 L9 256"/><path d="M51 237 L57 240 L60 243 L65 248 L70 252"/><path d="M44 224 L51 237 L61 248 L68 260 L76 272"/><path d="M102 97 L95 109 L87 120 L79 133 L70 144 L61 155 L55 169 L51 182 L49 196 L45 210 L44 224 L43 238"/><path d="M113 121 L114 134 L113 146 L114 158 L114 171"/><path d="M197 249 L197 254 L197 261 L197 267 L197 274"/><path d="M173 196 L185 208 L192 222 L197 235 L197 249"/><path d="M103 110 L113 121 L121 132 L131 143 L142 152 L151 161 L158 173 L166 184 L173 196 L177 210"/><path d="M102 124 L90 135 L82 146 L74 158 L66 171 L59 184 L52 197 L47 210 L43 224 L44 239 L48 253 L50 268"/><path d="M50 189 L39 197 L29 207 L23 219 L15 231"/><path d="M98 138 L87 146 L77 157 L67 168 L58 178 L50 189 L45 202 L37 214 L29 225 L22 237"/><path d="M10 346 L23 354 L35 363 L46 372 L59 380 L70 389"/><path d="M72 188 L63 199 L54 209 L44 218 L33 226 L23 236 L16 249 L13 263 L7 277 L3 289 L3 303 L5 318 L8 332 L10 346"/><path d="M43 280 L43 287 L45 294 L48 301 L51 308"/><path d="M72 229 L64 242 L54 253 L48 267 L43 280"/><path d="M134 369 L136 374 L138 380 L140 386 L142 392"/><path d="M122 360 L134 369 L147 377 L159 386 L170 396"/><path d="M69 215 L72 229 L77 242 L79 256 L84 269 L87 282 L93 295 L98 308 L106 320 L113 333 L117 346 L122 360 L124 374"/><path d="M5 324 L12 337 L20 349 L30 361 L40 370 L53 378 L64 387"/><path d="M8 367 L3 383 L3 398"/><path d="M14 380 L26 388 L36 398"/><path d="M25 390 L37 399"/><path d="M52 269 L40 277 L31 289 L21 300 L11 311 L5 324 L4 339 L4 353 L8 367 L14 380 L25 390 L37 399"/><path d="M5 338 L3 347 L3 359 L3 371 L3 382"/><path d="M46 296 L36 307 L24 315 L13 326 L5 338 L3 351 L3 366 L3 381 L3 395"/><path d="M100 0 L97 14 L93 27 L93 41 L92 55 L94 69 L98 83 L102 97 L103 110 L102 124 L98 138 L92 151 L85 163 L77 174 L72 188 L71 202 L69 215 L67 229 L63 242 L57 255 L52 269 L48 282 L46 296 L44 310 L39 323 L38 337 L40 351 L45 364 L52 377 L58 390"/></g></defs><use href="#lb" class="halo"/><use href="#lb" class="glow"/><use href="#lb" class="channel"/></svg>
+      <svg class="bolt bolt--2" viewBox="0 0 200 400" aria-hidden="true"><use href="#lb" class="halo"/><use href="#lb" class="glow"/><use href="#lb" class="channel"/></svg>
+      <svg class="bolt bolt--3" viewBox="0 0 200 400" aria-hidden="true"><use href="#lb" class="halo"/><use href="#lb" class="glow"/><use href="#lb" class="channel"/></svg>
       <span class="rain rain--far" aria-hidden="true"></span>
       <span class="rain rain--mid" aria-hidden="true"></span>
       <span class="rain rain--near" aria-hidden="true"></span>
