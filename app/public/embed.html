@@ -60,31 +60,48 @@
       }
       /* Each drop is an elongated ellipse. A one-dimensional linear-gradient cannot leave
          gaps along both axes — its band spans the whole tile width, so neighbouring tiles
-         merge into continuous stripes and it reads as venetian blinds. Elliptical radial
-         gradients give a real streak with space around it on every side. */
+         merge into unbroken stripes and the card reads as venetian blinds.
+
+         Real rain is long, fine and dense rather than short and sparse: streaks here run
+         40-70px tall but barely a pixel wide, so they read as motion blur. Three depths,
+         each denser and dimmer than the last, do the rest. */
       .rain--far {
         background-image:
-          radial-gradient(1px 9px at 18% 14%, rgba(158, 188, 220, 0.30), transparent 62%),
-          radial-gradient(1px 7px at 63% 57%, rgba(158, 188, 220, 0.22), transparent 62%);
-        background-size: 52px 90px;
-        animation: rain-far 1.5s linear infinite;
+          radial-gradient(2px 3px at 22% 12%, rgba(176, 202, 232, 0.40), transparent 72%),
+          radial-gradient(1.5px 2.5px at 68% 44%, rgba(176, 202, 232, 0.34), transparent 72%),
+          radial-gradient(2px 3px at 44% 78%, rgba(176, 202, 232, 0.36), transparent 72%);
+        background-size: 46px 118px;
+        animation: rain-far 1.25s linear infinite;
+      }
+      .rain--mid {
+        background-image:
+          radial-gradient(3px 4.5px at 16% 20%, rgba(198, 222, 248, 0.48), rgba(150, 182, 216, 0.14) 58%, transparent 74%),
+          radial-gradient(2.5px 3.5px at 58% 58%, rgba(198, 222, 248, 0.40), transparent 72%),
+          radial-gradient(3px 4px at 86% 34%, rgba(198, 222, 248, 0.42), transparent 72%);
+        background-size: 58px 152px;
+        animation: rain-mid 0.82s linear infinite;
       }
       .rain--near {
         background-image:
-          radial-gradient(1.3px 15px at 32% 22%, rgba(200, 224, 250, 0.40), transparent 60%),
-          radial-gradient(1.1px 12px at 77% 66%, rgba(200, 224, 250, 0.30), transparent 60%);
-        background-size: 76px 132px;
-        animation: rain-near 0.9s linear infinite;
+          radial-gradient(5px 7px at 30% 24%, rgba(224, 239, 255, 0.55), rgba(158, 190, 224, 0.16) 56%, transparent 72%),
+          radial-gradient(4px 5.5px at 74% 62%, rgba(224, 239, 255, 0.46), rgba(158, 190, 224, 0.12) 56%, transparent 72%),
+          radial-gradient(3px 4px at 52% 88%, rgba(224, 239, 255, 0.40), transparent 72%);
+        background-size: 88px 210px;
+        animation: rain-near 0.62s linear infinite;
       }
       /* Translating by exactly one tile height puts the pattern back where it started,
          so the loop has no visible seam. The rotate has to be repeated in both keyframes
          or the animation would override it. */
       @keyframes rain-far {
-        from { transform: rotate(11deg) translateY(-90px); }
+        from { transform: rotate(11deg) translateY(-118px); }
+        to   { transform: rotate(11deg) translateY(0); }
+      }
+      @keyframes rain-mid {
+        from { transform: rotate(11deg) translateY(-152px); }
         to   { transform: rotate(11deg) translateY(0); }
       }
       @keyframes rain-near {
-        from { transform: rotate(11deg) translateY(-132px); }
+        from { transform: rotate(11deg) translateY(-210px); }
         to   { transform: rotate(11deg) translateY(0); }
       }
 
@@ -117,23 +134,56 @@
         background-position: 40px 25px;
       }
 
-      /* Distant lightning: a soft bloom with no bolts, a couple of flickers every eleven
-         seconds. Deliberately restrained — this game's whole promise is that nothing is
-         chasing you, and a dramatic storm would argue with that. */
+      /* Lightning needs a fork, and a gradient cannot make one — a bolt is a line with
+         branches, so it is drawn as SVG paths. Inline, so it still costs no extra request.
+         The wide soft stroke underneath is the glow; the thin bright one is the channel. */
+      .bolt {
+        position: absolute;
+        top: -3%;
+        opacity: 0;
+        pointer-events: none;
+        /* Sized by HEIGHT, not width. The viewBox is 44x200, so a 165px width would render
+           a bolt 750px tall — taller than the card, straight through the title. */
+        width: auto;
+        /* The halo carries the violet; the strokes carry blue into white. */
+        filter: drop-shadow(0 0 10px rgba(150, 112, 246, 0.55)) drop-shadow(0 0 4px rgba(150, 190, 255, 0.85));
+      }
+      .bolt--1 { left: 7%;  height: clamp(96px, 40%, 240px); animation: strike 13s ease-out infinite; }
+      .bolt--2 { left: 39%; height: clamp(68px, 28%, 168px); animation: strike 13s ease-out 4.2s infinite; }
+      .bolt--3 { right: 6%; height: clamp(84px, 34%, 205px); animation: strike 13s ease-out 8.6s infinite; }
+      /* Three stacked strokes make the purple-blue-white gradient a bolt actually has:
+         a wide violet bloom, a blue sheath inside it, and a white-hot channel down the
+         middle. Painting order is widest first so each sits inside the last. */
+      .bolt .halo    { stroke: rgba(158, 116, 250, 0.42); stroke-width: 9; }
+      .bolt .glow    { stroke: rgba(126, 176, 255, 0.62); stroke-width: 4.5; }
+      .bolt .channel { stroke: rgba(247, 250, 255, 0.96); stroke-width: 1.7; }
+      .bolt path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+      /* A real strike is over in a blink and usually flickers twice. Most of the 13s cycle
+         is dark, so it stays weather rather than a strobe. */
+      @keyframes strike {
+        0%, 5.5%, 100% { opacity: 0; }
+        0.6%           { opacity: 1; }
+        1.6%           { opacity: 0.12; }
+        2.8%           { opacity: 0.8; }
+        4.4%           { opacity: 0; }
+      }
+
+      /* The sky lifting behind the bolt — what actually sells it as distance. */
       .flash {
         position: absolute;
         inset: 0;
         pointer-events: none;
         opacity: 0;
-        background: radial-gradient(130% 85% at 50% -10%, rgba(186, 208, 255, 0.55), transparent 62%);
-        animation: storm 11s ease-out infinite;
+        background: radial-gradient(130% 85% at 50% -10%, rgba(196, 206, 255, 0.5), rgba(142, 112, 220, 0.22) 34%, transparent 64%);
+        animation: storm 13s ease-out infinite;
       }
       @keyframes storm {
-        0%, 90%, 100% { opacity: 0; }
-        91%           { opacity: 0.5; }
-        92.5%         { opacity: 0.08; }
-        94%           { opacity: 0.38; }
-        97%           { opacity: 0; }
+        0%, 5.5%, 100% { opacity: 0; }
+        0.7%           { opacity: 0.55; }
+        1.8%           { opacity: 0.08; }
+        3%             { opacity: 0.4; }
+        4.6%           { opacity: 0; }
       }
 
       /* Warm lamplight pooling at the bottom — the reason it reads as cosy rain seen from
@@ -203,7 +253,7 @@
       @media (prefers-reduced-motion: reduce) {
         .rain { animation: none; transform: rotate(11deg); }
         /* The beads are static anyway; the storm is pure motion, so it goes entirely. */
-        .flash { animation: none; opacity: 0; }
+        .flash, .bolt { animation: none; opacity: 0; }
         .play { transition: none; }
       }
     </style>
@@ -211,7 +261,11 @@
   <body>
     <div class="poster" id="poster">
       <span class="flash" aria-hidden="true"></span>
+      <svg class="bolt bolt--1" viewBox="0 0 44 200" aria-hidden="true"><path class="halo" d="M32 0 L19 58 L35 62 L14 132 L31 137 L9 200"/><path class="halo" d="M19 58 L3 92"/><path class="halo" d="M14 132 L34 168"/><path class="glow" d="M32 0 L19 58 L35 62 L14 132 L31 137 L9 200"/><path class="glow" d="M19 58 L3 92"/><path class="glow" d="M14 132 L34 168"/><path class="channel" d="M32 0 L19 58 L35 62 L14 132 L31 137 L9 200"/><path class="channel" d="M19 58 L3 92"/><path class="channel" d="M14 132 L34 168"/></svg>
+      <svg class="bolt bolt--2" viewBox="0 0 44 200" aria-hidden="true"><path class="halo" d="M32 0 L19 58 L35 62 L14 132 L31 137 L9 200"/><path class="halo" d="M19 58 L3 92"/><path class="halo" d="M14 132 L34 168"/><path class="glow" d="M32 0 L19 58 L35 62 L14 132 L31 137 L9 200"/><path class="glow" d="M19 58 L3 92"/><path class="glow" d="M14 132 L34 168"/><path class="channel" d="M32 0 L19 58 L35 62 L14 132 L31 137 L9 200"/><path class="channel" d="M19 58 L3 92"/><path class="channel" d="M14 132 L34 168"/></svg>
+      <svg class="bolt bolt--3" viewBox="0 0 44 200" aria-hidden="true"><path class="halo" d="M32 0 L19 58 L35 62 L14 132 L31 137 L9 200"/><path class="halo" d="M19 58 L3 92"/><path class="halo" d="M14 132 L34 168"/><path class="glow" d="M32 0 L19 58 L35 62 L14 132 L31 137 L9 200"/><path class="glow" d="M19 58 L3 92"/><path class="glow" d="M14 132 L34 168"/><path class="channel" d="M32 0 L19 58 L35 62 L14 132 L31 137 L9 200"/><path class="channel" d="M19 58 L3 92"/><path class="channel" d="M14 132 L34 168"/></svg>
       <span class="rain rain--far" aria-hidden="true"></span>
+      <span class="rain rain--mid" aria-hidden="true"></span>
       <span class="rain rain--near" aria-hidden="true"></span>
       <span class="glass glass--a" aria-hidden="true"></span>
       <span class="glass glass--b" aria-hidden="true"></span>
