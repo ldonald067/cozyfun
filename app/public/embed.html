@@ -12,6 +12,11 @@
       autoloads makes every visitor who scrolls past pay for it. This poster is a few KB
       and pulls in nothing until someone actually asks to play.
 
+      The rain is drawn with two tiling CSS gradients, not images or canvas, so the whole
+      card stays a few KB and costs nothing to fetch. Each layer is a repeating strip of
+      dashes translated by exactly one tile height, which loops seamlessly, and the only
+      animated property is `transform` so it composites on the GPU without repainting.
+
       Every path here is relative, so this file works unchanged at a domain root or under
       a subpath — it always sits next to the index.html it launches, whatever COZY_BASE
       was set to at build time.
@@ -29,52 +34,100 @@
         background: #091018;
         color: #e8ecf2;
         font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
-        display: grid;
-        place-items: center;
         overflow: hidden;
       }
       .poster {
         position: relative;
         width: 100%;
         height: 100%;
-        border: 0;
-        padding: clamp(1.25rem, 5vw, 3rem);
         display: grid;
-        place-content: center;
-        gap: 0.85rem;
-        text-align: center;
+        place-items: center;
+        overflow: hidden;
         cursor: pointer;
-        background: radial-gradient(120% 90% at 50% 15%, #1b2534 0%, #0d1421 55%, #070c13 100%);
-        color: inherit;
-        font: inherit;
+        background: radial-gradient(120% 90% at 50% 12%, #1b2534 0%, #0d1421 55%, #070c13 100%);
       }
-      .poster::after {
-        content: "";
+
+      /* Two rain layers at different size, speed, and opacity read as depth: the near
+         sheet is longer, brighter, and faster, the far one finer and slower. Both are
+         oversized and rotated so the slanted streaks still cover the corners. */
+      .rain {
+        position: absolute;
+        inset: -40%;
+        pointer-events: none;
+        background-repeat: repeat;
+        will-change: transform;
+      }
+      /* Each drop is an elongated ellipse. A one-dimensional linear-gradient cannot leave
+         gaps along both axes — its band spans the whole tile width, so neighbouring tiles
+         merge into continuous stripes and it reads as venetian blinds. Elliptical radial
+         gradients give a real streak with space around it on every side. */
+      .rain--far {
+        background-image:
+          radial-gradient(1px 9px at 18% 14%, rgba(158, 188, 220, 0.30), transparent 62%),
+          radial-gradient(1px 7px at 63% 57%, rgba(158, 188, 220, 0.22), transparent 62%);
+        background-size: 52px 90px;
+        animation: rain-far 1.5s linear infinite;
+      }
+      .rain--near {
+        background-image:
+          radial-gradient(1.3px 15px at 32% 22%, rgba(200, 224, 250, 0.40), transparent 60%),
+          radial-gradient(1.1px 12px at 77% 66%, rgba(200, 224, 250, 0.30), transparent 60%);
+        background-size: 76px 132px;
+        animation: rain-near 0.9s linear infinite;
+      }
+      /* Translating by exactly one tile height puts the pattern back where it started,
+         so the loop has no visible seam. The rotate has to be repeated in both keyframes
+         or the animation would override it. */
+      @keyframes rain-far {
+        from { transform: rotate(11deg) translateY(-90px); }
+        to   { transform: rotate(11deg) translateY(0); }
+      }
+      @keyframes rain-near {
+        from { transform: rotate(11deg) translateY(-132px); }
+        to   { transform: rotate(11deg) translateY(0); }
+      }
+
+      /* Warm lamplight pooling at the bottom — the reason it reads as cosy rain seen from
+         indoors rather than as weather. */
+      .lamp {
+        position: absolute;
+        inset: auto 0 -12% 0;
+        height: 62%;
+        pointer-events: none;
+        background: radial-gradient(58% 100% at 50% 100%, rgba(244, 223, 184, 0.11), transparent 72%);
+      }
+      /* Keeps the rain from crawling over the type. */
+      .scrim {
         position: absolute;
         inset: 0;
         pointer-events: none;
-        background-image:
-          radial-gradient(1.5px 1.5px at 18% 24%, rgba(255, 233, 189, 0.55), transparent 60%),
-          radial-gradient(1.5px 1.5px at 72% 18%, rgba(198, 214, 255, 0.5), transparent 60%),
-          radial-gradient(1.5px 1.5px at 44% 66%, rgba(255, 226, 177, 0.4), transparent 60%),
-          radial-gradient(1.5px 1.5px at 86% 72%, rgba(190, 236, 214, 0.4), transparent 60%),
-          radial-gradient(1.5px 1.5px at 28% 82%, rgba(226, 205, 255, 0.4), transparent 60%);
+        background: radial-gradient(46% 40% at 50% 48%, rgba(7, 12, 19, 0.72), transparent 75%);
+      }
+
+      .content {
+        position: relative;
+        display: grid;
+        justify-items: center;
+        gap: 0.85rem;
+        padding: clamp(1.25rem, 5vw, 3rem);
+        text-align: center;
       }
       h1 {
         margin: 0;
         font: 600 clamp(1.35rem, 3.4vw, 2rem)/1.2 Georgia, "Iowan Old Style", serif;
         color: #f4dfb8;
         letter-spacing: 0.01em;
+        text-shadow: 0 2px 18px rgba(7, 12, 19, 0.9);
       }
       p {
-        margin: 0 auto;
+        margin: 0;
         max-width: 46ch;
-        color: #9fb3c4;
+        color: #a8bccd;
         font-size: clamp(0.9rem, 1.6vw, 1rem);
+        text-shadow: 0 1px 12px rgba(7, 12, 19, 0.85);
       }
       .play {
-        justify-self: center;
-        margin-top: 0.5rem;
+        margin-top: 0.4rem;
         padding: 0.7rem 1.6rem;
         border: 1px solid rgba(244, 223, 184, 0.42);
         border-radius: 999px;
@@ -82,34 +135,50 @@
         color: #f4dfb8;
         font: 600 1rem/1 inherit;
         letter-spacing: 0.02em;
+        cursor: pointer;
+        backdrop-filter: blur(2px);
         transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
       }
       .poster:hover .play,
-      .poster:focus-visible .play {
+      .play:focus-visible {
         background: rgba(244, 223, 184, 0.19);
         border-color: rgba(244, 223, 184, 0.75);
         transform: translateY(-1px);
       }
-      .poster:focus-visible { outline: 2px solid #f4dfb8; outline-offset: -4px; }
-      .hint { font-size: 0.78rem; color: #6f8496; }
+      .play:focus-visible { outline: 2px solid #f4dfb8; outline-offset: 3px; }
+      .hint { font-size: 0.78rem; color: #7b91a4; }
       iframe { width: 100%; height: 100%; border: 0; display: block; }
-      @media (prefers-reduced-motion: reduce) { .play { transition: none; } }
+
+      /* Motion is decoration here, so drop it entirely when it is unwelcome — the rain
+         stays as a still texture rather than disappearing. */
+      @media (prefers-reduced-motion: reduce) {
+        .rain { animation: none; transform: rotate(11deg); }
+        .play { transition: none; }
+      }
     </style>
   </head>
   <body>
-    <button class="poster" id="poster" type="button">
-      <h1>Night Desk Terrarium</h1>
-      <p>
-        A cozy pixel sandbox. Pour sand and water, light a hearth, grow moss and
-        moonlit flowers — no score, no timer, nothing to win.
-      </p>
-      <span class="play">Enter the terrarium</span>
-      <span class="hint">Loads on click · sound is off until you turn it on</span>
-    </button>
+    <div class="poster" id="poster">
+      <span class="rain rain--far" aria-hidden="true"></span>
+      <span class="rain rain--near" aria-hidden="true"></span>
+      <span class="lamp" aria-hidden="true"></span>
+      <span class="scrim" aria-hidden="true"></span>
+      <div class="content">
+        <h1>Night Desk Terrarium</h1>
+        <p>
+          A cozy pixel sandbox. Pour sand and water, light a hearth, grow moss and
+          moonlit flowers — no score, no timer, nothing to win.
+        </p>
+        <button class="play" id="play" type="button">Enter the terrarium</button>
+        <span class="hint">Loads on click · sound is off until you turn it on</span>
+      </div>
+    </div>
 
     <script>
       // Swap the poster for the real app only once the visitor asks for it. Same-origin,
       // so the sandbox keeps normal access to localStorage and can save scenes.
+      // The whole card is clickable for convenience, while the real <button> inside it is
+      // the keyboard and screen-reader target.
       document.getElementById("poster").addEventListener(
         "click",
         () => {
