@@ -4,39 +4,34 @@ Handoff for whoever works in the `ldonald067/album-club` repo. Everything below 
 built and tested against that repo at commit `874a941` (branch `master`); the build passed
 and all 13 tests passed with these edits applied.
 
-**The game itself needs no changes.** It already ships an embed-ready page. This is only
-about the site side, plus one deploy step that has to happen first.
+**The game is already deployed and verified live.** It needs no changes and this repo does
+not build it. All that remains is the site-side panel swap in Steps 1 and 2.
 
 ---
 
-## Step 0 — Deploy the game before touching the site
+## Step 0 — Deploy the game — ALREADY DONE
 
-**Do this first, and confirm it before merging anything into `master`.** The panel below
-points at `https://pixelfun.littlealbumclub.net`. Until that host answers, the panel renders
-as an empty box on the live site — `master` auto-deploys, so a premature merge ships a
-visibly broken section.
+Nothing to do here. Recorded so the state is auditable.
 
-In Railway:
+`pixelfun.littlealbumclub.net` is live: a Railway service named `cozyfun`, in the same
+project as `album-club`, building from `ldonald067/cozyfun` on `main`. Pushing to that
+branch redeploys the game on its own; this repo is not involved.
 
-1. New service → deploy from GitHub repo `ldonald067/cozyfun`.
-2. It picks up the `Dockerfile` at the repo root automatically (`railway.json` pins the
-   Dockerfile builder). The first build compiles Rust to wasm and is slow — a few minutes.
-   Later builds reuse cached layers.
-3. Add the custom domain `pixelfun.littlealbumclub.net` and create the CNAME Railway shows
-   you.
+Verified against the live host on 2026-07-30:
 
-Then verify, in a browser, before going further:
+| Check | Result |
+| --- | --- |
+| `/embed.html` and `/` | 200, poster renders |
+| Engine after clicking through | **wasm sim online**, 60 fps — not the JS fallback |
+| `.wasm` content type | `application/wasm` |
+| Audio and room art | `audio/mpeg`, `image/jpeg`, all 200 |
+| `localStorage` inside the frame | readable and writable |
+| Fingerprinted `/assets/*` | `max-age=31536000, immutable` |
+| `embed.html`, wasm, audio | `max-age=0, must-revalidate` |
+| Missing file | real 404 as `text/plain`, not 200 HTML |
+| TLS | valid, HTTP/2 |
 
-- `https://pixelfun.littlealbumclub.net/embed.html` shows a dark poster reading
-  "Night Desk Terrarium".
-- Clicking it loads the sandbox, and the status line reads **"wasm sim online"**. If it says
-  "js fallback", the `.wasm` is being served with the wrong MIME type — that is the one
-  failure this project trips over repeatedly, and it does not throw an error.
-- Paint something, reload, and confirm the scene is still there. That proves browser storage
-  is not being blocked.
-
-From then on, pushing to `cozyfun`'s `main` redeploys the game by itself. The site repo
-never needs to change again.
+**The blocker is lifted — the panel below will render a working game the moment it merges.**
 
 ---
 

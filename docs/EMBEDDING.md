@@ -6,9 +6,15 @@ served from** and **what path it is served under**.
 
 ## How this one is deployed
 
-`pixelfun.littlealbumclub.net` is its own Railway service built from this repo, so a push
-to `main` redeploys the game and the site repo is never touched. `littlealbumclub.net`
-simply iframes it.
+`pixelfun.littlealbumclub.net` is live: a Railway service named `cozyfun`, sharing a project
+with the `album-club` service, building from this repo on `main`. A push to `main` redeploys
+the game and the site repo is never touched — `littlealbumclub.net` simply iframes it.
+
+Two things that were not obvious while setting this up, recorded so they are not rediscovered
+the hard way. Railway only offers the **Custom Domain** button on a service that has deployed
+at least once, so a brand-new service appears to be missing the feature entirely — deploy
+first, then attach the domain. And attaching it needs **two** DNS records, not one: the CNAME
+plus a `_railway-verify.<sub>` TXT record, and the domain stays inactive until both resolve.
 
 The pieces: `Dockerfile` builds both toolchains (cargo compiles the sim to wasm32, then Vite
 bundles the app around it) and `scripts/serve-static.mjs` serves the result.
@@ -23,6 +29,14 @@ asset should 404 loudly rather than return a page of HTML.
 
 Because the service owns its whole hostname, the app sits at that host's root and
 `COZY_BASE` stays unset. Set it only to mount the build under a path on a larger site.
+
+### Verified live
+
+Checked against the running host on 2026-07-30: `/embed.html` and `/` return 200; clicking
+through reports **wasm sim online** at 60 fps rather than the JS fallback; `.wasm` arrives as
+`application/wasm`; `localStorage` inside the frame is readable and writable; fingerprinted
+`/assets/*` carry `immutable` while `embed.html`, the wasm, and the audio revalidate; a
+missing file returns a real 404 as `text/plain`; TLS valid over HTTP/2.
 
 ## Serve it from your own origin
 
