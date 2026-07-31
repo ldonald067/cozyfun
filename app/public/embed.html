@@ -12,7 +12,8 @@
       autoloads makes every visitor who scrolls past pay for it. This poster is a few KB
       and pulls in nothing until someone actually asks to play.
 
-      The rain is drawn with two tiling CSS gradients, not images or canvas, so the whole
+      Everything on it — falling rain, condensation beaded on the glass, and the distant
+      lightning bloom — is tiling CSS gradients rather than images or canvas, so the whole
       card stays a few KB and costs nothing to fetch. Each layer is a repeating strip of
       dashes translated by exactly one tile height, which loops seamlessly, and the only
       animated property is `transform` so it composites on the GPU without repainting.
@@ -87,6 +88,54 @@
         to   { transform: rotate(11deg) translateY(0); }
       }
 
+      /* Condensation clinging to the inside of the glass, in front of the falling rain so
+         the two read as different distances: weather outside, window between. Each bead is
+         a bright core fading to a faint rim, which is enough to look lens-like at this size.
+         Beads do not move — they cling — so this layer is static and costs nothing to run. */
+      .glass {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+      .glass--a {
+        background-image:
+          radial-gradient(circle 3px at 12% 18%, rgba(228, 241, 255, 0.40), rgba(140, 170, 200, 0.10) 62%, transparent 74%),
+          radial-gradient(circle 5px at 63% 34%, rgba(228, 241, 255, 0.34), rgba(140, 170, 200, 0.10) 62%, transparent 74%),
+          radial-gradient(circle 2px at 84% 11%, rgba(228, 241, 255, 0.38), transparent 72%),
+          radial-gradient(circle 4px at 37% 71%, rgba(228, 241, 255, 0.32), rgba(140, 170, 200, 0.09) 62%, transparent 74%),
+          radial-gradient(circle 2px at 78% 84%, rgba(228, 241, 255, 0.32), transparent 72%),
+          radial-gradient(circle 3px at 20% 92%, rgba(228, 241, 255, 0.28), transparent 74%);
+        background-size: 184px 202px;
+      }
+      .glass--b {
+        background-image:
+          radial-gradient(circle 2px at 45% 8%, rgba(228, 241, 255, 0.30), transparent 72%),
+          radial-gradient(circle 4px at 88% 48%, rgba(228, 241, 255, 0.30), rgba(140, 170, 200, 0.08) 62%, transparent 74%),
+          radial-gradient(circle 2px at 8% 62%, rgba(228, 241, 255, 0.26), transparent 72%),
+          radial-gradient(circle 3px at 58% 88%, rgba(228, 241, 255, 0.26), transparent 74%);
+        background-size: 137px 151px;
+        background-position: 40px 25px;
+      }
+
+      /* Distant lightning: a soft bloom with no bolts, a couple of flickers every eleven
+         seconds. Deliberately restrained — this game's whole promise is that nothing is
+         chasing you, and a dramatic storm would argue with that. */
+      .flash {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0;
+        background: radial-gradient(130% 85% at 50% -10%, rgba(186, 208, 255, 0.55), transparent 62%);
+        animation: storm 11s ease-out infinite;
+      }
+      @keyframes storm {
+        0%, 90%, 100% { opacity: 0; }
+        91%           { opacity: 0.5; }
+        92.5%         { opacity: 0.08; }
+        94%           { opacity: 0.38; }
+        97%           { opacity: 0; }
+      }
+
       /* Warm lamplight pooling at the bottom — the reason it reads as cosy rain seen from
          indoors rather than as weather. */
       .lamp {
@@ -153,14 +202,19 @@
          stays as a still texture rather than disappearing. */
       @media (prefers-reduced-motion: reduce) {
         .rain { animation: none; transform: rotate(11deg); }
+        /* The beads are static anyway; the storm is pure motion, so it goes entirely. */
+        .flash { animation: none; opacity: 0; }
         .play { transition: none; }
       }
     </style>
   </head>
   <body>
     <div class="poster" id="poster">
+      <span class="flash" aria-hidden="true"></span>
       <span class="rain rain--far" aria-hidden="true"></span>
       <span class="rain rain--near" aria-hidden="true"></span>
+      <span class="glass glass--a" aria-hidden="true"></span>
+      <span class="glass glass--b" aria-hidden="true"></span>
       <span class="lamp" aria-hidden="true"></span>
       <span class="scrim" aria-hidden="true"></span>
       <div class="content">
