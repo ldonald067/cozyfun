@@ -89,7 +89,7 @@ Notes on the choices, so they are not undone by accident:
 - **The `by jsmonzani` byline is deliberately gone.** This panel no longer hosts their game,
   so keeping their name on it would miscredit someone else's work. If you would rather keep
   the Greenhouse *as well*, do not edit this panel — add a second one instead.
-- **`src` points at `embed.html`, not the site root.** That page is a ~5 KB poster that loads
+- **`src` points at `embed.html`, not the site root.** That page is an ~18 KB poster that loads
   nothing until clicked. Pointing at `/` instead would make every visitor who scrolls past
   the panel download roughly 9 MB.
 - **`allow="autoplay; fullscreen"` is required** for the ambience audio and the in-game

@@ -12,11 +12,16 @@
       autoloads makes every visitor who scrolls past pay for it. This poster is a few KB
       and pulls in nothing until someone actually asks to play.
 
-      Everything on it — falling rain, condensation beaded on the glass, and the distant
-      lightning bloom — is tiling CSS gradients rather than images or canvas, so the whole
-      card stays a few KB and costs nothing to fetch. Each layer is a repeating strip of
-      dashes translated by exactly one tile height, which loops seamlessly, and the only
-      animated property is `transform` so it composites on the GPU without repainting.
+      Nothing here is an image. Rain and condensation are tiling CSS gradients; the
+      lightning is inline SVG, generated once as a fractal and referenced three times. The
+      card is ~18 KB and fetches no sub-resources at all, against roughly 440 KB of PNGs
+      for the CodePen this borrows from.
+
+      Two costs are accepted deliberately, both inherited from that reference. The rain
+      animates `background-position`, which repaints rather than compositing. And its
+      travel is not a whole number of tiles, so the field resets at the end of each cycle.
+      At this speed over a noise-like pattern neither is perceptible, which is precisely
+      why the technique works there.
 
       Every path here is relative, so this file works unchanged at a domain root or under
       a subpath — it always sits next to the index.html it launches, whatever COZY_BASE
@@ -48,9 +53,9 @@
         background: radial-gradient(120% 90% at 50% 12%, #1b2534 0%, #0d1421 55%, #070c13 100%);
       }
 
-      /* Two rain layers at different size, speed, and opacity read as depth: the near
-         sheet is longer, brighter, and faster, the far one finer and slower. Both are
-         oversized and rotated so the slanted streaks still cover the corners. */
+      /* Three sheets at different drop size, speed and opacity read as depth: the near one
+         largest, brightest and fastest, the far one finest and slowest. The slant comes
+         from the drift keyframe below, not from a rotation, so these sit flush in the frame. */
       .rain {
         position: absolute;
         inset: 0;
@@ -58,13 +63,15 @@
         background-repeat: repeat;
         will-change: background-position;
       }
-      /* Each drop is an elongated ellipse. A one-dimensional linear-gradient cannot leave
-         gaps along both axes — its band spans the whole tile width, so neighbouring tiles
-         merge into unbroken stripes and the card reads as venetian blinds.
+      /* Drops are small ovals, 1-3px, not streaks. Compositing the reference's rain PNG
+         over a dark field shows its texture is speckle too — what turns those dots into
+         rain is speed, not shape: they move fast enough to smear in the eye. Drawing the
+         blur instead, as long thin streaks, looked like scratches; drawing large slow
+         drops looked like snow.
 
-         Real rain is long, fine and dense rather than short and sparse: streaks here run
-         40-70px tall but barely a pixel wide, so they read as motion blur. Three depths,
-         each denser and dimmer than the last, do the rest. */
+         Each drop is a radial gradient because a one-dimensional linear-gradient cannot
+         leave gaps along both axes — its band spans the whole tile width, so neighbouring
+         tiles merge into unbroken stripes and the card reads as venetian blinds. */
       .rain--far {
         background-image:
           radial-gradient(1.2px 1.8px at 22% 12%, rgba(176, 202, 232, 0.42), transparent 70%),
@@ -139,9 +146,11 @@
         background-position: 40px 25px;
       }
 
-      /* Lightning needs a fork, and a gradient cannot make one — a bolt is a line with
-         branches, so it is drawn as SVG paths. Inline, so it still costs no extra request.
-         The wide soft stroke underneath is the glow; the thin bright one is the channel. */
+      /* A gradient cannot make a fork, so the bolt is SVG. Its 44 branches were generated
+         by a seeded fractal walk rather than drawn by hand — the reference bolt is dozens
+         of hairlines forking recursively, which is not something to author by hand. The
+         geometry is defined once and referenced by all three placements and all three
+         stroke passes; writing it out per pass would have cost 59 KB instead of 3. */
       .bolt {
         position: absolute;
         opacity: 0;

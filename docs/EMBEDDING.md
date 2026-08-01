@@ -82,7 +82,7 @@ confirm the status line reads **"wasm sim online"**.
 
 ## The embed snippet
 
-`embed.html` ships next to `index.html`. It is a ~5 KB poster that loads nothing until the
+`embed.html` ships next to `index.html`. It is an ~18 KB poster that loads nothing until the
 visitor clicks, then swaps itself for the app. Point the iframe at it rather than at
 `index.html` directly — the full build is roughly 9 MB, and without the poster every visitor
 who scrolls past pays for it.
@@ -112,6 +112,15 @@ exactly the storage problem described above.
 Height is a judgment call — the layout is responsive and the controls sit under the canvas,
 so around 620px reads comfortably on desktop while staying reasonable on mobile. The
 `loading="lazy"` attribute defers even the poster until it scrolls into view.
+
+### What the poster draws
+
+Rain falling in three sheets, condensation beaded on the glass in front of it, distant
+lightning, and warm lamplight below — all of it CSS gradients and inline SVG, with no image
+files and no sub-resource requests. The technique is borrowed from a CodePen that reaches a
+similar look with about 440 KB of hotlinked PNGs; the notes in `embed.html` record what was
+taken, what was deliberately not, and the two costs accepted along with it. Motion drops out
+under `prefers-reduced-motion`, leaving the beads, which never moved.
 
 ## What the gate covers
 

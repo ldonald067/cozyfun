@@ -119,7 +119,7 @@ reader unless the reasoning is on record.
    so their name must not stay attached to it. If both games should appear, do not edit this
    panel — add a second one and restore theirs intact.
 
-2. **`src` points at `embed.html`, not the site root.** That page is a ~5 KB poster that loads
+2. **`src` points at `embed.html`, not the site root.** That page is an ~18 KB poster that loads
    nothing until clicked. Pointing it at `/` instead would make every visitor who scrolls past
    the Chill Zone download roughly 9 MB of game and audio.
 
