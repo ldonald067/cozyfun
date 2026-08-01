@@ -110,8 +110,8 @@ app keep same-origin storage access, and `sandbox` without `allow-same-origin` r
 exactly the storage problem described above.
 
 Height is a judgment call — the layout is responsive and the controls sit under the canvas,
-so around 620px reads comfortably on desktop while staying reasonable on mobile. The
-`loading="lazy"` attribute defers even the poster until it scrolls into view.
+so around 620px gives them room. The `loading="lazy"` attribute defers even the poster until
+it scrolls into view.
 
 ### What the poster draws
 

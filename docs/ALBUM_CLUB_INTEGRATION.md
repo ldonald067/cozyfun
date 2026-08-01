@@ -174,6 +174,3 @@ a registrable domain and so are not treated as third-party. If it does happen, t
 is to serve the build from a path on the main site instead: build it with
 `COZY_BASE=/pixelfun/ npm run build`, drop the output in `public/pixelfun/`, and change the
 iframe `src` to `/pixelfun/embed.html`. See `docs/EMBEDDING.md` in the cozyfun repo.
-
-**Panel too tall or too short on some screen** — adjust the two heights in Step 2. Nothing
-else depends on them.
