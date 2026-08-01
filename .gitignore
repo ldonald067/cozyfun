@@ -12,3 +12,6 @@ app/public/sim/
 
 # Personal Claude Code permission allowlist — machine-local, not shared.
 .claude/settings.local.json
+
+# macOS Finder metadata
+.DS_Store

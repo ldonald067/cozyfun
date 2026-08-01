@@ -27,10 +27,13 @@
       a subpath — it always sits next to the index.html it launches, whatever COZY_BASE
       was set to at build time.
 
-      Host this on the SAME ORIGIN as the page embedding it. Served cross-origin (from
-      itch.io, say) the sandbox becomes a third-party frame, and Safari blocks its
-      localStorage outright while Chrome partitions it — which silently breaks saving a
-      terrarium, the one thing players want to keep.
+      Host this on the same SITE as the page embedding it — same registrable domain, which
+      a subdomain satisfies. That is the boundary browsers actually enforce: Chrome
+      partitions storage by top-level site and Safari's ITP judges third-party by
+      registrable domain, so pixelfun.littlealbumclub.net inside littlealbumclub.net is not
+      a third party even though it is a different origin. A wholly different domain
+      (itch.io, say) is, and there the sandbox loses localStorage — silently breaking saved
+      terrariums, the one thing players want to keep.
     -->
     <style>
       *, *::before, *::after { box-sizing: border-box; }
@@ -61,7 +64,7 @@
         inset: 0;
         pointer-events: none;
         background-repeat: repeat;
-        will-change: background-position;
+        will-change: transform;
       }
       /* Drops are small ovals, 1-3px, not streaks. Compositing the reference's rain PNG
          over a dark field shows its texture is speckle too — what turns those dots into
@@ -78,8 +81,8 @@
           radial-gradient(1px 1.5px at 68% 44%, rgba(176, 202, 232, 0.36), transparent 70%),
           radial-gradient(1.2px 1.8px at 44% 78%, rgba(176, 202, 232, 0.38), transparent 70%),
           radial-gradient(1px 1.4px at 84% 88%, rgba(176, 202, 232, 0.32), transparent 70%);
-        background-size: 44px 96px;
-        animation: rain 0.62s linear infinite;
+        background-size: 51px 96px;
+        animation: rain-far 0.34s linear infinite;
       }
       .rain--mid {
         background-image:
@@ -87,35 +90,30 @@
           radial-gradient(1.4px 2px at 58% 58%, rgba(198, 222, 248, 0.42), transparent 70%),
           radial-gradient(1.5px 2.2px at 86% 34%, rgba(198, 222, 248, 0.44), transparent 70%),
           radial-gradient(1.2px 1.8px at 36% 86%, rgba(198, 222, 248, 0.38), transparent 70%);
-        background-size: 56px 124px;
-        animation: rain 0.44s linear infinite;
+        background-size: 66px 124px;
+        animation: rain-mid 0.26s linear infinite;
       }
       .rain--near {
         background-image:
           radial-gradient(2.2px 3.2px at 30% 24%, rgba(224, 239, 255, 0.58), transparent 68%),
           radial-gradient(1.9px 2.8px at 74% 62%, rgba(224, 239, 255, 0.50), transparent 68%),
           radial-gradient(1.7px 2.4px at 52% 88%, rgba(224, 239, 255, 0.44), transparent 68%);
-        background-size: 72px 158px;
-        animation: rain 0.3s linear infinite;
+        background-size: 85px 158px;
+        animation: rain-near 0.2s linear infinite;
       }
 
-      /* The drift is the reference's own keyframe, unchanged: background-position from
-         0% 0% to 20% 100%. Worth knowing why that slants at all — a percentage
-         background-position resolves to (container - tile) * percentage, not to a share
-         of the width, so the sideways travel is 20% of the leftover space while the
-         vertical travel is all of it. Their 640px-wide tile leaves little slack in a
-         narrow frame, which is why their rain is near-vertical at this size and strongly
-         angled on a wide desktop. Our tiles are small, so the slack is large and the slant
-         holds at about 15 degrees here.
-
-         Two honest costs, both inherited from the reference and both worth it: animating
-         background-position repaints rather than compositing, and the travel is not a whole
-         number of tiles so the pattern resets at the end of each cycle. At this speed over
-         a noise-like field neither is perceptible — which is exactly why it works there. */
-      @keyframes rain {
-        0%   { background-position: 0% 0%; }
-        100% { background-position: 20% 100%; }
-      }
+      /* Each layer slides exactly one tile across and two down per cycle, so the pattern
+         lands back on itself and the loop has no seam. The reference animates
+         background-position from 0% 0% to 20% 100% instead, which is where the slant idea
+         came from — but a percentage background-position resolves to
+         (container - tile) * percentage, so its travel is almost never a whole number of
+         tiles. Measured in this frame that snapped the near field 146px, roughly a whole
+         tile, three times a second. Whole-tile transforms also make the motion independent
+         of frame size, and animate a compositor property instead of forcing a repaint.
+         Ratios are chosen so all three fall at about 15 degrees. */
+      @keyframes rain-far  { to { transform: translate(51px, 192px); } }
+      @keyframes rain-mid  { to { transform: translate(66px, 248px); } }
+      @keyframes rain-near { to { transform: translate(85px, 316px); } }
 
       /* Condensation clinging to the inside of the glass, in front of the falling rain so
          the two read as different distances: weather outside, window between. Each bead is
@@ -193,6 +191,10 @@
         background: radial-gradient(130% 85% at 50% -10%, rgba(196, 206, 255, 0.5), rgba(142, 112, 220, 0.22) 34%, transparent 64%);
         animation: storm 13s ease-out infinite;
       }
+      /* One flash per bolt, sharing each bolt's delay. A single un-staggered flash lit only
+         the first strike and left the other two firing into an unlit sky. */
+      .flash--2 { animation-delay: 4.2s; }
+      .flash--3 { animation-delay: 8.6s; }
       @keyframes storm {
         0%, 5.5%, 100% { opacity: 0; }
         0.7%           { opacity: 0.55; }
@@ -276,6 +278,8 @@
   <body>
     <div class="poster" id="poster">
       <span class="flash" aria-hidden="true"></span>
+      <span class="flash flash--2" aria-hidden="true"></span>
+      <span class="flash flash--3" aria-hidden="true"></span>
       <svg class="bolt bolt--1" viewBox="0 0 200 400" aria-hidden="true"><defs><g id="lb"><path d="M110 55 L109 63 L107 72 L102 79 L100 87"/><path d="M121 100 L115 104 L111 110 L106 116 L102 122"/><path d="M101 41 L110 55 L116 69 L120 84 L121 100 L120 115"/><path d="M83 139 L91 152 L97 166 L100 181 L100 196"/><path d="M69 163 L57 172 L48 184 L39 196 L32 210"/><path d="M97 14 L101 27 L101 41 L99 55 L97 69 L93 83 L92 97 L90 111 L87 125 L83 139 L77 151 L69 163"/><path d="M99 94 L96 98 L92 101 L88 103 L85 107"/><path d="M88 121 L87 125 L86 130 L86 135 L85 140"/><path d="M104 80 L99 94 L95 108 L88 121 L80 133"/><path d="M162 212 L165 215 L169 217 L172 220 L175 223"/><path d="M148 190 L157 200 L162 212 L167 224 L176 235"/><path d="M152 204 L164 213 L176 224 L186 236 L197 247"/><path d="M94 69 L104 80 L112 93 L118 106 L123 120 L126 135 L132 149 L137 162 L142 176 L148 190 L152 204"/><path d="M95 109 L100 121 L107 132 L116 141 L125 151"/><path d="M87 120 L76 128 L65 137 L56 148 L45 158"/><path d="M76 174 L71 179 L65 184 L61 189 L58 196"/><path d="M70 144 L75 158 L76 174 L79 189 L85 203 L94 216"/><path d="M24 231 L26 237 L28 244 L28 250 L32 256"/><path d="M45 210 L35 220 L24 231 L18 244 L9 256"/><path d="M51 237 L57 240 L60 243 L65 248 L70 252"/><path d="M44 224 L51 237 L61 248 L68 260 L76 272"/><path d="M102 97 L95 109 L87 120 L79 133 L70 144 L61 155 L55 169 L51 182 L49 196 L45 210 L44 224 L43 238"/><path d="M113 121 L114 134 L113 146 L114 158 L114 171"/><path d="M197 249 L197 254 L197 261 L197 267 L197 274"/><path d="M173 196 L185 208 L192 222 L197 235 L197 249"/><path d="M103 110 L113 121 L121 132 L131 143 L142 152 L151 161 L158 173 L166 184 L173 196 L177 210"/><path d="M102 124 L90 135 L82 146 L74 158 L66 171 L59 184 L52 197 L47 210 L43 224 L44 239 L48 253 L50 268"/><path d="M50 189 L39 197 L29 207 L23 219 L15 231"/><path d="M98 138 L87 146 L77 157 L67 168 L58 178 L50 189 L45 202 L37 214 L29 225 L22 237"/><path d="M10 346 L23 354 L35 363 L46 372 L59 380 L70 389"/><path d="M72 188 L63 199 L54 209 L44 218 L33 226 L23 236 L16 249 L13 263 L7 277 L3 289 L3 303 L5 318 L8 332 L10 346"/><path d="M43 280 L43 287 L45 294 L48 301 L51 308"/><path d="M72 229 L64 242 L54 253 L48 267 L43 280"/><path d="M134 369 L136 374 L138 380 L140 386 L142 392"/><path d="M122 360 L134 369 L147 377 L159 386 L170 396"/><path d="M69 215 L72 229 L77 242 L79 256 L84 269 L87 282 L93 295 L98 308 L106 320 L113 333 L117 346 L122 360 L124 374"/><path d="M5 324 L12 337 L20 349 L30 361 L40 370 L53 378 L64 387"/><path d="M8 367 L3 383 L3 398"/><path d="M14 380 L26 388 L36 398"/><path d="M25 390 L37 399"/><path d="M52 269 L40 277 L31 289 L21 300 L11 311 L5 324 L4 339 L4 353 L8 367 L14 380 L25 390 L37 399"/><path d="M5 338 L3 347 L3 359 L3 371 L3 382"/><path d="M46 296 L36 307 L24 315 L13 326 L5 338 L3 351 L3 366 L3 381 L3 395"/><path d="M100 0 L97 14 L93 27 L93 41 L92 55 L94 69 L98 83 L102 97 L103 110 L102 124 L98 138 L92 151 L85 163 L77 174 L72 188 L71 202 L69 215 L67 229 L63 242 L57 255 L52 269 L48 282 L46 296 L44 310 L39 323 L38 337 L40 351 L45 364 L52 377 L58 390"/></g></defs><use href="#lb" class="halo"/><use href="#lb" class="glow"/><use href="#lb" class="channel"/></svg>
       <svg class="bolt bolt--2" viewBox="0 0 200 400" aria-hidden="true"><use href="#lb" class="halo"/><use href="#lb" class="glow"/><use href="#lb" class="channel"/></svg>
       <svg class="bolt bolt--3" viewBox="0 0 200 400" aria-hidden="true"><use href="#lb" class="halo"/><use href="#lb" class="glow"/><use href="#lb" class="channel"/></svg>
@@ -293,7 +297,7 @@
           moonlit flowers — no score, no timer, nothing to win.
         </p>
         <button class="play" id="play" type="button">Enter the terrarium</button>
-        <span class="hint">Loads on click · sound is off until you turn it on</span>
+        <span class="hint" id="hint">Loads on click · sound is off until you turn it on</span>
       </div>
     </div>
 
@@ -302,18 +306,24 @@
       // so the sandbox keeps normal access to localStorage and can save scenes.
       // The whole card is clickable for convenience, while the real <button> inside it is
       // the keyboard and screen-reader target.
-      document.getElementById("poster").addEventListener(
-        "click",
-        () => {
+      function enter() {
+          const poster = document.getElementById("poster");
           const frame = document.createElement("iframe");
           frame.src = "index.html";
           frame.title = "Night Desk Terrarium";
           frame.allow = "autoplay; fullscreen";
+          // If the app never arrives — a deploy mid-flight, a dropped connection — put the
+          // poster back rather than leaving a dead frame the visitor cannot retry from.
+          const giveUp = setTimeout(() => {
+            document.body.replaceChildren(poster);
+            document.getElementById("hint").textContent = "That did not load — click to try again";
+            document.getElementById("poster").addEventListener("click", enter, { once: true });
+          }, 20000);
+          frame.addEventListener("load", () => clearTimeout(giveUp), { once: true });
           document.body.replaceChildren(frame);
           frame.focus();
-        },
-        { once: true }
-      );
+      }
+      document.getElementById("poster").addEventListener("click", enter, { once: true });
     </script>
   </body>
 </html>

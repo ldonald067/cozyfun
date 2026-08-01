@@ -35,6 +35,9 @@ const TYPES = {
 // Vite fingerprints everything under /assets, so those are safe to cache hard. Everything
 // else — index.html, embed.html, the wasm, audio, room art — keeps a stable filename across
 // releases and must revalidate, or a returning visitor gets a stale mix of old and new.
+// Revalidation is only cheap if the response carries a validator: without one the browser
+// cannot ask "still current?" and re-downloads in full, which for the ambience beds means
+// several MB on every return visit. Size and mtime are enough to build that validator.
 function cacheControl(pathname) {
   if (pathname.startsWith("/assets/")) return "public, max-age=31536000, immutable";
   return "public, max-age=0, must-revalidate";
@@ -63,17 +66,34 @@ createServer(async (req, res) => {
       return;
     }
 
-    res.writeHead(200, {
+    const etag = `W/"${info.size.toString(16)}-${Math.floor(info.mtimeMs).toString(16)}"`;
+    const headers = {
       "content-type": TYPES[extname(file).toLowerCase()] ?? "application/octet-stream",
-      "content-length": info.size,
       "cache-control": cacheControl(pathname),
       "x-content-type-options": "nosniff",
-    });
+      etag,
+    };
+    if (req.headers["if-none-match"] === etag) {
+      res.writeHead(304, headers).end();
+      return;
+    }
+
+    res.writeHead(200, { ...headers, "content-length": info.size });
     if (req.method === "HEAD") {
       res.end();
       return;
     }
-    createReadStream(file).pipe(res);
+
+    // A stream error is emitted asynchronously, so the try/catch around this handler cannot
+    // see it — unhandled, it takes the whole process down and the service with it. A file
+    // can vanish between stat and open, and disks do fail.
+    const stream = createReadStream(file);
+    stream.on("error", () => {
+      if (!res.headersSent) res.writeHead(500, { "content-type": "text/plain" }).end("read error");
+      else res.destroy();
+    });
+    res.on("close", () => stream.destroy());
+    stream.pipe(res);
   } catch {
     res.writeHead(500, { "content-type": "text/plain; charset=utf-8" }).end("server error");
   }

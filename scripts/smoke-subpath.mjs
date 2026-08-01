@@ -46,6 +46,16 @@ for (const name of bundles) {
     failures.push(`${name} still hardcodes ${hit} — it would 404 under ${BASE}`);
   }
   if (!code.includes(BASE)) failures.push(`${name} never references ${BASE}; the base was not applied`);
+  // Requiring the base "somewhere" is weak on its own — the audio and room URLs satisfy it
+  // without the wasm being involved at all. So also require the wasm to appear in its
+  // base-relative form. Note it can only be checked in that form: assetUrl() joins base and
+  // path at runtime, so the finished URL never exists as a literal in the bundle to match.
+  // Together with the absolute-path rejection above this pins the wasm to the helper; what
+  // it cannot catch is a deliberate origin-relative construction, which the root-served
+  // browser smoke would still miss too, and which nobody writes by accident.
+  if (!code.includes("sim/cozy_sandbox_sim.wasm")) {
+    failures.push(`${name} never references sim/cozy_sandbox_sim.wasm in base-relative form; the wasm would 404 under ${BASE} and the sandbox would drop to the JS engine without erroring`);
+  }
   // Catches a double-applied base, e.g. assetUrl() run over an already-prefixed path.
   if (code.includes(`${BASE}${BASE.slice(1)}`)) failures.push(`${name} contains a doubled base prefix`);
 }

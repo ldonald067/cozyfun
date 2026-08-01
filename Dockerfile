@@ -26,8 +26,11 @@ COPY package.json ./
 RUN npm run build:sim
 
 COPY app ./app
-# COZY_BASE is intentionally unset: this image serves the app at the root of its own
-# hostname. Set it only when mounting the build under a path on a larger site.
+# COZY_BASE is intentionally unset, and must stay unset for this image: it serves from the
+# root of its own hostname, and scripts/serve-static.mjs maps request paths straight onto
+# dist without stripping a prefix. A COZY_BASE build emits /<base>/assets/... references
+# while the files still sit at dist/assets/..., so this server would 404 every one of them.
+# Set COZY_BASE only when handing the build to someone else's server to mount under a path.
 RUN npm --prefix app run build
 
 FROM node:24-slim AS runtime
