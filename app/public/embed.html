@@ -8,20 +8,20 @@
     <!--
       Click-to-load shell for embedding the sandbox in a page on another site.
 
-      The point is weight. The app is ~9 MB with its ambience beds, and an embed that
-      autoloads makes every visitor who scrolls past pay for it. This poster is a few KB
+      The point is weight. The app is ~7 MB with its ambience beds, and an embed that
+      autoloads makes every visitor who scrolls past pay for it. This poster is ~19 KB
       and pulls in nothing until someone actually asks to play.
 
       Nothing here is an image. Rain and condensation are tiling CSS gradients; the
       lightning is inline SVG, generated once as a fractal and referenced three times. The
-      card is ~18 KB and fetches no sub-resources at all, against roughly 440 KB of PNGs
-      for the CodePen this borrows from.
+      card fetches no sub-resources at all, against roughly 440 KB of PNGs for the CodePen
+      this borrows from.
 
-      Two costs are accepted deliberately, both inherited from that reference. The rain
-      animates `background-position`, which repaints rather than compositing. And its
-      travel is not a whole number of tiles, so the field resets at the end of each cycle.
-      At this speed over a noise-like pattern neither is perceptible, which is precisely
-      why the technique works there.
+      Two things were deliberately not borrowed. That reference animates
+      `background-position`, which repaints every frame instead of compositing, and its
+      travel is not a whole number of tiles, so the field visibly resets each cycle. Both
+      are avoided here by translating whole tiles with `transform` (see the note above
+      the rain keyframes).
 
       Every path here is relative, so this file works unchanged at a domain root or under
       a subpath — it always sits next to the index.html it launches, whatever COZY_BASE

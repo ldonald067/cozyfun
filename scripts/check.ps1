@@ -30,10 +30,13 @@ function Invoke-CheckStep {
 Push-Location $Root
 try {
   Invoke-CheckStep "Material identity audit" { & $Npm run material:audit }
+  Invoke-CheckStep "Material contrast floor" { & $Npm run material:contrast }
   Invoke-CheckStep "Rust simulation tests" { & $Npm run test:sim }
   Invoke-CheckStep "Production build" { & $Npm run build }
   Invoke-CheckStep "WASM smoke checks" { & (Join-Path $Root ".tools\node\node.exe") "scripts/smoke-wasm.mjs" }
   Invoke-CheckStep "JavaScript fallback smoke checks" { & $Npm run test:js-fallback }
+  Invoke-CheckStep "Rust/JS parity harness" { & $Npm run test:parity }
+  Invoke-CheckStep "Subpath build gate" { & $Npm run test:subpath }
   Invoke-CheckStep "Audio reaction smoke checks" { & $Npm run test:audio-reactions }
   Invoke-CheckStep "Browser smoke checks" { & $Npm run test:browser }
   Invoke-CheckStep "Audio QA" { & $Npm run audio:qa }

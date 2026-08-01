@@ -5,8 +5,10 @@ The sandbox renders as a grid of cells, but the grid does not need to look flat.
 ## Layers
 
 - Base canvas: crisp pixel data for the simulation.
-- Glow canvas: blurred additive-feeling light for fire, lava, ember, steam, stardust, meteor, moonwater, pollen, flowers, cosmic moss, and firework sparks.
-- Motes canvas: full-screen room dust and atmosphere, separate from the simulation.
+- Glow canvas: blurred additive-feeling light for fire, lava, ember, steam, stardust, meteor, moonwater, pollen, flowers, cosmic moss, and firework sparks. Four materials reach it only in a particular state — an attuned wellspring, a lit rocket grain, glass while the vitrify flash is still cooling (`age < 70`), and constellation-etched stone — so `hasGlow` is a predicate over `(kind, flags, energy, age)`, not a set membership test.
+- Motes canvas: full-screen room dust, separate from the simulation.
+
+Steam is deliberately the dimmest thing on the glow layer. It is lit *by* sources rather than being one, and an earlier shared floor had a kettle out-glowing the fire boiling it.
 
 ## Cell Rendering
 
@@ -32,7 +34,7 @@ Shape language is intentionally procedural:
 - Fire/Lava/Meteor: heat cores, exposed flame tips, cooling crust, glowing seams, and ember-dark edges.
 - Moss/Fungus/Wood: leafy clusters, fungus cap/gill/spore role colors, oil/heat/cosmic contact cues, damp moonwater tint, char/damp contact cues, end-grain, and woodgrain lines.
 - Ember: pulsing heat cores that dim into cold char, with spark flecks above hot beds.
-- Glass: teal translucency, fresh warm flash, and fog film near steam.
+- Glass: a mostly see-through pane — the interior starts from the night sky and takes only a whisper of mint, so the rims and a drifting diagonal sheen band carry the identity rather than the fill. Fresh panes flash warm as they vitrify. Condensation (steam nearby, or the wet flag) is a thin haze plus scattered beads streaked by vertical clear runs, which read *darker* than the fog because the drop has wiped the pane behind it — not a flat grey wash.
 - Pollen/Stem/Flower: bobbing golden motes, leaf-nubbed climbing stalks with pale growing tips, and petal variety on blooms.
 - Rocket: crimson grains with paper flecks when inert, a bright white-gold firework head when lit.
 - Spark: white-hot birth, per-cell firework hue (gold, rose, mint, sky, magenta) that reads apart from cool Stardust, glitter blinks, and an ember-red fade.
@@ -53,6 +55,7 @@ Current life/water rules:
 - Watered moss uses that energy to spread into nearby soil or wood more readily.
 - Watered soil stores moisture briefly and can green up into moss even after the water has moved away.
 - Fungus can rot wet seeds or overtake old wet moss, keeping decay distinct from plant growth.
+- A fungus that has run out of anything to eat eventually collapses back into fresh soil, closing the soil → moss → fungus → soil loop so a terrarium recovers instead of ending as a dead mat.
 - Flowers are generated outcomes, not toolbar materials. They mark seed success, while moss remains surface carpet.
 
 Current temperature rules:
@@ -68,7 +71,7 @@ Current substrate rules:
 - Damp sand reads darker and moves more slowly, making it clump instead of behaving like dry loose grains.
 - Wet sand drains back to loose sand when its stored moisture is gone.
 - Oil rises over water/moonwater, sheets sideways when supported, and keeps its smothering boundary around hydratable materials.
-- Stone and wall now split their roles: stone is the natural hard substrate that weathers and takes condensation more strongly, while wall is a sealed construction barrier that stains but resists casual moss.
+- Stone and wall split their roles along two axes. Stone is the natural hard substrate: it weathers, takes condensation more strongly, and **falls straight down when nothing supports it**. Wall is sealed construction that stains but resists casual moss, and never moves under any circumstance. Wall is therefore the only material that can hold a scaffold, frame, basin, or ceiling in place — build test fixtures and showcase stands out of it.
 - Damp stone can be colonized by moss more readily than wall, while wood remains the faster soft substrate.
 - Oil strips nearby wet flags and blocks plain water hydration, creating a smothering boundary around life.
 - Smoke leaves soot/scorch flags on wall, stone, and wood. Steam condenses into wet flags on hard surfaces and still frosts near ice.
@@ -78,8 +81,10 @@ Current cosmic rules:
 - Stardust touching ordinary water charges it into moonwater.
 - Moonwater can clean oil into stardust instead of being blocked like ordinary water.
 - Meteor contact with moonwater produces a stardust burst, giving cosmic materials a visible special-case outcome.
+- A falling meteor sheds sparks in its wake, so a shower streaks instead of dropping silently — and those sparks can light rocket fuses on the way down, or hiss into steam over water.
+- A cosmic-charged fungus sows a stardust grain instead of spreading as it digests, spending the charge: the fairy ring.
 - Rocket powder is inert until any flame lights its fuse; the lit grain climbs fast and bursts into a spark shell that droops, twinkles out, and can light more powder.
-- Wellspring blocks drink the first touching source material and pour it back out from open faces; nearby ice stills the flow.
+- Wellspring blocks drink the first touching source material and pour it back out from open faces. Nearby ice stills the flow *and* reopens the drinking branch, so a chilled spring re-drinks whatever touches it next: attunement is re-teachable rather than a permanent first-touch commitment.
 
 Visual state polish:
 
@@ -127,7 +132,11 @@ npm run test:browser
 
 `npm run visual:qa` saves a controlled current-material capture to `.tmp/visual-qa/current-materials.png`, a deterministic material identity showcase to `.tmp/visual-qa/material-identity-showcase.png`, responsive layout metrics to `.tmp/visual-qa/current-layout.json`, and room backdrop captures for every scene environment.
 
-The material showcase is shared by visual, Chrome, and Firefox QA through `scripts/material-showcase.mjs`. It should cover oil-over-water, wet/dry/scorched/frozen sand, damp/frozen/scorched hard materials, wet wood steam, ordinary water/lava and water/meteor shock, water/moonwater contact contrast, oil-smothered plants, distinct fungus life/cosmic/heat clusters, freeze-thaw wall stress, a grown stalked plant, veined stone and patinated wall, constellation etching, a pouring wellspring basin beside a dormant block, and a rocket charge with a lit grain in flight.
+The material showcase is shared by visual, Chrome, and Firefox QA through `scripts/material-showcase.mjs`. It should cover oil-over-water, wet/dry/scorched/frozen sand, damp/frozen/scorched hard materials, wet wood steam, ordinary water/lava and water/meteor shock, water/moonwater contact contrast, oil-smothered plants, distinct fungus life/cosmic/heat clusters, freeze-thaw wall stress up to a near-crumble frost-stressed wall, a grown stalked plant, veined stone and patinated wall, constellation etching, a pouring wellspring basin beside a dormant block, a one-cell attuned/dormant wellspring pair, the glass set (an age-0 vitrify flash clear of the lava pool, a cooled see-through pane, a deeper pane with real interior, and a dewed pane), and a rocket charge with a lit grain in flight.
+
+Two traps in this scene, both learned the hard way. Display stands must be **Wall**, since stone now falls. And a glass bloom placed beside the lava pool cannot evidence anything — it sits inside lava's own halo — so the vitrify exhibit is deliberately somewhere else.
+
+The composite that visual QA saves must draw the glow layer *over* the base canvas with the live layer's settings (screen blend, `blur(16px) saturate(1.35)`, alpha 0.9). It once drew glow underneath the opaque base, which silently reviewed every night light as though it did not exist; keep `saveSandboxComposite` in `scripts/visual-qa.mjs` in sync with `.glow-canvas` in `styles.css`.
 
 The room captures are part of the visual QA contract. They should stay calm behind the sandbox and panels: if a photo becomes too busy, literal, or high-contrast, tune the scene metadata in `sceneEnvironments.ts` or replace the asset and update `ASSET_CREDITS.md` in the same change.
 

@@ -4,7 +4,9 @@ This roadmap keeps the project focused: make the toy feel good, keep the codebas
 
 ## Status Snapshot
 
-Phases 0-7, 9, and 10 are complete; Phase 8 is in progress. The sandbox is a playable browser toy: React/Vite UI, Rust/WASM sim with a JS fallback, 19 toolbar materials plus generated flowers, six credited room backdrops with room-linked native ambience, optional YouTube Desk Radio, local save/share/postcard/clip export, and deterministic sim/browser/visual/audio QA wired into local scripts and CI. Details live in the phase sections below.
+Every phase through 18 is complete except two open items: Phase 8's remaining subjective listening pass, and Phase 12D (room weather play).
+
+The sandbox is a playable, deployed browser toy: React/Vite UI, Rust/WASM sim with a byte-identical JS fallback, 18 paintable materials plus the Eraser on the toolbar and 8 generated-only outcomes, six credited room backdrops with room-linked native ambience, optional YouTube Desk Radio, local save/share/postcard/clip export, a click-to-load embed poster, and deterministic sim/parity/browser/visual/audio QA wired into local scripts and CI. It runs at `pixelfun.littlealbumclub.net` and is iframed into `littlealbumclub.net`. Details live in the phase sections below.
 
 ## Phase 0: Playable V0
 
@@ -285,7 +287,7 @@ After Phase 7, higher-level world goals, optional prompts/challenges, or a calme
 
 ## Phase 8: Sound + Desk Radio Polish
 
-Status: started.
+Status: shipped; open only on a subjective listening pass. Every deliverable below is built and gated by `npm run audio:qa`; what remains is a taste judgment about the mix, not work with a definition of done.
 
 Goal: make the sandbox sound more intentional while letting users play their own YouTube videos or playlists from the visible Desk Radio when YouTube allows embedding.
 
@@ -371,7 +373,7 @@ Completed:
 - 11A: Smoke and Steam left the toolbar as generated-only vapors; the toolbar went from 19 to 17 paint choices with no sim loss.
 - 11B: Sand vitrifies into generated-only Glass under strong heat; stardust snuffs fire into sparkle bursts and etches constellations onto stone/wall; walls crack and crumble into stone under accumulated freeze-thaw stress; wood burns through a glowing Ember arc into relightable char.
 - 11C: every new interaction shipped with its renderer moment, and the deterministic showcase now covers the glass, ember, freeze-thaw, and constellation states alongside the existing wet/frozen/scorched/cosmic captures.
-- 11D: `npm run material:audit` now requires 4-6 documented interaction roles per toolbar material (generated-only outcomes and the Eraser stay at 1-3), and the audit matrix documents the new bar for all 17 toolbar materials.
+- 11D: `npm run material:audit` now requires 4-6 documented interaction roles per toolbar material (generated-only outcomes and the Eraser stay at 1-3), and the audit matrix documented the new bar for all 17 toolbar materials of the time. Phase 17 later added Rocket and Wellspring under the same bar, so the matrix covers 19 today.
 
 The bar this phase established: a "special interaction" is a distinct, player-visible sim reaction with another material or state. Movement style alone does not count, and a shared flag treatment counts once, not once per flag. Elements that fall below 4 interactions get combined, demoted to generated-only, or removed instead of padded; `docs/MATERIAL_AUDIT.md` is the enforcement point.
 
@@ -386,7 +388,7 @@ Completed:
 - Spread the cool family across hue anchors: steam went neutral gray, ice stays the cyan-blue anchor, glass shifted green-teal, moonwater kept silver-lavender, and stardust deepened to violet with gold flecks. Ember char warmed away from oil's green slick, and seed leaned greener away from wood.
 - The closest pair rose from 19 to 49, and `npm run material:contrast` now gates `npm run check` with a distance floor of 45 so palettes cannot silently drift back together.
 
-Remaining review targets when taste says so: Fungus vs Stardust purples (53) and Ember vs Oil darks (49) both rely on motion, glow, and shape to separate, which currently reads fine in play.
+Remaining review target when taste says so: Ember vs Oil darks, still the closest pair at 49, relying on motion, glow, and shape to separate — which currently reads fine in play. (Fungus vs Stardust was on this list at distance 53; later palette work pushed it to 92, so it is no longer a concern. Re-run `npm run material:contrast` before trusting any number here.)
 
 Follow-up from live testing: palettes alone were not enough for stardust vs moonwater because both bloomed nearly identical lavender glow halos. Stardust now glows warm gold starlight (glow, twinkle, and air sparkle all lean gold over violet) while moonwater glows cool silver-blue moonlight.
 
@@ -414,6 +416,8 @@ Interactions grounded in real life or cozy invention, each with a visible or aud
 Status: complete.
 
 Completed:
+
+The headline cycle this phase closed: wall weathers into stone (freeze-thaw), stone erodes into sand, sand fuses into glass under heat, glass shatters back to sand under impact. Every mineral is a stage in one loop the player can push in either direction with water, cold, and heat.
 
 - 15A: stone fully saturated by touching water now erodes rarely into wet sand that keeps the stone's variant, with per-water-neighbor rolls so heavier flow wears faster. Damp stone without water contact never erodes and sealed wall is exempt, both pinned by sim tests, and erosion plays a soft grinding cue.
 - 15B: larger stone masses carry rare clustered mineral vein glints, so cliffs read as strata instead of uniform gray; single pebbles stay plain.
@@ -445,25 +449,7 @@ Status: complete. Cozy translations of the two classic sandbox elements the proj
 - A rune-carved block that drinks the identity of the first source material to touch it (consuming that cell, with a cosmic-charge chime) and stores it in the energy field as a material id.
 - Attuned runes tint toward the remembered material with a slow pulse; dormant runes shimmer faintly silver.
 - Gently pours the remembered material from open faces forever (rare per-tick chance per face), so eternal waterfalls, everlasting hearths, and meteor-shower windows are one-block scenes. Sources: sand, water, soil, fire, lava, oil, seed, stardust, meteor, moonwater, rocket.
-- Nearby ice stills the spring until the cold is removed; eraser clears it like anything else.
-
-The headline cycle: wall weathers into stone (freeze-thaw, shipped), stone erodes into sand (new), sand fuses into glass under heat (shipped), glass shatters back to sand under impact (shipped). Every mineral becomes a stage in one loop the player can push in either direction with water, cold, and heat.
-
-### Phase 15A: Water Erosion
-
-- Stone that stays fully saturated by moving water very slowly wears into sand. The wear accumulator is stone's existing stored dampness: only sustained soaking near the energy cap qualifies, with a rare per-tick chance tuned so erosion takes minutes of continuous flow.
-- Guardrails: standing dampness alone never erodes (buildings beside ponds are safe), wall is exempt entirely (sealed construction; its decay stays freeze-thaw), and eroded sand inherits the stone's variant so a worn cliff sheds matching grains.
-- A soft audio cue and the existing sand-fall motion carry the moment; no new UI.
-
-### Phase 15B: Mineral Veins
-
-- Renderer-only: rare hash-clustered glinting veins run through larger stone masses, so cliffs and caves read as rock strata instead of uniform gray. Natural veins sit beside the cosmic etching marks without competing with them.
-
-### Phase 15C: Wall Patina
-
-- Renderer-only: bricks age visibly using the cell age field: mortar darkens, corners chip, and long-standing walls read as lived-in. Pairs with damp moss crossings for abandoned-garden-wall scenes.
-
-Order: 15A first since it completes the cycle and is the only sim change, then 15B and 15C as one visual pass.
+- Nearby ice stills the spring — and reopens its drinking branch, so a chilled spring re-drinks whatever touches it next (Phase 18). Attunement is re-teachable rather than a permanent first-touch commitment. Eraser clears it like anything else.
 
 ## Phase 12: Heat Identity + Discovery Moments
 
@@ -495,36 +481,34 @@ Interactions should pop at the instant they happen instead of quietly swapping p
 - One-shot renderer flashes (3-6 ticks, keyed off young cell age after a kind transition) for vitrify, starfire, quench, wall crumble, bloom, and moonwater oil-cleaning.
 - Matching sparse native audio cues through the existing post-tick reaction detector: glass ting, quench hiss, starfire chime, crumble grumble, bloom note. Audio stays optional, throttled, and recorded/generated-cue based per the Phase 8 guardrails.
 
-### Phase 12C: Discovery Journal
-
-The sandbox now has dozens of distinct interactions, but nothing tells the player the web exists. Make discovering it the game.
-
-- A local discoveries list (localStorage, no accounts, no backend): first time a session triggers vitrify, starfire, char relight, freeze-thaw crumble, flower bloom, moss-on-stone, fungus takeover, moonwater cleaning, meteor stardust burst, or steam frost, it lights up.
-- A quiet toast plus journal entry on first trigger; postcards can carry a discovery-count stamp.
-- Reuses the same post-tick transition detector as audio reactions, so simulation rules stay untouched.
-
-### Phase 12D: Room Weather Play
+### Phase 12D: Room Weather Play — the one open item
 
 - An optional, off-by-default "open window" toggle lets the backdrop weather lean into the tray: light rain drizzle in Rain Desk, snow specks in Snow Window, rare meteor streaks in Stardust Hearth.
 - Strictly opt-in so room backdrops stay non-destructive; painting remains the core verb.
 
-Order: 12A first (it answers the live-session feedback directly), 12B alongside it since flashes reuse the same transition detection, 12C as the headline gameplay feature, and 12D last as the atmosphere bonus.
-
 ## Phase 18: Living-World Batch (design-feedback pass)
 
+Status: complete.
+
 A roster-wide design review (interaction depth, visual identity, uniqueness, combos)
-produced 12 owner-approved items in four gated commits. Full specs, grounding, status,
-and gotchas live in `docs/PHASE_18_HANDOFF.md` — read that to resume.
+produced 12 owner-approved items, shipped in five gated commits. Full specs, measurements,
+and gotchas live in `docs/PHASE_18_HANDOFF.md`.
 
-- Batch 1 (garden lineage) — shipped `fbaafae`: revive the dead pollen loop; cosmic
-  flowers breed cosmic pollen into cosmic seeds so moonlit gardens breed true.
-- Batch 2 (terrarium & hearth) — shipped `e5cfebe`: glass dew re-waters a sealed
-  terrarium; hearth walls dry/thaw their nook beside a flame; sparks hiss to steam over water.
-- Batch 3 (geology) — TODO: unsupported Stone falls (Wall never moves) as the Wall/Stone
-  debate-ender and to make erosion/crust/meteor-stone visible drama; freeze-thaw crumble
-  retune 200->150 + a distinct crack sprite.
-- Batch 4 (cycles & rituals) — TODO: wellspring re-attunement via ice; fairy-ring cosmic
-  fungus; fungus->soil collapse; meteor spark trail; ember doc-honesty note.
+- Batch 1 (garden lineage) — `fbaafae`: revived the dead pollen loop; cosmic flowers breed
+  cosmic pollen into cosmic seeds so moonlit gardens breed true.
+- Batch 2 (terrarium & hearth) — `e5cfebe`: glass dew re-waters a sealed terrarium; hearth
+  walls dry and thaw their nook beside a flame; sparks hiss to steam over water.
+- Batch 3 (geology) — `a95168c`: unsupported stone falls while wall never moves, settling
+  the Wall/Stone overlap and making erosion, crust, and meteor-stone visible drama;
+  freeze-thaw crumble retuned 200→150 with spatially coherent fracture veins.
+- Batch 4 (cycles & rituals) — `d5d8f37`: wellspring re-attunement via ice; fairy-ring
+  cosmic fungus; fungus→soil collapse; meteor spark trail; ember doc-honesty note.
+- Batch 5 (visual lens, renderer only) — `7ebb3be` and `05c2b30`: state-gated glows reach
+  the glow layer (attuned wellspring, lit rocket, vitrify flash, etched stone), steam stops
+  out-glowing its own flame, the wellspring reads as carved at night, and glass became a
+  see-through pane with a beaded, streaked condensation field instead of a grey wash.
 
-Deferred (needs owner sign-off): visual-lens renderer polish — wellspring/lit-rocket/glass
-visibility and a glow-layer rebalance (see the handoff's "Not approved (yet)" section).
+The most valuable finding of the phase was not a material rule: `saveSandboxComposite` in
+`scripts/visual-qa.mjs` had been drawing the glow layer *underneath* the opaque base canvas,
+so every visual-QA capture reviewed the night lights as though they did not exist. Four of
+batch 5's five findings had survived earlier review passes for that reason alone.

@@ -1,11 +1,14 @@
 # Phase 18 — Living-World Batch (handoff)
 
-Status snapshot for resuming in a fresh session. Phase 18 applies a roster-wide
-design-feedback pass (four lenses: interaction depth, visual identity, uniqueness,
-combos — each item fact-checked against the code before it made this list). The
-owner approved **12 items**, split into four gated commits, then approved the
-visual-lens findings as a fifth. **All five batches are shipped; Phase 18 is
-complete.**
+**Phase 18 is complete — all five batches shipped.** This is the record of what was
+built and why, not a resume point. Phase 18 applied a roster-wide design-feedback pass
+(four lenses: interaction depth, visual identity, uniqueness, combos — each item
+fact-checked against the code before it made the list). The owner approved **12 items**,
+split into four gated commits, then approved the visual-lens findings as a fifth.
+
+Read it for the measurements, the fixture fallout, and the bugs an adversarial review
+caught. The repo-wide conventions below have since moved into `CLAUDE.md`; they are
+repeated here because the batch notes assume them.
 
 ## Working conventions (do not skip)
 
@@ -15,8 +18,9 @@ complete.**
   engines and asserts every cell byte matches each tick. Add a scenario for each new
   rule and confirm it isn't vacuous (that it actually exercises the path).
 - Full gate: `npm run check` (from repo root; `source "$HOME/.cargo/env"` first for
-  cargo). It runs material audit, contrast floor, 80 cargo tests, both engine smokes,
-  the parity harness, audio + browser smoke, and visual QA.
+  cargo). Twelve steps: material audit, contrast floor, 80 cargo tests, the production
+  build, both engine smokes, the parity harness, the subpath gate, audio reaction +
+  browser smoke, audio QA, and visual QA. README lists them in order.
 - `docs/MATERIAL_AUDIT.md` interaction matrix: **toolbar materials document 4–6
   roles, generated-only materials 1–3** (semicolon-separated clauses). The
   `material:audit` gate enforces this and also asserts the showcase renders every

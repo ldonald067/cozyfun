@@ -1,8 +1,8 @@
 # Embedding the sandbox in another site
 
-The sandbox is a static build with no backend, so it can be dropped onto any host that
-serves files. The two things that actually decide whether an embed works are **where it is
-served from** and **what path it is served under**.
+The sandbox is a static build with no application backend, so it can be dropped onto any
+host that serves files. The two things that actually decide whether an embed works are
+**where it is served from** and **what path it is served under**.
 
 ## How this one is deployed
 
@@ -82,9 +82,9 @@ confirm the status line reads **"wasm sim online"**.
 
 ## The embed snippet
 
-`embed.html` ships next to `index.html`. It is an ~18 KB poster that loads nothing until the
+`embed.html` ships next to `index.html`. It is a ~19 KB poster that loads nothing until the
 visitor clicks, then swaps itself for the app. Point the iframe at it rather than at
-`index.html` directly — the full build is roughly 9 MB, and without the poster every visitor
+`index.html` directly — the full build is about 7 MB, and without the poster every visitor
 who scrolls past pays for it.
 
 For the deploy described above, where the game owns its own hostname:
@@ -104,10 +104,11 @@ For the deploy described above, where the game owns its own hostname:
 If the build is instead mounted under a path on the same site, the only change is a relative
 `src` — `src="/pixelfun/embed.html"` — and a matching `COZY_BASE` at build time.
 
-`allow="autoplay; fullscreen"` is needed for ambience and Desk Radio. Do not add a `sandbox`
-attribute unless you know what you are re-granting: the default omission is what lets the
-app keep same-origin storage access, and `sandbox` without `allow-same-origin` reintroduces
-exactly the storage problem described above.
+`allow="autoplay; fullscreen"` is load-bearing: without it ambience and Desk Radio fail
+silently, with no console error to point at. Do not add a `sandbox` attribute unless you
+know what you are re-granting — the default omission is what lets the app keep same-origin
+storage access, and `sandbox` without `allow-same-origin` reintroduces exactly the storage
+problem described above.
 
 Height is a judgment call — the layout is responsive and the controls sit under the canvas,
 so around 620px gives them room. The `loading="lazy"` attribute defers even the poster until
@@ -119,8 +120,11 @@ Rain falling in three sheets, condensation beaded on the glass in front of it, d
 lightning, and warm lamplight below — all of it CSS gradients and inline SVG, with no image
 files and no sub-resource requests. The technique is borrowed from a CodePen that reaches a
 similar look with about 440 KB of hotlinked PNGs; the notes in `embed.html` record what was
-taken, what was deliberately not, and the two costs accepted along with it. Motion drops out
-under `prefers-reduced-motion`, leaving the beads, which never moved.
+taken and what was deliberately not.
+
+Under `prefers-reduced-motion` the storm is removed outright — the lightning and its sky
+flashes go to zero opacity rather than merely stilling, since a frozen bolt reads as a
+graphic artifact. The rain and the beads stay as static texture.
 
 ## What the gate covers
 
@@ -137,3 +141,19 @@ so a subpath regression — especially the silent wasm one — would otherwise s
 3. Paint something, reload the page, and confirm the scene is still there — that proves
    storage is not being blocked or partitioned.
 4. Turn on sound and confirm ambience plays.
+
+## Triage from the embedding site's side
+
+Every one of these is diagnosable without touching the game's repo.
+
+- **Empty box instead of the game.** Open the embed URL directly in a tab. If it loads
+  there, the problem is in the iframe attributes, not the game.
+- **Runs but feels sluggish.** Open it standalone and read the status line. "js fallback"
+  means the host is not serving `application/wasm` — a hosting problem, not a site one.
+- **Saved scenes vanish on reload.** Storage is being blocked. Check for a `sandbox`
+  attribute first; failing that, confirm the game's hostname really does share a
+  registrable domain with the page embedding it.
+
+The contract between the two sides is one URL in one iframe. The game is not a dependency,
+submodule, or build step of the site that embeds it, and the site never builds or deploys
+it — pushing this repo's `main` is what ships a change.

@@ -36,7 +36,7 @@ Fire crackle processing notes: downloaded on June 10, 2026 as `ronkoster2023-fir
 
 Cat purr and rain processing notes: copied from user-provided local MP3 files on June 12, 2026 without mixing, scraping, or runtime network requests.
 
-Compression pass, July 25, 2026: all three beds were re-encoded for web delivery so the app can be embedded on another site without a 19 MB download. Fire crackle went from a 7.3 MB mono WAV to a 1.15 MB mono 80 kbps MP3 (the file extension changed with it); rain from 8.5 MB at 256 kbps to 3.18 MB at 96 kbps; cat purr from 2.2 MB at 160 kbps to 0.89 MB at 64 kbps. Durations are unchanged to the millisecond, and each bed's measured mean level moved by at most 0.5 dB, so the `levelTrim` calibration in `assets.ts` still holds. The purr was deliberately kept stereo: downmixing it to mono raised its level 2.6 dB and would have invalidated that calibration. No content was edited, mixed, or re-timed — this is a format change only.
+Compression pass, July 30, 2026: all three beds were re-encoded for web delivery so the app can be embedded on another site without a 19 MB download. Fire crackle went from a 7.3 MB mono WAV to a 1.15 MB mono 80 kbps MP3 (the file extension changed with it); rain from 8.5 MB at 256 kbps to 3.18 MB at 96 kbps; cat purr from 2.2 MB at 160 kbps to 0.89 MB at 64 kbps. Durations are unchanged to the millisecond, and each bed's measured mean level moved by at most 0.5 dB, so the `levelTrim` calibration in `assets.ts` still holds. The purr was deliberately kept stereo: downmixing it to mono raised its level 2.6 dB and would have invalidated that calibration. No content was edited, mixed, or re-timed — this is a format change only.
 
 ## Usage Notes
 

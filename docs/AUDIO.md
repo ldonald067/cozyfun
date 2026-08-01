@@ -76,7 +76,7 @@ Add new sounds in the narrowest module:
 - room-specific ambience balance: `rooms.ts`
 - short material cue: `cues.ts`, routed through the dedicated cue bus under master (so quiet ambience never silences feedback) and throttled by `controller.ts`
 - reaction cue detection: `reactions.ts`
-- provider switching or external playback hooks: keep YouTube-specific parsing and persistence isolated in `deskRadio.ts`
+- provider switching or external playback hooks: keep YouTube-specific parsing and persistence isolated in `app/src/deskRadio.ts` (the one module in this list that sits outside `app/src/audio/`, because it is a UI-visible player rather than part of the mix)
 - channel/routing behavior: `mixer.ts`
 - preference shape: `preferences.ts`
 

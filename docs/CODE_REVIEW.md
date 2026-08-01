@@ -2,6 +2,8 @@
 
 This checklist is the repo's "no slop" bar. Use it for `/review`, audit passes, and phase closeouts.
 
+Prefer evidence over opinion throughout. Run the command, read the file, compute the number. A finding that cannot show how the code actually fails is not a finding — say the concern is unproven rather than reporting it as one.
+
 ## Scope
 
 - Does the change solve the stated task without dragging in unrelated refactors?
@@ -13,7 +15,7 @@ This checklist is the repo's "no slop" bar. Use it for `/review`, audit passes, 
 
 - If Rust sim behavior changed, is the JavaScript fallback mirrored deliberately?
 - Are imported scene bytes masked and validated before reaching sim state?
-- Do tests cover the new rule in Rust, WASM smoke, and JS fallback when user-visible behavior can differ?
+- Do tests cover the new rule in Rust, WASM smoke, and JS fallback when user-visible behavior can differ, **and is there a parity scenario that actually reaches it**? A scenario that passes because nothing ever triggers the new path is worse than none.
 - Does each material keep a distinct role? For example, moss should read as damp carpet growth, fungus as decay pressure, seed as potential, oil as coating/smothering, and water as hydration/cooling.
 - If a material was added or specialized, did `npm run material:audit` pass and does `docs/MATERIAL_AUDIT.md` still match the source traits?
 - Are ordinary material reactions grounded while cosmic materials keep the special cases?
@@ -56,9 +58,9 @@ This checklist is the repo's "no slop" bar. Use it for `/review`, audit passes, 
 Use the smallest honest gate for the change:
 
 - Docs only: `git diff --check`.
-- Sim behavior: `npm run test:sim`, `npm run test:wasm`, and `npm run test:js-fallback`.
+- Sim behavior: `npm run test:sim`, `npm run test:wasm`, `npm run test:js-fallback`, and **`npm run test:parity`** — the first three each drive one engine and can all pass while the two have drifted apart; only parity compares them.
 - Native audio direction: `npm run audio:qa`.
 - UI, browser, visual, audio, export, or cross-boundary work: `npm run check`.
-- Stale-preview or visual concern: `.\scripts\preview-current.ps1 -Port 4181` on Windows (or rebuild and serve `app/dist` with `node scripts/preview-dist.mjs`), then browser or script-based visual QA against that URL.
+- Stale-preview or visual concern: rebuild, then serve `app/dist` with `node scripts/preview-dist.mjs` (Windows has `.\scripts\preview-current.ps1 -Port 4181`), then browser or script-based visual QA against that URL.
 
 See `docs/HARNESS.md` when a missing check, stale preview, duplicated QA helper, or repeated cleanup issue should become part of the repo's feedback loop.

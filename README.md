@@ -36,37 +36,26 @@ Open the local URL printed by Vite. The default dev URL is usually:
 http://127.0.0.1:5173/
 ```
 
-To see exactly what the current production build looks like, rebuild and serve `app/dist` without Vite dev/preview:
+To see exactly what the current production build looks like, serve `app/dist` without Vite dev/preview. Build first, then:
 
-```powershell
-.\scripts\preview-current.ps1
+```sh
+node scripts/preview-dist.mjs
 ```
 
-That command prints a local URL and the exact built JS/CSS assets it is serving, usually:
+That command prints a local URL and the exact built JS/CSS assets it is serving, usually `http://127.0.0.1:4173/`. Pass a port to get a brand-new URL when a browser is caching the old one:
 
-```txt
-http://127.0.0.1:4173/
+```sh
+node scripts/preview-dist.mjs 4181
 ```
 
-If you have already built and only need to reopen the preview server, run:
-
-```powershell
-.\scripts\preview-built.cmd
-```
-
-Both preview commands accept a port when you want a brand-new URL:
-
-```powershell
-.\scripts\preview-current.ps1 -Port 4181
-.\scripts\preview-built.cmd 4181
-```
+On Windows, `.\scripts\preview-current.ps1` rebuilds and previews in one step, and `.\scripts\preview-built.cmd` reopens the preview for an existing build; both accept `-Port` / a trailing port argument.
 
 Preview and QA URLs that include `?fresh=...`, `?chromeQa=...`, or `?firefoxQa=...` show a small top-center badge with the active JS and CSS bundle names. If that badge does not show the expected label or bundle hashes, the browser is still looking at an older page.
 
 If the WASM file has not been built yet, you can still run the React app with the JavaScript fallback engine:
 
-```powershell
-npm --prefix app run dev -- --host 127.0.0.1
+```sh
+npm run dev:fallback
 ```
 
 ## Controls
@@ -118,30 +107,29 @@ Some key reactions:
 - Repeated freeze-thaw cycles crack sealed walls until they crumble into natural stone.
 - Seeds are now potential: wet rooted seeds can bloom into flowers, moss beds can overtake them, and nearby fungus can rot them.
 - Moss is carpet growth: it spreads over damp soil and wood but does not bloom.
-- Wall and stone are intentionally separate: wall is sealed construction, while stone is natural, weatherable, and easier for moss/condensation to affect.
+- Wall and stone are intentionally separate: stone is natural, weatherable, easier for moss/condensation to affect, and falls when nothing supports it; wall is sealed construction that stains but resists casual moss, and is the only material that never moves. Build scaffolds and test fixtures out of wall.
 - Rocket powder lies inert until any flame lights it; a lit grain whooshes skyward trailing glitter and bursts into a multicolor firework shell of sparks that droop, twinkle, and fade, chain-lighting neighboring powder.
-- Wellspring blocks drink the identity of the first material to touch them (water, lava, sand, stardust, and more), then pour it back out from open faces forever; nearby ice stills the spring.
+- Wellspring blocks drink the identity of the first material to touch them (water, lava, sand, stardust, and more), then pour it back out from open faces forever. Nearby ice stills the spring and also reopens it: a chilled spring re-drinks whatever touches it next, so a misattuned block can be re-taught instead of being ruined.
 - Stardust, meteor, and moonwater add the cozy/cosmic identity.
 
 ## Architecture
 
-- `app` contains the React/Vite UI, renderer, local audio, input handling, local saves, and JS fallback engine.
-- `sim` contains the Rust simulation compiled to WASM.
+- `sim` contains the Rust simulation compiled to WASM. It is the source of truth for every material rule.
+- `app` contains the React/Vite UI, renderer, local audio, input handling, local saves, and the JavaScript fallback engine in `app/src/engine.ts`, which mirrors the Rust sim rule for rule.
+- `app/src/assetUrl.ts` applies Vite's base path to assets fetched by URL string (room images, ambience audio, the WASM file) — Vite cannot rewrite those, so a subpath build depends on it.
 - `app/src/sceneEnvironments.ts` contains non-destructive room/backdrop definitions.
 - `app/src/deskRadio.ts` validates user-provided YouTube Desk Radio sources and keeps native ambience as the default fallback when a link cannot embed.
 - `app/public/rooms` contains local room backdrop images used by those scene definitions.
-- `scripts/build.ps1` builds the Rust sim, copies the generated WASM into `app/public/sim`, then builds the Vite app.
-- `scripts/dev.ps1` builds the sim first, then starts Vite.
-- `scripts/preview-current.ps1` rebuilds and serves `app/dist` directly so local previews cannot show a stale dev bundle.
-- `scripts/preview-built.cmd` serves the existing `app/dist` build, accepts an optional port, and keeps a visible window open while the preview is running.
-- `scripts/test-sim.ps1` runs the Rust simulation tests with the checked-in local tool paths.
-- `scripts/audio-qa.ps1` writes a native ambience asset manifest into `.tmp/audio-qa`.
-- `scripts/visual-qa.ps1` captures the current controlled material scene, room backdrops, and responsive layout metrics into `.tmp/visual-qa`.
-- `scripts/check.ps1` runs the full local gate with the checked-in local tool paths.
+- `app/public/embed.html` is the click-to-load poster used when the sandbox is iframed into another site.
+- `scripts/*.mjs` are the cross-platform build, test, and QA steps invoked by the root npm scripts; `scripts/*.ps1` are Windows wrappers around them.
+- `scripts/serve-static.mjs` is the production server used by the container deploy.
+- `Dockerfile` and `railway.json` define the standalone deploy.
 
-The app is static after build. There is no backend, account system, database, cloud save, hidden streaming dependency, or paid API dependency. Desk Radio is an optional visible YouTube player supplied by the user.
+The app is static after build. There is no account system, database, cloud save, hidden streaming dependency, or paid API dependency; the only server is `serve-static.mjs`, which serves files and nothing else. Desk Radio is an optional visible YouTube player supplied by the user.
 
-See `AGENTS.md` for repo-level agent guidance, `docs/CODE_REVIEW.md` for the review checklist, `docs/HARNESS.md` for build/test/visual feedback loops, `docs/ARCHITECTURE.md` for module boundaries, `docs/VISUAL_PIPELINE.md` for renderer and shape-language notes, `docs/AUDIO.md` for the sound foundation, and `ASSET_CREDITS.md` for third-party room and audio sources.
+The Rust sim and the JavaScript fallback must stay byte-for-byte identical. `npm run test:parity` drives 17 scenarios through both engines and compares every cell each tick. Changing a rule in one engine and not the other is the single easiest way to break this project.
+
+`CLAUDE.md` is the operating guide for coding agents (and a fast orientation for people). Beyond it: `docs/ARCHITECTURE.md` for module boundaries, `docs/CODE_REVIEW.md` for the review checklist, `docs/HARNESS.md` for build/test/visual feedback loops, `docs/VISUAL_PIPELINE.md` for renderer and shape-language notes, `docs/AUDIO.md` for the sound foundation, `docs/MATERIAL_AUDIT.md` for the per-material interaction matrix, `docs/EMBEDDING.md` for deploying and embedding, `docs/PHASE_18_HANDOFF.md` for the living-world batch record, and `ASSET_CREDITS.md` for third-party room and audio sources.
 
 ## Scene format
 
@@ -159,56 +147,45 @@ Imports are validated before loading. A scene must match the current world size.
 
 ## Deployment
 
-For Cloudflare Pages or another static host:
+The live deploy is a container: `Dockerfile` builds both toolchains and `scripts/serve-static.mjs` serves the result, with `railway.json` pinning the Dockerfile builder. Pushing `main` redeploys `pixelfun.littlealbumclub.net`, which `littlealbumclub.net` iframes.
+
+For a plain static host (Cloudflare Pages and similar) instead:
 
 - Build command: `rustup target add wasm32-unknown-unknown && npm --prefix app ci && npm run build`
 - Output directory: `app/dist`
+
+Either way the host **must** serve `.wasm` as `application/wasm`. If it does not, `WebAssembly.instantiateStreaming` refuses the file and the app silently drops to the slower JavaScript engine with no error — check the status line under the canvas reads `wasm sim online`. That requirement is why the deploy uses a hand-written server rather than a generic one.
+
+Set `COZY_BASE=/subpath/` at build time only when mounting the build under a path on a larger site; leave it unset for a domain root. See `docs/EMBEDDING.md` for the iframe snippet, the same-site storage constraint, and what to verify after deploying.
 
 The generated WASM file is created during the build and is not committed.
 
 ## Checks
 
-On macOS/Linux the root npm scripts run everything directly:
+`npm run check` is the full gate, and CI runs exactly it on pushes and pull requests to `main`. It runs twelve steps in order:
 
-```sh
-npm run check
-npm run test:sim
-npm run test:wasm
-npm run test:js-fallback
-npm run test:browser
-npm run material:audit
-npm run audio:qa
-npm run visual:qa
+```txt
+material:audit          material identity matrix
+material:contrast       palette contrast floor
+test:sim                Rust simulation tests
+build                   production build
+smoke-wasm.mjs          WASM engine smoke
+test:js-fallback        JavaScript engine smoke
+test:parity             Rust/JS byte-for-byte comparison
+test:subpath            COZY_BASE build gate
+test:audio-reactions    post-tick reaction cue smoke
+test:browser            Chrome + Firefox smoke
+audio:qa                ambience manifest
+visual:qa               deterministic visual captures
 ```
 
-On Windows, the equivalent PowerShell wrappers:
+Any of those can be run on its own — `npm run test:parity`, `npm run visual:qa`, and so on. `npm run test:wasm` builds the sim and runs just the WASM smoke.
 
-```powershell
-.\scripts\build.ps1
-.\scripts\preview-current.ps1
-.\scripts\test-sim.ps1
-.\scripts\test-wasm.ps1
-.\scripts\test-js-fallback.ps1
-.\scripts\test-browser.ps1
-.\scripts\test-chrome.ps1 -AppPort 4181
-.\scripts\test-firefox.ps1
-.\scripts\audio-qa.ps1
-.\scripts\visual-qa.ps1
-.\scripts\check.ps1
-.\scripts\app-npm.ps1 run build
-.\scripts\app-npm.ps1 audit --audit-level=moderate
-```
+`test:browser` and `visual:qa` drive an installed Chrome or Edge; set `BROWSER_BINARY` if yours is in a custom location. Both start their own static server, so they need nothing running first.
 
-CI runs the full `npm run check` gate on pushes and pull requests to `main`: material audit, Rust sim tests, build, WASM smoke, JS fallback smoke, audio reaction smoke, browser smoke, audio QA, and visual QA. Browser and visual checks use an installed Chrome or Edge browser; set `BROWSER_BINARY` if your browser is in a custom location.
+`npm run test:chrome` and `npm run test:firefox` are **Windows-only** — they shell out to PowerShell. Unlike the gate's headless smoke they drive a visible browser against a preview server you started yourself, which is the way to watch a QA run rather than just read its result. They expect the preview on port 4173; override with `CHROME_QA_APP_PORT` / `FIREFOX_QA_APP_PORT`, and add `-KeepOpen` to `.\scripts\test-chrome.ps1` to leave the window up afterwards.
 
-Firefox QA expects a running preview server. If the preview is on a non-default port, pass it explicitly:
-
-```powershell
-.\scripts\test-chrome.ps1 -AppPort 4181
-.\scripts\test-firefox.ps1 -AppPort 4181
-```
-
-Add `-KeepOpen` to leave the Chrome QA window open after it finishes.
+The rest of the steps have Windows wrappers too (`.\scripts\check.ps1`, `.\scripts\test-sim.ps1`, `.\scripts\visual-qa.ps1`, and so on), plus `.\scripts\app-npm.ps1` for running app-level npm commands through the repo-local Node.
 
 On Windows, native simulation tests use the local GNU Rust test toolchain instead of Visual Studio Build Tools. If that toolchain is missing, run:
 
@@ -229,12 +206,13 @@ MIT. See `LICENSE`. Third-party room images and ambience recordings are credited
 
 ## Troubleshooting
 
-If the app says `js fallback online`, the WASM file was not found or failed to load. Run:
+If the app says `js fallback online`, the WASM file was not found or failed to load. Locally that usually means the sim has not been built; `npm run dev` builds it first, so:
 
-```powershell
-.\scripts\build.ps1
-.\scripts\dev.ps1
+```sh
+npm run dev
 ```
+
+On a deployed host it usually means the server is sending the wrong content type — see Deployment above.
 
 If Rust cannot find the WASM target, run:
 
@@ -246,10 +224,10 @@ If `npm run check` fails on Windows with `link.exe not found`, make sure you are
 
 If npm app scripts report `Access is denied` on Windows, use `.\scripts\app-npm.ps1 run build` or the other checked-in scripts. The wrapper puts the repo-local Node runtime before the blocked WindowsApps Node shim that npm package scripts may otherwise resolve.
 
-If Vite reports `Access is denied` while loading `vite.config.ts` on Windows, use the checked-in scripts. The app build command uses Vite's runner config loader to avoid that Windows path-walking issue. To inspect the current built UI without Vite dev or preview, run `.\scripts\preview-current.ps1`.
+If Vite reports `Access is denied` while loading `vite.config.ts` on Windows, use the checked-in scripts. The app build command uses Vite's runner config loader to avoid that Windows path-walking issue. To inspect the current built UI without Vite dev or preview, build and run `node scripts/preview-dist.mjs`.
 
 If a scene import fails, confirm it was exported from this app version and has the same world size.
 
 ## Repository status
 
-This is an early V0 prototype. The code is intentionally small and direct so the simulation feel, visuals, and interactions can evolve quickly.
+Playable and deployed, still evolving. The code is intentionally small and direct so the simulation feel, visuals, and interactions can keep moving quickly; the gate in `npm run check` is what keeps that speed from costing correctness.

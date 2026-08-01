@@ -7,13 +7,14 @@ This project is a static browser toy: React owns the interface, Rust/WASM owns t
 1. `app/src/App.tsx` creates the engine, owns UI state, and forwards pointer input to `engine.paint`.
 2. `app/src/engine.ts` loads the Rust/WASM simulation when available and falls back to a JavaScript simulation if the WASM file is missing.
 3. `sim` contains the Rust cellular automata rules.
-4. `app/src/renderer.ts` converts the engine cell bytes into base, glow, and atmosphere canvas layers.
+4. `app/src/renderer.ts` converts the engine cell bytes into the base, glow, and motes canvas layers.
 5. `app/src/storage.ts` handles browser-local saves and JSON scene import/export.
 6. `app/src/audio.ts` exposes the optional local native audio controller.
-7. `app/src/deskRadio.ts` validates user-provided YouTube Desk Radio sources and creates visible watch/embed URLs.
+7. `app/src/deskRadio.ts` validates user-provided YouTube Desk Radio sources and builds the visible watch URL and display label; the embedded player itself is constructed in `DeskRadioPanel.tsx`.
 8. `app/src/sceneEnvironments.ts` provides non-destructive room/backdrop definitions and their local image metadata.
+9. `app/src/assetUrl.ts` prefixes runtime-fetched asset URLs with the deploy base. It uses `import.meta`, so it MUST NOT be reachable from `engine.ts` or `materials.ts` — the parity harness compiles those two to CommonJS, where that is a compile error.
 
-The built app is static. There is no server, account system, database, cloud save, hidden streaming dependency, or paid API in the current architecture. Native ambience is the default sound path; Desk Radio is an optional browser-side YouTube player selected by the user.
+The built app is static. There is no account system, database, cloud save, hidden streaming dependency, or paid API. The one server is `scripts/serve-static.mjs`, which only hands out the built files for the standalone deploy — it holds no state and knows nothing about the game. Native ambience is the default sound path; Desk Radio is an optional browser-side YouTube player selected by the user.
 
 ## Simulation Boundary
 
@@ -68,7 +69,7 @@ External playback enters only through Desk Radio. Desk Radio parsing is isolated
 
 ## UI Boundary
 
-Keep reusable controls in `app/src/components` when they remove real top-level UI weight. `SegmentedControl` is shared by sound moods, sound source selection, and room backdrops. `SharePanel` and `DeskRadioPanel` keep Phase 5 controls out of the main app orchestration without inventing a larger UI framework.
+Keep reusable controls in `app/src/components` when they remove real top-level UI weight. `SegmentedControl` is shared by sound moods, sound source selection, and room backdrops. `SharePanel` and `DeskRadioPanel` keep sharing and radio controls out of the main app orchestration without inventing a larger UI framework.
 
 The app should favor compact controls over explanatory panels. Tooltips and titles are acceptable for details like channel meaning; the first screen should remain the toy itself.
 
@@ -89,9 +90,9 @@ Desk Radio is user-controlled. It plays only a pasted YouTube video or playlist 
 ## Adding A Material
 
 1. Add the material id to `MATERIAL` in `app/src/materials.ts`.
-2. Add its label, slug, palette, group, two identity traits, and optional glow color to `MATERIALS`.
+2. Add its label, slug, description, color, palette, group, two identity traits, and optional glow color to `MATERIALS`. `description` and `color` are required by `MaterialDef` and the description is user-visible in the toolbar.
 3. Add simulation behavior in Rust, and mirror only necessary fallback behavior in `app/src/engine.ts`.
-4. Add a toolbar icon in `app/src/App.tsx` when users should be able to paint it directly. Generated-only outcomes can stay in `MATERIALS` with `userSelectable: false`.
+4. Add a toolbar icon to `MATERIAL_ICONS` in `app/src/components/MaterialPanel.tsx` when users should be able to paint it directly. Generated-only outcomes can stay in `MATERIALS` with `userSelectable: false`.
 5. Add rendering rules in `app/src/rendering/shapeLanguage.ts` only if palette variation is not enough.
 6. Extend `docs/MATERIAL_AUDIT.md` and run `npm run material:audit`.
 7. Extend smoke tests if the material changes common workflows.
@@ -101,9 +102,7 @@ Desk Radio is user-controlled. It plays only a pasted YouTube video or playlist 
 Local checks (macOS/Linux; Windows uses the matching `scripts\*.ps1` wrappers):
 
 ```sh
-npm run build
-npm run test:wasm
-npm run test:browser
+npm run check
 ```
 
 CI runs the same full `npm run check` gate expected locally on every push and pull request to `main`.

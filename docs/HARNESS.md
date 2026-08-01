@@ -1,28 +1,30 @@
 # Harness Engineering
 
-Harness engineering means improving the feedback loops around the sandbox so good changes become easier to make and bad patterns become harder to repeat. For this repo, the harness is the combination of scripts, deterministic scenes, browser captures, docs, and review rules that make Codex work legible.
+Harness engineering means improving the feedback loops around the sandbox so good changes become easier to make and bad patterns become harder to repeat. For this repo, the harness is the combination of scripts, deterministic scenes, browser captures, docs, and review rules that make agent work legible.
 
 ## Current Harnesses
 
-The `.ps1` wrappers below are the Windows entrypoints; on macOS/Linux each has a direct npm equivalent (`npm run build`, `npm run check`, `npm run test:sim`, `npm run test:wasm`, `npm run test:js-fallback`, `npm run test:browser`, `npm run visual:qa`, `npm run audio:qa`).
+The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `scripts/` that adds repo-local tool paths; the wrappers run the same underlying steps.
 
-- `.\scripts\build.ps1`: builds Rust/WASM, copies WASM, and builds the Vite app with the repo-local Windows-safe tool path.
-- `.\scripts\check.ps1`: runs the full local gate: material identity audit, Rust sim tests, WASM smoke, JS fallback smoke, production build, browser smoke, audio QA, and visual QA.
+- `npm run build`: builds Rust/WASM, copies the WASM into `app/public/sim`, and builds the Vite app.
+- `npm run check`: the full local gate, in order — material identity audit, material contrast floor, Rust sim tests, production build, WASM smoke, JS fallback smoke, cross-engine parity, subpath build, audio reactions, browser smoke, audio QA, and visual QA. Twelve stages; if you are listing them anywhere, take the list from `package.json` rather than from memory.
+- `npm run test:parity`: drives 17 scenarios through the Rust/WASM sim and the JS fallback together and asserts every cell byte matches on every tick. This is the only gate that can see the two engines diverge — the single-engine smokes below can both pass while behaviour has drifted.
+- `npm run material:contrast`: fails when any two material palettes fall below the averaged-colour distance floor. It cannot see per-variant, interaction-state, glow, shape or animation differences, so it is a floor and not a verdict.
+- `npm run test:audio-reactions`: asserts the post-tick reaction detector emits the right cues for each material transition.
 - `npm run test:subpath`: builds at a non-root base and asserts no root-absolute asset path survives, so embedding the sandbox under a path on another site cannot silently regress into the JS fallback engine.
-- `npm run material:audit`: validates that every material definition has two concrete identity traits and one to three documented interaction roles before a new element can pass review.
-- `.\scripts\test-sim.ps1`: validates Rust simulation behavior.
-- `.\scripts\test-wasm.ps1`: validates the WASM bridge and key sim outcomes from JavaScript.
-- `.\scripts\test-js-fallback.ps1`: validates JS fallback parity for user-visible sim behavior.
-- `.\scripts\test-browser.ps1`: drives the built app through core UI, local ambience asset decoding, sharing, import/export, and Desk Radio paths.
-- `.\scripts\visual-qa.ps1`: captures deterministic material scenes, room backdrops, and responsive layout metrics.
-- `.\scripts\audio-qa.ps1`: writes a native ambience manifest for local audio asset size, target loop length, and mood/room balance review into `.tmp/audio-qa`.
-- `.\scripts\test-chrome.ps1 -AppPort 4181`: verifies the current preview in Chrome or Edge when an actual browser path matters.
-- `.\scripts\test-firefox.ps1 -AppPort 4181`: verifies Firefox when supported by the local environment.
-- `.\scripts\preview-current.ps1 -Port 4181`: rebuilds and serves `app/dist` directly with bundle badges so stale browser sessions are obvious.
+- `npm run material:audit`: validates that every material definition has two concrete identity traits and the right number of documented interaction roles — **4-6 for toolbar materials, 1-3 for generated-only outcomes and the Eraser** — before a new element can pass review. It also asserts the visual review board renders every material and every cell-state flag.
+- `npm run test:sim`: validates Rust simulation behavior.
+- `npm run test:wasm`: validates the WASM bridge and key sim outcomes from JavaScript.
+- `npm run test:js-fallback`: validates JS fallback parity for user-visible sim behavior.
+- `npm run test:browser`: drives the built app through core UI, local ambience asset decoding, sharing, import/export, and Desk Radio paths. It starts its own static server.
+- `npm run visual:qa`: captures deterministic material scenes, room backdrops, and responsive layout metrics into `.tmp/visual-qa`.
+- `npm run audio:qa`: writes a native ambience manifest for local audio asset size, target loop length, and mood/room balance review into `.tmp/audio-qa`.
+- `node scripts/preview-dist.mjs 4181`: serves the built `app/dist` with bundle badges so stale browser sessions are obvious. Build first. (Windows: `.\scripts\preview-current.ps1 -Port 4181` rebuilds and serves in one step.)
+- `npm run test:chrome` / `npm run test:firefox`: **Windows-only** — they shell out to PowerShell. They drive a *visible* browser against a preview server you started yourself, which is how to watch a QA run rather than read its result. Port via `CHROME_QA_APP_PORT` / `FIREFOX_QA_APP_PORT`, default 4173.
 
 ## Golden Principles
 
-- Keep `AGENTS.md` as a map, not a manual. Put deeper source-of-truth detail in `docs/`.
+- Keep `CLAUDE.md` a map, not a manual: it is loaded every session, so it earns its length only by preventing mistakes. Deeper source-of-truth detail belongs in `docs/`, reached by reference. `AGENTS.md` stays a pointer to it rather than a second copy.
 - Turn repeated review feedback into a script, smoke test, deterministic scene, checklist item, or architecture doc update.
 - Prefer deterministic QA scenes over ad hoc visual judgment when a material or interaction changes.
 - Treat material identity as a checked contract: a toolbar element should have a clear role before it ships.
@@ -58,7 +60,7 @@ A good harness improvement should include:
 
 ## Material Identity Targets
 
-- Keep `docs/MATERIAL_AUDIT.md` aligned with `app/src/materials.ts` when adding, removing, or specializing a material. Each material should keep one to three concrete interaction roles.
+- Keep `docs/MATERIAL_AUDIT.md` aligned with `app/src/materials.ts` when adding, removing, or specializing a material. A toolbar material documents 4-6 concrete interaction roles; a generated-only outcome documents 1-3. Both bounds are enforced, so a material that outgrows its cap needs a row edit in the same change.
 - Extend `scripts/material-showcase.mjs` when renderer changes affect material readability.
 - Run `npm run material:audit` before broader checks when editing material definitions.
 
