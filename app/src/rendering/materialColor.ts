@@ -103,7 +103,11 @@ export function glowIntensity(kind: number, energy: number, age: number, time: n
   }
   // Constellation-etched stone: a soft starfield, not a lamp.
   if (kind === MATERIAL.Stone) return clampColor(24 + pulse * 16);
-  const base = kind === MATERIAL.Stardust || kind === MATERIAL.Moonwater || kind === MATERIAL.Flower ? 80 : 120;
+  // A bloom's energy is its remaining lifetime, not a heat value. Scaling glow by it the
+  // way the sources below do would light a fresh flower like a lantern; this is a soft
+  // nightlight that dims as the bloom spends its arc.
+  if (kind === MATERIAL.Flower) return clampColor(28 + Math.min(energy, 200) * 0.12 + pulse * 14);
+  const base = kind === MATERIAL.Stardust || kind === MATERIAL.Moonwater ? 80 : 120;
   return clampColor(base + energy * 0.45 + pulse * 55);
 }
 

@@ -268,6 +268,32 @@ const scenarios = [
       p(11, 10, 1, M.Wellspring);
     },
   },
+  {
+    // A whole plant lifecycle in one walled planter: seed roots on soil, the stalk
+    // climbs and unfurls leaves, the crown opens into a petal head, the head dusts
+    // pollen from its open faces, and spent petals finally shed as motes.
+    //
+    // NOT VACUOUS — verified by driving this exact scene through the fallback engine
+    // and counting: the crown reaches 9 flower cells by ~tick 300, the stalk goes two
+    // cells wide where a leaf unfurls, pollen is airborne on hundreds of separate
+    // ticks, and the head is back down to the lone crown by ~tick 2400. The older
+    // "germinating garden" scenario reaches NONE of this: its whole soil bed greens
+    // into moss inside 100 ticks, so no seed there has ever germinated. Keep the tick
+    // count high enough to reach the shed phase — cutting it short silently returns
+    // this to a growth-only test.
+    name: "a plant's whole life, bud to shed petals",
+    w: 20, h: 24, seed: 777, ticks: 2400,
+    paint(p) {
+      for (let x = 0; x < 20; x++) p(x, 21, 1, M.Wall);
+      for (let y = 14; y < 21; y++) {
+        p(2, y, 1, M.Wall);
+        p(17, y, 1, M.Wall);
+      }
+      p(9, 19, 1, M.Soil);
+      p(9, 16, 1, M.Seed);
+      p(9, 13, 2, M.Water);
+    },
+  },
 ];
 
 for (const s of scenarios) runScenario(s);

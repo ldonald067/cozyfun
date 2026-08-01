@@ -75,9 +75,17 @@ export function materialShowcaseScript() {
     line(80, 84, 65, material.Oil, 70, 20);
     for (const [x, y] of [[73, 59], [74, 58]]) setCell(x, y, material.Fire, 220, 12);
     for (const [x, y] of [[51, 61], [53, 60], [70, 59], [72, 60]]) setCell(x, y, material.Seed, 120, 24, flag.Wet | flag.Rooted, x);
-    for (const [x, y] of [[86, 58], [87, 57], [88, 58], [89, 57], [90, 58], [88, 55]]) setCell(x, y, material.Flower, 130, 48, flag.Rooted, x + y);
-    setCell(91, 57, material.Oil, 70, 20);
+    // A lilac bloom showing the head's state cues: one flank smothered by oil, the other
+    // lit cosmic by moonwater. This used to be six loose rooted crowns at six variants,
+    // which now reads as six separate half-open buds in six different hues.
+    setCell(88, 57, material.Flower, 100, 48, flag.Rooted, 4);
+    for (const [dx, dy] of [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]]) {
+      setCell(88 + dx, 57 + dy, material.Flower, 95, 44, 0, 4);
+    }
+    setCell(90, 57, material.Oil, 70, 20);
+    setCell(90, 58, material.Oil, 70, 20);
     setCell(87, 54, material.Moonwater, 140, 22, flag.Cosmic);
+    setCell(88, 55, material.Flower, 95, 44, flag.Cosmic, 4);
     for (const [x, y] of [[85, 53], [89, 52], [92, 54]]) setCell(x, y, material.Pollen, 150, 24, 0, x);
 
     // Cosmic and heat/cold readable outcomes.
@@ -119,12 +127,39 @@ export function materialShowcaseScript() {
     for (const [x, y] of [[22, 63], [22, 66], [22, 69]]) setCell(x, y, material.Ice, 90, 28);
     for (const [x, y] of [[34, 68], [34, 69]]) setCell(x, y, material.Fire, 230, 10);
 
-    // Grown plant: soil base, climbing stalk segments, and a bloom at the tip.
-    setCell(200, 74, material.Soil, 120, 40, flag.Wet);
-    setCell(200, 73, material.Stem, 20, 60, flag.Rooted, 2);
-    setCell(200, 72, material.Stem, 20, 50, 0, 2);
-    setCell(200, 71, material.Stem, 20, 40, 0, 2);
-    setCell(200, 70, material.Flower, 120, 60, flag.Rooted, 3);
+    // Grown plants: the bloom arc side by side, in the exact cell layout the sim
+    // produces — a head is a crown (rooted, the disc) with petals opened around it, on a
+    // leafy stalk. Three stages and three of the five garden hues, because hue is chosen
+    // by variant and a single specimen cannot show that a head is one flat colour.
+    // The bed is Wall, not Stone and not bare soil: soil is a powder, so an unsupported
+    // planter falls the moment the capture's sim starts and takes the whole plant with it.
+    line(196, 216, 75, material.Wall);
+    // Crown and petal energies sit below CROWN_RESERVE and above the shed floor on
+    // purpose, so the exhibit cannot open extra petals or drop them while the page runs.
+    const plant = (bx, by, variant, stalk, leaves) => {
+      setCell(bx, by, material.Soil, 120, 40, flag.Wet);
+      for (let i = 1; i <= stalk; i++) setCell(bx, by - i, material.Stem, 20, 50, i === 1 ? flag.Rooted : 0, variant);
+      for (const [lx, ly] of leaves) setCell(bx + lx, by - ly, material.Stem, 12, 40, 0, variant);
+    };
+    // Open cornflower head: crown at the middle, seven petals around it, stem below.
+    plant(199, 74, 0, 5, [[-1, 2], [1, 4]]);
+    setCell(199, 68, material.Flower, 100, 200, flag.Rooted, 0);
+    for (const [dx, dy] of [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [1, 1]]) {
+      setCell(199 + dx, 68 + dy, material.Flower, 95, 180, 0, 0);
+    }
+    // Unopened buttercup bud: a lone crown, no petals yet.
+    plant(206, 74, 3, 4, [[-1, 2]]);
+    setCell(206, 69, material.Flower, 100, 20, flag.Rooted, 3);
+    // Spent tulip head part way through shedding: petals gone from one flank, and the
+    // low energy on what is left is what drives the wilt tint.
+    plant(213, 74, 1, 5, [[1, 2], [-1, 4]]);
+    setCell(213, 68, material.Flower, 45, 1300, flag.Rooted, 1);
+    // The surviving petals stay attached to the crown. A petal left stranded on its own
+    // has no Flower neighbours, so it correctly renders as a bud — true to the rule, but
+    // it reads as a stray blob in a lineup meant to show a thinning head.
+    for (const [dx, dy] of [[0, -1], [1, -1], [1, 0]]) {
+      setCell(213 + dx, 68 + dy, material.Flower, 45, 1320, 0, 1);
+    }
 
     // Geology: a larger stone mass with mineral veins and an old patinated wall.
     rect(24, 44, 44, 56, material.Stone, 0, 60);

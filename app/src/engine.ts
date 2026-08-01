@@ -204,6 +204,7 @@ class JsSandboxEngine implements SandboxEngine {
         if (kind === MATERIAL.Spark) this.spark(idx, x, y, cell, old, next);
         if (kind === MATERIAL.Seed) this.seed(idx, x, y, cell, old, next);
         if (kind === MATERIAL.Stem) this.stem(idx, x, y, cell, old, next);
+        if (kind === MATERIAL.Flower) this.flower(idx, x, y, cell, old, next);
         if (kind === MATERIAL.Moss) this.moss(idx, x, y, cell, old, next);
         if (kind === MATERIAL.Fungus) this.fungus(x, y, old, next);
       }
@@ -292,7 +293,13 @@ class JsSandboxEngine implements SandboxEngine {
               ? 1
               : 0;
       const flags = readU16(next, idx + 6);
-      const energy = Math.max(0, readU16(next, idx + 4) - drain - (flags & CELL_FLAG.Frozen ? 1 : 0) - (flags & CELL_FLAG.Wet && absorbent(kind) ? 1 : 0));
+      // A bloom's whole arc ticks down on BLOOM_CLOCK, so its budget can stay a small
+      // number the save format already accepts while still lasting long enough to
+      // watch it open, dust the air with pollen, and finally wilt.
+      const slowed = kind === MATERIAL.Flower && this.ticks % BLOOM_CLOCK !== 0;
+      const energy = slowed
+        ? readU16(next, idx + 4)
+        : Math.max(0, readU16(next, idx + 4) - drain - (flags & CELL_FLAG.Frozen ? 1 : 0) - (flags & CELL_FLAG.Wet && absorbent(kind) ? 1 : 0));
       writeU16(next, idx + 2, age);
       writeU16(next, idx + 4, energy);
       if (energy === 0) {
@@ -530,21 +537,6 @@ class JsSandboxEngine implements SandboxEngine {
       if (kind === MATERIAL.Ember && readU16(old, idx + 4) > 90 && this.chance(9)) {
         this.emitVaporFrom(idx, old, next, MATERIAL.Smoke, old[idx + 1], 80);
       }
-      if (kind === MATERIAL.Flower) {
-        const flowerAge = readU16(old, idx + 2);
-        const flowerEnergy = readU16(old, idx + 4);
-        const flowerFlags = readU16(old, idx + 6);
-        // Gate tracks the bloom's energy arc so untended flowers still seed gently;
-        // cosmic blooms release more often and their motes carry the spark onward.
-        const flowerCosmic = Boolean(flowerFlags & CELL_FLAG.Cosmic);
-        if (flowerAge > 20 && flowerEnergy > 40 && !(flowerFlags & CELL_FLAG.Frozen) && this.chance(flowerCosmic ? 60 : 120)) {
-          const mote = this.emitVaporFrom(idx, old, next, MATERIAL.Pollen, old[idx + 1], 150);
-          if (flowerCosmic && mote >= 0) {
-            writeU16(next, mote + 6, readU16(next, mote + 6) | CELL_FLAG.Cosmic);
-          }
-          writeU16(next, idx + 4, Math.max(0, readU16(next, idx + 4) - 30));
-        }
-      }
       if (kind === MATERIAL.Fire && fireDampened) {
         const energy = Math.max(0, readU16(next, idx + 4) - 32);
         writeU16(next, idx + 4, energy);
@@ -607,7 +599,13 @@ class JsSandboxEngine implements SandboxEngine {
     if (this.ticks % 2 === 0) this.powder(idx, x, y, cell, old, next);
     const flags = readU16(next, idx + 6);
     if (flags & CELL_FLAG.Frozen) return;
-    if (next[idx] === MATERIAL.Soil && readU16(next, idx + 4) > 140 && readU16(cell, 2) > 10 && this.chance(flags & CELL_FLAG.Cosmic ? 7 : 12)) {
+    // Soil that a rooted seed is standing on is spoken for. Without this a watered bed
+    // greens over long before anything can germinate — the seed needs Soil directly
+    // beneath it, and moss was reliably winning that race, which is why a watered garden
+    // used to end as a moss carpet and never as a flower.
+    const aboveIdx = y > 0 ? this.index(x, y - 1) : -1;
+    const claimed = aboveIdx >= 0 && old[aboveIdx] === MATERIAL.Seed && Boolean(readU16(old, aboveIdx + 6) & CELL_FLAG.Rooted);
+    if (!claimed && next[idx] === MATERIAL.Soil && readU16(next, idx + 4) > 140 && readU16(cell, 2) > 10 && this.chance(flags & CELL_FLAG.Cosmic ? 7 : 12)) {
       writeCellBytes(next, idx, MATERIAL.Moss, cell[1], 90, 0, CELL_FLAG.Wet);
     }
   }
@@ -981,7 +979,10 @@ class JsSandboxEngine implements SandboxEngine {
     if (below === MATERIAL.Soil && wet) {
       writeU16(next, idx + 6, readU16(next, idx + 6) | CELL_FLAG.Rooted);
       if (age > 30 && energy > 70 && this.chance(cosmic ? 4 : 8)) {
-        writeCellBytes(next, idx, MATERIAL.Stem, cell[1], 130 + (cell[1] & 3) * 55 + (cosmic ? 55 : 0), 0, CELL_FLAG.Rooted | (cosmic ? CELL_FLAG.Cosmic : 0));
+        // Each segment costs 55, so this is a 4-to-7 cell stalk. The old 130 base could
+        // bloom after a single segment, leaving a head almost on the ground with no room
+        // for leaves.
+        writeCellBytes(next, idx, MATERIAL.Stem, cell[1], 200 + (cell[1] & 3) * 55 + (cosmic ? 55 : 0), 0, CELL_FLAG.Rooted | (cosmic ? CELL_FLAG.Cosmic : 0));
         return;
       }
     }
@@ -993,7 +994,7 @@ class JsSandboxEngine implements SandboxEngine {
 
   private stem(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
     if (next[idx] !== MATERIAL.Stem || readU16(next, idx + 6) & CELL_FLAG.Frozen) return;
-    if (this.inBounds(x, y + 1) && old[this.index(x, y + 1)] === MATERIAL.Empty) {
+    if (!this.stemHasFooting(x, y, old)) {
       this.powder(idx, x, y, cell, old, next);
       return;
     }
@@ -1004,10 +1005,103 @@ class JsSandboxEngine implements SandboxEngine {
     const cosmic = Boolean(readU16(old, idx + 6) & CELL_FLAG.Cosmic);
     if (energy > 75) {
       writeCellBytes(next, above, MATERIAL.Stem, cell[1], energy - 55, 0, cosmic ? CELL_FLAG.Cosmic : 0);
+      this.unfurlLeaf(x, y, cell, old, next);
     } else {
-      writeCellBytes(next, above, MATERIAL.Flower, cell[1], cosmic ? 150 : 90, 0, CELL_FLAG.Rooted | (cosmic ? CELL_FLAG.Cosmic : 0));
+      writeCellBytes(
+        next,
+        above,
+        MATERIAL.Flower,
+        cell[1],
+        cosmic ? BLOOM_ENERGY_COSMIC : BLOOM_ENERGY,
+        0,
+        CELL_FLAG.Rooted | (cosmic ? CELL_FLAG.Cosmic : 0)
+      );
     }
     writeU16(next, idx + 4, 20);
+  }
+
+  // A stalk stands on its own base, or clings to a neighbouring stalk cell that has its
+  // own footing. Leaves ride entirely on the second rule; cutting the stalk takes both
+  // away at once, so a severed plant still collapses whole.
+  private stemHasFooting(x: number, y: number, old: Uint8Array) {
+    if (y + 1 >= this.h) return true;
+    if (old[this.index(x, y + 1)] !== MATERIAL.Empty) return true;
+    for (const dx of [-1, 1]) {
+      const nx = x + dx;
+      if (!this.inBounds(nx, y)) continue;
+      const side = old[this.index(nx, y)];
+      if (side !== MATERIAL.Stem && side !== MATERIAL.Flower) continue;
+      if (old[this.index(nx, y + 1)] !== MATERIAL.Empty) return true;
+    }
+    return false;
+  }
+
+  // Leaves unfurl in alternating pairs as the stalk climbs, so a grown plant reads as a
+  // plant instead of a bare pole. Placement is a pure function of height — no RNG — so it
+  // cannot desynchronise the two engines. Leaf energy stays under the growth threshold,
+  // so a leaf never climbs a stalk of its own.
+  private unfurlLeaf(x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
+    // Every other segment, alternating sides. Spacing them any further apart left the
+    // shortest stalks — the common case — with no leaves at all.
+    if (y % 2 !== 0) return;
+    const lx = Math.floor(y / 2) % 2 === 0 ? x - 1 : x + 1;
+    if (!this.inBounds(lx, y)) return;
+    const leaf = this.index(lx, y);
+    if (old[leaf] !== MATERIAL.Empty || next[leaf] !== MATERIAL.Empty) return;
+    writeCellBytes(next, leaf, MATERIAL.Stem, cell[1], 12, 0, readU16(cell, 6) & CELL_FLAG.Cosmic);
+  }
+
+  // First empty cell around idx, scanning the canonical faces from `start`. Rotating the
+  // start spreads pollen off a bloom's whole rim rather than always puffing from the same
+  // corner. Returns -1 when the cell is walled in.
+  private openFace(x: number, y: number, start: number, old: Uint8Array, next: Uint8Array) {
+    for (let step = 0; step < FACE_OFFSETS.length; step++) {
+      const [dx, dy] = FACE_OFFSETS[(start + step) % FACE_OFFSETS.length];
+      const nx = x + dx;
+      const ny = y + dy;
+      if (!this.inBounds(nx, ny)) continue;
+      const nidx = this.index(nx, ny);
+      if (old[nidx] === MATERIAL.Empty && next[nidx] === MATERIAL.Empty) return nidx;
+    }
+    return -1;
+  }
+
+  private flower(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
+    if (next[idx] !== MATERIAL.Flower || readU16(next, idx + 6) & CELL_FLAG.Frozen) return;
+    const age = readU16(cell, 2);
+    const energy = readU16(cell, 4);
+    const flags = readU16(cell, 6);
+    const cosmic = Boolean(flags & CELL_FLAG.Cosmic);
+
+    // The crown is the one cell the stalk produced. It spends the top of its budget
+    // unfurling petals into the open air around it, one per beat, so a bloom is watched
+    // opening rather than appearing whole. Petals are never rooted, so only the crown
+    // ever opens and a head cannot run away.
+    if (flags & CELL_FLAG.Rooted && energy > CROWN_RESERVE && age > 12 && this.chance(cosmic ? 8 : 12)) {
+      const petal = this.openFace(x, y, 0, old, next);
+      if (petal >= 0) {
+        writeCellBytes(next, petal, MATERIAL.Flower, cell[1], PETAL_ENERGY, 0, cosmic ? CELL_FLAG.Cosmic : 0);
+        writeU16(next, idx + 4, Math.max(0, readU16(next, idx + 4) - PETAL_COST));
+      }
+    }
+
+    // Pollen leaves from any open face. Straight up alone would silence a finished bloom
+    // outright, because the crown is walled in by its own petals.
+    if (energy > POLLEN_RESERVE && age > 24 && this.chance(cosmic ? 90 : 200)) {
+      const face = this.openFace(x, y, (cell[1] + age) % FACE_OFFSETS.length, old, next);
+      if (face >= 0) {
+        writeCellBytes(next, face, MATERIAL.Pollen, cell[1], 150, 0, cosmic ? CELL_FLAG.Cosmic : 0);
+        writeU16(next, idx + 4, Math.max(0, readU16(next, idx + 4) - POLLEN_COST));
+      }
+    }
+
+    // Wilt: a spent petal finally lets go and drifts off as a mote, so an old bloom
+    // visibly thins instead of standing perfect forever, and what it sheds can still seed
+    // the soil under it. The crown stays behind as a seed head — which is why a finished
+    // garden is not a field of bare poles.
+    if (!(flags & CELL_FLAG.Rooted) && age > PETAL_SHED_AGE && energy < POLLEN_RESERVE && this.chance(400)) {
+      writeCellBytes(next, idx, MATERIAL.Pollen, cell[1], 150, 0, flags & CELL_FLAG.Cosmic);
+    }
   }
 
   private moss(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
@@ -1136,6 +1230,32 @@ const SPARK_DIRS: ReadonlyArray<readonly [number, number]> = [
 // SPARK_DIRS index for straight down, used by trail sparks shed in flight.
 const SPARK_DOWN = 4;
 
+// Canonical face order around a cell, walked identically by petal opening and pollen
+// release in both engines. Same order as `neighbors`.
+const FACE_OFFSETS: ReadonlyArray<readonly [number, number]> = [
+  [-1, -1],
+  [0, -1],
+  [1, -1],
+  [-1, 0],
+  [1, 0],
+  [-1, 1],
+  [0, 1],
+  [1, 1]
+];
+
+// The bloom arc, mirroring sim/src/lib.rs. A flower loses energy once every
+// BLOOM_CLOCK ticks rather than every tick, so the open → dust → wilt sequence lasts
+// tens of seconds while its budget stays under the 255 the scene-import clamp assumes.
+const BLOOM_CLOCK = 8;
+const BLOOM_ENERGY = 200;
+const BLOOM_ENERGY_COSMIC = 250;
+const CROWN_RESERVE = 112;
+const PETAL_ENERGY = 150;
+const PETAL_COST = 10;
+const POLLEN_RESERVE = 40;
+const POLLEN_COST = 15;
+const PETAL_SHED_AGE = 1200;
+
 function range(start: number, endExclusive: number) {
   const out: number[] = [];
   const step = start < endExclusive ? 1 : -1;
@@ -1181,7 +1301,7 @@ function startEnergy(kind: number) {
   if (kind === MATERIAL.Moonwater) return 120;
   if (kind === MATERIAL.Seed) return 50;
   if (kind === MATERIAL.Moss || kind === MATERIAL.Fungus) return 70;
-  if (kind === MATERIAL.Flower) return 90;
+  if (kind === MATERIAL.Flower) return BLOOM_ENERGY;
   return 0;
 }
 

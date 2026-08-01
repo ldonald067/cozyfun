@@ -195,9 +195,11 @@ export const MATERIALS: MaterialDef[] = [
     label: "Flower",
     slug: "flower",
     description: "Generated bloom outcome from healthy rooted seeds.",
-    identity: ["Generated bloom outcome", "Petals react to wet and cosmic states"],
+    identity: ["Opens from a bud into a petal crown", "One garden hue per plant"],
     color: "#f0c25f",
-    palette: ["#75b95e", "#f3cf69", "#f38fbe", "#e8f3a8", "#b98dff", "#fff4c2"],
+    // The five garden hues a bloom can take, plus its golden disc. One hue per plant,
+    // chosen by the cell's variant, so every cell of a head matches.
+    palette: ["#7ebcf2", "#ec5c56", "#f8f7ee", "#face58", "#be82ec", "#ffd868"],
     glow: "#f7d574",
     group: "life",
     userSelectable: false

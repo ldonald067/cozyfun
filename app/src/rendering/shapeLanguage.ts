@@ -31,6 +31,23 @@ const EMBER_KINDS = [MATERIAL.Ember] as const;
 const STEAM_KINDS = [MATERIAL.Steam] as const;
 const EARTH_CONTACT_KINDS = [MATERIAL.Sand, MATERIAL.Soil, MATERIAL.Stone, MATERIAL.Wall, MATERIAL.Wood] as const;
 
+// One flat hue per plant, picked from the cell's variant rather than its position, so
+// every cell of a head is the same colour and the head reads as one flower. Deriving
+// petal colour from a per-cell hash — which is what this used to do — turned a bloom
+// into confetti the moment it became more than a single cell. Five garden hues, in the
+// same family as the pixel-flower reference: cornflower, tulip, daisy, buttercup, lilac.
+const PETAL_HUES: ReadonlyArray<readonly [Rgb, Rgb]> = [
+  [[126, 188, 242], [58, 122, 200]],
+  [[236, 92, 86], [172, 38, 44]],
+  [[248, 247, 238], [198, 196, 182]],
+  [[250, 206, 88], [210, 150, 34]],
+  [[190, 130, 236], [126, 70, 182]]
+];
+const COSMIC_PETAL: readonly [Rgb, Rgb] = [[228, 214, 255], [150, 118, 226]];
+// The eye of an open head. Warm gold reads against every petal hue above, including
+// the buttercup, because the disc is always the darker, denser of the two.
+const FLOWER_DISC: readonly [Rgb, Rgb] = [[255, 216, 104], [198, 134, 30]];
+
 export function emptyCellColor(cells: Uint8Array, width: number, height: number, x: number, y: number, time: number): Rgb {
   const background: Rgb = [9, 14, 20];
   if (kindAt(cells, width, height, x, y + 1) === MATERIAL.Ember) {
@@ -503,53 +520,93 @@ function stemColor({ color, variant, energy, flags, cells, width, height, x, y }
   const hash = hashCell(x, y, variant);
   const localX = (x + (hash & 1)) & 3;
   const above = kindAt(cells, width, height, x, y - 1);
+  const below = kindAt(cells, width, height, x, y + 1);
   const growingTip = energy > 20 && above !== MATERIAL.Stem && above !== MATERIAL.Flower;
-  const leafSide = ((y >> 1) & 1) === 0 ? 0 : 3;
+  // A stalk cell only ever gains a horizontal Stem neighbour when a leaf unfurls beside
+  // it, and the leaf itself is the one of the pair with no stalk running through it.
+  const leftStem = sameKind(cells, width, height, x - 1, y, MATERIAL.Stem);
+  const rightStem = sameKind(cells, width, height, x + 1, y, MATERIAL.Stem);
+  const isLeaf =
+    (leftStem || rightStem) && !(above === MATERIAL.Stem && below === MATERIAL.Stem);
+
   let out = mixRgb(color, [76, 143, 56], 0.25);
-  if (localX === 1 || localX === 2) out = mixRgb(out, [151, 219, 108], 0.4);
-  if (localX === leafSide && (y & 1) === 0) out = mixRgb(out, [122, 204, 84], 0.5);
-  if (growingTip) out = mixRgb(out, [214, 244, 160], 0.45);
+  if (isLeaf) {
+    // A leaf is a single cell, so sub-cell veining would be invisible. What has to read
+    // at play zoom is leaf against stalk, and that is a flatter, deeper green beside the
+    // stalk's lit one.
+    out = mixRgb(out, [68, 132, 54], 0.68);
+    if ((hash & 3) === 0) out = mixRgb(out, [92, 158, 66], 0.22);
+  } else {
+    if (localX === 1 || localX === 2) out = mixRgb(out, [151, 219, 108], 0.4);
+    if (growingTip) out = mixRgb(out, [214, 244, 160], 0.45);
+  }
   if (flags & CELL_FLAG.Cosmic) out = mixRgb(out, [165, 220, 255], 0.2);
   if (flags & CELL_FLAG.Scorched) out = mixRgb(out, [52, 40, 26], 0.6);
   if (flags & CELL_FLAG.Frozen) out = mixRgb(out, [190, 228, 238], 0.55);
   return out;
 }
 
-function flowerColor({ color, variant, age, energy, flags, time, cells, width, height, x, y }: ShapeContext) {
+// A bloom is a small cluster of Flower cells, so a cell's job is read off state the sim
+// already keeps — no new cell data:
+//   no Flower neighbours          -> an unopened bud, still a green knob
+//   rooted, with petals around it -> the disc, the bright eye of an open head
+//   anything else                 -> a petal
+// Rooted is exactly the crown the stalk produced, and the crown is the cell the petals
+// opened around, so it is the middle of the head by construction. Counting neighbours
+// alone cannot find it: the stem occupies one of the crown's four cardinal sides, so no
+// cell in a real head ever has four Flower neighbours.
+function flowerColor({ variant, age, energy, flags, time, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
-  const localX = (x + (hash & 1)) & 3;
-  const localY = (y + ((hash >> 2) & 1)) & 3;
   const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Flower);
+  const neighbours = 4 - edge.count;
   const cosmic = Boolean(flags & CELL_FLAG.Cosmic) || hasNearbyKind(cells, width, height, x, y, COSMIC_LIGHT_KINDS);
-  const wet = Boolean(flags & CELL_FLAG.Wet) || energy > 70 || hasNearbyKind(cells, width, height, x, y, COOL_LIQUID_KINDS);
+  // Energy is the bloom's remaining lifetime, not moisture. Reading it as wetness — the
+  // old `energy > 70` — now tints every healthy flower, because a fresh bloom starts at 200.
+  const wet = Boolean(flags & CELL_FLAG.Wet) || hasNearbyKind(cells, width, height, x, y, COOL_LIQUID_KINDS);
   const oilContact = contactInfo(cells, width, height, x, y, OIL_KINDS);
   const frozen = Boolean(flags & CELL_FLAG.Frozen);
   const scorched = Boolean(flags & CELL_FLAG.Scorched);
   const bloom = Math.min(1, age / 28);
-  const petalShift = (hash + variant) % 4;
-  const petal: Rgb = cosmic
-    ? petalShift === 0
-      ? [190, 158, 255]
-      : [235, 218, 255]
-    : petalShift === 0
-      ? [245, 143, 190]
-      : petalShift === 1
-        ? [244, 205, 102]
-        : [238, 235, 155];
-  let out = mixRgb(color, [70, 151, 79], 0.46);
+  const [petalLight, petalDark] = cosmic ? COSMIC_PETAL : PETAL_HUES[variant % PETAL_HUES.length];
+  // The last of the arc: a bloom dulls toward grey before its petals let go, so a garden
+  // past its peak reads as past its peak rather than staying showroom-fresh until cells
+  // start vanishing.
+  const fade = energy < 80 ? Math.min(0.4, (80 - energy) / 150) : 0;
 
-  if (localY >= 2 || edge.bottom) out = mixRgb(out, [44, 118, 55], 0.44);
-  if ((localX === 1 || localX === 2 || edge.top) && bloom > 0.25) out = mixRgb(out, petal, 0.5 + bloom * 0.28);
-  if ((localX === 1 && localY === 1) || hash % 11 === 0) out = mixRgb(out, [255, 232, 127], 0.5);
-  if (edge.top || edge.left) out = mixRgb(out, cosmic ? [239, 231, 255] : [255, 246, 187], 0.2 + bloom * 0.18);
-  if (wet) out = mixRgb(out, [146, 222, 152], 0.14);
+  const rooted = Boolean(flags & CELL_FLAG.Rooted);
+  let out: Rgb;
+  if (neighbours === 0) {
+    // Unopened bud. A bud is one cell, so it gets one flat colour and cannot show sepals
+    // wrapping a tip. Leading with the plant's own dark hue under a green wash is what
+    // makes it read: a deep knob of the colour about to open, clearly not the lit stalk
+    // beneath it. Leading with green instead put a muddy olive dot on top of the stem.
+    out = mixRgb(petalDark, [58, 104, 58], 0.28 - bloom * 0.1);
+    if ((hash & 3) === 0) out = mixRgb(out, [104, 160, 82], 0.18);
+  } else if (rooted && neighbours >= 2) {
+    // Disc: a dense golden eye, flecked so it does not read as a flat square.
+    out = mixRgb(FLOWER_DISC[0], FLOWER_DISC[1], ((x ^ y) & 1) === 0 ? 0.1 : 0.42);
+    if ((hash & 7) === 0) out = mixRgb(out, [255, 246, 196], 0.5);
+  } else {
+    // Petal: the plant's one hue, darkening toward the rim so the head reads round
+    // rather than as a block. Corner cells (attached on one side only) take the most,
+    // which is what rounds the silhouette.
+    out = petalLight;
+    const rim = edge.count >= 2 ? 0.42 : edge.count === 1 ? 0.2 : 0.06;
+    out = mixRgb(out, petalDark, rim);
+    if (edge.top && !edge.bottom) out = mixRgb(out, [255, 255, 255], 0.16 * bloom);
+    if (edge.bottom && !edge.top) out = mixRgb(out, petalDark, 0.22);
+    if ((hash & 7) === 0) out = mixRgb(out, petalDark, 0.16);
+  }
+
+  if (fade > 0) out = mixRgb(out, [122, 108, 88], fade);
+  if (wet) out = mixRgb(out, [146, 222, 152], 0.12);
   if (cosmic) {
     const pulse = (Math.sin(time * 0.012 + hash * 0.001) + 1) * 0.5;
-    out = mixRgb(out, [165, 202, 255], 0.18 + pulse * 0.16);
+    out = mixRgb(out, [165, 202, 255], 0.12 + pulse * 0.14);
   }
   if (oilContact.count > 0) {
     out = mixRgb(out, [45, 49, 31], oilContact.top ? 0.44 : 0.3);
-    if ((edge.top || localY === 0) && hash % 3 === 0) out = mixRgb(out, [126, 121, 64], 0.28);
+    if ((edge.top || edge.left) && hash % 3 === 0) out = mixRgb(out, [126, 121, 64], 0.28);
   }
   if (scorched) out = mixRgb(out, [55, 37, 31], 0.62);
   if (frozen) out = mixRgb(out, [207, 236, 245], 0.56);

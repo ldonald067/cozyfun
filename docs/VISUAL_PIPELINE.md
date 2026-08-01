@@ -35,7 +35,7 @@ Shape language is intentionally procedural:
 - Moss/Fungus/Wood: leafy clusters, fungus cap/gill/spore role colors, oil/heat/cosmic contact cues, damp moonwater tint, char/damp contact cues, end-grain, and woodgrain lines.
 - Ember: pulsing heat cores that dim into cold char, with spark flecks above hot beds.
 - Glass: a mostly see-through pane — the interior starts from the night sky and takes only a whisper of mint, so the rims and a drifting diagonal sheen band carry the identity rather than the fill. Fresh panes flash warm as they vitrify. Condensation (steam nearby, or the wet flag) is a thin haze plus scattered beads streaked by vertical clear runs, which read *darker* than the fog because the drop has wiped the pane behind it — not a flat grey wash.
-- Pollen/Stem/Flower: bobbing golden motes, leaf-nubbed climbing stalks with pale growing tips, and petal variety on blooms.
+- Pollen/Stem/Flower: bobbing golden motes; climbing stalks whose leaves are real cells, drawn as a flatter deeper green than the lit stalk beside them; and blooms built from a cluster of Flower cells. A bloom cell's role is read off state the sim already keeps, not off new cell data: no Flower neighbours means an unopened bud, the rooted crown with petals around it is the golden disc, and everything else is a petal. Petal hue comes from the cell's `variant` alone — one flat garden hue per plant — because deriving it from a per-cell hash turned a multi-cell head into confetti. Counting neighbours cannot find the disc on its own: the stem takes one of the crown's four cardinal sides, so no cell in a real head ever has four Flower neighbours.
 - Rocket: crimson grains with paper flecks when inert, a bright white-gold firework head when lit.
 - Spark: white-hot birth, per-cell firework hue (gold, rose, mint, sky, magenta) that reads apart from cool Stardust, glitter blinks, and an ember-red fade.
 - Wellspring: dark rune-carved block; dormant runes shimmer silver, attuned runes pulse in the remembered material's tint.
@@ -52,6 +52,9 @@ Current life/water rules:
 
 - Water and moonwater hydrate seeds, moss, fungus, and soil by raising cell energy.
 - Watered rooted seeds can bloom into generated flowers.
+- Soil under a rooted seed stops greening into moss. Without that exception a watered bed carpets over within a hundred ticks, and since germination needs Soil directly beneath the seed, moss won that race essentially every time — a watered garden reliably ended as moss and never as a flower.
+- A stalk climbs four to seven cells and unfurls leaves on alternating sides. It stands on its own base or clings to a neighbouring stalk cell that has one, so leaves stay attached while a cut stalk still collapses whole.
+- A bloom arrives as a closed bud and opens petal by petal into a head around the rooted crown, dusts pollen from the head's open faces, then sheds spent petals as drifting motes and leaves the crown standing as a seed head.
 - Watered moss uses that energy to spread into nearby soil or wood more readily.
 - Watered soil stores moisture briefly and can green up into moss even after the water has moved away.
 - Fungus can rot wet seeds or overtake old wet moss, keeping decay distinct from plant growth.
@@ -134,7 +137,7 @@ npm run test:browser
 
 The material showcase is shared by visual, Chrome, and Firefox QA through `scripts/material-showcase.mjs`. It should cover oil-over-water, wet/dry/scorched/frozen sand, damp/frozen/scorched hard materials, wet wood steam, ordinary water/lava and water/meteor shock, water/moonwater contact contrast, oil-smothered plants, distinct fungus life/cosmic/heat clusters, freeze-thaw wall stress up to a near-crumble frost-stressed wall, a grown stalked plant, veined stone and patinated wall, constellation etching, a pouring wellspring basin beside a dormant block, a one-cell attuned/dormant wellspring pair, the glass set (an age-0 vitrify flash clear of the lava pool, a cooled see-through pane, a deeper pane with real interior, and a dewed pane), and a rocket charge with a lit grain in flight.
 
-Two traps in this scene, both learned the hard way. Display stands must be **Wall**, since stone now falls. And a glass bloom placed beside the lava pool cannot evidence anything — it sits inside lava's own halo — so the vitrify exhibit is deliberately somewhere else.
+Three traps in this scene, all learned the hard way. Display stands must be **Wall**, since stone now falls — and that includes planters: soil is a powder, so a garden bed with nothing under it drops the instant the capture's sim starts and takes the whole plant with it. A glass bloom placed beside the lava pool cannot evidence anything — it sits inside lava's own halo — so the vitrify exhibit is deliberately somewhere else. And the showcase is a *live* scene: it is loaded into the running app and captured a beat later, so an exhibit painted in a state the sim will immediately leave does not survive to the picture. The garden row's crown energies sit below `CROWN_RESERVE` and above the shed floor for exactly this reason — otherwise the bud exhibit opens into a head before the shutter.
 
 The composite that visual QA saves must draw the glow layer *over* the base canvas with the live layer's settings (screen blend, `blur(16px) saturate(1.35)`, alpha 0.9). It once drew glow underneath the opaque base, which silently reviewed every night light as though it did not exist; keep `saveSandboxComposite` in `scripts/visual-qa.mjs` in sync with `.glow-canvas` in `styles.css`.
 

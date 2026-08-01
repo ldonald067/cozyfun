@@ -55,6 +55,39 @@ const FLAG_FROZEN: u16 = 1 << 3;
 const FLAG_SCORCHED: u16 = 1 << 4;
 const FLAG_MASK: u16 = FLAG_WET | FLAG_ROOTED | FLAG_COSMIC | FLAG_FROZEN | FLAG_SCORCHED;
 
+/// Canonical face order around a cell, walked identically by petal opening and
+/// pollen release in both engines. Same order as `neighbor_indices`.
+const FACE_OFFSETS: [(i32, i32); 8] = [
+    (-1, -1),
+    (0, -1),
+    (1, -1),
+    (-1, 0),
+    (1, 0),
+    (-1, 1),
+    (0, 1),
+    (1, 1),
+];
+
+/// A bloom runs on a slower clock than the rest of the life materials: it loses
+/// energy once every this many ticks instead of every tick. The old bloom carried
+/// 90 energy at 1/tick — about a second and a half of life — which is why an
+/// untended flower emitted one or two pollen motes at most and then sat inert
+/// forever. Slowing the clock buys a watchable open → dust → wilt arc while
+/// keeping every material's energy under 255, which is what the scene-import
+/// clamp in `load_cells` assumes.
+const BLOOM_CLOCK: u32 = 8;
+const BLOOM_ENERGY: u16 = 200;
+const BLOOM_ENERGY_COSMIC: u16 = 250;
+/// The crown only unfurls petals down to this reserve, so a head is bounded by
+/// budget as well as by the open faces around it.
+const CROWN_RESERVE: u16 = 112;
+const PETAL_ENERGY: u16 = 150;
+const PETAL_COST: u16 = 10;
+/// Below this a bloom is spent: no more pollen, and petals may start to let go.
+const POLLEN_RESERVE: u16 = 40;
+const POLLEN_COST: u16 = 15;
+const PETAL_SHED_AGE: u16 = 1200;
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Cell {
@@ -241,6 +274,7 @@ impl Universe {
                 x if x == Material::Spark as u8 => self.update_spark(idx, cell, &old, &mut next),
                 x if x == Material::Seed as u8 => self.update_seed(idx, cell, &old, &mut next),
                 x if x == Material::Stem as u8 => self.update_stem(idx, cell, &old, &mut next),
+                x if x == Material::Flower as u8 => self.update_flower(idx, cell, &old, &mut next),
                 x if x == Material::Moss as u8 => self.update_moss(idx, cell, &old, &mut next),
                 x if x == Material::Fungus as u8 => self.update_fungus(idx, cell, &old, &mut next),
                 _ => {}
@@ -444,6 +478,15 @@ impl Universe {
                 _ => 0,
             } + if cell.flags & FLAG_FROZEN != 0 { 1 } else { 0 }
                 + if cell.flags & FLAG_WET != 0 && is_absorbent(cell.kind) { 1 } else { 0 };
+            // A bloom's whole arc ticks down on BLOOM_CLOCK, so its budget can stay a
+            // small number the save format already accepts while still lasting long
+            // enough to watch it open, dust the air with pollen, and finally wilt.
+            let drain = if cell.kind == Material::Flower as u8 && self.tick_count % BLOOM_CLOCK != 0
+            {
+                0
+            } else {
+                drain
+            };
             cell.energy = cell.energy.saturating_sub(drain);
             if cell.energy == 0 {
                 if cell.flags & FLAG_FROZEN != 0 {
@@ -842,27 +885,6 @@ impl Universe {
                         }
                     }
                 }
-                x if x == Material::Flower as u8 => {
-                    // Fed flowers spend stored energy to release pollen motes. The gate
-                    // tracks the bloom's energy arc (90 at bloom, draining 1/tick), so an
-                    // untended flower still seeds gently; cosmic blooms release more often
-                    // and their motes carry the cosmic spark to the next generation.
-                    let cosmic = cell.flags & FLAG_COSMIC != 0;
-                    if cell.age > 20
-                        && cell.energy > 40
-                        && cell.flags & FLAG_FROZEN == 0
-                        && self.chance(if cosmic { 60 } else { 120 })
-                    {
-                        let mote =
-                            self.emit_vapor_from(idx, old, next, Material::Pollen as u8, cell.variant, 150);
-                        if cosmic {
-                            if let Some(mote) = mote {
-                                next[mote].flags |= FLAG_COSMIC;
-                            }
-                        }
-                        next[idx].energy = next[idx].energy.saturating_sub(30);
-                    }
-                }
                 x if x == Material::Ember as u8 => {
                     for nidx in neighbors {
                         let other = old[nidx];
@@ -989,7 +1011,17 @@ impl Universe {
         if next[idx].flags & FLAG_FROZEN != 0 {
             return;
         }
-        if next[idx].kind == Material::Soil as u8
+        // Soil that a rooted seed is standing on is spoken for. Without this a watered
+        // bed greens over long before anything can germinate — the seed needs Soil
+        // directly beneath it, and moss was reliably winning that race, which is why
+        // a watered garden used to end as a moss carpet and never as a flower.
+        let (x, y) = self.xy(idx);
+        let claimed = y > 0 && {
+            let above = old[self.idx(x as u32, (y - 1) as u32)];
+            above.kind == Material::Seed as u8 && above.flags & FLAG_ROOTED != 0
+        };
+        if !claimed
+            && next[idx].kind == Material::Soil as u8
             && next[idx].energy > 140
             && cell.age > 10
             && self.chance(if next[idx].flags & FLAG_COSMIC != 0 { 7 } else { 12 })
@@ -1132,7 +1164,10 @@ impl Universe {
                     next[idx] = Cell::new(
                         Material::Stem as u8,
                         cell.variant,
-                        130 + u16::from(cell.variant & 3) * 55 + if cosmic { 55 } else { 0 },
+                        // Each segment costs 55, so this is a 4-to-7 cell stalk. The old
+                        // 130 base could bloom after a single segment, which left a head
+                        // sitting almost on the ground with no room for leaves.
+                        200 + u16::from(cell.variant & 3) * 55 + if cosmic { 55 } else { 0 },
                     );
                     next[idx].flags = FLAG_ROOTED | if cosmic { FLAG_COSMIC } else { 0 };
                     return;
@@ -1150,8 +1185,8 @@ impl Universe {
             return;
         }
         let (x, y) = self.xy(idx);
-        if y + 1 < self.height as i32 && old[self.idx(x as u32, (y + 1) as u32)].is_empty() {
-            // A stalk segment with nothing under it falls, so cut plants collapse.
+        if !self.stem_has_footing(x, y, old) {
+            // A stalk segment with nothing holding it up falls, so cut plants collapse.
             self.update_powder(idx, cell, old, next, 1);
             return;
         }
@@ -1167,11 +1202,135 @@ impl Universe {
         if cell.energy > 75 {
             next[above] = Cell::new(Material::Stem as u8, cell.variant, cell.energy - 55);
             next[above].flags = if cosmic { FLAG_COSMIC } else { 0 };
+            self.unfurl_leaf(x, y, cell, old, next);
         } else {
-            next[above] = Cell::new(Material::Flower as u8, cell.variant, if cosmic { 150 } else { 90 });
+            next[above] = Cell::new(
+                Material::Flower as u8,
+                cell.variant,
+                if cosmic { BLOOM_ENERGY_COSMIC } else { BLOOM_ENERGY },
+            );
             next[above].flags = FLAG_ROOTED | if cosmic { FLAG_COSMIC } else { 0 };
         }
         next[idx].energy = 20;
+    }
+
+    /// A stalk stands on its own base, or clings to a neighbouring stalk cell that
+    /// has its own footing. Leaves ride entirely on the second rule; cutting the
+    /// stalk takes both away at once, so a severed plant still collapses whole.
+    fn stem_has_footing(&self, x: i32, y: i32, old: &[Cell]) -> bool {
+        if y + 1 >= self.height as i32 {
+            return true;
+        }
+        if !old[self.idx(x as u32, (y + 1) as u32)].is_empty() {
+            return true;
+        }
+        for dx in [-1i32, 1] {
+            let nx = x + dx;
+            if !self.in_bounds(nx, y) {
+                continue;
+            }
+            let side = old[self.idx(nx as u32, y as u32)];
+            if side.kind != Material::Stem as u8 && side.kind != Material::Flower as u8 {
+                continue;
+            }
+            if !old[self.idx(nx as u32, (y + 1) as u32)].is_empty() {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Leaves unfurl in alternating pairs as the stalk climbs, so a grown plant
+    /// reads as a plant instead of a bare pole. Placement is a pure function of
+    /// height — no RNG — so it cannot desynchronise the two engines. Leaf energy
+    /// stays under the growth threshold, so a leaf never climbs a stalk of its own.
+    fn unfurl_leaf(&self, x: i32, y: i32, cell: Cell, old: &[Cell], next: &mut [Cell]) {
+        // Every other segment, alternating sides. Spacing them any further apart left
+        // the shortest stalks — the common case — with no leaves at all.
+        if y % 2 != 0 {
+            return;
+        }
+        let lx = if (y / 2) % 2 == 0 { x - 1 } else { x + 1 };
+        if !self.in_bounds(lx, y) {
+            return;
+        }
+        let leaf = self.idx(lx as u32, y as u32);
+        if !old[leaf].is_empty() || !next[leaf].is_empty() {
+            return;
+        }
+        next[leaf] = Cell::new(Material::Stem as u8, cell.variant, 12);
+        next[leaf].flags = cell.flags & FLAG_COSMIC;
+    }
+
+    /// First empty cell around `idx`, scanning the canonical faces from `start`.
+    /// Rotating the start spreads pollen off a bloom's whole rim rather than
+    /// always puffing from the same corner.
+    fn open_face(&self, idx: usize, start: usize, old: &[Cell], next: &[Cell]) -> Option<usize> {
+        let (x, y) = self.xy(idx);
+        for step in 0..FACE_OFFSETS.len() {
+            let (dx, dy) = FACE_OFFSETS[(start + step) % FACE_OFFSETS.len()];
+            let nx = x + dx;
+            let ny = y + dy;
+            if !self.in_bounds(nx, ny) {
+                continue;
+            }
+            let nidx = self.idx(nx as u32, ny as u32);
+            if old[nidx].is_empty() && next[nidx].is_empty() {
+                return Some(nidx);
+            }
+        }
+        None
+    }
+
+    fn update_flower(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
+        if next[idx].kind != Material::Flower as u8 || next[idx].flags & FLAG_FROZEN != 0 {
+            return;
+        }
+        let cosmic = cell.flags & FLAG_COSMIC != 0;
+
+        // The crown is the one cell the stalk produced. It spends the top of its
+        // budget unfurling petals into the open air around it, one per beat, so a
+        // bloom is watched opening rather than appearing whole. Petals are never
+        // rooted, so only the crown ever opens and a head cannot run away.
+        if cell.flags & FLAG_ROOTED != 0
+            && cell.energy > CROWN_RESERVE
+            && cell.age > 12
+            && self.chance(if cosmic { 8 } else { 12 })
+        {
+            if let Some(petal) = self.open_face(idx, 0, old, next) {
+                next[petal] = Cell::new(Material::Flower as u8, cell.variant, PETAL_ENERGY);
+                next[petal].flags = if cosmic { FLAG_COSMIC } else { 0 };
+                next[idx].energy = next[idx].energy.saturating_sub(PETAL_COST);
+            }
+        }
+
+        // Pollen leaves from any open face. Straight up alone would silence a
+        // finished bloom outright, because the crown is walled in by its own petals.
+        if cell.energy > POLLEN_RESERVE && cell.age > 24 && self.chance(if cosmic { 90 } else { 200 })
+        {
+            let start =
+                (cell.variant as usize).wrapping_add(cell.age as usize) % FACE_OFFSETS.len();
+            if let Some(face) = self.open_face(idx, start, old, next) {
+                next[face] = Cell::new(Material::Pollen as u8, cell.variant, 150);
+                if cosmic {
+                    next[face].flags |= FLAG_COSMIC;
+                }
+                next[idx].energy = next[idx].energy.saturating_sub(POLLEN_COST);
+            }
+        }
+
+        // Wilt: a spent petal finally lets go and drifts off as a mote, so an old
+        // bloom visibly thins instead of standing perfect forever, and what it sheds
+        // can still seed the soil under it. The crown stays behind as a seed head —
+        // which is why a finished garden is not a field of bare poles.
+        if cell.flags & FLAG_ROOTED == 0
+            && cell.age > PETAL_SHED_AGE
+            && cell.energy < POLLEN_RESERVE
+            && self.chance(400)
+        {
+            next[idx] = Cell::new(Material::Pollen as u8, cell.variant, 150);
+            next[idx].flags = cell.flags & FLAG_COSMIC;
+        }
     }
 
     fn update_moss(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
@@ -1570,7 +1729,7 @@ fn starting_energy(kind: u8) -> u16 {
         x if x == Material::Seed as u8 => 50,
         x if x == Material::Moss as u8 => 70,
         x if x == Material::Fungus as u8 => 70,
-        x if x == Material::Flower as u8 => 90,
+        x if x == Material::Flower as u8 => BLOOM_ENERGY,
         _ => 0,
     }
 }
@@ -2115,6 +2274,172 @@ mod tests {
         assert!(
             u.cells.iter().any(|cell| cell.kind == Material::Stem as u8),
             "the fallen segment should land, not vanish"
+        );
+    }
+
+    #[test]
+    fn a_climbing_stalk_unfurls_side_leaves() {
+        let mut u = Universe::new(16, 32, 7);
+        set_cell_state(&mut u, 8, 20, Material::Seed, 40, 180, FLAG_WET);
+        set_cell(&mut u, 8, 21, Material::Soil);
+        for (x, y) in [(7, 21), (9, 21), (7, 22), (8, 22), (9, 22)] {
+            set_cell(&mut u, x, y, Material::Wall);
+        }
+        let mut leafy = false;
+        for _ in 0..600 {
+            u.tick();
+            // A leaf is the only way a stalk is ever two cells wide on one row.
+            leafy = (0..32).any(|y| {
+                (1..15).any(|x| {
+                    kind_at(&u, x, y) == Material::Stem as u8
+                        && kind_at(&u, x + 1, y) == Material::Stem as u8
+                })
+            });
+            if leafy {
+                break;
+            }
+        }
+        assert!(leafy, "a climbing stalk should unfurl a leaf beside itself");
+    }
+
+    #[test]
+    fn a_leaf_rides_on_the_stalk_it_clings_to() {
+        // Held: the stalk beside the leaf has its own footing, so the leaf stays put.
+        let mut u = Universe::new(16, 16, 7);
+        set_cell_state(&mut u, 8, 5, Material::Stem, 30, 20, 0);
+        set_cell_state(&mut u, 7, 5, Material::Stem, 30, 12, 0);
+        set_cell(&mut u, 8, 6, Material::Wall);
+        u.tick();
+        u.tick();
+        assert_eq!(
+            kind_at(&u, 7, 5),
+            Material::Stem as u8,
+            "a leaf should hang on a stalk that has its own footing"
+        );
+
+        // Cut: the stalk loses its footing, so the leaf loses its hold in the same tick
+        // and the whole plant still collapses.
+        let mut cut = Universe::new(16, 16, 7);
+        set_cell_state(&mut cut, 8, 5, Material::Stem, 30, 20, 0);
+        set_cell_state(&mut cut, 7, 5, Material::Stem, 30, 12, 0);
+        cut.tick();
+        cut.tick();
+        assert_eq!(
+            kind_at(&cut, 7, 5),
+            Material::Empty as u8,
+            "a leaf on a severed stalk should fall with it"
+        );
+    }
+
+    #[test]
+    fn a_bud_opens_into_a_petal_crown() {
+        let mut u = Universe::new(16, 16, 3);
+        set_cell_state(&mut u, 8, 8, Material::Flower, 20, BLOOM_ENERGY, FLAG_ROOTED);
+        for _ in 0..400 {
+            u.tick();
+        }
+        let petals = u
+            .cells
+            .iter()
+            .filter(|cell| cell.kind == Material::Flower as u8)
+            .count();
+        assert!(
+            petals >= 6,
+            "a rooted crown should unfurl into a multi-cell head, saw {petals} cells"
+        );
+        assert!(
+            petals <= 9,
+            "the head is bounded by its budget and its open faces, saw {petals} cells"
+        );
+    }
+
+    #[test]
+    fn a_lone_petal_never_opens_a_head_of_its_own() {
+        // Only the rooted crown opens. Without this the head would grow without bound.
+        let mut u = Universe::new(16, 16, 3);
+        set_cell_state(&mut u, 8, 8, Material::Flower, 20, PETAL_ENERGY, 0);
+        for _ in 0..400 {
+            u.tick();
+        }
+        let flowers = u
+            .cells
+            .iter()
+            .filter(|cell| cell.kind == Material::Flower as u8)
+            .count();
+        assert_eq!(flowers, 1, "an unrooted petal should not spawn more petals");
+    }
+
+    #[test]
+    fn a_capped_bloom_still_puffs_pollen_from_its_rim() {
+        // The regression this guards: pollen used to leave straight up only, so a petal
+        // with anything above it — which is every inner cell of a real head — was silent.
+        let mut u = Universe::new(16, 16, 5);
+        set_cell_state(&mut u, 8, 8, Material::Flower, 30, 100, 0);
+        set_cell_state(&mut u, 8, 7, Material::Flower, 30, 100, 0);
+        let mut puffed = false;
+        for _ in 0..600 {
+            u.tick();
+            if u.cells.iter().any(|cell| cell.kind == Material::Pollen as u8) {
+                puffed = true;
+                break;
+            }
+        }
+        assert!(puffed, "a bloom capped from above should still dust pollen sideways");
+    }
+
+    #[test]
+    fn a_spent_petal_sheds_as_a_drifting_mote() {
+        let mut u = Universe::new(16, 16, 9);
+        set_cell_state(&mut u, 8, 4, Material::Flower, PETAL_SHED_AGE + 40, 20, 0);
+        let mut shed = false;
+        for _ in 0..4000 {
+            u.tick();
+            if u.cells.iter().any(|cell| cell.kind == Material::Pollen as u8) {
+                shed = true;
+                break;
+            }
+        }
+        assert!(shed, "a spent petal should let go as a pollen mote");
+        assert!(
+            !u.cells.iter().any(|cell| cell.kind == Material::Flower as u8),
+            "the shed petal should leave its cell, not duplicate itself"
+        );
+    }
+
+    #[test]
+    fn a_fresh_crown_holds_its_petals() {
+        // Pairs with the shed test: without this, "petals fall off" could be passing
+        // because every bloom crumbles immediately rather than only when spent.
+        let mut u = Universe::new(16, 16, 9);
+        set_cell_state(&mut u, 8, 4, Material::Flower, 30, PETAL_ENERGY, 0);
+        for _ in 0..600 {
+            u.tick();
+        }
+        assert_eq!(
+            kind_at(&u, 8, 4),
+            Material::Flower as u8,
+            "a young, fed petal should stay on the bloom"
+        );
+    }
+
+    #[test]
+    fn soil_under_a_rooted_seed_stays_soil() {
+        let mut u = Universe::new(16, 16, 11);
+        set_cell_state(&mut u, 8, 9, Material::Soil, 16, 190, FLAG_WET);
+        set_cell_state(&mut u, 8, 8, Material::Seed, 40, 180, FLAG_WET | FLAG_ROOTED);
+        set_cell(&mut u, 8, 10, Material::Wall);
+        for _ in 0..200 {
+            u.tick();
+            if kind_at(&u, 8, 9) != Material::Soil as u8 {
+                break;
+            }
+        }
+        // The seed may germinate into a stalk; what must never happen is the soil
+        // greening out from under it, which is what used to strand every seed.
+        assert_ne!(
+            kind_at(&u, 8, 9),
+            Material::Moss as u8,
+            "soil claimed by a rooted seed should not green into moss"
         );
     }
 
