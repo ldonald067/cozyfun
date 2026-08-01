@@ -555,10 +555,20 @@ function stemColor({ color, variant, energy, flags, cells, width, height, x, y }
 // opened around, so it is the middle of the head by construction. Counting neighbours
 // alone cannot find it: the stem occupies one of the crown's four cardinal sides, so no
 // cell in a real head ever has four Flower neighbours.
+//
+// The count is over all EIGHT faces, not the four cardinals. Petals can open into corners,
+// and a crown whose only petal sits diagonally has zero cardinal neighbours — counting
+// cardinals rendered that half-open bloom as two separate buds.
 function flowerColor({ variant, age, energy, flags, time, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
   const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Flower);
-  const neighbours = 4 - edge.count;
+  let neighbours = 0;
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (dx === 0 && dy === 0) continue;
+      if (sameKind(cells, width, height, x + dx, y + dy, MATERIAL.Flower)) neighbours++;
+    }
+  }
   const cosmic = Boolean(flags & CELL_FLAG.Cosmic) || hasNearbyKind(cells, width, height, x, y, COSMIC_LIGHT_KINDS);
   // Energy is the bloom's remaining lifetime, not moisture. Reading it as wetness — the
   // old `energy > 70` — now tints every healthy flower, because a fresh bloom starts at 200.
@@ -582,7 +592,7 @@ function flowerColor({ variant, age, energy, flags, time, cells, width, height, 
     // beneath it. Leading with green instead put a muddy olive dot on top of the stem.
     out = mixRgb(petalDark, [58, 104, 58], 0.28 - bloom * 0.1);
     if ((hash & 3) === 0) out = mixRgb(out, [104, 160, 82], 0.18);
-  } else if (rooted && neighbours >= 2) {
+  } else if (rooted) {
     // Disc: a dense golden eye, flecked so it does not read as a flat square.
     out = mixRgb(FLOWER_DISC[0], FLOWER_DISC[1], ((x ^ y) & 1) === 0 ? 0.1 : 0.42);
     if ((hash & 7) === 0) out = mixRgb(out, [255, 246, 196], 0.5);

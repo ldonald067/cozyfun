@@ -53,15 +53,21 @@ function wasmCells(uni) {
   return new Uint8Array(wasm.memory.buffer, ptr, len).slice();
 }
 
-function runScenario({ name, w, h, seed, ticks, paint }) {
+function runScenario({ name, w, h, seed, ticks, paint, observe, expect }) {
   const js = createFallbackEngine(w, h, seed);
   const uni = wasm.universe_new(w, h, seed);
   paint((x, y, r, mat, d = 100) => js.paint(x, y, r, mat, d));
   paint((x, y, r, mat, d = 100) => wasm.universe_paint(uni, x, y, r, mat, d));
 
+  // Byte-equality alone cannot tell a scenario that exercises a rule from one that never
+  // reaches it — delete a feature from BOTH engines and parity still passes. `observe`
+  // and `expect` make a scenario assert that it actually saw what it claims to cover.
+  const seen = {};
+
   const compare = (tick) => {
     const a = js.getCellBytes();
     const b = wasmCells(uni);
+    if (observe) observe(seen, a, w, h, tick);
     for (let i = 0; i < a.length; i++) {
       if (a[i] === b[i]) continue;
       const cell = Math.floor(i / STRIDE);
@@ -84,7 +90,18 @@ function runScenario({ name, w, h, seed, ticks, paint }) {
   }
   wasm.universe_free(uni);
   js.dispose();
-  console.log(`  ok  ${name} (${ticks} ticks)`);
+  if (expect) {
+    const problem = expect(seen);
+    if (problem) {
+      throw new Error(
+        `[${name}] scenario is VACUOUS: ${problem}\n` +
+          `  observed: ${JSON.stringify(seen)}\n` +
+          `  Both engines still agreed byte-for-byte, but they agreed about nothing. Fix the\n` +
+          `  scene (or the rule) until the milestones below are reached again.`,
+      );
+    }
+  }
+  console.log(`  ok  ${name} (${ticks} ticks)${expect ? ` ${JSON.stringify(seen)}` : ""}`);
 }
 
 const scenarios = [
@@ -269,29 +286,52 @@ const scenarios = [
     },
   },
   {
-    // A whole plant lifecycle in one walled planter: seed roots on soil, the stalk
-    // climbs and unfurls leaves, the crown opens into a petal head, the head dusts
-    // pollen from its open faces, and spent petals finally shed as motes.
+    // A whole plant lifecycle in two walled planters — one plain, one cosmic: seeds root
+    // on soil, stalks climb and unfurl leaves, crowns open into petal heads, the heads
+    // dust pollen from their open faces, and spent petals finally shed as motes.
     //
-    // NOT VACUOUS — verified by driving this exact scene through the fallback engine
-    // and counting: the crown reaches 9 flower cells by ~tick 300, the stalk goes two
-    // cells wide where a leaf unfurls, pollen is airborne on hundreds of separate
-    // ticks, and the head is back down to the lone crown by ~tick 2400. The older
-    // "germinating garden" scenario reaches NONE of this: its whole soil bed greens
-    // into moss inside 100 ticks, so no seed there has ever germinated. Keep the tick
-    // count high enough to reach the shed phase — cutting it short silently returns
-    // this to a growth-only test.
+    // The `expect` below is the guard, not the comment. The older "germinating garden"
+    // scenario passed for months while reaching none of this — its soil bed greens into
+    // moss inside 100 ticks, so no seed there ever germinated. Byte-equality cannot tell
+    // the difference; only asserting the milestones can.
     name: "a plant's whole life, bud to shed petals",
-    w: 20, h: 24, seed: 777, ticks: 2400,
+    w: 40, h: 24, seed: 777, ticks: 2400,
     paint(p) {
-      for (let x = 0; x < 20; x++) p(x, 21, 1, M.Wall);
-      for (let y = 14; y < 21; y++) {
-        p(2, y, 1, M.Wall);
-        p(17, y, 1, M.Wall);
+      for (let x = 0; x < 40; x++) p(x, 21, 1, M.Wall);
+      for (const wall of [2, 17, 22, 37]) for (let y = 14; y < 21; y++) p(wall, y, 1, M.Wall);
+      p(9, 19, 1, M.Soil);  p(9, 16, 1, M.Seed);  p(9, 13, 2, M.Water);
+      // The cosmic arm covers BLOOM_ENERGY_COSMIC and the cosmic bloom timings, which no
+      // other parity scenario reaches.
+      p(29, 19, 1, M.Soil); p(29, 16, 1, M.Seed); p(29, 13, 2, M.Moonwater);
+    },
+    observe(seen, cells, w, h) {
+      const kindAt = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : cells[(y * w + x) * STRIDE]);
+      let head = 0, pollen = 0, cosmicHead = 0, leaf = false;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const k = kindAt(x, y);
+          if (k === 19) {
+            head++;
+            if (cells[(y * w + x) * STRIDE + 6] & 4) cosmicHead++;
+          } else if (k === 22) pollen++;
+          else if (k === 23 && kindAt(x + 1, y) === 23) leaf = true;
+        }
       }
-      p(9, 19, 1, M.Soil);
-      p(9, 16, 1, M.Seed);
-      p(9, 13, 2, M.Water);
+      seen.maxHead = Math.max(seen.maxHead ?? 0, head);
+      seen.maxCosmicHead = Math.max(seen.maxCosmicHead ?? 0, cosmicHead);
+      seen.pollenTicks = (seen.pollenTicks ?? 0) + (pollen > 0 ? 1 : 0);
+      seen.leaf = Boolean(seen.leaf) || leaf;
+      // A shed is the head shrinking after it has finished opening.
+      if (head < (seen.prevHead ?? 0) && (seen.prevHead ?? 0) >= 6) seen.shed = true;
+      seen.prevHead = head;
+    },
+    expect(seen) {
+      if (!seen.leaf) return "no stalk ever unfurled a leaf";
+      if ((seen.maxHead ?? 0) < 6) return `head never opened past ${seen.maxHead ?? 0} cells`;
+      if ((seen.maxCosmicHead ?? 0) < 6) return `cosmic head never opened past ${seen.maxCosmicHead ?? 0} cells`;
+      if ((seen.pollenTicks ?? 0) < 20) return `pollen was airborne on only ${seen.pollenTicks ?? 0} ticks`;
+      if (!seen.shed) return "no bloom ever shed a petal";
+      return null;
     },
   },
 ];

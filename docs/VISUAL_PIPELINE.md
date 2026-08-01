@@ -52,7 +52,9 @@ Current life/water rules:
 
 - Water and moonwater hydrate seeds, moss, fungus, and soil by raising cell energy.
 - Watered rooted seeds can bloom into generated flowers.
-- Soil under a rooted seed stops greening into moss. Without that exception a watered bed carpets over within a hundred ticks, and since germination needs Soil directly beneath the seed, moss won that race essentially every time — a watered garden reliably ended as moss and never as a flower.
+- Water soaks down through a seed bed, and a wet seed is grounded by soil *or* by another grounded seed, so a bed roots as a whole and sprouts from its surface. Only a seed with something growable above it germinates, since a buried one would make a stalk that can never climb. This is what actually makes flowers reachable: measured on a hand-painted planter, the old rules produced **zero** rooted seeds in 3600 ticks, because the seeds touching soil were buried out of the water's reach while the seeds the water reached were sitting on other seeds.
+- Growth pushes up through standing water as well as open air. A watered garden pools, and requiring bare air left a bed sprouting only around the pond's dry margins while its whole middle stayed bare — which is exactly what a player who waters generously sees.
+- Ground a living seed is standing on stops greening into moss, and moss cannot spread into it from the side either. Guarding only the soil's own greening left the claim porous: the bed still carpeted over, just from a neighbour. The claim is released when the seed dries out, so an abandoned bed still completes the soil → moss → fungus → soil loop.
 - A stalk climbs four to seven cells and unfurls leaves on alternating sides. It stands on its own base or clings to a neighbouring stalk cell that has one, so leaves stay attached while a cut stalk still collapses whole.
 - A bloom arrives as a closed bud and opens petal by petal into a head around the rooted crown, dusts pollen from the head's open faces, then sheds spent petals as drifting motes and leaves the crown standing as a seed head.
 - Watered moss uses that energy to spread into nearby soil or wood more readily.

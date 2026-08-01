@@ -296,7 +296,11 @@ class JsSandboxEngine implements SandboxEngine {
       // A bloom's whole arc ticks down on BLOOM_CLOCK, so its budget can stay a small
       // number the save format already accepts while still lasting long enough to
       // watch it open, dust the air with pollen, and finally wilt.
-      const slowed = kind === MATERIAL.Flower && this.ticks % BLOOM_CLOCK !== 0;
+      // The phase comes from the cell's OWN age, not the global tick count. Cell age is
+      // saved with the scene; the tick count is not restored on load, so a global phase
+      // would silently shift a loaded bloom's arc. The environmental drains ride the same
+      // slow clock deliberately — see the note in sim/src/lib.rs.
+      const slowed = kind === MATERIAL.Flower && age % BLOOM_CLOCK !== 0;
       const energy = slowed
         ? readU16(next, idx + 4)
         : Math.max(0, readU16(next, idx + 4) - drain - (flags & CELL_FLAG.Frozen ? 1 : 0) - (flags & CELL_FLAG.Wet && absorbent(kind) ? 1 : 0));
@@ -603,11 +607,22 @@ class JsSandboxEngine implements SandboxEngine {
     // greens over long before anything can germinate — the seed needs Soil directly
     // beneath it, and moss was reliably winning that race, which is why a watered garden
     // used to end as a moss carpet and never as a flower.
-    const aboveIdx = y > 0 ? this.index(x, y - 1) : -1;
-    const claimed = aboveIdx >= 0 && old[aboveIdx] === MATERIAL.Seed && Boolean(readU16(old, aboveIdx + 6) & CELL_FLAG.Rooted);
+    const claimed = this.soilIsClaimed(x, y, old);
     if (!claimed && next[idx] === MATERIAL.Soil && readU16(next, idx + 4) > 140 && readU16(cell, 2) > 10 && this.chance(flags & CELL_FLAG.Cosmic ? 7 : 12)) {
       writeCellBytes(next, idx, MATERIAL.Moss, cell[1], 90, 0, CELL_FLAG.Wet);
     }
+  }
+
+  // Ground a living seed is standing on, which moss may not take — neither by the soil
+  // greening on its own nor by moss spreading in from a neighbour. The claim is held only
+  // while the seed is still viable: a seed that dries out releases the ground, so the
+  // soil -> moss -> fungus -> soil loop still closes on an abandoned bed.
+  private soilIsClaimed(x: number, y: number, old: Uint8Array) {
+    if (y <= 0) return false;
+    const above = this.index(x, y - 1);
+    if (old[above] !== MATERIAL.Seed) return false;
+    const aboveFlags = readU16(old, above + 6);
+    return Boolean(aboveFlags & CELL_FLAG.Rooted) && (Boolean(aboveFlags & CELL_FLAG.Wet) || readU16(old, above + 4) > 40);
   }
 
   private liquid(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array, slow: number) {
@@ -976,9 +991,30 @@ class JsSandboxEngine implements SandboxEngine {
       return;
     }
 
-    if (below === MATERIAL.Soil && wet) {
+    // Water soaks down through a seed bed. Without this a painted bed never germinates
+    // at all: the seeds touching soil are buried at the bottom and never meet the water,
+    // while the seeds the water does reach are sitting on other seeds. Measured on a
+    // hand-painted planter, that combination produced zero rooted seeds in 3600 ticks.
+    const aboveIdx = y > 0 ? this.index(x, y - 1) : -1;
+    if (aboveIdx >= 0 && old[aboveIdx] === MATERIAL.Seed) {
+      const aboveEnergy = readU16(old, aboveIdx + 4);
+      if (aboveEnergy > SEED_SOAK_LOSS) {
+        const soaked = aboveEnergy - SEED_SOAK_LOSS;
+        if (soaked > readU16(next, idx + 4)) writeU16(next, idx + 4, soaked);
+      }
+    }
+
+    // A wet seed is grounded either by soil directly under it or by another grounded
+    // seed, so a bed is rooted as a whole and sprouts from its surface.
+    const grounded =
+      below === MATERIAL.Soil ||
+      (below === MATERIAL.Seed && Boolean(readU16(old, this.index(x, y + 1) + 6) & CELL_FLAG.Rooted));
+    if (grounded && wet) {
       writeU16(next, idx + 6, readU16(next, idx + 6) | CELL_FLAG.Rooted);
-      if (age > 30 && energy > 70 && this.chance(cosmic ? 4 : 8)) {
+      // Only a seed with open sky above sprouts — a buried one would germinate into a
+      // stalk that can never climb, wasting the bed's whole surface.
+      const openAbove = aboveIdx >= 0 && isGrowable(old[aboveIdx]);
+      if (openAbove && age > 30 && energy > 70 && this.chance(cosmic ? 4 : 8)) {
         // Each segment costs 55, so this is a 4-to-7 cell stalk. The old 130 base could
         // bloom after a single segment, leaving a head almost on the ground with no room
         // for leaves.
@@ -1001,7 +1037,7 @@ class JsSandboxEngine implements SandboxEngine {
     const energy = readU16(old, idx + 4);
     if (energy <= 20 || y === 0) return;
     const above = this.index(x, y - 1);
-    if (old[above] !== MATERIAL.Empty || next[above] !== MATERIAL.Empty || !this.chance(4)) return;
+    if (!isGrowable(old[above]) || !isGrowable(next[above]) || !this.chance(4)) return;
     const cosmic = Boolean(readU16(old, idx + 6) & CELL_FLAG.Cosmic);
     if (energy > 75) {
       writeCellBytes(next, above, MATERIAL.Stem, cell[1], energy - 55, 0, cosmic ? CELL_FLAG.Cosmic : 0);
@@ -1047,7 +1083,7 @@ class JsSandboxEngine implements SandboxEngine {
     const lx = Math.floor(y / 2) % 2 === 0 ? x - 1 : x + 1;
     if (!this.inBounds(lx, y)) return;
     const leaf = this.index(lx, y);
-    if (old[leaf] !== MATERIAL.Empty || next[leaf] !== MATERIAL.Empty) return;
+    if (!isGrowable(old[leaf]) || !isGrowable(next[leaf])) return;
     writeCellBytes(next, leaf, MATERIAL.Stem, cell[1], 12, 0, readU16(cell, 6) & CELL_FLAG.Cosmic);
   }
 
@@ -1122,9 +1158,16 @@ class JsSandboxEngine implements SandboxEngine {
     for (const nidx of this.neighbors(x, y)) {
       const other = old[nidx];
       const dampSubstrate = Boolean(readU16(old, nidx + 6) & CELL_FLAG.Wet) || readU16(old, nidx + 4) > 40;
+      // Ground under a living seed is off limits to moss spreading in as well as to soil
+      // greening on its own. Guarding only the latter left the claim porous: a bed still
+      // carpeted over, just from the side instead.
+      const ncell = Math.floor(nidx / CELL_STRIDE);
+      const softSubstrate =
+        (other === MATERIAL.Soil && !this.soilIsClaimed(ncell % this.w, Math.floor(ncell / this.w), old)) ||
+        other === MATERIAL.Wood;
       // Spreading moss inherits the substrate's variant, not the parent moss's.
       let spread = false;
-      if ((other === MATERIAL.Soil || other === MATERIAL.Wood) && (oldEnergy > 110 || dampSubstrate || this.chance(8))) {
+      if (softSubstrate && (oldEnergy > 110 || dampSubstrate || this.chance(8))) {
         writeCellBytes(next, nidx, MATERIAL.Moss, old[nidx + 1], 70, 0, wet ? CELL_FLAG.Wet : 0);
         spread = true;
       } else if (other === MATERIAL.Stone && dampSubstrate && (oldEnergy > 120 || this.chance(10))) {
@@ -1231,17 +1274,31 @@ const SPARK_DIRS: ReadonlyArray<readonly [number, number]> = [
 const SPARK_DOWN = 4;
 
 // Canonical face order around a cell, walked identically by petal opening and pollen
-// release in both engines. Same order as `neighbors`.
+// release in both engines. Cardinals first, then diagonals: a head that fills its sides
+// before its corners is rounder at every stage of opening, and the renderer can tell a
+// crown from a bud as soon as the first petal lands. Opening diagonally first left a
+// one-petal bloom rendering as two separate buds.
 const FACE_OFFSETS: ReadonlyArray<readonly [number, number]> = [
-  [-1, -1],
   [0, -1],
-  [1, -1],
   [-1, 0],
   [1, 0],
-  [-1, 1],
   [0, 1],
+  [-1, -1],
+  [1, -1],
+  [-1, 1],
   [1, 1]
 ];
+
+// Moisture lost per cell as water soaks down through a seed bed.
+const SEED_SOAK_LOSS = 20;
+
+// Growth may push up through standing water as well as through open air. A watered garden
+// pools, and requiring bare air meant a bed only ever sprouted around the pond's dry
+// margins while its whole middle stayed bare — which is what a player who waters
+// generously actually sees.
+function isGrowable(kind: number) {
+  return kind === MATERIAL.Empty || kind === MATERIAL.Water || kind === MATERIAL.Moonwater;
+}
 
 // The bloom arc, mirroring sim/src/lib.rs. A flower loses energy once every
 // BLOOM_CLOCK ticks rather than every tick, so the open → dust → wilt sequence lasts

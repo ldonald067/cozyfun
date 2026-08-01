@@ -56,17 +56,23 @@ const FLAG_SCORCHED: u16 = 1 << 4;
 const FLAG_MASK: u16 = FLAG_WET | FLAG_ROOTED | FLAG_COSMIC | FLAG_FROZEN | FLAG_SCORCHED;
 
 /// Canonical face order around a cell, walked identically by petal opening and
-/// pollen release in both engines. Same order as `neighbor_indices`.
+/// pollen release in both engines. **Cardinals first, then diagonals**: a head that
+/// fills its sides before its corners is rounder at every stage of opening, and the
+/// renderer can tell a crown from a bud as soon as the first petal lands. Opening
+/// diagonally first left a one-petal bloom rendering as two separate buds.
 const FACE_OFFSETS: [(i32, i32); 8] = [
-    (-1, -1),
     (0, -1),
-    (1, -1),
     (-1, 0),
     (1, 0),
-    (-1, 1),
     (0, 1),
+    (-1, -1),
+    (1, -1),
+    (-1, 1),
     (1, 1),
 ];
+
+/// Moisture lost per cell as water soaks down through a seed bed.
+const SEED_SOAK_LOSS: u16 = 20;
 
 /// A bloom runs on a slower clock than the rest of the life materials: it loses
 /// energy once every this many ticks instead of every tick. The old bloom carried
@@ -75,7 +81,7 @@ const FACE_OFFSETS: [(i32, i32); 8] = [
 /// forever. Slowing the clock buys a watchable open → dust → wilt arc while
 /// keeping every material's energy under 255, which is what the scene-import
 /// clamp in `load_cells` assumes.
-const BLOOM_CLOCK: u32 = 8;
+const BLOOM_CLOCK: u16 = 8;
 const BLOOM_ENERGY: u16 = 200;
 const BLOOM_ENERGY_COSMIC: u16 = 250;
 /// The crown only unfurls petals down to this reserve, so a head is bounded by
@@ -481,8 +487,16 @@ impl Universe {
             // A bloom's whole arc ticks down on BLOOM_CLOCK, so its budget can stay a
             // small number the save format already accepts while still lasting long
             // enough to watch it open, dust the air with pollen, and finally wilt.
-            let drain = if cell.kind == Material::Flower as u8 && self.tick_count % BLOOM_CLOCK != 0
-            {
+            //
+            // The phase comes from the cell's OWN age, not the global tick count. Cell
+            // age is saved with the scene; the tick count is not restored on load, so a
+            // global phase would silently shift a loaded bloom's arc.
+            //
+            // The environmental drains ride the same slow clock deliberately. A bloom in
+            // a watered garden is usually wet, and Flower is absorbent, so letting the
+            // wet drain run at full rate would collapse the whole arc back to the few
+            // seconds this change exists to fix.
+            let drain = if cell.kind == Material::Flower as u8 && cell.age % BLOOM_CLOCK != 0 {
                 0
             } else {
                 drain
@@ -1016,10 +1030,7 @@ impl Universe {
         // directly beneath it, and moss was reliably winning that race, which is why
         // a watered garden used to end as a moss carpet and never as a flower.
         let (x, y) = self.xy(idx);
-        let claimed = y > 0 && {
-            let above = old[self.idx(x as u32, (y - 1) as u32)];
-            above.kind == Material::Seed as u8 && above.flags & FLAG_ROOTED != 0
-        };
+        let claimed = self.soil_is_claimed(x, y, old);
         if !claimed
             && next[idx].kind == Material::Soil as u8
             && next[idx].energy > 140
@@ -1029,6 +1040,20 @@ impl Universe {
             next[idx] = Cell::new(Material::Moss as u8, cell.variant, 90);
             next[idx].flags = FLAG_WET;
         }
+    }
+
+    /// Ground a living seed is standing on, which moss may not take — neither by the
+    /// soil greening on its own nor by moss spreading in from a neighbour. The claim is
+    /// held only while the seed is still viable: a seed that dries out releases the
+    /// ground, so the soil → moss → fungus → soil loop still closes on an abandoned bed.
+    fn soil_is_claimed(&self, x: i32, y: i32, old: &[Cell]) -> bool {
+        if y <= 0 {
+            return false;
+        }
+        let above = old[self.idx(x as u32, (y - 1) as u32)];
+        above.kind == Material::Seed as u8
+            && above.flags & FLAG_ROOTED != 0
+            && (above.flags & FLAG_WET != 0 || above.energy > 40)
     }
 
     fn update_liquid(
@@ -1156,11 +1181,33 @@ impl Universe {
                 next[idx].flags = FLAG_WET;
                 return;
             }
-            if below.kind == Material::Soil as u8 && wet {
+            // Water soaks down through a seed bed. Without this a painted bed never
+            // germinates at all: the seeds touching soil are buried at the bottom and
+            // never meet the water, while the seeds the water does reach are sitting on
+            // other seeds. Measured on a hand-painted planter, that combination produced
+            // zero rooted seeds in 3600 ticks.
+            if y > 0 {
+                let above = old[self.idx(x as u32, (y - 1) as u32)];
+                if above.kind == Material::Seed as u8 && above.energy > SEED_SOAK_LOSS {
+                    let soaked = above.energy - SEED_SOAK_LOSS;
+                    if soaked > next[idx].energy {
+                        next[idx].energy = soaked;
+                    }
+                }
+            }
+            // A wet seed is grounded either by soil directly under it or by another
+            // grounded seed, so a bed is rooted as a whole and sprouts from its surface.
+            let grounded = below.kind == Material::Soil as u8
+                || (below.kind == Material::Seed as u8 && below.flags & FLAG_ROOTED != 0);
+            if grounded && wet {
                 next[idx].flags |= FLAG_ROOTED;
                 // Germination: a fed, rooted seed becomes the base of a growing stalk.
                 // Its energy is the stalk's height budget, varied per seed by variant.
-                if cell.age > 30 && cell.energy > 70 && self.chance(if cosmic { 4 } else { 8 }) {
+                // Only a seed with open sky above sprouts — a buried one would germinate
+                // into a stalk that can never climb, wasting the bed's whole surface.
+                let open_above = y > 0 && is_growable(old[self.idx(x as u32, (y - 1) as u32)].kind);
+                if open_above && cell.age > 30 && cell.energy > 70 && self.chance(if cosmic { 4 } else { 8 })
+                {
                     next[idx] = Cell::new(
                         Material::Stem as u8,
                         cell.variant,
@@ -1195,7 +1242,7 @@ impl Universe {
             return;
         }
         let above = self.idx(x as u32, (y - 1) as u32);
-        if !old[above].is_empty() || !next[above].is_empty() || !self.chance(4) {
+        if !is_growable(old[above].kind) || !is_growable(next[above].kind) || !self.chance(4) {
             return;
         }
         let cosmic = cell.flags & FLAG_COSMIC != 0;
@@ -1255,7 +1302,7 @@ impl Universe {
             return;
         }
         let leaf = self.idx(lx as u32, y as u32);
-        if !old[leaf].is_empty() || !next[leaf].is_empty() {
+        if !is_growable(old[leaf].kind) || !is_growable(next[leaf].kind) {
             return;
         }
         next[leaf] = Cell::new(Material::Stem as u8, cell.variant, 12);
@@ -1355,7 +1402,13 @@ impl Universe {
         for nidx in self.neighbor_indices(x, y) {
             let other = old[nidx];
             let damp_substrate = other.flags & FLAG_WET != 0 || other.energy > 40;
-            let soft_substrate = other.kind == Material::Soil as u8 || other.kind == Material::Wood as u8;
+            // Ground under a living seed is off limits to moss spreading in as well as
+            // to soil greening on its own. Guarding only the latter left the claim
+            // porous: a bed still carpeted over, just from the side instead.
+            let (nx, ny) = self.xy(nidx);
+            let soft_substrate = (other.kind == Material::Soil as u8
+                && !self.soil_is_claimed(nx, ny, old))
+                || other.kind == Material::Wood as u8;
             let stone_substrate = other.kind == Material::Stone as u8;
             let wall_substrate = other.kind == Material::Wall as u8;
             let mut spread = false;
@@ -1862,6 +1915,16 @@ fn is_flammable(kind: u8) -> bool {
         || kind == Material::Rocket as u8
 }
 
+/// Growth may push up through standing water as well as through open air. A watered
+/// garden pools, and requiring bare air meant a bed only ever sprouted around the pond's
+/// dry margins while its whole middle stayed bare — which is what a player who waters
+/// generously actually sees.
+fn is_growable(kind: u8) -> bool {
+    kind == Material::Empty as u8
+        || kind == Material::Water as u8
+        || kind == Material::Moonwater as u8
+}
+
 fn burn_chance(kind: u8) -> u32 {
     match kind {
         x if x == Material::Oil as u8 => 2,
@@ -2274,6 +2337,157 @@ mod tests {
         assert!(
             u.cells.iter().any(|cell| cell.kind == Material::Stem as u8),
             "the fallen segment should land, not vanish"
+        );
+    }
+
+    #[test]
+    fn water_soaks_down_through_a_seed_bed() {
+        // Without this the seeds touching soil are buried and never meet the water, while
+        // the seeds the water reaches are standing on other seeds. Nothing ever roots.
+        let mut u = Universe::new(16, 20, 3);
+        for x in 0..16 {
+            set_cell(&mut u, x, 16, Material::Wall);
+        }
+        set_cell(&mut u, 8, 15, Material::Soil);
+        set_cell_state(&mut u, 8, 14, Material::Seed, 0, 0, 0);
+        set_cell_state(&mut u, 8, 13, Material::Seed, 0, 0, 0);
+        set_cell_state(&mut u, 8, 12, Material::Seed, 40, 250, FLAG_WET);
+        for _ in 0..12 {
+            u.tick();
+        }
+        assert!(
+            energy_at(&u, 8, 14) > 70,
+            "moisture should soak to the bottom of the bed, saw {}",
+            energy_at(&u, 8, 14)
+        );
+        assert!(
+            flags_at(&u, 8, 14) & FLAG_ROOTED != 0,
+            "the soaked seed on soil should root"
+        );
+    }
+
+    #[test]
+    fn a_seed_bed_sprouts_from_its_surface() {
+        let mut u = Universe::new(16, 24, 5);
+        for x in 0..16 {
+            set_cell(&mut u, x, 20, Material::Wall);
+        }
+        set_cell(&mut u, 8, 19, Material::Soil);
+        for y in [16, 17, 18] {
+            set_cell_state(&mut u, 8, y, Material::Seed, 40, 200, FLAG_WET);
+        }
+        let mut sprouted = false;
+        for _ in 0..400 {
+            u.tick();
+            if u.cells.iter().any(|c| c.kind == Material::Stem as u8) {
+                sprouted = true;
+                break;
+            }
+        }
+        assert!(sprouted, "a wet, grounded seed bed should sprout");
+        assert_eq!(
+            kind_at(&u, 8, 16),
+            Material::Stem as u8,
+            "the seed with open sky above is the one that sprouts"
+        );
+        assert_eq!(
+            kind_at(&u, 8, 17),
+            Material::Seed as u8,
+            "a buried seed should wait rather than germinate into a stalk that cannot climb"
+        );
+    }
+
+    #[test]
+    fn a_capped_seed_never_sprouts() {
+        // Pairs with the bed test: proves "sprouts from the surface" is a real gate and
+        // not just an artefact of which cell happened to be checked first.
+        let mut u = Universe::new(16, 24, 5);
+        for x in 0..16 {
+            set_cell(&mut u, x, 20, Material::Wall);
+        }
+        set_cell(&mut u, 8, 19, Material::Soil);
+        set_cell_state(&mut u, 8, 18, Material::Seed, 40, 200, FLAG_WET);
+        set_cell(&mut u, 8, 17, Material::Wall);
+        for _ in 0..400 {
+            u.tick();
+        }
+        assert_eq!(
+            kind_at(&u, 8, 18),
+            Material::Seed as u8,
+            "a seed sealed under wall should stay a seed"
+        );
+    }
+
+    #[test]
+    fn growth_pushes_up_through_standing_water() {
+        let mut u = Universe::new(16, 24, 7);
+        for x in 0..16 {
+            set_cell(&mut u, x, 20, Material::Wall);
+        }
+        set_cell(&mut u, 8, 19, Material::Soil);
+        set_cell_state(&mut u, 8, 18, Material::Seed, 40, 200, FLAG_WET);
+        // A walled shaft so the water stays standing over the seed instead of draining.
+        for y in 15..=20 {
+            set_cell(&mut u, 7, y, Material::Wall);
+            set_cell(&mut u, 9, y, Material::Wall);
+        }
+        set_cell_state(&mut u, 8, 17, Material::Water, 0, 60, 0);
+        set_cell_state(&mut u, 8, 16, Material::Water, 0, 60, 0);
+        let mut sprouted = false;
+        for _ in 0..400 {
+            u.tick();
+            if u.cells.iter().any(|c| c.kind == Material::Stem as u8) {
+                sprouted = true;
+                break;
+            }
+        }
+        assert!(
+            sprouted,
+            "a seed under shallow water should still send up a stalk — a watered bed pools, \
+             and requiring bare air left the whole middle of a garden bare"
+        );
+    }
+
+    #[test]
+    fn a_dried_out_seed_releases_its_ground() {
+        // The claim is a loan, not a deed: an abandoned bed must still complete the
+        // soil -> moss -> fungus -> soil loop.
+        let mut u = Universe::new(16, 16, 11);
+        for x in 0..16 {
+            set_cell(&mut u, x, 10, Material::Wall);
+        }
+        set_cell_state(&mut u, 8, 9, Material::Soil, 16, 250, FLAG_WET);
+        set_cell_state(&mut u, 8, 8, Material::Seed, 40, 0, FLAG_ROOTED);
+        let mut greened = false;
+        for _ in 0..300 {
+            u.tick();
+            if kind_at(&u, 8, 9) == Material::Moss as u8 {
+                greened = true;
+                break;
+            }
+        }
+        assert!(greened, "a spent seed should release the ground it claimed");
+    }
+
+    #[test]
+    fn moss_cannot_spread_into_claimed_ground() {
+        let mut u = Universe::new(16, 16, 13);
+        for x in 0..16 {
+            set_cell(&mut u, x, 10, Material::Wall);
+        }
+        set_cell_state(&mut u, 7, 9, Material::Moss, 40, 200, FLAG_WET);
+        set_cell_state(&mut u, 8, 9, Material::Soil, 16, 250, FLAG_WET);
+        set_cell_state(&mut u, 8, 8, Material::Seed, 40, 200, FLAG_WET | FLAG_ROOTED);
+        // Capped so the seed stays a seed and keeps holding the claim for the whole run.
+        set_cell(&mut u, 8, 7, Material::Wall);
+        for _ in 0..300 {
+            u.tick();
+        }
+        assert_ne!(
+            kind_at(&u, 8, 9),
+            Material::Moss as u8,
+            "moss should not spread into ground a living seed is standing on — guarding only \
+             the soil's own greening left the claim porous from the side"
         );
     }
 
