@@ -133,15 +133,19 @@ export function materialShowcaseScript() {
     // row is the only place a reviewer can check that a lavender is not a daisy.
     // These offsets mirror BLOOM_SHAPES in sim/src/lib.rs; keep them in step.
     const BLOOM_SHAPES = [
-      [[0, -1], [-1, 0], [1, 0]],                                  // poppy
-      [[0, -1], [-1, 0], [1, 0], [-1, 1], [1, 1]],                 // daisy
-      [[0, -1], [-1, -1], [1, -1], [0, -2]],                       // tulip
-      [[0, -1], [0, -2], [-1, -1], [1, -2], [0, -3]],              // lavender
-      [[0, -1], [-1, -1], [1, -1], [-1, 1], [1, 1]],               // pinwheel
+      [[0, -1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-2, 0], [2, 0], [-2, -1], [2, -1], [0, -2], [-1, -2], [1, -2], [-1, 1], [1, 1]], // round
+      [[0, -1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-2, 0], [2, 0], [0, -2], [-1, 1], [1, 1]],                                       // daisy
+      [[0, -1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-2, -1], [2, -1], [-2, -2], [0, -2], [2, -2]],                                   // tulip
+      [[0, -1], [-1, -2], [1, -2], [0, -3], [-1, -4], [1, -4], [0, -5]],                                                              // lavender
+      [[0, -1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-2, 0], [2, 0]],                                                                 // bellflower
     ];
     // The bed is Wall, not Stone and not bare soil: soil is a powder, so an unsupported
     // planter falls the moment the capture's sim starts and takes the whole plant with it.
-    line(191, 219, 75, material.Wall);
+    // The row lives in the empty bottom band because a five-wide head needs real room —
+    // the old right-hand strip could not fit these without the heads touching. It sits WEST
+    // of x=72 on purpose: the sand pile and the stardust/pollen exhibits above that column
+    // fall to the floor once the capture's sim starts, and they buried the first attempt.
+    line(10, 74, 135, material.Wall);
     // Crown and petal energies sit below CROWN_RESERVE and above the shed floor on
     // purpose, so the exhibit cannot open extra petals or drop them while the page runs.
     const plant = (bx, by, variant, stalk, leaves) => {
@@ -162,12 +166,13 @@ export function materialShowcaseScript() {
       }
     };
     // An unopened bud is a lone crown with too little budget left to open.
-    plant(194, 74, 0, 4, [[-1, 2]]);
-    setCell(194, 69, material.Flower, 100, 20, flag.Rooted, 0);
-    bloom(200, 74, 1, 5, [[-1, 2], [1, 4]], 100, 200);       // daisy
-    bloom(206, 74, 2, 5, [[1, 2], [-1, 4]], 100, 200);       // tulip
-    bloom(212, 74, 3, 5, [[-1, 2], [1, 4]], 100, 200);       // lavender
-    bloom(217, 74, 4, 5, [[-1, 2]], 45, 1300, 1);            // pinwheel, spent and shedding
+    plant(16, 134, 1, 4, [[-1, 2]]);
+    setCell(16, 129, material.Flower, 90, 20, flag.Rooted, 1);
+    bloom(26, 134, 0, 5, [[-1, 2], [1, 4]], 95, 200);        // round bloom
+    bloom(36, 134, 1, 5, [[1, 2], [-1, 4]], 95, 200);        // daisy
+    bloom(46, 134, 2, 5, [[-1, 2], [1, 4]], 95, 200);        // tulip
+    bloom(56, 134, 3, 5, [[1, 2], [-1, 4]], 95, 200);        // lavender
+    bloom(66, 134, 4, 5, [[-1, 2], [1, 4]], 45, 1300, 2);    // bellflower, spent and shedding
 
     // Geology: a larger stone mass with mineral veins and an old patinated wall.
     rect(24, 44, 44, 56, material.Stone, 0, 60);

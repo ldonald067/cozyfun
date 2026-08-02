@@ -76,27 +76,67 @@ const SEED_SOAK_LOSS: u16 = 20;
 
 /// A seed will not germinate this close to an existing plant. Without it every cell of a
 /// watered bed sprouts and the meadow becomes one solid wall of blooms with no silhouette.
-const PLANT_SPACING: i32 = 3;
+/// Five keeps a clear gap between heads now that a head is itself five cells across.
+const PLANT_SPACING: i32 = 5;
 
 /// Per-plant bloom silhouettes, chosen by the plant's variant exactly as its hue is.
 /// Offsets are relative to the crown, which always sits directly above the stalk tip, and
 /// are opened in listed order. A head that is always a filled 3x3 reads as a square; these
 /// give a meadow actual shapes to tell apart. Every offset stays connected to the one
 /// before it, so no petal is ever stranded on its own.
-/// Every shape leaves gaps. At four screen pixels per cell a silhouette is carried by its
-/// negative space, not its size: the first draft filled solid 3x2 rectangles and those read
-/// as coloured blocks, while the cross and the spike beside them read as flowers.
+/// Per-plant bloom silhouettes: five cells across, which is the smallest head that can hold
+/// a shape at all. A 3-wide head has too few pixels to be anything but a block or a cross —
+/// at five, knocked-off corners, a notched top edge and a checkered spike all read. Petals
+/// are listed in opening order and every offset touches one already placed, so a half-open
+/// bloom is never a scatter of stranded cells.
 const BLOOM_SHAPES: [&[(i32, i32)]; 5] = [
-    // Poppy: a small three-petal cross around a bright eye.
-    &[(0, -1), (-1, 0), (1, 0)],
-    // Daisy: five petals in a star, the stalk running up between the lower two.
-    &[(0, -1), (-1, 0), (1, 0), (-1, 1), (1, 1)],
-    // Tulip: an upright cup carried above the crown.
-    &[(0, -1), (-1, -1), (1, -1), (0, -2)],
-    // Lavender: a narrow spike climbing above the crown.
-    &[(0, -1), (0, -2), (-1, -1), (1, -2), (0, -3)],
-    // Pinwheel: four petals set on the diagonals, with an open cross between them.
-    &[(0, -1), (-1, -1), (1, -1), (-1, 1), (1, 1)],
+    // Round bloom: a full head with its corners knocked off, a bright eye at the middle.
+    &[
+        (0, -1),
+        (-1, 0),
+        (1, 0),
+        (-1, -1),
+        (1, -1),
+        (-2, 0),
+        (2, 0),
+        (-2, -1),
+        (2, -1),
+        (0, -2),
+        (-1, -2),
+        (1, -2),
+        (-1, 1),
+        (1, 1),
+    ],
+    // Daisy: the same span opened out into a diamond, so the gaps do the work.
+    &[
+        (0, -1),
+        (-1, 0),
+        (1, 0),
+        (-1, -1),
+        (1, -1),
+        (-2, 0),
+        (2, 0),
+        (0, -2),
+        (-1, 1),
+        (1, 1),
+    ],
+    // Tulip: a solid cup under a notched top edge — the notches are the whole signature.
+    &[
+        (0, -1),
+        (-1, 0),
+        (1, 0),
+        (-1, -1),
+        (1, -1),
+        (-2, -1),
+        (2, -1),
+        (-2, -2),
+        (0, -2),
+        (2, -2),
+    ],
+    // Lavender: a tall checkered spike, three wide and six high.
+    &[(0, -1), (-1, -2), (1, -2), (0, -3), (-1, -4), (1, -4), (0, -5)],
+    // Bellflower: a wide, low head that spreads sideways instead of climbing.
+    &[(0, -1), (-1, 0), (1, 0), (-1, -1), (1, -1), (-2, 0), (2, 0)],
 ];
 
 /// A bloom runs on a slower clock than the rest of the life materials: it loses
@@ -110,10 +150,12 @@ const BLOOM_CLOCK: u16 = 8;
 const BLOOM_ENERGY: u16 = 200;
 const BLOOM_ENERGY_COSMIC: u16 = 250;
 /// The crown only unfurls petals down to this reserve, so a head is bounded by
-/// budget as well as by the open faces around it.
-const CROWN_RESERVE: u16 = 112;
+/// budget as well as by its silhouette. The cost must leave room for the largest shape
+/// (14 petals) *plus* the energy the crown drains while it is opening, or the biggest
+/// blooms stall half-open.
+const CROWN_RESERVE: u16 = 100;
 const PETAL_ENERGY: u16 = 150;
-const PETAL_COST: u16 = 10;
+const PETAL_COST: u16 = 4;
 /// Below this a bloom is spent: no more pollen, and petals may start to let go.
 const POLLEN_RESERVE: u16 = 40;
 const POLLEN_COST: u16 = 15;
@@ -1374,7 +1416,11 @@ impl Universe {
                 continue;
             }
             let site = self.idx(nx as u32, ny as u32);
-            if old[site].is_empty() && next[site].is_empty() {
+            // A petal may open through the head's own drifting pollen. A mote that lands
+            // on top of a bloom is wedged — the bloom is under it, so it cannot fall — and
+            // it would otherwise hold the last petal site until it aged out, leaving big
+            // heads permanently one petal short at the crest.
+            if petal_site_free(old[site]) && petal_site_free(next[site]) {
                 return Some(site);
             }
         }
@@ -1997,6 +2043,10 @@ fn is_flammable(kind: u8) -> bool {
 /// garden pools, and requiring bare air meant a bed only ever sprouted around the pond's
 /// dry margins while its whole middle stayed bare — which is what a player who waters
 /// generously actually sees.
+fn petal_site_free(cell: Cell) -> bool {
+    cell.is_empty() || cell.kind == Material::Pollen as u8
+}
+
 fn is_growable(kind: u8) -> bool {
     kind == Material::Empty as u8
         || kind == Material::Water as u8

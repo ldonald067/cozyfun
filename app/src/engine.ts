@@ -1109,7 +1109,10 @@ class JsSandboxEngine implements SandboxEngine {
       const ny = y + dy;
       if (!this.inBounds(nx, ny)) continue;
       const site = this.index(nx, ny);
-      if (old[site] === MATERIAL.Empty && next[site] === MATERIAL.Empty) return site;
+      // A petal may open through the head's own drifting pollen: a mote that lands on top
+      // of a bloom is wedged (the bloom is under it) and would otherwise hold the last
+      // petal site until it aged out, leaving big heads one petal short at the crest.
+      if (petalSiteFree(old[site]) && petalSiteFree(next[site])) return site;
     }
     return -1;
   }
@@ -1324,31 +1327,36 @@ const SEED_SOAK_LOSS = 20;
 
 // A seed will not germinate this close to an existing plant. Without it every cell of a
 // watered bed sprouts and the meadow becomes one solid wall of blooms with no silhouette.
-const PLANT_SPACING = 3;
+// Five keeps a clear gap between heads now that a head is itself five cells across.
+const PLANT_SPACING = 5;
 
 // Per-plant bloom silhouettes, chosen by the plant's variant exactly as its hue is.
 // Offsets are relative to the crown, which always sits directly above the stalk tip, and
 // are opened in listed order. Mirrors BLOOM_SHAPES in sim/src/lib.rs.
-// Every shape leaves gaps. At four screen pixels per cell a silhouette is carried by its
-// negative space, not its size: the first draft filled solid 3x2 rectangles and those read
-// as coloured blocks, while the cross and the spike beside them read as flowers.
+// Per-plant bloom silhouettes: five cells across, which is the smallest head that can hold
+// a shape at all. Petals are listed in opening order and every offset touches one already
+// placed. Mirrors BLOOM_SHAPES in sim/src/lib.rs.
 const BLOOM_SHAPES: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [
-  // Poppy: a small three-petal cross around a bright eye.
-  [[0, -1], [-1, 0], [1, 0]],
-  // Daisy: five petals in a star, the stalk running up between the lower two.
-  [[0, -1], [-1, 0], [1, 0], [-1, 1], [1, 1]],
-  // Tulip: an upright cup carried above the crown.
-  [[0, -1], [-1, -1], [1, -1], [0, -2]],
-  // Lavender: a narrow spike climbing above the crown.
-  [[0, -1], [0, -2], [-1, -1], [1, -2], [0, -3]],
-  // Pinwheel: four petals set on the diagonals, with an open cross between them.
-  [[0, -1], [-1, -1], [1, -1], [-1, 1], [1, 1]]
+  // Round bloom: a full head with its corners knocked off, a bright eye at the middle.
+  [[0, -1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-2, 0], [2, 0], [-2, -1], [2, -1], [0, -2], [-1, -2], [1, -2], [-1, 1], [1, 1]],
+  // Daisy: the same span opened out into a diamond, so the gaps do the work.
+  [[0, -1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-2, 0], [2, 0], [0, -2], [-1, 1], [1, 1]],
+  // Tulip: a solid cup under a notched top edge — the notches are the whole signature.
+  [[0, -1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-2, -1], [2, -1], [-2, -2], [0, -2], [2, -2]],
+  // Lavender: a tall checkered spike, three wide and six high.
+  [[0, -1], [-1, -2], [1, -2], [0, -3], [-1, -4], [1, -4], [0, -5]],
+  // Bellflower: a wide, low head that spreads sideways instead of climbing.
+  [[0, -1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-2, 0], [2, 0]]
 ];
 
 // Growth may push up through standing water as well as through open air. A watered garden
 // pools, and requiring bare air meant a bed only ever sprouted around the pond's dry
 // margins while its whole middle stayed bare — which is what a player who waters
 // generously actually sees.
+function petalSiteFree(kind: number) {
+  return kind === MATERIAL.Empty || kind === MATERIAL.Pollen;
+}
+
 function isGrowable(kind: number) {
   return kind === MATERIAL.Empty || kind === MATERIAL.Water || kind === MATERIAL.Moonwater;
 }
@@ -1359,9 +1367,9 @@ function isGrowable(kind: number) {
 const BLOOM_CLOCK = 8;
 const BLOOM_ENERGY = 200;
 const BLOOM_ENERGY_COSMIC = 250;
-const CROWN_RESERVE = 112;
+const CROWN_RESERVE = 100;
 const PETAL_ENERGY = 150;
-const PETAL_COST = 10;
+const PETAL_COST = 4;
 const POLLEN_RESERVE = 40;
 const POLLEN_COST = 15;
 const PETAL_SHED_AGE = 1200;
