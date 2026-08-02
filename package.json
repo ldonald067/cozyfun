@@ -21,7 +21,8 @@
     "test:firefox": "powershell -ExecutionPolicy Bypass -File scripts/test-firefox.ps1",
     "visual:qa": "node scripts/visual-qa.mjs",
     "audio:qa": "node scripts/audio-qa.mjs",
-    "check": "npm run material:audit && npm run material:contrast && npm run test:sim && npm run build && node scripts/smoke-wasm.mjs && npm run test:js-fallback && npm run test:parity && npm run test:subpath && npm run test:audio-reactions && npm run test:browser && npm run audio:qa && npm run visual:qa",
-    "test:subpath": "node scripts/smoke-subpath.mjs"
+    "check": "npm run material:audit && npm run material:contrast && npm run test:sim && npm run build && node scripts/smoke-wasm.mjs && npm run test:js-fallback && npm run test:parity && npm run interaction:audit && npm run test:subpath && npm run test:audio-reactions && npm run test:browser && npm run audio:qa && npm run visual:qa",
+    "test:subpath": "node scripts/smoke-subpath.mjs",
+    "interaction:audit": "node scripts/interaction-audit.mjs"
   }
 }
