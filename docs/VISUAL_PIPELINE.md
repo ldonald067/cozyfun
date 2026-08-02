@@ -57,6 +57,8 @@ Current life/water rules:
 - Ground a living seed is standing on stops greening into moss, and moss cannot spread into it from the side either. Guarding only the soil's own greening left the claim porous: the bed still carpeted over, just from a neighbour. The claim is released when the seed dries out, so an abandoned bed still completes the soil → moss → fungus → soil loop.
 - A stalk climbs four to seven cells and unfurls leaves on alternating sides. It stands on its own base or clings to a neighbouring stalk cell that has one, so leaves stay attached while a cut stalk still collapses whole.
 - A bloom arrives as a closed bud and opens petal by petal into a head around the rooted crown, dusts pollen from the head's open faces, then sheds spent petals as drifting motes and leaves the crown standing as a seed head.
+- A plant's **silhouette** comes from its `variant`, exactly as its hue does: poppy cross, daisy star, tulip cup, lavender spike, or pinwheel. Every shape leaves gaps on purpose. At four screen pixels per cell a bloom is read by its negative space, not its size — the first draft filled solid 3x2 rectangles and they read as coloured blocks, while the cross and the spike beside them read as flowers.
+- A seed will not germinate within `PLANT_SPACING` of an existing plant. Without that every cell of a watered bed sprouts and the meadow is one continuous wall of petals with no silhouette at all.
 - Watered moss uses that energy to spread into nearby soil or wood more readily.
 - Watered soil stores moisture briefly and can green up into moss even after the water has moved away.
 - Fungus can rot wet seeds or overtake old wet moss, keeping decay distinct from plant growth.

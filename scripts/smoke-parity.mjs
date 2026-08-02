@@ -327,8 +327,11 @@ const scenarios = [
     },
     expect(seen) {
       if (!seen.leaf) return "no stalk ever unfurled a leaf";
-      if ((seen.maxHead ?? 0) < 6) return `head never opened past ${seen.maxHead ?? 0} cells`;
-      if ((seen.maxCosmicHead ?? 0) < 6) return `cosmic head never opened past ${seen.maxCosmicHead ?? 0} cells`;
+      // 4 = crown plus the smallest silhouette (the three-petal poppy). Thresholds above
+      // that would be asserting which BLOOM_SHAPES entry these two variants happen to
+      // pick, not that blooms open — and would fail the moment a shape is retuned.
+      if ((seen.maxHead ?? 0) < 4) return `head never opened into a multi-cell bloom (peaked at ${seen.maxHead ?? 0})`;
+      if ((seen.maxCosmicHead ?? 0) < 4) return `cosmic head never opened into a multi-cell bloom (peaked at ${seen.maxCosmicHead ?? 0})`;
       if ((seen.pollenTicks ?? 0) < 20) return `pollen was airborne on only ${seen.pollenTicks ?? 0} ticks`;
       if (!seen.shed) return "no bloom ever shed a petal";
       return null;

@@ -79,7 +79,7 @@ export function materialShowcaseScript() {
     // lit cosmic by moonwater. This used to be six loose rooted crowns at six variants,
     // which now reads as six separate half-open buds in six different hues.
     setCell(88, 57, material.Flower, 100, 48, flag.Rooted, 4);
-    for (const [dx, dy] of [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]]) {
+    for (const [dx, dy] of [[0, -1], [-1, -1], [1, -1], [-1, 1], [1, 1]]) {
       setCell(88 + dx, 57 + dy, material.Flower, 95, 44, 0, 4);
     }
     setCell(90, 57, material.Oil, 70, 20);
@@ -127,13 +127,21 @@ export function materialShowcaseScript() {
     for (const [x, y] of [[22, 63], [22, 66], [22, 69]]) setCell(x, y, material.Ice, 90, 28);
     for (const [x, y] of [[34, 68], [34, 69]]) setCell(x, y, material.Fire, 230, 10);
 
-    // Grown plants: the bloom arc side by side, in the exact cell layout the sim
-    // produces — a head is a crown (rooted, the disc) with petals opened around it, on a
-    // leafy stalk. Three stages and three of the five garden hues, because hue is chosen
-    // by variant and a single specimen cannot show that a head is one flat colour.
+    // Grown plants: all five bloom silhouettes side by side, in the exact cell layout the
+    // sim produces — a head is a crown with its shape's petals opened around it, on a leafy
+    // stalk. One specimen cannot show that shape AND hue are both chosen per plant, so the
+    // row is the only place a reviewer can check that a lavender is not a daisy.
+    // These offsets mirror BLOOM_SHAPES in sim/src/lib.rs; keep them in step.
+    const BLOOM_SHAPES = [
+      [[0, -1], [-1, 0], [1, 0]],                                  // poppy
+      [[0, -1], [-1, 0], [1, 0], [-1, 1], [1, 1]],                 // daisy
+      [[0, -1], [-1, -1], [1, -1], [0, -2]],                       // tulip
+      [[0, -1], [0, -2], [-1, -1], [1, -2], [0, -3]],              // lavender
+      [[0, -1], [-1, -1], [1, -1], [-1, 1], [1, 1]],               // pinwheel
+    ];
     // The bed is Wall, not Stone and not bare soil: soil is a powder, so an unsupported
     // planter falls the moment the capture's sim starts and takes the whole plant with it.
-    line(196, 216, 75, material.Wall);
+    line(191, 219, 75, material.Wall);
     // Crown and petal energies sit below CROWN_RESERVE and above the shed floor on
     // purpose, so the exhibit cannot open extra petals or drop them while the page runs.
     const plant = (bx, by, variant, stalk, leaves) => {
@@ -141,25 +149,25 @@ export function materialShowcaseScript() {
       for (let i = 1; i <= stalk; i++) setCell(bx, by - i, material.Stem, 20, 50, i === 1 ? flag.Rooted : 0, variant);
       for (const [lx, ly] of leaves) setCell(bx + lx, by - ly, material.Stem, 12, 40, 0, variant);
     };
-    // Open cornflower head: crown at the middle, seven petals around it, stem below.
-    plant(199, 74, 0, 5, [[-1, 2], [1, 4]]);
-    setCell(199, 68, material.Flower, 100, 200, flag.Rooted, 0);
-    for (const [dx, dy] of [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [1, 1]]) {
-      setCell(199 + dx, 68 + dy, material.Flower, 95, 180, 0, 0);
-    }
-    // Unopened buttercup bud: a lone crown, no petals yet.
-    plant(206, 74, 3, 4, [[-1, 2]]);
-    setCell(206, 69, material.Flower, 100, 20, flag.Rooted, 3);
-    // Spent tulip head part way through shedding: petals gone from one flank, and the
-    // low energy on what is left is what drives the wilt tint.
-    plant(213, 74, 1, 5, [[1, 2], [-1, 4]]);
-    setCell(213, 68, material.Flower, 45, 1300, flag.Rooted, 1);
-    // The surviving petals stay attached to the crown. A petal left stranded on its own
-    // has no Flower neighbours, so it correctly renders as a bud — true to the rule, but
-    // it reads as a stray blob in a lineup meant to show a thinning head.
-    for (const [dx, dy] of [[0, -1], [1, -1], [1, 0]]) {
-      setCell(213 + dx, 68 + dy, material.Flower, 45, 1320, 0, 1);
-    }
+    const bloom = (bx, by, variant, stalk, leaves, energy, age, skip = 0) => {
+      plant(bx, by, variant, stalk, leaves);
+      const cy = by - stalk - 1;
+      setCell(bx, cy, material.Flower, energy, age, flag.Rooted, variant);
+      const shape = BLOOM_SHAPES[variant % BLOOM_SHAPES.length];
+      // skip drops the last petals, showing a head part way through shedding. Dropping
+      // from the end keeps what is left attached: a petal stranded alone has no Flower
+      // neighbours, so it correctly renders as a bud and reads as a stray blob here.
+      for (const [dx, dy] of shape.slice(0, shape.length - skip)) {
+        setCell(bx + dx, cy + dy, material.Flower, Math.max(45, energy - 5), age - 20, 0, variant);
+      }
+    };
+    // An unopened bud is a lone crown with too little budget left to open.
+    plant(194, 74, 0, 4, [[-1, 2]]);
+    setCell(194, 69, material.Flower, 100, 20, flag.Rooted, 0);
+    bloom(200, 74, 1, 5, [[-1, 2], [1, 4]], 100, 200);       // daisy
+    bloom(206, 74, 2, 5, [[1, 2], [-1, 4]], 100, 200);       // tulip
+    bloom(212, 74, 3, 5, [[-1, 2], [1, 4]], 100, 200);       // lavender
+    bloom(217, 74, 4, 5, [[-1, 2]], 45, 1300, 1);            // pinwheel, spent and shedding
 
     // Geology: a larger stone mass with mineral veins and an old patinated wall.
     rect(24, 44, 44, 56, material.Stone, 0, 60);

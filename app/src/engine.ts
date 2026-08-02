@@ -1014,7 +1014,7 @@ class JsSandboxEngine implements SandboxEngine {
       // Only a seed with open sky above sprouts — a buried one would germinate into a
       // stalk that can never climb, wasting the bed's whole surface.
       const openAbove = aboveIdx >= 0 && isGrowable(old[aboveIdx]);
-      if (openAbove && age > 30 && energy > 70 && this.chance(cosmic ? 4 : 8)) {
+      if (openAbove && age > 30 && energy > 70 && !this.plantNearby(x, y, old, next) && this.chance(cosmic ? 4 : 8)) {
         // Each segment costs 55, so this is a 4-to-7 cell stalk. The old 130 base could
         // bloom after a single segment, leaving a head almost on the ground with no room
         // for leaves.
@@ -1102,6 +1102,36 @@ class JsSandboxEngine implements SandboxEngine {
     return -1;
   }
 
+  // Next unfilled cell of this plant's bloom silhouette, in the shape's own order.
+  private nextPetalSite(x: number, y: number, variant: number, old: Uint8Array, next: Uint8Array) {
+    for (const [dx, dy] of BLOOM_SHAPES[variant % BLOOM_SHAPES.length]) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (!this.inBounds(nx, ny)) continue;
+      const site = this.index(nx, ny);
+      if (old[site] === MATERIAL.Empty && next[site] === MATERIAL.Empty) return site;
+    }
+    return -1;
+  }
+
+  // Whether another plant already stands within PLANT_SPACING. Checks next as well as old
+  // so seeds germinating in the same tick still space themselves out.
+  private plantNearby(x: number, y: number, old: Uint8Array, next: Uint8Array) {
+    for (let dy = -PLANT_SPACING; dy <= PLANT_SPACING; dy++) {
+      for (let dx = -PLANT_SPACING; dx <= PLANT_SPACING; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const nx = x + dx;
+        const ny = y + dy;
+        if (!this.inBounds(nx, ny)) continue;
+        const site = this.index(nx, ny);
+        for (const kind of [old[site], next[site]]) {
+          if (kind === MATERIAL.Stem || kind === MATERIAL.Flower) return true;
+        }
+      }
+    }
+    return false;
+  }
+
   private flower(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
     if (next[idx] !== MATERIAL.Flower || readU16(next, idx + 6) & CELL_FLAG.Frozen) return;
     const age = readU16(cell, 2);
@@ -1114,7 +1144,7 @@ class JsSandboxEngine implements SandboxEngine {
     // opening rather than appearing whole. Petals are never rooted, so only the crown
     // ever opens and a head cannot run away.
     if (flags & CELL_FLAG.Rooted && energy > CROWN_RESERVE && age > 12 && this.chance(cosmic ? 8 : 12)) {
-      const petal = this.openFace(x, y, 0, old, next);
+      const petal = this.nextPetalSite(x, y, cell[1], old, next);
       if (petal >= 0) {
         writeCellBytes(next, petal, MATERIAL.Flower, cell[1], PETAL_ENERGY, 0, cosmic ? CELL_FLAG.Cosmic : 0);
         writeU16(next, idx + 4, Math.max(0, readU16(next, idx + 4) - PETAL_COST));
@@ -1291,6 +1321,29 @@ const FACE_OFFSETS: ReadonlyArray<readonly [number, number]> = [
 
 // Moisture lost per cell as water soaks down through a seed bed.
 const SEED_SOAK_LOSS = 20;
+
+// A seed will not germinate this close to an existing plant. Without it every cell of a
+// watered bed sprouts and the meadow becomes one solid wall of blooms with no silhouette.
+const PLANT_SPACING = 3;
+
+// Per-plant bloom silhouettes, chosen by the plant's variant exactly as its hue is.
+// Offsets are relative to the crown, which always sits directly above the stalk tip, and
+// are opened in listed order. Mirrors BLOOM_SHAPES in sim/src/lib.rs.
+// Every shape leaves gaps. At four screen pixels per cell a silhouette is carried by its
+// negative space, not its size: the first draft filled solid 3x2 rectangles and those read
+// as coloured blocks, while the cross and the spike beside them read as flowers.
+const BLOOM_SHAPES: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [
+  // Poppy: a small three-petal cross around a bright eye.
+  [[0, -1], [-1, 0], [1, 0]],
+  // Daisy: five petals in a star, the stalk running up between the lower two.
+  [[0, -1], [-1, 0], [1, 0], [-1, 1], [1, 1]],
+  // Tulip: an upright cup carried above the crown.
+  [[0, -1], [-1, -1], [1, -1], [0, -2]],
+  // Lavender: a narrow spike climbing above the crown.
+  [[0, -1], [0, -2], [-1, -1], [1, -2], [0, -3]],
+  // Pinwheel: four petals set on the diagonals, with an open cross between them.
+  [[0, -1], [-1, -1], [1, -1], [-1, 1], [1, 1]]
+];
 
 // Growth may push up through standing water as well as through open air. A watered garden
 // pools, and requiring bare air meant a bed only ever sprouted around the pond's dry

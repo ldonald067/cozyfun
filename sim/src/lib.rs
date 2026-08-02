@@ -74,6 +74,31 @@ const FACE_OFFSETS: [(i32, i32); 8] = [
 /// Moisture lost per cell as water soaks down through a seed bed.
 const SEED_SOAK_LOSS: u16 = 20;
 
+/// A seed will not germinate this close to an existing plant. Without it every cell of a
+/// watered bed sprouts and the meadow becomes one solid wall of blooms with no silhouette.
+const PLANT_SPACING: i32 = 3;
+
+/// Per-plant bloom silhouettes, chosen by the plant's variant exactly as its hue is.
+/// Offsets are relative to the crown, which always sits directly above the stalk tip, and
+/// are opened in listed order. A head that is always a filled 3x3 reads as a square; these
+/// give a meadow actual shapes to tell apart. Every offset stays connected to the one
+/// before it, so no petal is ever stranded on its own.
+/// Every shape leaves gaps. At four screen pixels per cell a silhouette is carried by its
+/// negative space, not its size: the first draft filled solid 3x2 rectangles and those read
+/// as coloured blocks, while the cross and the spike beside them read as flowers.
+const BLOOM_SHAPES: [&[(i32, i32)]; 5] = [
+    // Poppy: a small three-petal cross around a bright eye.
+    &[(0, -1), (-1, 0), (1, 0)],
+    // Daisy: five petals in a star, the stalk running up between the lower two.
+    &[(0, -1), (-1, 0), (1, 0), (-1, 1), (1, 1)],
+    // Tulip: an upright cup carried above the crown.
+    &[(0, -1), (-1, -1), (1, -1), (0, -2)],
+    // Lavender: a narrow spike climbing above the crown.
+    &[(0, -1), (0, -2), (-1, -1), (1, -2), (0, -3)],
+    // Pinwheel: four petals set on the diagonals, with an open cross between them.
+    &[(0, -1), (-1, -1), (1, -1), (-1, 1), (1, 1)],
+];
+
 /// A bloom runs on a slower clock than the rest of the life materials: it loses
 /// energy once every this many ticks instead of every tick. The old bloom carried
 /// 90 energy at 1/tick — about a second and a half of life — which is why an
@@ -1206,7 +1231,11 @@ impl Universe {
                 // Only a seed with open sky above sprouts — a buried one would germinate
                 // into a stalk that can never climb, wasting the bed's whole surface.
                 let open_above = y > 0 && is_growable(old[self.idx(x as u32, (y - 1) as u32)].kind);
-                if open_above && cell.age > 30 && cell.energy > 70 && self.chance(if cosmic { 4 } else { 8 })
+                if open_above
+                    && cell.age > 30
+                    && cell.energy > 70
+                    && !self.plant_nearby(x, y, old, next)
+                    && self.chance(if cosmic { 4 } else { 8 })
                 {
                     next[idx] = Cell::new(
                         Material::Stem as u8,
@@ -1329,6 +1358,55 @@ impl Universe {
         None
     }
 
+    /// Next unfilled cell of this plant's bloom silhouette, in the shape's own order.
+    fn next_petal_site(
+        &self,
+        idx: usize,
+        variant: u8,
+        old: &[Cell],
+        next: &[Cell],
+    ) -> Option<usize> {
+        let (x, y) = self.xy(idx);
+        for &(dx, dy) in BLOOM_SHAPES[usize::from(variant) % BLOOM_SHAPES.len()] {
+            let nx = x + dx;
+            let ny = y + dy;
+            if !self.in_bounds(nx, ny) {
+                continue;
+            }
+            let site = self.idx(nx as u32, ny as u32);
+            if old[site].is_empty() && next[site].is_empty() {
+                return Some(site);
+            }
+        }
+        None
+    }
+
+    /// Whether another plant already stands within `PLANT_SPACING`. Checks `next` as well
+    /// as `old` so seeds germinating in the same tick still space themselves out.
+    fn plant_nearby(&self, x: i32, y: i32, old: &[Cell], next: &[Cell]) -> bool {
+        for dy in -PLANT_SPACING..=PLANT_SPACING {
+            for dx in -PLANT_SPACING..=PLANT_SPACING {
+                if dx == 0 && dy == 0 {
+                    continue;
+                }
+                let nx = x + dx;
+                let ny = y + dy;
+                if !self.in_bounds(nx, ny) {
+                    continue;
+                }
+                let site = self.idx(nx as u32, ny as u32);
+                for candidate in [old[site], next[site]] {
+                    if candidate.kind == Material::Stem as u8
+                        || candidate.kind == Material::Flower as u8
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
     fn update_flower(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
         if next[idx].kind != Material::Flower as u8 || next[idx].flags & FLAG_FROZEN != 0 {
             return;
@@ -1344,7 +1422,7 @@ impl Universe {
             && cell.age > 12
             && self.chance(if cosmic { 8 } else { 12 })
         {
-            if let Some(petal) = self.open_face(idx, 0, old, next) {
+            if let Some(petal) = self.next_petal_site(idx, cell.variant, old, next) {
                 next[petal] = Cell::new(Material::Flower as u8, cell.variant, PETAL_ENERGY);
                 next[petal].flags = if cosmic { FLAG_COSMIC } else { 0 };
                 next[idx].energy = next[idx].energy.saturating_sub(PETAL_COST);
@@ -2547,23 +2625,37 @@ mod tests {
 
     #[test]
     fn a_bud_opens_into_a_petal_crown() {
-        let mut u = Universe::new(16, 16, 3);
-        set_cell_state(&mut u, 8, 8, Material::Flower, 20, BLOOM_ENERGY, FLAG_ROOTED);
-        for _ in 0..400 {
-            u.tick();
-        }
-        let petals = u
-            .cells
-            .iter()
-            .filter(|cell| cell.kind == Material::Flower as u8)
-            .count();
-        assert!(
-            petals >= 6,
-            "a rooted crown should unfurl into a multi-cell head, saw {petals} cells"
+        // The plant's variant picks its silhouette, so a head's size is its shape's size
+        // rather than one constant. Two variants must give two different blooms — that is
+        // the whole point of the table, and a fixed threshold here would hide a regression
+        // that collapsed every plant back to the same head.
+        let head_of = |variant: u8| {
+            let mut u = Universe::new(16, 16, 3);
+            set_cell_state(&mut u, 8, 8, Material::Flower, 20, BLOOM_ENERGY, FLAG_ROOTED);
+            let idx = u.idx(8, 8);
+            u.cells[idx].variant = variant;
+            for _ in 0..400 {
+                u.tick();
+            }
+            u.cells
+                .iter()
+                .filter(|cell| cell.kind == Material::Flower as u8)
+                .count()
+        };
+        assert_eq!(
+            head_of(0),
+            1 + BLOOM_SHAPES[0].len(),
+            "a poppy crown should open its whole silhouette"
         );
-        assert!(
-            petals <= 9,
-            "the head is bounded by its budget and its open faces, saw {petals} cells"
+        assert_eq!(
+            head_of(3),
+            1 + BLOOM_SHAPES[3].len(),
+            "a lavender crown should open its whole silhouette"
+        );
+        assert_ne!(
+            head_of(0),
+            head_of(3),
+            "different variants should grow visibly different blooms"
         );
     }
 

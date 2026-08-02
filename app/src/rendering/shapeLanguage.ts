@@ -44,6 +44,11 @@ const PETAL_HUES: ReadonlyArray<readonly [Rgb, Rgb]> = [
   [[190, 130, 236], [126, 70, 182]]
 ];
 const COSMIC_PETAL: readonly [Rgb, Rgb] = [[228, 214, 255], [150, 118, 226]];
+// Which BLOOM_SHAPES entries (sim/src/lib.rs) hold the crown at the middle of the head,
+// where a bright eye belongs. The tulip and the lavender carry their petals *above* the
+// crown, so gilding it would put a gold dot at the bloom's base rather than its heart.
+// Indexed by the same `variant % 5` that picks the shape and the hue.
+const BLOOM_SHAPE_HAS_EYE: readonly boolean[] = [true, true, false, false, true];
 // The eye of an open head. Warm gold reads against every petal hue above, including
 // the buttercup, because the disc is always the darker, denser of the two.
 const FLOWER_DISC: readonly [Rgb, Rgb] = [[255, 216, 104], [198, 134, 30]];
@@ -592,7 +597,7 @@ function flowerColor({ variant, age, energy, flags, time, cells, width, height, 
     // beneath it. Leading with green instead put a muddy olive dot on top of the stem.
     out = mixRgb(petalDark, [58, 104, 58], 0.28 - bloom * 0.1);
     if ((hash & 3) === 0) out = mixRgb(out, [104, 160, 82], 0.18);
-  } else if (rooted) {
+  } else if (rooted && BLOOM_SHAPE_HAS_EYE[variant % PETAL_HUES.length]) {
     // Disc: a dense golden eye, flecked so it does not read as a flat square.
     out = mixRgb(FLOWER_DISC[0], FLOWER_DISC[1], ((x ^ y) & 1) === 0 ? 0.1 : 0.42);
     if ((hash & 7) === 0) out = mixRgb(out, [255, 246, 196], 0.5);
