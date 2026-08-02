@@ -1104,7 +1104,7 @@ class JsSandboxEngine implements SandboxEngine {
 
   // Next unfilled cell of this plant's bloom silhouette, in the shape's own order.
   private nextPetalSite(x: number, y: number, variant: number, old: Uint8Array, next: Uint8Array) {
-    for (const [dx, dy] of BLOOM_SHAPES[variant % BLOOM_SHAPES.length]) {
+    for (const [dx, dy] of BLOOM_SHAPES[variant & 7]) {
       const nx = x + dx;
       const ny = y + dy;
       if (!this.inBounds(nx, ny)) continue;
@@ -1333,20 +1333,26 @@ const PLANT_SPACING = 5;
 // Per-plant bloom silhouettes, chosen by the plant's variant exactly as its hue is.
 // Offsets are relative to the crown, which always sits directly above the stalk tip, and
 // are opened in listed order. Mirrors BLOOM_SHAPES in sim/src/lib.rs.
-// Per-plant bloom silhouettes: five cells across, which is the smallest head that can hold
-// a shape at all. Petals are listed in opening order and every offset touches one already
+// One species per plant, chosen by `variant & 7` — the same number that picks its hue in
+// the renderer. Petals are listed in opening order and every offset touches one already
 // placed. Mirrors BLOOM_SHAPES in sim/src/lib.rs.
 const BLOOM_SHAPES: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [
-  // Round bloom: a full head with its corners knocked off, a bright eye at the middle.
+  // 0 Cornflower: a round, ragged head with its corners knocked off.
   [[0, -1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-2, 0], [2, 0], [-2, -1], [2, -1], [0, -2], [-1, -2], [1, -2], [-1, 1], [1, 1]],
-  // Daisy: the same span opened out into a diamond, so the gaps do the work.
+  // 1 Poppy: four broad petals around an open notch at the crest.
+  [[0, -1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-2, 0], [2, 0]],
+  // 2 Daisy: the same span opened out into a star, so the gaps do the work.
   [[0, -1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-2, 0], [2, 0], [0, -2], [-1, 1], [1, 1]],
-  // Tulip: a solid cup under a notched top edge — the notches are the whole signature.
+  // 3 Sunflower: the biggest head, a full disc under a crown of rays.
+  [[0, -1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-2, 0], [2, 0], [-2, -1], [2, -1], [0, -2], [-1, -2], [1, -2], [-1, 1], [1, 1], [-2, -2], [2, -2], [0, -3]],
+  // 4 Tulip: a solid cup under a notched top edge — the notches are the signature.
   [[0, -1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-2, -1], [2, -1], [-2, -2], [0, -2], [2, -2]],
-  // Lavender: a tall checkered spike, three wide and six high.
+  // 5 Lavender: a tall checkered spike, three wide and six high.
   [[0, -1], [-1, -2], [1, -2], [0, -3], [-1, -4], [1, -4], [0, -5]],
-  // Bellflower: a wide, low head that spreads sideways instead of climbing.
-  [[0, -1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-2, 0], [2, 0]]
+  // 6 Bluebell: paired bells nodding off a bare central stalk.
+  [[0, -1], [0, -2], [-1, -1], [1, -2], [-2, 0], [2, -1]],
+  // 7 Forget-me-not: the smallest head, a tight five-petal cluster.
+  [[0, -1], [-1, 0], [1, 0], [-1, -1], [1, -1]]
 ];
 
 // Growth may push up through standing water as well as through open air. A watered garden
@@ -1369,7 +1375,7 @@ const BLOOM_ENERGY = 200;
 const BLOOM_ENERGY_COSMIC = 250;
 const CROWN_RESERVE = 100;
 const PETAL_ENERGY = 150;
-const PETAL_COST = 4;
+const PETAL_COST = 3;
 const POLLEN_RESERVE = 40;
 const POLLEN_COST = 15;
 const PETAL_SHED_AGE = 1200;

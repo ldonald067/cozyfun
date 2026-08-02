@@ -31,27 +31,27 @@ const EMBER_KINDS = [MATERIAL.Ember] as const;
 const STEAM_KINDS = [MATERIAL.Steam] as const;
 const EARTH_CONTACT_KINDS = [MATERIAL.Sand, MATERIAL.Soil, MATERIAL.Stone, MATERIAL.Wall, MATERIAL.Wood] as const;
 
-// One flat hue per plant, picked from the cell's variant rather than its position, so
-// every cell of a head is the same colour and the head reads as one flower. Deriving
-// petal colour from a per-cell hash — which is what this used to do — turned a bloom
-// into confetti the moment it became more than a single cell. Five garden hues, in the
-// same family as the pixel-flower reference: cornflower, tulip, daisy, buttercup, lilac.
-const PETAL_HUES: ReadonlyArray<readonly [Rgb, Rgb]> = [
-  [[126, 188, 242], [58, 122, 200]],
-  [[236, 92, 86], [172, 38, 44]],
-  [[248, 247, 238], [198, 196, 182]],
-  [[250, 206, 88], [210, 150, 34]],
-  [[190, 130, 236], [126, 70, 182]]
+// One species per plant, indexed by `variant & 7` — the same number that picks its
+// silhouette in BLOOM_SHAPES (sim/src/lib.rs). Keep these two tables in the same order:
+// index 3 must be the sunflower in both, or plants get a shape from one species and a
+// colour from another. The hue is per plant, never per cell — deriving petal colour from
+// a per-cell hash, which this used to do, turned a multi-cell head into confetti.
+//
+// `eye` is whether the crown sits at the middle of the head, where a bright centre
+// belongs. Tulip, lavender and bluebell carry their petals *above* the crown, so gilding
+// it would put a dot at the bloom's base rather than its heart.
+type Species = { readonly light: Rgb; readonly dark: Rgb; readonly eye: Rgb | null };
+const SPECIES: readonly Species[] = [
+  { light: [126, 188, 242], dark: [58, 122, 200], eye: [255, 216, 104] },  // 0 cornflower
+  { light: [236, 92, 86], dark: [172, 38, 44], eye: [46, 32, 30] },        // 1 poppy, dark heart
+  { light: [248, 247, 238], dark: [198, 196, 182], eye: [255, 216, 104] }, // 2 daisy
+  { light: [250, 206, 88], dark: [210, 150, 34], eye: [92, 58, 30] },      // 3 sunflower, brown disc
+  { light: [244, 140, 178], dark: [196, 66, 116], eye: null },             // 4 tulip
+  { light: [190, 130, 236], dark: [126, 70, 182], eye: null },             // 5 lavender
+  { light: [142, 150, 238], dark: [78, 86, 190], eye: null },              // 6 bluebell
+  { light: [168, 214, 246], dark: [96, 150, 206], eye: [255, 216, 104] }   // 7 forget-me-not
 ];
-const COSMIC_PETAL: readonly [Rgb, Rgb] = [[228, 214, 255], [150, 118, 226]];
-// Which BLOOM_SHAPES entries (sim/src/lib.rs) hold the crown at the middle of the head,
-// where a bright eye belongs. The tulip and the lavender carry their petals *above* the
-// crown, so gilding it would put a gold dot at the bloom's base rather than its heart.
-// Indexed by the same `variant % 5` that picks the shape and the hue.
-const BLOOM_SHAPE_HAS_EYE: readonly boolean[] = [true, true, false, false, true];
-// The eye of an open head. Warm gold reads against every petal hue above, including
-// the buttercup, because the disc is always the darker, denser of the two.
-const FLOWER_DISC: readonly [Rgb, Rgb] = [[255, 216, 104], [198, 134, 30]];
+const COSMIC_SPECIES: Species = { light: [228, 214, 255], dark: [150, 118, 226], eye: [235, 240, 255] };
 
 export function emptyCellColor(cells: Uint8Array, width: number, height: number, x: number, y: number, time: number): Rgb {
   const background: Rgb = [9, 14, 20];
@@ -582,7 +582,9 @@ function flowerColor({ variant, age, energy, flags, time, cells, width, height, 
   const frozen = Boolean(flags & CELL_FLAG.Frozen);
   const scorched = Boolean(flags & CELL_FLAG.Scorched);
   const bloom = Math.min(1, age / 28);
-  const [petalLight, petalDark] = cosmic ? COSMIC_PETAL : PETAL_HUES[variant % PETAL_HUES.length];
+  const species = cosmic ? COSMIC_SPECIES : SPECIES[variant & 7];
+  const petalLight = species.light;
+  const petalDark = species.dark;
   // The last of the arc: a bloom dulls toward grey before its petals let go, so a garden
   // past its peak reads as past its peak rather than staying showroom-fresh until cells
   // start vanishing.
@@ -597,10 +599,11 @@ function flowerColor({ variant, age, energy, flags, time, cells, width, height, 
     // beneath it. Leading with green instead put a muddy olive dot on top of the stem.
     out = mixRgb(petalDark, [58, 104, 58], 0.28 - bloom * 0.1);
     if ((hash & 3) === 0) out = mixRgb(out, [104, 160, 82], 0.18);
-  } else if (rooted && BLOOM_SHAPE_HAS_EYE[variant % PETAL_HUES.length]) {
-    // Disc: a dense golden eye, flecked so it does not read as a flat square.
-    out = mixRgb(FLOWER_DISC[0], FLOWER_DISC[1], ((x ^ y) & 1) === 0 ? 0.1 : 0.42);
-    if ((hash & 7) === 0) out = mixRgb(out, [255, 246, 196], 0.5);
+  } else if (rooted && species.eye) {
+    // The eye of an open head, flecked so it does not read as a flat square. A poppy's is
+    // near-black and a sunflower's is brown, so the centre is species identity too.
+    out = mixRgb(species.eye, species.dark, ((x ^ y) & 1) === 0 ? 0.08 : 0.3);
+    if ((hash & 7) === 0) out = mixRgb(out, [255, 246, 196], 0.35);
   } else {
     // Petal: the plant's one hue, darkening toward the rim so the head reads round
     // rather than as a block. Corner cells (attached on one side only) take the most,

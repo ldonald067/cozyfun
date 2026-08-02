@@ -84,59 +84,40 @@ const PLANT_SPACING: i32 = 5;
 /// are opened in listed order. A head that is always a filled 3x3 reads as a square; these
 /// give a meadow actual shapes to tell apart. Every offset stays connected to the one
 /// before it, so no petal is ever stranded on its own.
-/// Per-plant bloom silhouettes: five cells across, which is the smallest head that can hold
-/// a shape at all. A 3-wide head has too few pixels to be anything but a block or a cross —
-/// at five, knocked-off corners, a notched top edge and a checkered spike all read. Petals
-/// are listed in opening order and every offset touches one already placed, so a half-open
-/// bloom is never a scatter of stranded cells.
-const BLOOM_SHAPES: [&[(i32, i32)]; 5] = [
-    // Round bloom: a full head with its corners knocked off, a bright eye at the middle.
+/// One species per plant, chosen by `variant & 7` — the same number that picks its hue in
+/// the renderer, so a bluebell is always bluebell-blue. Heads are up to five cells across,
+/// which is the smallest head that can hold a shape at all: at three there are too few
+/// pixels to be anything but a block or a cross. Petals are listed in opening order and
+/// every offset touches one already placed, so a half-open bloom is never a scatter of
+/// stranded cells. Offsets are relative to the crown, which sits directly above the tip of
+/// the stalk. `app/src/rendering/shapeLanguage.ts` holds the matching hue and eye per index.
+const BLOOM_SHAPES: [&[(i32, i32)]; 8] = [
+    // 0 Cornflower: a round, ragged head with its corners knocked off.
     &[
-        (0, -1),
-        (-1, 0),
-        (1, 0),
-        (-1, -1),
-        (1, -1),
-        (-2, 0),
-        (2, 0),
-        (-2, -1),
-        (2, -1),
-        (0, -2),
-        (-1, -2),
-        (1, -2),
-        (-1, 1),
-        (1, 1),
+        (0, -1), (-1, 0), (1, 0), (-1, -1), (1, -1), (-2, 0), (2, 0),
+        (-2, -1), (2, -1), (0, -2), (-1, -2), (1, -2), (-1, 1), (1, 1),
     ],
-    // Daisy: the same span opened out into a diamond, so the gaps do the work.
-    &[
-        (0, -1),
-        (-1, 0),
-        (1, 0),
-        (-1, -1),
-        (1, -1),
-        (-2, 0),
-        (2, 0),
-        (0, -2),
-        (-1, 1),
-        (1, 1),
-    ],
-    // Tulip: a solid cup under a notched top edge — the notches are the whole signature.
-    &[
-        (0, -1),
-        (-1, 0),
-        (1, 0),
-        (-1, -1),
-        (1, -1),
-        (-2, -1),
-        (2, -1),
-        (-2, -2),
-        (0, -2),
-        (2, -2),
-    ],
-    // Lavender: a tall checkered spike, three wide and six high.
-    &[(0, -1), (-1, -2), (1, -2), (0, -3), (-1, -4), (1, -4), (0, -5)],
-    // Bellflower: a wide, low head that spreads sideways instead of climbing.
+    // 1 Poppy: a broad shallow bowl. Leaving a notch at the crest split the head into
+    // two separate red blocks, because the dark eye cuts the middle of the lower row too.
+    // Filling the notch instead made a solid 5x2 bar, so the top corners come off: the
+    // bowl has to be rounded at the crest or it is just a rectangle.
     &[(0, -1), (-1, 0), (1, 0), (-1, -1), (1, -1), (-2, 0), (2, 0)],
+    // 2 Daisy: the same span opened out into a star, so the gaps do the work.
+    &[(0, -1), (-1, 0), (1, 0), (-1, -1), (1, -1), (-2, 0), (2, 0), (0, -2), (-1, 1), (1, 1)],
+    // 3 Sunflower: the biggest head, a full disc under a crown of rays.
+    &[
+        (0, -1), (-1, 0), (1, 0), (-1, -1), (1, -1), (-2, 0), (2, 0),
+        (-2, -1), (2, -1), (0, -2), (-1, -2), (1, -2), (-1, 1), (1, 1),
+        (-2, -2), (2, -2), (0, -3),
+    ],
+    // 4 Tulip: a solid cup under a notched top edge — the notches are the signature.
+    &[(0, -1), (-1, 0), (1, 0), (-1, -1), (1, -1), (-2, -1), (2, -1), (-2, -2), (0, -2), (2, -2)],
+    // 5 Lavender: a tall checkered spike, three wide and six high.
+    &[(0, -1), (-1, -2), (1, -2), (0, -3), (-1, -4), (1, -4), (0, -5)],
+    // 6 Bluebell: paired bells nodding off a bare central stalk.
+    &[(0, -1), (0, -2), (-1, -1), (1, -2), (-2, 0), (2, -1)],
+    // 7 Forget-me-not: the smallest head, a tight five-petal cluster.
+    &[(0, -1), (-1, 0), (1, 0), (-1, -1), (1, -1)],
 ];
 
 /// A bloom runs on a slower clock than the rest of the life materials: it loses
@@ -151,11 +132,11 @@ const BLOOM_ENERGY: u16 = 200;
 const BLOOM_ENERGY_COSMIC: u16 = 250;
 /// The crown only unfurls petals down to this reserve, so a head is bounded by
 /// budget as well as by its silhouette. The cost must leave room for the largest shape
-/// (14 petals) *plus* the energy the crown drains while it is opening, or the biggest
+/// (17 petals) *plus* the energy the crown drains while it is opening, or the biggest
 /// blooms stall half-open.
 const CROWN_RESERVE: u16 = 100;
 const PETAL_ENERGY: u16 = 150;
-const PETAL_COST: u16 = 4;
+const PETAL_COST: u16 = 3;
 /// Below this a bloom is spent: no more pollen, and petals may start to let go.
 const POLLEN_RESERVE: u16 = 40;
 const POLLEN_COST: u16 = 15;
@@ -1409,7 +1390,7 @@ impl Universe {
         next: &[Cell],
     ) -> Option<usize> {
         let (x, y) = self.xy(idx);
-        for &(dx, dy) in BLOOM_SHAPES[usize::from(variant) % BLOOM_SHAPES.len()] {
+        for &(dx, dy) in BLOOM_SHAPES[usize::from(variant) & 7] {
             let nx = x + dx;
             let ny = y + dy;
             if !self.in_bounds(nx, ny) {
