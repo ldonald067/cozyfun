@@ -8,9 +8,9 @@ Vibes tab on `littlealbumclub.net`.
 
 ```bash
 source "$HOME/.cargo/env"   # cargo is not on PATH by default
-npm run check               # the gate: audit, contrast, 80 cargo tests, both engine
-                            # smokes, parity, subpath, audio, browser, visual QA
-npm run test:parity         # the strictest gate on its own
+npm run check               # the full gate; read the stage list from package.json, not memory
+npm run test:parity         # strictest single gate: both engines must agree byte-for-byte
+npm run interaction:audit   # does each documented interaction actually HAPPEN in play
 npm run build               # cargo -> wasm32, then Vite
 ```
 
@@ -20,37 +20,40 @@ here.
 ## The invariant
 
 **Every user-visible sim rule MUST exist in both `sim/src/lib.rs` and `app/src/engine.ts`,
-and behave byte-for-byte identically.** `npm run test:parity` drives 17 scenarios through
-both engines and compares every cell byte on every tick. When you add a rule:
+and behave byte-for-byte identically.** When you add a rule:
 
 1. Write it in `sim/src/lib.rs` (source of truth) and mirror it in `app/src/engine.ts`.
-2. Add a cargo test and a parity scenario.
-3. **Prove the scenario is not vacuous** — that it actually reaches the new code path.
-   A scenario that passes because nothing ever triggers is worse than none.
+2. Add a cargo test and a parity scenario in `scripts/smoke-parity.mjs`.
+3. Give the scenario `observe`/`expect` callbacks that assert what it actually witnessed.
 
 RNG consumption is the classic divergence: a `chance()` call on one side but not the other,
 or in a different order, desynchronises both engines permanently.
 
+## A passing test does not mean a reachable feature
+
+This is the most expensive mistake this repo has made, twice. A test that hand-places ideal
+state proves a rule is correct; nothing about it proves a player can ever get there.
+
+- `rooted_seed_grows_a_stalk_that_blooms` passed for months while **no player had ever seen
+  a flower**: it placed a wet, rooted seed on soil, and painting seeds could not produce
+  that state.
+- A parity scenario named "germinating garden" never germinated. Byte-equality cannot tell
+  coverage from vacuity — delete a rule from *both* engines and every scenario still passes.
+
+So: when you add player-visible behaviour, add a check to `npm run interaction:audit` that
+starts from **painted materials only**. Never set flags or energy directly in it — that
+shortcut is exactly what hid the flower bug. Assert what a scene witnessed, and make the
+check fail when it stops witnessing it.
+
 ## Gotchas that have already cost time
 
-- **`Universe::new` clamps width and height to ≥16.** Shrinking a test grid below 16 is a
-  silent no-op.
-- **Wall is the only immovable scaffold.** Stone falls when unsupported. Test frames, floors,
-  ceilings and showcase display stands MUST be Wall, never Stone.
+- **A missing wasm does not throw.** It silently drops to the slower JS engine, so a broken
+  deploy looks fine. After deploying, confirm the status line reads "wasm sim online".
 - **`engine.ts` and `materials.ts` MUST NOT use `import.meta`**, directly or through an
   import. `scripts/smoke-parity.mjs` compiles them to CommonJS, where it is a compile error.
   Engine-side URLs are passed in from the app layer instead.
-- **A missing wasm does not throw.** It silently drops to the slower JS engine, so a broken
-  deploy looks fine. After deploying, confirm the status line reads "wasm sim online".
-- **Renderer code must not encode sim rules.** `app/src/rendering/*` may read cells; it must
-  never move, create, destroy or transform them.
-- **Visual claims are measurable, so measure them.** The renderer is pure functions and QA
-  writes real captures — asserting "it reads better now" has produced wrong results here more
-  than once.
 - **`material:contrast` only checks averaged palettes.** It cannot see per-variant colours,
-  interaction states, glow, shape or animation. Any change to `materials.ts`, `rendering/`,
-  or reaction rules MUST regenerate `npm run visual:qa` and be judged on
-  `.tmp/visual-qa/material-identity-showcase.png`.
+  interaction states, glow, shape or animation, so it is a floor and not a verdict.
 - **`docs/MATERIAL_AUDIT.md` clause caps are enforced**: toolbar materials document 4-6
   interaction roles, generated-only materials 1-3. Exceeding them fails `material:audit`.
 
@@ -75,7 +78,8 @@ handing the build to another server to mount under a path.
 
 ## Deeper references
 
-Read these when the task touches them, not by default:
+Directory rules load themselves: `sim/CLAUDE.md` and `app/src/rendering/CLAUDE.md` are
+pulled in when you read a file there. Read these when the task touches them, not by default:
 
 - Architecture and module boundaries: @docs/ARCHITECTURE.md
 - Review bar: @docs/CODE_REVIEW.md
@@ -87,5 +91,6 @@ Read these when the task touches them, not by default:
 - Asset provenance and licences: @ASSET_CREDITS.md
 
 `/adversarial-review` spawns Codex reviewers against the current diff. It has caught real
-bugs — an unseamed rain loop, a crash-on-read-error, a silently-wrong gate — so it is worth
-running before committing anything substantial.
+bugs — an unseamed rain loop, a crash-on-read-error, a silently-wrong gate, and a shipped
+feature no player could reach — so it is worth running before committing anything
+substantial.

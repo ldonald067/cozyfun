@@ -10,25 +10,17 @@ Read it for the measurements, the fixture fallout, and the bugs an adversarial r
 caught. The repo-wide conventions below have since moved into `CLAUDE.md`; they are
 repeated here because the batch notes assume them.
 
-## Working conventions (do not skip)
+## Working conventions
 
-- Every sim rule lives in **both** `sim/src/lib.rs` (source of truth) and
-  `app/src/engine.ts` (JS fallback). They must stay **byte-for-byte identical** —
-  `npm run test:parity` (`scripts/smoke-parity.mjs`) runs 17 scenarios through both
-  engines and asserts every cell byte matches each tick. Add a scenario for each new
-  rule and confirm it isn't vacuous (that it actually exercises the path).
-- Full gate: `npm run check` (from repo root; `source "$HOME/.cargo/env"` first for
-  cargo). Twelve steps: material audit, contrast floor, 80 cargo tests, the production
-  build, both engine smokes, the parity harness, the subpath gate, audio reaction +
-  browser smoke, audio QA, and visual QA. README lists them in order.
-- `docs/MATERIAL_AUDIT.md` interaction matrix: **toolbar materials document 4–6
-  roles, generated-only materials 1–3** (semicolon-separated clauses). The
-  `material:audit` gate enforces this and also asserts the showcase renders every
-  material + every flag state. Keep clause counts within the caps when editing rows.
-- New parity scenarios that leave cells **floating** must remember liquids side-hop
-  ±2 and gases rise — seal test enclosures with walls, or the scenario diverges for
-  the wrong reason.
-- Commit per batch, push, let CI (`npm run check`) confirm green.
+These are not repeated here. `CLAUDE.md` is the one source of truth for the parity
+invariant, the gate, and the material-audit clause caps; `sim/CLAUDE.md` holds the physics
+gotchas this batch ran into. The copy that used to live here had already drifted — it named
+a scenario count and a cargo-test count that were both wrong within weeks, which is the
+argument against duplicating them.
+
+One convention this batch discovered and the rest of the repo now assumes: a parity scenario
+that leaves cells **floating** must account for liquids side-hopping ±2 and gases rising.
+Seal test enclosures with walls, or the scenario diverges for the wrong reason.
 
 ## Done — Batch 1: garden lineage (commit `fbaafae`)
 
