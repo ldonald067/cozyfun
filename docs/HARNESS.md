@@ -15,6 +15,10 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
 
   Checks start from painted materials and never set flags or energy directly; that shortcut is exactly what hid the flower bug. Each check also runs its predicate *before* the first tick and fails as `VACUOUS` if it is already true, because a predicate like `count(Moss) > 3` happily passes by counting the moss you painted. `absent: true` inverts a check for rules that PREVENT something, like oil smothering hydration.
 
+  **It also asserts a visible footprint**, because firing and being seen are different things — the second half of what went wrong with flowers. A check returns the *cell indices* that are the outcome, and the gate measures three things about them: how many cells the outcome ever occupies, how many ticks it is on screen, and its median colour distance from what it replaced, computed by compiling the **real renderer** and asking it for the pixels. Floors are 4 cells, 30 ticks (0.5s at 60fps), and 24 contrast. Reimplementing the colour rules in the harness would only prove the harness agrees with itself.
+
+  Two lessons are baked into the metrics. Size is the union over the outcome's whole life, not the peak at one instant, or a gradual rule like a fungus mat reverting to soil scores as invisible while being perfectly obvious. And an outcome that is a *transition* ("was glass, is sand now") must be made sticky, or it scores 2 ticks no matter how permanent its result is.
+
 - `npm run material:contrast`: fails when any two material palettes fall below the averaged-colour distance floor. It cannot see per-variant, interaction-state, glow, shape or animation differences, so it is a floor and not a verdict.
 - `npm run test:audio-reactions`: asserts the post-tick reaction detector emits the right cues for each material transition.
 - `npm run test:subpath`: builds at a non-root base and asserts no root-absolute asset path survives, so embedding the sandbox under a path on another site cannot silently regress into the JS fallback engine.

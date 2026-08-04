@@ -720,7 +720,13 @@ class JsSandboxEngine implements SandboxEngine {
       else if (old[nidx] === MATERIAL.Sand && this.chance(2)) {
         writeCellBytes(next, nidx, MATERIAL.Glass, old[nidx + 1]);
       } else if (old[nidx] === MATERIAL.Glass) {
+        // The crack runs one pane-width further than the strike. Converting only the cells
+        // the meteor physically touched turned a smashed pane into a two-cell chip.
         writeCellBytes(next, nidx, MATERIAL.Sand, old[nidx + 1]);
+        const ncell = Math.floor(nidx / CELL_STRIDE);
+        for (const cracked of this.neighbors(ncell % this.w, Math.floor(ncell / this.w))) {
+          if (old[cracked] === MATERIAL.Glass) writeCellBytes(next, cracked, MATERIAL.Sand, old[cracked + 1]);
+        }
       } else if (flammable(old[nidx])) {
         writeIgnitedCell(next, nidx, old[nidx], old[nidx + 1], 230);
       }

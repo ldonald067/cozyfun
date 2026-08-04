@@ -1680,7 +1680,17 @@ impl Universe {
             } else if old[nidx].kind == Material::Sand as u8 && self.chance(2) {
                 next[nidx] = Cell::new(Material::Glass as u8, old[nidx].variant, 0);
             } else if old[nidx].kind == Material::Glass as u8 {
+                // The crack runs one pane-width further than the strike. Converting only the
+                // cells the meteor physically touched turned a smashed pane into a two-cell
+                // chip — measured at 2 cells and a colour delta of 17 through the real
+                // renderer, which is nothing a player would ever notice happening.
                 next[nidx] = Cell::new(Material::Sand as u8, old[nidx].variant, 0);
+                let (nx, ny) = self.xy(nidx);
+                for cracked in self.neighbor_indices(nx, ny) {
+                    if old[cracked].kind == Material::Glass as u8 {
+                        next[cracked] = Cell::new(Material::Sand as u8, old[cracked].variant, 0);
+                    }
+                }
             } else if is_flammable(old[nidx].kind) {
                 next[nidx] = ignited_cell(old[nidx], 230);
             }
