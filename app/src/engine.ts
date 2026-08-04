@@ -477,7 +477,12 @@ class JsSandboxEngine implements SandboxEngine {
           }
           if (other === MATERIAL.Soil) {
             if (readU16(old, nidx + 4) === 0 && readU16(old, nidx + 2) > 40) {
-              this.emitVaporFrom(nidx, old, next, MATERIAL.Steam, old[nidx + 1], 90);
+              // Vents from any open face, not straight up: venting upward only meant the mist
+        // could never appear when a player waters from above, which is the only gesture
+        // anybody makes. Mirrors sim/src/lib.rs.
+        const ncell = Math.floor(nidx / CELL_STRIDE);
+        const vent = this.openFace(ncell % this.w, Math.floor(ncell / this.w), 0, old, next);
+        if (vent >= 0) writeCellBytes(next, vent, MATERIAL.Steam, old[nidx + 1], 90);
             }
             writeU16(next, nidx + 4, Math.min(255, readU16(next, nidx + 4) + vigor * 2));
             writeU16(next, nidx + 6, (readU16(next, nidx + 6) | CELL_FLAG.Wet | (kind === MATERIAL.Moonwater ? CELL_FLAG.Cosmic : 0)) & ~CELL_FLAG.Scorched);

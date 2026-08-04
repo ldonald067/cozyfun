@@ -829,8 +829,14 @@ impl Universe {
                         }
                         if other.kind == Material::Soil as u8 {
                             if other.energy == 0 && other.age > 40 {
-                                // Petrichor: the first water on long-dry soil breathes out a moist wisp.
-                                self.emit_vapor_from(nidx, old, next, Material::Steam as u8, other.variant, 90);
+                                // Petrichor: the first water on long-dry soil breathes out a moist
+                                // wisp. It vents from any open face, not straight up. Venting
+                                // upward only meant the mist could never appear when a player
+                                // waters from above — the water is sitting on the vent — which is
+                                // to say, in the one gesture anybody actually makes.
+                                if let Some(vent) = self.open_face(nidx, 0, old, next) {
+                                    next[vent] = Cell::new(Material::Steam as u8, other.variant, 90);
+                                }
                             }
                             next[nidx].energy = next[nidx].energy.saturating_add(vigor * 2).min(255);
                             next[nidx].flags = (next[nidx].flags | FLAG_WET) & !FLAG_SCORCHED;
