@@ -186,36 +186,36 @@ const FLOOR_FROM_BOTTOM = 4;
 
 const CHECKS = [
   // ---- Hard materials -----------------------------------------------------------------
-  { m: "Wall", role: "stays anchored where natural stone falls", w: 24, h: 24, seed: 1, ticks: 120,
+  { m: "Wall", covers: "wall.anchored", role: "stays anchored where natural stone falls", w: 24, h: 24, seed: 1, ticks: 120,
     paint: (p) => { p(8, 8, 1, M.Wall); p(16, 8, 1, M.Stone); },
     outcome: (g, before) => (g.kindAt(8, 8) === M.Wall ? g.appeared(M.Stone, before) : []) },
-  { m: "Wall", role: "takes soot from smoke", w: 24, h: 24, seed: 2, ticks: 600,
+  { m: "Wall", covers: "wall.stains", role: "takes soot from smoke", w: 24, h: 24, seed: 2, ticks: 600,
     paint: (p) => { p(12, 18, 2, M.Wood); p(12, 16, 1, M.Fire); p(12, 10, 3, M.Wall); },
     outcome: (g, before) => g.gained(M.Wall, F.Scorched, before) },
-  { m: "Stone", role: "falls when left unsupported", w: 24, h: 24, seed: 3, ticks: 120,
+  { m: "Stone", covers: "stone.slumps", role: "falls when left unsupported", w: 24, h: 24, seed: 3, ticks: 120,
     paint: (p) => { p(12, 8, 2, M.Stone); },
     outcome: (g, before) => g.appeared(M.Stone, before) },
-  { m: "Stone", role: "hosts moss on damp stone", w: 30, h: 24, seed: 4, ticks: 1200,
+  { m: "Stone", covers: "stone.hosts", role: "hosts moss on damp stone", w: 30, h: 24, seed: 4, ticks: 1200,
     paint: (p) => { p(15, 18, 3, M.Stone); p(15, 14, 2, M.Water); p(10, 18, 1, M.Moss); },
     outcome: (g, before) => g.appeared(M.Moss, before) },
-  { m: "Stone", role: "is born from lava cooling", w: 30, h: 26, seed: 5, ticks: 900,
+  { m: "Stone", covers: "stone.born", role: "is born from lava cooling", w: 30, h: 26, seed: 5, ticks: 900,
     paint: (p) => { p(15, 20, 3, M.Lava); p(15, 12, 3, M.Water); },
     outcome: (g, before) => g.appeared(M.Stone, before) },
-  { m: "Stone", role: "erodes into sand under sustained water", w: 30, h: 26, seed: 6, ticks: 4000,
+  { m: "Stone", covers: "stone.erodes", role: "erodes into sand under sustained water", w: 30, h: 26, seed: 6, ticks: 4000,
     paint: (p) => { p(15, 20, 3, M.Stone); p(15, 14, 4, M.Water); },
     outcome: (g, before) => g.appeared(M.Sand, before) },
 
   // ---- Powders and liquids ------------------------------------------------------------
-  { m: "Sand", role: "clumps wet when watered", w: 24, h: 24, seed: 7, ticks: 300,
+  { m: "Sand", covers: "sand.clumps", role: "clumps wet when watered", w: 24, h: 24, seed: 7, ticks: 300,
     paint: (p) => { p(12, 18, 3, M.Sand); p(12, 13, 2, M.Water); },
     outcome: (g, before) => g.gained(M.Sand, F.Wet, before) },
-  { m: "Sand", role: "fuses into glass under lava", w: 30, h: 26, seed: 8, ticks: 900,
+  { m: "Sand", covers: "sand.vitrifies", role: "fuses into glass under lava", w: 30, h: 26, seed: 8, ticks: 900,
     paint: (p) => { p(15, 20, 3, M.Sand); p(15, 15, 2, M.Lava); },
     outcome: (g, before) => g.appeared(M.Glass, before) },
-  { m: "Water", role: "boils away to steam over sustained flame", w: 30, h: 26, seed: 9, ticks: 2000,
+  { m: "Water", covers: "water.boils", role: "boils away to steam over sustained flame", w: 30, h: 26, seed: 9, ticks: 2000,
     paint: (p) => { p(15, 20, 3, M.Wall); p(15, 16, 3, M.Water); p(15, 21, 2, M.Lava); },
     outcome: (g, before) => g.appeared(M.Steam, before) },
-  { m: "Water", role: "rinses soot from scorched stone", w: 30, h: 26, seed: 10, ticks: 2500,
+  { m: "Water", covers: "water.rinses", role: "rinses soot from scorched stone", w: 30, h: 26, seed: 10, ticks: 2500,
     paint: (p) => { p(15, 20, 3, M.Stone); p(15, 17, 1, M.Fire); p(15, 12, 4, M.Water); },
     outcome: (g, before, memo) => {
       const sooty = g.all(M.Stone).filter((i) => g.hasFlag(i, F.Scorched));
@@ -223,13 +223,13 @@ const CHECKS = [
       if (!memo.sooted) return [];
       return g.all(M.Stone).filter((i) => g.hasFlag(i, F.Wet));
     } },
-  { m: "Moonwater", role: "cleans oil into stardust", w: 30, h: 26, seed: 11, ticks: 900,
+  { m: "Moonwater", covers: "moonwater.cleans", role: "cleans oil into stardust", w: 30, h: 26, seed: 11, ticks: 900,
     paint: (p) => { p(15, 20, 3, M.Oil); p(15, 15, 3, M.Moonwater); },
     outcome: (g, before) => g.appeared(M.Stardust, before) },
-  { m: "Moonwater", role: "marks touched cells cosmic", w: 30, h: 26, seed: 12, ticks: 600,
+  { m: "Moonwater", covers: "moonwater.marks", role: "marks touched cells cosmic", w: 30, h: 26, seed: 12, ticks: 600,
     paint: (p) => { p(15, 20, 3, M.Soil); p(15, 16, 3, M.Moonwater); },
     outcome: (g, before) => [...g.gained(M.Soil, F.Cosmic, before), ...g.gained(M.Moss, F.Cosmic, before)] },
-  { m: "Oil", role: "floats up above water", w: 30, h: 26, seed: 13, ticks: 600,
+  { m: "Oil", covers: "oil.floats", role: "floats up above water", w: 30, h: 26, seed: 13, ticks: 600,
     paint: (p) => { p(15, 17, 3, M.Water); p(15, 21, 2, M.Oil); },
     outcome: (g, before) => {
       let botWater = -1;
@@ -238,94 +238,94 @@ const CHECKS = [
     } },
 
   // ---- Heat ---------------------------------------------------------------------------
-  { m: "Fire", role: "ignites wood into ember", w: 30, h: 26, seed: 14, ticks: 900,
+  { m: "Fire", covers: "fire.ignites", role: "ignites wood into ember", w: 30, h: 26, seed: 14, ticks: 900,
     paint: (p) => { p(15, 20, 4, M.Wood); p(15, 15, 1, M.Fire); },
     outcome: (g, before) => g.appeared(M.Ember, before) },
-  { m: "Fire", role: "softens into steam against water", w: 30, h: 26, seed: 15, ticks: 400,
+  { m: "Fire", covers: "fire.softens", role: "softens into steam against water", w: 30, h: 26, seed: 15, ticks: 400,
     // Water poured from above onto a flame, which is how a player puts a fire out. A blob
     // painted beside the fire just falls past it before anything can happen.
     paint: (p) => { p(15, 20, 1, M.Fire); p(15, 14, 2, M.Water); },
     outcome: (g, before) => g.appeared(M.Steam, before) },
-  { m: "Lava", role: "crusts into stone on its own", w: 26, h: 24, seed: 16, ticks: 3000,
+  { m: "Lava", covers: "lava.cools", role: "crusts into stone on its own", w: 26, h: 24, seed: 16, ticks: 3000,
     paint: (p) => { p(13, 18, 2, M.Lava); },
     outcome: (g, before) => g.appeared(M.Stone, before) },
-  { m: "Ember", role: "cools into inert char", w: 26, h: 24, seed: 17, ticks: 2000,
+  { m: "Ember", covers: "ember.cools", role: "cools into inert char", w: 26, h: 24, seed: 17, ticks: 2000,
     paint: (p) => { p(13, 18, 3, M.Wood); p(13, 15, 1, M.Fire); },
     outcome: (g) => g.all(M.Ember).filter((i) => g.energyAt(i) < 60) },
-  { m: "Ice", role: "freezes nearby water", w: 26, h: 24, seed: 18, ticks: 600,
+  { m: "Ice", covers: "ice.freezes", role: "freezes nearby water", w: 26, h: 24, seed: 18, ticks: 600,
     paint: (p) => { p(13, 18, 3, M.Water); p(13, 15, 2, M.Ice); },
     outcome: (g, before) => g.appeared(M.Ice, before) },
-  { m: "Ice", role: "condenses steam into frost", w: 26, h: 26, seed: 19, ticks: 900,
+  { m: "Ice", covers: "ice.condenses", role: "condenses steam into frost", w: 26, h: 26, seed: 19, ticks: 900,
     paint: (p) => { p(13, 20, 3, M.Water); p(13, 21, 2, M.Lava); p(13, 10, 2, M.Ice); },
     outcome: (g, before) => g.appeared(M.Ice, before) },
-  { m: "Ice", role: "frost-stresses damp hard materials", w: 26, h: 26, seed: 20, ticks: 1500,
+  { m: "Ice", covers: "ice.stresses", role: "frost-stresses damp hard materials", w: 26, h: 26, seed: 20, ticks: 1500,
     // The stone has to be damp *where the ice touches it*, so the water runs across the
     // whole slab top rather than soaking one column three cells away from the ice.
     paint: (p) => { p(13, 19, 3, M.Stone); p(11, 15, 1, M.Ice); p(15, 13, 2, M.Water); },
     outcome: (g, before) => g.gained(M.Stone, F.Frozen, before) },
 
   // ---- Life ---------------------------------------------------------------------------
-  { m: "Soil", role: "greens into moss when watered", w: 30, h: 26, seed: 21, ticks: 900,
+  { m: "Soil", covers: "soil.greens", role: "greens into moss when watered", w: 30, h: 26, seed: 21, ticks: 900,
     paint: (p) => { p(15, 20, 4, M.Soil); p(15, 14, 3, M.Water); },
     outcome: (g, before) => g.appeared(M.Moss, before) },
-  { m: "Seed", role: "germinates into a climbing stalk", w: 40, h: 34, seed: 22, ticks: 3000,
+  { m: "Seed", covers: "seed.germinates", role: "germinates into a climbing stalk", w: 40, h: 34, seed: 22, ticks: 3000,
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
     outcome: (g, before) => g.appeared(M.Stem, before) },
-  { m: "Flower", role: "opens into a multi-cell head", w: 40, h: 34, seed: 23, ticks: 4000,
+  { m: "Flower", covers: "flower.opens", role: "opens into a multi-cell head", w: 40, h: 34, seed: 23, ticks: 4000,
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
     outcome: (g) => (g.count(M.Flower) >= 4 ? g.all(M.Flower) : []) },
-  { m: "Pollen", role: "is released by a mature flower", w: 40, h: 34, seed: 24, ticks: 5000,
+  { m: "Pollen", covers: "pollen.drifts", role: "is released by a mature flower", w: 40, h: 34, seed: 24, ticks: 5000,
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
     outcome: (g, before) => g.appeared(M.Pollen, before) },
-  { m: "Stem", role: "unfurls side leaves as it climbs", w: 40, h: 34, seed: 25, ticks: 3500,
+  { m: "Stem", covers: "stem.climbs", role: "unfurls side leaves as it climbs", w: 40, h: 34, seed: 25, ticks: 3500,
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
     outcome: (g) => g.all(M.Stem).filter((i) => {
       const [x, y] = g.xyOf(i);
       return g.kindAt(x - 1, y) === M.Stem || g.kindAt(x + 1, y) === M.Stem;
     }) },
-  { m: "Moss", role: "spreads across damp wood", w: 30, h: 26, seed: 26, ticks: 1500,
+  { m: "Moss", covers: "moss.spreads", role: "spreads across damp wood", w: 30, h: 26, seed: 26, ticks: 1500,
     paint: (p) => { p(15, 20, 4, M.Wood); p(15, 15, 3, M.Water); p(9, 20, 1, M.Moss); },
     outcome: (g, before) => g.appeared(M.Moss, before) },
-  { m: "Moss", role: "sheds dew droplets when saturated", w: 26, h: 26, seed: 27, ticks: 1500,
+  { m: "Moss", covers: "moss.dew", role: "sheds dew droplets when saturated", w: 26, h: 26, seed: 27, ticks: 1500,
     paint: (p) => { p(13, 14, 3, M.Wall); p(13, 13, 3, M.Moss); p(13, 10, 3, M.Water); },
     outcome: (g) => g.all(M.Water).filter((i) => g.xyOf(i)[1] >= 16) },
-  { m: "Fungus", role: "rots a wet seed", w: 30, h: 26, seed: 28, ticks: 1500,
+  { m: "Fungus", covers: "fungus.rots", role: "rots a wet seed", w: 30, h: 26, seed: 28, ticks: 1500,
     paint: (p) => { p(15, 20, 3, M.Soil); p(15, 17, 2, M.Seed); p(19, 17, 1, M.Fungus); p(15, 13, 3, M.Water); },
     outcome: (g, before) => g.appeared(M.Fungus, before) },
-  { m: "Fungus", role: "collapses back into soil once starved", w: 24, h: 24, seed: 29, ticks: 6000,
+  { m: "Fungus", covers: "fungus.collapses", role: "collapses back into soil once starved", w: 24, h: 24, seed: 29, ticks: 6000,
     paint: (p) => { p(12, 18, 2, M.Wall); p(12, 16, 2, M.Fungus); },
     outcome: (g, before) => g.appeared(M.Soil, before) },
-  { m: "Oil", role: "smothers hydration so seeds cannot sprout", w: 30, h: 26, seed: 30, ticks: 2000,
+  { m: "Oil", covers: "oil.smothers", role: "smothers hydration so seeds cannot sprout", w: 30, h: 26, seed: 30, ticks: 2000,
     absent: true,
     paint: (p) => { p(15, 20, 3, M.Soil); p(15, 17, 1, M.Seed); p(15, 15, 2, M.Oil); p(15, 12, 3, M.Water); },
     outcome: (g, before) => g.appeared(M.Stem, before) },
 
   // ---- Cosmic and festival ------------------------------------------------------------
-  { m: "Stardust", role: "charges water into moonwater", w: 26, h: 24, seed: 31, ticks: 600,
+  { m: "Stardust", covers: "stardust.charges", role: "charges water into moonwater", w: 26, h: 24, seed: 31, ticks: 600,
     paint: (p) => { p(13, 18, 3, M.Water); p(13, 14, 2, M.Stardust); },
     outcome: (g, before) => g.appeared(M.Moonwater, before) },
-  { m: "Stardust", role: "snuffs fire into a sparkle burst", w: 26, h: 24, seed: 32, ticks: 600,
+  { m: "Stardust", covers: "stardust.snuffs", role: "snuffs fire into a sparkle burst", w: 26, h: 24, seed: 32, ticks: 600,
     paint: (p) => { p(13, 18, 2, M.Wood); p(13, 16, 1, M.Fire); p(13, 12, 2, M.Stardust); },
     outcome: (g, before) => g.vanished(M.Fire, before) },
-  { m: "Meteor", role: "impacts into stone and fire", w: 30, h: 34, seed: 33, ticks: 900,
+  { m: "Meteor", covers: "meteor.impacts", role: "impacts into stone and fire", w: 30, h: 34, seed: 33, ticks: 900,
     paint: (p) => { p(15, 28, 3, M.Stone); p(15, 6, 1, M.Meteor); },
     outcome: (g, before) => [...g.appeared(M.Stardust, before), ...g.appeared(M.Fire, before)] },
-  { m: "Meteor", role: "sheds a spark trail as it falls", w: 30, h: 40, seed: 34, ticks: 200,
+  { m: "Meteor", covers: "meteor.trail", role: "sheds a spark trail as it falls", w: 30, h: 40, seed: 34, ticks: 200,
     paint: (p) => { p(15, 6, 1, M.Meteor); },
     outcome: (g) => g.all(M.Spark) },
-  { m: "Meteor", role: "bursts into stardust against moonwater", w: 30, h: 34, seed: 35, ticks: 900,
+  { m: "Meteor", covers: "meteor.bursts", role: "bursts into stardust against moonwater", w: 30, h: 34, seed: 35, ticks: 900,
     paint: (p) => { p(15, 28, 4, M.Moonwater); p(15, 6, 1, M.Meteor); },
     outcome: (g, before) => g.appeared(M.Stardust, before) },
-  { m: "Rocket", role: "is lit by flame and launches", w: 30, h: 40, seed: 36, ticks: 900,
+  { m: "Rocket", covers: "rocket.lights", role: "is lit by flame and launches", w: 30, h: 40, seed: 36, ticks: 900,
     paint: (p) => { p(15, 34, 2, M.Rocket); p(15, 32, 1, M.Fire); },
     outcome: (g) => g.all(M.Spark) },
-  { m: "Spark", role: "hisses into steam over water", w: 30, h: 40, seed: 37, ticks: 900,
+  { m: "Spark", covers: "spark.hisses", role: "hisses into steam over water", w: 30, h: 40, seed: 37, ticks: 900,
     paint: (p) => { p(15, 34, 4, M.Water); p(15, 28, 2, M.Rocket); p(15, 26, 1, M.Fire); },
     outcome: (g, before) => g.appeared(M.Steam, before) },
-  { m: "Wellspring", role: "drinks a source and then pours it forever", w: 30, h: 26, seed: 38, ticks: 3000,
+  { m: "Wellspring", covers: "wellspring.pours", role: "drinks a source and then pours it forever", w: 30, h: 26, seed: 38, ticks: 3000,
     paint: (p) => { p(15, 18, 1, M.Wellspring); p(15, 15, 1, M.Water); },
     outcome: (g, before) => g.appeared(M.Water, before) },
-  { m: "Glass", role: "shatters back to sand under meteor impact", w: 30, h: 34, seed: 39, ticks: 1200,
+  { m: "Glass", covers: "glass.shatters", role: "shatters back to sand under meteor impact", w: 30, h: 34, seed: 39, ticks: 1200,
     // The pane is painted directly here, which is the one composition in this file that a
     // player could not do from the tray. It is deliberate: reaching glass at all is proved
     // by its own check above ("Sand fuses into glass under lava"), so re-deriving it here
@@ -341,39 +341,39 @@ const CHECKS = [
       for (const i of g.all(M.Sand)) if (prev.kindOf(i) === M.Glass) memo.shattered.add(i);
       return [...memo.shattered].filter((i) => g.kindOf(i) === M.Sand);
     } },
-  { m: "Steam", role: "condenses onto hard surfaces", w: 26, h: 30, seed: 40, ticks: 1200,
+  { m: "Steam", covers: "steam.condenses", role: "condenses onto hard surfaces", w: 26, h: 30, seed: 40, ticks: 1200,
     paint: (p) => { p(13, 24, 3, M.Water); p(13, 25, 2, M.Lava); p(13, 14, 3, M.Wall); },
     outcome: (g, before) => g.gained(M.Wall, F.Wet, before) },
-  { m: "Smoke", role: "rises off open flame", w: 26, h: 30, seed: 41, ticks: 900,
+  { m: "Smoke", covers: "smoke.rises", role: "rises off open flame", w: 26, h: 30, seed: 41, ticks: 900,
     paint: (p) => { p(13, 24, 3, M.Wood); p(13, 21, 1, M.Fire); },
     outcome: (g, before) => g.appeared(M.Smoke, before) },
   // ---- Coverage completion: the remaining documented roles ------------------------------
   // Written against docs/MATERIAL_AUDIT.md clause by clause, so `npm run material:audit`'s
   // matrix and this gate cannot drift apart. Grouped by material, in matrix order.
 
-  { m: "Eraser", role: "clears cells without adding state", w: 24, h: 24, seed: 50, ticks: 200,
+  { m: "Eraser", covers: "eraser.clears", role: "clears cells without adding state", w: 24, h: 24, seed: 50, ticks: 200,
     // A wall, because it is the one material that cannot move on its own: if it leaves its
     // cell, the eraser is the only thing that can have done it.
     paint: (p) => { p(12, 12, 2, M.Wall); },
     act: (p, t) => { if (t === 60) p(12, 12, 2, M.Empty); },
     outcome: (g, before) => g.vanished(M.Wall, before) },
 
-  { m: "Wall", role: "blocks flow as sealed construction", w: 30, h: 26, seed: 51, ticks: 400,
+  { m: "Wall", covers: "wall.blocks", role: "blocks flow as sealed construction", w: 30, h: 26, seed: 51, ticks: 400,
     paint: (p) => { p(15, 18, 3, M.Wall); p(15, 12, 3, M.Water); },
     outcome: (g, before) => g.appeared(M.Water, before).filter((i) => {
       const [x, y] = g.xyOf(i);
       return g.kindAt(x, y + 1) === M.Wall;
     }) },
-  { m: "Wall", role: "resists casual moss crossing", w: 34, h: 26, seed: 52, ticks: 2500,
+  { m: "Wall", covers: "wall.resists", role: "resists casual moss crossing", w: 34, h: 26, seed: 52, ticks: 2500,
     absent: true,
     // Moss and its water on the left, a sealed wall down the middle. Nothing should appear
     // on the far side; moss crosses damp stone happily, which is the contrast being drawn.
     paint: (p) => { p(8, 20, 3, M.Soil); p(8, 16, 2, M.Water); p(8, 20, 1, M.Moss); for (let y = 14; y < 22; y += 2) p(17, y, 1, M.Wall); p(24, 20, 3, M.Soil); },
     outcome: (g) => g.all(M.Moss).filter((i) => g.xyOf(i)[0] > 18) },
-  { m: "Wall", role: "takes damp and frost stains", w: 30, h: 26, seed: 53, ticks: 1500,
+  { m: "Wall", covers: "wall.stains", role: "takes damp and frost stains", w: 30, h: 26, seed: 53, ticks: 1500,
     paint: (p) => { p(15, 19, 3, M.Wall); p(15, 15, 2, M.Water); p(19, 15, 1, M.Ice); },
     outcome: (g, before) => [...g.gained(M.Wall, F.Wet, before), ...g.gained(M.Wall, F.Frozen, before)] },
-  { m: "Wall", role: "hearth masonry dries its damp nook", w: 30, h: 26, seed: 54, ticks: 3000,
+  { m: "Wall", covers: "wall.hearth", role: "hearth masonry dries its damp nook", w: 30, h: 26, seed: 54, ticks: 3000,
     // Damp stone in a wall nook with a flame in it. The claim is that the masonry dries its
     // neighbours without igniting them, so the outcome is stone that got wet and then lost it.
     paint: (p) => { p(15, 19, 2, M.Stone); p(15, 16, 2, M.Water); p(10, 19, 2, M.Wall); p(20, 19, 2, M.Wall); p(15, 13, 1, M.Fire); },
@@ -382,7 +382,7 @@ const CHECKS = [
       for (const i of g.all(M.Stone)) if (g.hasFlag(i, F.Wet)) memo.damp.add(i);
       return [...memo.damp].filter((i) => g.kindOf(i) === M.Stone && !g.hasFlag(i, F.Wet));
     } },
-  { m: "Wall", role: "freeze-thaw stress crumbles it into stone", w: 30, h: 26, seed: 55, ticks: 30000,
+  { m: "Wall", covers: "wall.crumbles", role: "freeze-thaw stress crumbles it into stone", w: 30, h: 26, seed: 55, ticks: 30000,
     // Stress accrues per cycle and the wall only crumbles once it is carrying a lot of it,
     // so the scene has to keep the masonry DAMP and cycle it: a static ice/fire pairing
     // thaws once and stops. This is a player leaving a wet wall out through many frosts.
@@ -394,7 +394,7 @@ const CHECKS = [
     },
     outcome: (g, before) => g.appeared(M.Stone, before) },
 
-  { m: "Stone", role: "blocks flow as natural hard substrate", w: 30, h: 26, seed: 56, ticks: 400,
+  { m: "Stone", covers: "stone.blocks", role: "blocks flow as natural hard substrate", w: 30, h: 26, seed: 56, ticks: 400,
     // A stone basin, so the pooling persists instead of the water sluicing off a slab. The
     // water starts clear of the stone: painted onto it, the check would be true before a tick.
     paint: (p) => { p(15, 19, 3, M.Stone); p(9, 16, 2, M.Stone); p(21, 16, 2, M.Stone); p(15, 8, 3, M.Water); },
@@ -406,11 +406,11 @@ const CHECKS = [
       }
       return [...memo.held].filter((i) => g.kindOf(i) === M.Water);
     } },
-  { m: "Stone", role: "condenses steam harder than sealed wall", w: 26, h: 30, seed: 57, ticks: 1500,
+  { m: "Stone", covers: "stone.weathers", role: "condenses steam harder than sealed wall", w: 26, h: 30, seed: 57, ticks: 1500,
     paint: (p) => { p(13, 24, 3, M.Water); p(13, 25, 2, M.Lava); p(13, 14, 3, M.Stone); },
     outcome: (g, before) => g.gained(M.Stone, F.Wet, before) },
 
-  { m: "Sand", role: "pours fast as dry powder, two cells per tick", w: 26, h: 30, seed: 58, ticks: 60,
+  { m: "Sand", covers: "sand.pours", role: "pours fast as dry powder, two cells per tick", w: 26, h: 30, seed: 58, ticks: 60,
     // Painted at row 6 with radius 1, so the lowest grain starts at row 7. Anything at row 9
     // after a single tick can only have moved two cells in that tick.
     paint: (p) => { p(13, 6, 1, M.Sand); },
@@ -419,7 +419,7 @@ const CHECKS = [
       for (const i of g.all(M.Sand)) if (g.xyOf(i)[1] >= 9) memo.deep.add(i);
       return [...memo.deep].filter((i) => g.kindOf(i) === M.Sand);
     } },
-  { m: "Sand", role: "drains dry back to loose grains", w: 26, h: 26, seed: 59, ticks: 3000,
+  { m: "Sand", covers: "sand.drains", role: "drains dry back to loose grains", w: 26, h: 26, seed: 59, ticks: 3000,
     paint: (p) => { p(13, 19, 3, M.Sand); p(13, 15, 1, M.Water); },
     outcome: (g, before, memo) => {
       memo.wet ??= new Set();
@@ -427,14 +427,14 @@ const CHECKS = [
       return [...memo.wet].filter((i) => g.kindOf(i) === M.Sand && !g.hasFlag(i, F.Wet));
     } },
 
-  { m: "Water", role: "flows and pools sideways", w: 34, h: 26, seed: 60, ticks: 400,
+  { m: "Water", covers: "water.flows", role: "flows and pools sideways", w: 34, h: 26, seed: 60, ticks: 400,
     paint: (p) => { p(17, 12, 4, M.Water); },
     outcome: (g, before, memo) => {
       memo.spread ??= new Set();
       for (const i of g.appeared(M.Water, before)) if (Math.abs(g.xyOf(i)[0] - 17) > 4) memo.spread.add(i);
       return [...memo.spread].filter((i) => g.kindOf(i) === M.Water);
     } },
-  { m: "Water", role: "hydrates soil and life", w: 30, h: 26, seed: 61, ticks: 600,
+  { m: "Water", covers: "water.hydrates", role: "hydrates soil and life", w: 30, h: 26, seed: 61, ticks: 600,
     paint: (p) => { p(15, 19, 3, M.Soil); p(15, 15, 2, M.Water); },
     // Sticky: damp soil greens into moss, so the flag itself is fleeting even though the
     // hydration plainly happened and is what drives everything downstream.
@@ -443,48 +443,48 @@ const CHECKS = [
       for (const i of g.all(M.Soil)) if (g.hasFlag(i, F.Wet)) memo.damp.add(i);
       return [...memo.damp].filter((i) => g.kindOf(i) === M.Soil || g.kindOf(i) === M.Moss);
     } },
-  { m: "Water", role: "quenches lava into scorched stone", w: 30, h: 26, seed: 62, ticks: 900,
+  { m: "Water", covers: "water.quenches", role: "quenches lava into scorched stone", w: 30, h: 26, seed: 62, ticks: 900,
     paint: (p) => { p(15, 20, 3, M.Lava); p(15, 14, 4, M.Water); },
     outcome: (g) => g.all(M.Stone).filter((i) => g.hasFlag(i, F.Scorched)) },
-  { m: "Water", role: "is blocked from feeding life by oil", w: 30, h: 26, seed: 63, ticks: 2000,
+  { m: "Water", covers: "water.oilblocked", role: "is blocked from feeding life by oil", w: 30, h: 26, seed: 63, ticks: 2000,
     absent: true,
     paint: (p) => { p(15, 20, 3, M.Soil); p(15, 17, 1, M.Seed); p(15, 15, 2, M.Oil); p(15, 12, 3, M.Water); },
     outcome: (g, before) => g.gained(M.Soil, F.Cosmic, before) },
 
-  { m: "Moonwater", role: "supercharges growth like water", w: 40, h: 34, seed: 64, ticks: 3000,
+  { m: "Moonwater", covers: "moonwater.moves", role: "supercharges growth like water", w: 40, h: 34, seed: 64, ticks: 3000,
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Moonwater); },
     outcome: (g, before) => g.appeared(M.Stem, before) },
-  { m: "Moonwater", role: "bursts meteor contact into stardust", w: 30, h: 34, seed: 65, ticks: 900,
+  { m: "Moonwater", covers: "moonwater.bursts", role: "bursts meteor contact into stardust", w: 30, h: 34, seed: 65, ticks: 900,
     paint: (p) => { p(15, 28, 4, M.Moonwater); p(15, 5, 1, M.Meteor); },
     outcome: (g, before) => g.appeared(M.Stardust, before) },
-  { m: "Moonwater", role: "freezes into cosmic ice", w: 26, h: 26, seed: 66, ticks: 900,
+  { m: "Moonwater", covers: "moonwater.freezes", role: "freezes into cosmic ice", w: 26, h: 26, seed: 66, ticks: 900,
     // Ice set into the pool rather than perched above it, so there is real contact area.
     paint: (p) => { p(13, 20, 4, M.Moonwater); p(9, 19, 1, M.Ice); p(17, 19, 1, M.Ice); },
     outcome: (g, before) => g.appeared(M.Ice, before) },
 
-  { m: "Smoke", role: "soots hard surfaces", w: 26, h: 30, seed: 67, ticks: 1200,
+  { m: "Smoke", covers: "smoke.soots", role: "soots hard surfaces", w: 26, h: 30, seed: 67, ticks: 1200,
     paint: (p) => { p(13, 24, 2, M.Wood); p(13, 22, 1, M.Fire); p(13, 15, 3, M.Stone); },
     outcome: (g, before) => g.gained(M.Stone, F.Scorched, before) },
 
-  { m: "Steam", role: "rises and fades", w: 26, h: 30, seed: 68, ticks: 1200,
+  { m: "Steam", covers: "steam.rises", role: "rises and fades", w: 26, h: 30, seed: 68, ticks: 1200,
     paint: (p) => { p(13, 24, 3, M.Water); p(13, 25, 2, M.Lava); },
     outcome: (g, before, memo) => {
       memo.high ??= new Set();
       for (const i of g.all(M.Steam)) if (g.xyOf(i)[1] < 18) memo.high.add(i);
       return [...memo.high].filter((i) => g.kindOf(i) === M.Steam);
     } },
-  { m: "Steam", role: "frosts into ice near ice", w: 26, h: 30, seed: 69, ticks: 1500,
+  { m: "Steam", covers: "steam.frosts", role: "frosts into ice near ice", w: 26, h: 30, seed: 69, ticks: 1500,
     paint: (p) => { p(13, 24, 3, M.Water); p(13, 25, 2, M.Lava); p(13, 16, 2, M.Ice); },
     outcome: (g, before) => g.appeared(M.Ice, before) },
-  { m: "Soil", role: "falls as organic substrate", w: 26, h: 26, seed: 70, ticks: 300,
+  { m: "Soil", covers: "soil.falls", role: "falls as organic substrate", w: 26, h: 26, seed: 70, ticks: 300,
     paint: (p) => { p(13, 8, 2, M.Soil); },
     outcome: (g, before) => g.appeared(M.Soil, before) },
-  { m: "Soil", role: "ground under a rooted seed still germinates", w: 40, h: 34, seed: 71, ticks: 3000,
+  { m: "Soil", covers: "soil.greens", role: "ground under a rooted seed still germinates", w: 40, h: 34, seed: 71, ticks: 3000,
     // The observable consequence of the claim: if moss took the claimed ground, this bed
     // would carpet over and nothing would ever sprout — which is what it used to do.
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
     outcome: (g, before) => g.appeared(M.Stem, before) },
-  { m: "Soil", role: "breathes a petrichor mist when watered after a dry spell", w: 30, h: 26, seed: 72, ticks: 2000,
+  { m: "Soil", covers: "soil.breathes", role: "breathes a petrichor mist when watered after a dry spell", w: 30, h: 26, seed: 72, ticks: 2000,
     // A soil pocket walled into stone so it sits still and dries out, then a splash arrives
     // long after. The mist only comes off soil that is both old and bone dry.
     // A whole bed left to dry out, then watered — which is what a player does. One soil
@@ -498,36 +498,36 @@ const CHECKS = [
       for (const i of g.all(M.Steam)) memo.mist.add(i);
       return [...memo.mist].filter((i) => g.kindOf(i) === M.Steam);
     } },
-  { m: "Soil", role: "roots wet seeds for blooming", w: 30, h: 26, seed: 73, ticks: 900,
+  { m: "Soil", covers: "soil.roots", role: "roots wet seeds for blooming", w: 30, h: 26, seed: 73, ticks: 900,
     paint: (p) => { p(15, 20, 3, M.Soil); p(15, 17, 1, M.Seed); p(15, 14, 2, M.Water); },
     outcome: (g, before) => g.gained(M.Seed, F.Rooted, before) },
-  { m: "Soil", role: "feeds fungus decomposition", w: 30, h: 26, seed: 74, ticks: 2500,
+  { m: "Soil", covers: "soil.feeds", role: "feeds fungus decomposition", w: 30, h: 26, seed: 74, ticks: 2500,
     paint: (p) => { p(15, 20, 4, M.Soil); p(15, 16, 1, M.Fungus); p(15, 13, 2, M.Water); },
     outcome: (g, before) => g.appeared(M.Fungus, before) },
-  { m: "Soil", role: "is reborn where a starved fungus collapses", w: 24, h: 24, seed: 75, ticks: 6000,
+  { m: "Soil", covers: "soil.reborn", role: "is reborn where a starved fungus collapses", w: 24, h: 24, seed: 75, ticks: 6000,
     paint: (p) => { p(12, 18, 2, M.Wall); p(12, 16, 2, M.Fungus); },
     outcome: (g, before) => g.appeared(M.Soil, before) },
 
-  { m: "Wood", role: "burns through the ember arc instead of vanishing", w: 30, h: 26, seed: 76, ticks: 1500,
+  { m: "Wood", covers: "wood.burns", role: "burns through the ember arc instead of vanishing", w: 30, h: 26, seed: 76, ticks: 1500,
     paint: (p) => { p(15, 20, 4, M.Wood); p(15, 15, 1, M.Fire); },
     outcome: (g, before) => g.appeared(M.Ember, before) },
-  { m: "Wood", role: "vents steam while wet before igniting", w: 30, h: 26, seed: 77, ticks: 1500,
+  { m: "Wood", covers: "wood.steams", role: "vents steam while wet before igniting", w: 30, h: 26, seed: 77, ticks: 1500,
     // The flame beside the soaked log, not stacked three cells above it with the water in
     // between — the water simply drowned the fire before either could touch the wood.
     paint: (p) => { p(15, 20, 3, M.Wood); p(15, 16, 2, M.Water); },
     act: (p, t) => { if (t === 300) p(20, 20, 1, M.Fire); },
     outcome: (g, before) => g.appeared(M.Steam, before) },
-  { m: "Wood", role: "hosts moss spread", w: 30, h: 26, seed: 78, ticks: 2000,
+  { m: "Wood", covers: "wood.hosts", role: "hosts moss spread", w: 30, h: 26, seed: 78, ticks: 2000,
     paint: (p) => { p(15, 20, 4, M.Wood); p(15, 15, 3, M.Water); p(9, 20, 1, M.Moss); },
     outcome: (g, before) => g.appeared(M.Moss, before) },
-  { m: "Wood", role: "feeds fungus digestion", w: 30, h: 26, seed: 79, ticks: 2500,
+  { m: "Wood", covers: "wood.feeds", role: "feeds fungus digestion", w: 30, h: 26, seed: 79, ticks: 2500,
     paint: (p) => { p(15, 20, 4, M.Wood); p(15, 16, 1, M.Fungus); p(15, 13, 2, M.Water); },
     outcome: (g, before) => g.appeared(M.Fungus, before) },
 
-  { m: "Fire", role: "ignites fuel with per-material burn odds", w: 30, h: 26, seed: 80, ticks: 600,
+  { m: "Fire", covers: "fire.ignites", role: "ignites fuel with per-material burn odds", w: 30, h: 26, seed: 80, ticks: 600,
     paint: (p) => { p(15, 20, 3, M.Oil); p(15, 16, 1, M.Fire); },
     outcome: (g, before) => g.appeared(M.Fire, before) },
-  { m: "Fire", role: "dries and scorches wet cells first", w: 30, h: 26, seed: 81, ticks: 1500,
+  { m: "Fire", covers: "fire.dries", role: "dries and scorches wet cells first", w: 30, h: 26, seed: 81, ticks: 1500,
     paint: (p) => { p(15, 20, 6, M.Wood); p(15, 13, 4, M.Water); },
     act: (p, t) => { if (t === 300) { p(22, 20, 1, M.Fire); p(8, 20, 1, M.Fire); } },
     // Sticky: scorch is the step before ignition, so it is gone again moments later.
@@ -536,7 +536,7 @@ const CHECKS = [
       for (const i of g.all(M.Wood)) if (g.hasFlag(i, F.Scorched)) memo.charred.add(i);
       return [...memo.charred].filter((i) => g.kindOf(i) === M.Wood || g.kindOf(i) === M.Ember);
     } },
-  { m: "Fire", role: "thaws frozen cells", w: 30, h: 26, seed: 82, ticks: 3000,
+  { m: "Fire", covers: "fire.thaws", role: "thaws frozen cells", w: 30, h: 26, seed: 82, ticks: 3000,
     paint: (p) => { p(15, 20, 3, M.Stone); p(15, 16, 1, M.Water); },
     act: (p, t) => { if (t === 200) p(15, 17, 1, M.Ice); if (t === 1400) p(15, 16, 2, M.Fire); },
     outcome: (g, before, memo) => {
@@ -544,41 +544,41 @@ const CHECKS = [
       for (const i of g.all(M.Stone)) if (g.hasFlag(i, F.Frozen)) memo.frozen.add(i);
       return [...memo.frozen].filter((i) => g.kindOf(i) === M.Stone && !g.hasFlag(i, F.Frozen));
     } },
-  { m: "Fire", role: "vitrifies dry sand while young and hot", w: 30, h: 26, seed: 83, ticks: 900,
+  { m: "Fire", covers: "fire.vitrifies", role: "vitrifies dry sand while young and hot", w: 30, h: 26, seed: 83, ticks: 900,
     paint: (p) => { p(15, 20, 4, M.Sand); p(15, 16, 2, M.Fire); },
     outcome: (g, before) => g.appeared(M.Glass, before) },
 
-  { m: "Lava", role: "flows slowly and ignites fuel", w: 30, h: 26, seed: 84, ticks: 900,
+  { m: "Lava", covers: "lava.flows", role: "flows slowly and ignites fuel", w: 30, h: 26, seed: 84, ticks: 900,
     paint: (p) => { p(15, 20, 3, M.Wood); p(15, 15, 2, M.Lava); },
     // Wood ignites into ember rather than bare flame, so ignition is either of the two.
     outcome: (g, before) => [...g.appeared(M.Fire, before), ...g.appeared(M.Ember, before)] },
-  { m: "Lava", role: "is quenched by water into scorched stone", w: 30, h: 26, seed: 85, ticks: 900,
+  { m: "Lava", covers: "lava.quenched", role: "is quenched by water into scorched stone", w: 30, h: 26, seed: 85, ticks: 900,
     paint: (p) => { p(15, 20, 3, M.Lava); p(15, 14, 4, M.Water); },
     outcome: (g) => g.all(M.Stone).filter((i) => g.hasFlag(i, F.Scorched)) },
-  { m: "Lava", role: "vitrifies dry sand into glass", w: 30, h: 26, seed: 86, ticks: 900,
+  { m: "Lava", covers: "lava.vitrifies", role: "vitrifies dry sand into glass", w: 30, h: 26, seed: 86, ticks: 900,
     paint: (p) => { p(15, 20, 4, M.Sand); p(15, 15, 2, M.Lava); },
     outcome: (g, before) => g.appeared(M.Glass, before) },
-  { m: "Lava", role: "dries, scorches and thaws its neighbours", w: 30, h: 26, seed: 87, ticks: 1200,
+  { m: "Lava", covers: "lava.scorches", role: "dries, scorches and thaws its neighbours", w: 30, h: 26, seed: 87, ticks: 1200,
     paint: (p) => { p(15, 20, 3, M.Stone); p(15, 16, 2, M.Water); p(20, 20, 2, M.Lava); },
     outcome: (g, before) => g.gained(M.Stone, F.Scorched, before) },
 
-  { m: "Ice", role: "pauses life in frozen dormancy", w: 30, h: 26, seed: 88, ticks: 2500,
+  { m: "Ice", covers: "ice.pauses", role: "pauses life in frozen dormancy", w: 30, h: 26, seed: 88, ticks: 2500,
     absent: true,
     // Ice set right on the seed bed. Perched two cells up it never chilled the seed, which
     // germinated on schedule and made this read as a leak rather than a scene fault.
     paint: (p) => { p(15, 20, 3, M.Soil); p(15, 17, 1, M.Seed); p(15, 15, 1, M.Water); p(15, 16, 1, M.Ice); },
     outcome: (g, before) => g.appeared(M.Stem, before) },
-  { m: "Ice", role: "melts back to water near heat", w: 26, h: 26, seed: 89, ticks: 1200,
+  { m: "Ice", covers: "ice.melts", role: "melts back to water near heat", w: 26, h: 26, seed: 89, ticks: 1200,
     paint: (p) => { p(13, 19, 3, M.Ice); p(13, 15, 2, M.Fire); },
     outcome: (g, before) => g.appeared(M.Water, before) },
 
-  { m: "Moss", role: "colonizes damp stone slowly", w: 30, h: 26, seed: 90, ticks: 2500,
+  { m: "Moss", covers: "moss.colonizes", role: "colonizes damp stone slowly", w: 30, h: 26, seed: 90, ticks: 2500,
     paint: (p) => { p(15, 20, 3, M.Stone); p(15, 16, 2, M.Water); p(10, 20, 1, M.Moss); },
     outcome: (g, before) => g.appeared(M.Moss, before) },
-  { m: "Moss", role: "is overtaken by fungus when old or wet", w: 30, h: 26, seed: 91, ticks: 3000,
+  { m: "Moss", covers: "moss.overtaken", role: "is overtaken by fungus when old or wet", w: 30, h: 26, seed: 91, ticks: 3000,
     paint: (p) => { p(15, 20, 4, M.Moss); p(15, 16, 1, M.Fungus); p(15, 13, 2, M.Water); },
     outcome: (g, before) => g.appeared(M.Fungus, before) },
-  { m: "Moss", role: "dries and scorches before burning", w: 30, h: 26, seed: 92, ticks: 900,
+  { m: "Moss", covers: "moss.dries", role: "dries and scorches before burning", w: 30, h: 26, seed: 92, ticks: 900,
     // The moss has to be WET first: measured on a dry mat, fire skips straight to burning
     // and the scorch step the docs describe never happens at all.
     paint: (p) => { p(15, 20, 4, M.Moss); p(15, 15, 2, M.Water); },
@@ -589,10 +589,10 @@ const CHECKS = [
       for (const i of g.all(M.Moss)) if (g.hasFlag(i, F.Scorched)) memo.charred.add(i);
       return [...memo.charred].filter((i) => g.kindOf(i) === M.Moss);
     } },
-  { m: "Seed", role: "roots on soil, and on other rooted seeds through a bed", w: 40, h: 34, seed: 93, ticks: 1500,
+  { m: "Seed", covers: "seed.roots", role: "roots on soil, and on other rooted seeds through a bed", w: 40, h: 34, seed: 93, ticks: 1500,
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
     outcome: (g, before) => g.gained(M.Seed, F.Rooted, before) },
-  { m: "Seed", role: "never sprouts in the shadow of a neighbouring plant", w: 40, h: 34, seed: 94, ticks: 4000,
+  { m: "Seed", covers: "seed.germinates", role: "never sprouts in the shadow of a neighbouring plant", w: 40, h: 34, seed: 94, ticks: 4000,
     absent: true,
     // Two plant BASES closer together than the spacing rule allows. A base is a rooted stalk
     // cell, which is exactly what germination produces, so crowding shows up here and
@@ -610,52 +610,52 @@ const CHECKS = [
         });
       });
     } },
-  { m: "Seed", role: "settles into the carpet when it lands wet on moss", w: 30, h: 26, seed: 95, ticks: 2500,
+  { m: "Seed", covers: "seed.settles", role: "settles into the carpet when it lands wet on moss", w: 30, h: 26, seed: 95, ticks: 2500,
     paint: (p) => { p(15, 20, 4, M.Moss); p(15, 16, 2, M.Seed); p(15, 13, 3, M.Water); },
     outcome: (g, before) => g.appeared(M.Moss, before) },
-  { m: "Seed", role: "rots into fungus under decay pressure", w: 30, h: 26, seed: 96, ticks: 2000,
+  { m: "Seed", covers: "seed.rots", role: "rots into fungus under decay pressure", w: 30, h: 26, seed: 96, ticks: 2000,
     paint: (p) => { p(15, 20, 3, M.Soil); p(15, 17, 2, M.Seed); p(19, 17, 1, M.Fungus); p(15, 13, 3, M.Water); },
     outcome: (g, before) => g.appeared(M.Fungus, before) },
-  { m: "Seed", role: "waits dormant when frozen", w: 30, h: 26, seed: 97, ticks: 2500,
+  { m: "Seed", covers: "seed.dormant", role: "waits dormant when frozen", w: 30, h: 26, seed: 97, ticks: 2500,
     absent: true,
     paint: (p) => { p(15, 20, 3, M.Soil); p(15, 17, 1, M.Seed); p(15, 15, 1, M.Water); p(15, 16, 1, M.Ice); },
     outcome: (g, before) => g.appeared(M.Stem, before) },
-  { m: "Seed", role: "is smothered by an oil coating", w: 30, h: 26, seed: 98, ticks: 2000,
+  { m: "Seed", covers: "seed.smothered", role: "is smothered by an oil coating", w: 30, h: 26, seed: 98, ticks: 2000,
     absent: true,
     paint: (p) => { p(15, 20, 3, M.Soil); p(15, 17, 1, M.Seed); p(15, 15, 2, M.Oil); p(15, 12, 3, M.Water); },
     outcome: (g, before) => g.appeared(M.Stem, before) },
 
-  { m: "Flower", role: "puffs pollen from the head's open rim", w: 40, h: 34, seed: 99, ticks: 5000,
+  { m: "Flower", covers: "flower.pollen", role: "puffs pollen from the head's open rim", w: 40, h: 34, seed: 99, ticks: 5000,
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
     outcome: (g, before) => g.appeared(M.Pollen, before) },
-  { m: "Flower", role: "sheds spent petals, leaving the crown as a seed head", w: 40, h: 40, seed: 100, ticks: 9000,
+  { m: "Flower", covers: "flower.wilts", role: "sheds spent petals, leaving the crown as a seed head", w: 40, h: 40, seed: 100, ticks: 9000,
     paint: (p) => { p(20, 34, 4, M.Soil); p(20, 29, 3, M.Seed); p(20, 24, 3, M.Water); },
     outcome: (g, before, memo) => {
       memo.peak = Math.max(memo.peak ?? 0, g.count(M.Flower));
       return memo.peak >= 5 && g.count(M.Flower) < memo.peak ? g.all(M.Flower) : [];
     } },
 
-  { m: "Pollen", role: "drifts down and settles where it lands", w: 40, h: 34, seed: 101, ticks: 5000,
+  { m: "Pollen", covers: "pollen.drifts", role: "drifts down and settles where it lands", w: 40, h: 34, seed: 101, ticks: 5000,
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
     outcome: (g, before, memo) => {
       memo.low ??= new Set();
       for (const i of g.all(M.Pollen)) if (g.xyOf(i)[1] > 26) memo.low.add(i);
       return [...memo.low].filter((i) => g.kindOf(i) === M.Pollen);
     } },
-  { m: "Pollen", role: "takes root as a seed on damp soil", w: 40, h: 34, seed: 102, ticks: 9000,
+  { m: "Pollen", covers: "pollen.seeds", role: "takes root as a seed on damp soil", w: 40, h: 34, seed: 102, ticks: 9000,
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
     outcome: (g, before) => g.appeared(M.Seed, before) },
-  { m: "Pollen", role: "lives out a full drift before fading", w: 40, h: 34, seed: 103, ticks: 6000,
+  { m: "Pollen", covers: "pollen.fades", role: "lives out a full drift before fading", w: 40, h: 34, seed: 103, ticks: 6000,
     // Measured as the aged mote still on screen, not the hole it leaves: an empty cell has
     // no colour to compare against an empty baseline, so a disappearance always scores zero
     // contrast. What a player actually sees is the mote drifting out its life.
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
     outcome: (g) => g.all(M.Pollen).filter((i) => g.energyAt(i) < 120) },
 
-  { m: "Stem", role: "climbs from a rooted seed and blooms at its tip", w: 40, h: 34, seed: 104, ticks: 4000,
+  { m: "Stem", covers: "stem.climbs", role: "climbs from a rooted seed and blooms at its tip", w: 40, h: 34, seed: 104, ticks: 4000,
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
     outcome: (g, before) => g.appeared(M.Flower, before) },
-  { m: "Stem", role: "collapses whole when the stalk is severed", w: 40, h: 34, seed: 105, ticks: 5000,
+  { m: "Stem", covers: "stem.footing", role: "collapses whole when the stalk is severed", w: 40, h: 34, seed: 105, ticks: 5000,
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
     // Cut across the whole column the stalk could be standing in, since where it grew is
     // up to the sim, then watch the segments above the cut come down.
@@ -668,7 +668,7 @@ const CHECKS = [
       for (const i of g.appeared(M.Stem, before)) memo.fallen.add(i);
       return [...memo.fallen].filter((i) => g.kindOf(i) === M.Stem);
     } },
-  { m: "Stem", role: "burns like living growth", w: 40, h: 34, seed: 106, ticks: 5000,
+  { m: "Stem", covers: "stem.burns", role: "burns like living growth", w: 40, h: 34, seed: 106, ticks: 5000,
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
     // A broad sweep: which column the bed sprouts in is the sim's choice and moves with the
     // seed, so a flame aimed at one guessed cell simply misses.
@@ -684,21 +684,21 @@ const CHECKS = [
       return [...memo.burnt].filter((i) => g.kindOf(i) === M.Fire || g.kindOf(i) === M.Ember);
     } },
 
-  { m: "Glass", role: "forms as a pane where strong heat fuses dry sand", w: 30, h: 26, seed: 107, ticks: 900,
+  { m: "Glass", covers: "glass.forms", role: "forms as a pane where strong heat fuses dry sand", w: 30, h: 26, seed: 107, ticks: 900,
     paint: (p) => { p(15, 20, 4, M.Sand); p(15, 15, 2, M.Lava); },
     outcome: (g, before) => g.appeared(M.Glass, before) },
-  { m: "Glass", role: "beads steam back into water so a terrarium cycles", w: 26, h: 30, seed: 108, ticks: 2500,
+  { m: "Glass", covers: "glass.beads", role: "beads steam back into water so a terrarium cycles", w: 26, h: 30, seed: 108, ticks: 2500,
     paint: (p) => { p(13, 24, 3, M.Water); p(13, 25, 2, M.Lava); p(13, 16, 4, M.Glass); },
     outcome: (g, before) => g.gained(M.Glass, F.Wet, before) },
 
-  { m: "Ember", role: "glows hot and weakly spreads fire", w: 30, h: 26, seed: 109, ticks: 1500,
+  { m: "Ember", covers: "ember.glows", role: "glows hot and weakly spreads fire", w: 30, h: 26, seed: 109, ticks: 1500,
     paint: (p) => { p(15, 20, 4, M.Wood); p(15, 16, 1, M.Fire); },
     outcome: (g, before, memo) => {
       memo.hot ??= new Set();
       for (const i of g.all(M.Ember)) if (g.energyAt(i) > 150) memo.hot.add(i);
       return [...memo.hot].filter((i) => g.kindOf(i) === M.Ember);
     } },
-  { m: "Ember", role: "quenches wet under water and washes cold char away", w: 30, h: 26, seed: 110, ticks: 4000,
+  { m: "Ember", covers: "ember.quenched", role: "quenches wet under water and washes cold char away", w: 30, h: 26, seed: 110, ticks: 4000,
     paint: (p) => { p(15, 20, 4, M.Wood); p(15, 16, 1, M.Fire); },
     act: (p, t) => { if (t === 1500) p(15, 13, 4, M.Water); },
     outcome: (g, before, memo) => {
@@ -707,16 +707,16 @@ const CHECKS = [
       return [...memo.doused].filter((i) => g.kindOf(i) === M.Ember);
     } },
 
-  { m: "Fungus", role: "overtakes old or wet moss", w: 30, h: 26, seed: 111, ticks: 3000,
+  { m: "Fungus", covers: "fungus.overtakes", role: "overtakes old or wet moss", w: 30, h: 26, seed: 111, ticks: 3000,
     paint: (p) => { p(15, 20, 4, M.Moss); p(15, 16, 1, M.Fungus); p(15, 13, 2, M.Water); },
     outcome: (g, before) => g.appeared(M.Fungus, before) },
-  { m: "Fungus", role: "digests wood and soil", w: 30, h: 26, seed: 112, ticks: 3000,
+  { m: "Fungus", covers: "fungus.digests", role: "digests wood and soil", w: 30, h: 26, seed: 112, ticks: 3000,
     paint: (p) => { p(15, 20, 4, M.Wood); p(15, 16, 1, M.Fungus); p(15, 13, 2, M.Water); },
     outcome: (g, before) => g.appeared(M.Fungus, before) },
-  { m: "Fungus", role: "charges cosmic near stardust and moonwater", w: 30, h: 26, seed: 113, ticks: 2000,
+  { m: "Fungus", covers: "fungus.cosmic", role: "charges cosmic near stardust and moonwater", w: 30, h: 26, seed: 113, ticks: 2000,
     paint: (p) => { p(15, 20, 3, M.Fungus); p(15, 16, 2, M.Moonwater); },
     outcome: (g, before) => g.gained(M.Fungus, F.Cosmic, before) },
-  { m: "Fungus", role: "sows a stardust grain as a charged fairy ring", w: 30, h: 26, seed: 114, ticks: 6000,
+  { m: "Fungus", covers: "fungus.fairyring", role: "sows a stardust grain as a charged fairy ring", w: 30, h: 26, seed: 114, ticks: 6000,
     paint: (p) => { p(15, 20, 6, M.Soil); p(15, 15, 4, M.Fungus); p(15, 10, 4, M.Moonwater); },
     outcome: (g, before, memo) => {
       memo.grains ??= new Set();
@@ -724,25 +724,32 @@ const CHECKS = [
       return [...memo.grains].filter((i) => g.kindOf(i) === M.Stardust);
     } },
 
-  { m: "Oil", role: "sheets sideways when supported", w: 34, h: 26, seed: 115, ticks: 900,
+  { m: "Oil", covers: "oil.floats", role: "sheets sideways when supported", w: 34, h: 26, seed: 115, ticks: 900,
     paint: (p) => { p(17, 19, 3, M.Wall); p(17, 15, 2, M.Oil); },
     outcome: (g, before, memo) => {
       memo.sheet ??= new Set();
       for (const i of g.appeared(M.Oil, before)) if (Math.abs(g.xyOf(i)[0] - 17) > 3) memo.sheet.add(i);
       return [...memo.sheet].filter((i) => g.kindOf(i) === M.Oil);
     } },
-  { m: "Oil", role: "is cleaned into stardust by moonwater", w: 30, h: 26, seed: 116, ticks: 900,
+  { m: "Oil", covers: "oil.ignites", role: "ignites readily near heat", w: 30, h: 26, seed: 131, ticks: 600,
+    paint: (p) => { p(15, 20, 3, M.Oil); p(15, 16, 1, M.Fire); },
+    outcome: (g, before, memo, prev) => {
+      memo.caught ??= new Set();
+      for (let i = 0; i < g.size; i++) if (prev.kindOf(i) === M.Oil && g.kindOf(i) === M.Fire) memo.caught.add(i);
+      return [...memo.caught].filter((i) => g.kindOf(i) === M.Fire);
+    } },
+  { m: "Oil", covers: "oil.cleaned", role: "is cleaned into stardust by moonwater", w: 30, h: 26, seed: 116, ticks: 900,
     paint: (p) => { p(15, 20, 3, M.Oil); p(15, 15, 3, M.Moonwater); },
     outcome: (g, before) => g.appeared(M.Stardust, before) },
 
-  { m: "Stardust", role: "energizes life and soil with cosmic marks", w: 30, h: 26, seed: 117, ticks: 1200,
+  { m: "Stardust", covers: "stardust.energizes", role: "energizes life and soil with cosmic marks", w: 30, h: 26, seed: 117, ticks: 1200,
     paint: (p) => { p(15, 20, 3, M.Soil); p(15, 16, 2, M.Stardust); },
     outcome: (g, before) => [...g.gained(M.Soil, F.Cosmic, before), ...g.gained(M.Moss, F.Cosmic, before)] },
-  { m: "Stardust", role: "etches constellation marks onto stone and wall", w: 30, h: 26, seed: 118, ticks: 1500,
+  { m: "Stardust", covers: "stardust.etches", role: "etches constellation marks onto stone and wall", w: 30, h: 26, seed: 118, ticks: 1500,
     paint: (p) => { p(15, 19, 3, M.Stone); p(15, 15, 2, M.Stardust); },
     outcome: (g, before) => g.gained(M.Stone, F.Cosmic, before) },
 
-  { m: "Meteor", role: "falls as impact heat", w: 30, h: 64, seed: 119, ticks: 300,
+  { m: "Meteor", covers: "meteor.falls", role: "falls as impact heat", w: 30, h: 64, seed: 119, ticks: 300,
     // A tall sky, because that is where a meteor is seen: in a short scene it is on screen
     // for barely a third of a second and the fall itself never registers.
     paint: (p) => { p(15, 5, 1, M.Meteor); },
@@ -753,14 +760,14 @@ const CHECKS = [
       for (const i of g.all(M.Meteor)) if (g.xyOf(i)[1] > 7) memo.fell.add(i);
       return [...memo.fell].filter((i) => g.kindOf(i) === M.Meteor);
     } },
-  { m: "Meteor", role: "is shocked into scorched stone by water", w: 30, h: 34, seed: 120, ticks: 900,
+  { m: "Meteor", covers: "meteor.shocked", role: "is shocked into scorched stone by water", w: 30, h: 34, seed: 120, ticks: 900,
     paint: (p) => { p(15, 28, 4, M.Water); p(15, 5, 1, M.Meteor); },
     outcome: (g, before, memo) => {
       memo.shocked ??= new Set();
       for (const i of g.all(M.Stone)) if (g.hasFlag(i, F.Scorched)) memo.shocked.add(i);
       return [...memo.shocked].filter((i) => g.kindOf(i) === M.Stone);
     } },
-  { m: "Meteor", role: "vitrifies nearby sand on impact", w: 30, h: 34, seed: 121, ticks: 900,
+  { m: "Meteor", covers: "meteor.vitrifies", role: "vitrifies nearby sand on impact", w: 30, h: 34, seed: 121, ticks: 900,
     paint: (p) => { p(15, 28, 6, M.Sand); p(15, 5, 1, M.Meteor); p(21, 5, 1, M.Meteor); p(9, 5, 1, M.Meteor); },
     outcome: (g, before, memo) => {
       memo.fused ??= new Set();
@@ -768,28 +775,28 @@ const CHECKS = [
       return [...memo.fused].filter((i) => g.kindOf(i) === M.Glass);
     } },
 
-  { m: "Rocket", role: "falls and piles as inert powder", w: 30, h: 34, seed: 122, ticks: 400,
+  { m: "Rocket", covers: "rocket.falls", role: "falls and piles as inert powder", w: 30, h: 34, seed: 122, ticks: 400,
     paint: (p) => { p(15, 10, 3, M.Rocket); },
     outcome: (g, before) => g.appeared(M.Rocket, before) },
-  { m: "Rocket", role: "a lit grain climbs fast with a glittering trail", w: 30, h: 44, seed: 123, ticks: 900,
+  { m: "Rocket", covers: "rocket.climbs", role: "a lit grain climbs fast with a glittering trail", w: 30, h: 44, seed: 123, ticks: 900,
     paint: (p) => { p(15, 38, 2, M.Rocket); p(15, 36, 1, M.Fire); },
     outcome: (g, before, memo) => {
       memo.high ??= new Set();
       for (const i of [...g.all(M.Rocket), ...g.all(M.Spark)]) if (g.xyOf(i)[1] < 24) memo.high.add(i);
       return [...memo.high].filter((i) => g.kindOf(i) === M.Rocket || g.kindOf(i) === M.Spark);
     } },
-  { m: "Rocket", role: "bursts into a firework shell of sparks and stardust", w: 30, h: 44, seed: 124, ticks: 900,
+  { m: "Rocket", covers: "rocket.bursts", role: "bursts into a firework shell of sparks and stardust", w: 30, h: 44, seed: 124, ticks: 900,
     paint: (p) => { p(15, 38, 2, M.Rocket); p(15, 36, 1, M.Fire); },
     outcome: (g, before) => g.appeared(M.Stardust, before) },
 
-  { m: "Spark", role: "flies outward from a burst then droops and fades", w: 30, h: 44, seed: 125, ticks: 900,
+  { m: "Spark", covers: "spark.flies", role: "flies outward from a burst then droops and fades", w: 30, h: 44, seed: 125, ticks: 900,
     paint: (p) => { p(15, 38, 2, M.Rocket); p(15, 36, 1, M.Fire); },
     outcome: (g, before, memo) => {
       memo.flung ??= new Set();
       for (const i of g.all(M.Spark)) if (Math.abs(g.xyOf(i)[0] - 15) > 3) memo.flung.add(i);
       return [...memo.flung].filter((i) => g.kindOf(i) === M.Spark);
     } },
-  { m: "Spark", role: "lights rocket powder it reaches in flight", w: 34, h: 44, seed: 126, ticks: 1200,
+  { m: "Spark", covers: "spark.lights", role: "lights rocket powder it reaches in flight", w: 34, h: 44, seed: 126, ticks: 1200,
     paint: (p) => { p(17, 38, 2, M.Rocket); p(17, 36, 1, M.Fire); p(8, 30, 2, M.Rocket); p(26, 30, 2, M.Rocket); },
     outcome: (g, before, memo) => {
       // A far-off charge that has caught: inert powder sits at energy 0, so a lit one is
@@ -800,12 +807,12 @@ const CHECKS = [
       return [...memo.lit].filter((i) => g.kindOf(i) === M.Rocket || g.kindOf(i) === M.Spark);
     } },
 
-  { m: "Wellspring", role: "drinks the identity of the first source that touches it", w: 30, h: 26, seed: 130, ticks: 900,
+  { m: "Wellspring", covers: "wellspring.drinks", role: "drinks the identity of the first source that touches it", w: 30, h: 26, seed: 130, ticks: 900,
     // A dormant spring stores nothing; once it has drunk, it carries the remembered
     // material's id as its energy, so a non-zero reading is the attunement itself.
     paint: (p) => { p(15, 19, 1, M.Wellspring); p(15, 15, 1, M.Water); },
     outcome: (g) => g.all(M.Wellspring).filter((i) => g.energyAt(i) > 0) },
-  { m: "Wellspring", role: "blocks flow like sealed construction while dormant", w: 30, h: 26, seed: 127, ticks: 400,
+  { m: "Wellspring", covers: "wellspring.blocks", role: "blocks flow like sealed construction while dormant", w: 30, h: 26, seed: 127, ticks: 400,
     paint: (p) => { p(13, 19, 1, M.Wellspring); p(17, 19, 1, M.Wellspring); p(9, 19, 2, M.Wall); p(21, 19, 2, M.Wall); p(15, 8, 4, M.Sand); },
     outcome: (g, before, memo) => {
       memo.held ??= new Set();
@@ -815,12 +822,12 @@ const CHECKS = [
       }
       return [...memo.held].filter((i) => g.kindOf(i) === M.Sand);
     } },
-  { m: "Wellspring", role: "is stilled by nearby ice", w: 30, h: 26, seed: 128, ticks: 3000,
+  { m: "Wellspring", covers: "wellspring.stilled", role: "is stilled by nearby ice", w: 30, h: 26, seed: 128, ticks: 3000,
     absent: true,
     paint: (p) => { p(15, 19, 1, M.Wellspring); p(15, 16, 1, M.Water); p(11, 19, 2, M.Ice); p(19, 19, 2, M.Ice); },
     act: (p, t) => { if (t % 300 === 0) { p(11, 19, 2, M.Ice); p(19, 19, 2, M.Ice); } },
     outcome: (g, before) => g.appeared(M.Water, before).filter((i) => g.xyOf(i)[1] > 20) },
-  { m: "Wellspring", role: "re-drinks a new source while held under that chill", w: 30, h: 26, seed: 129, ticks: 8000,
+  { m: "Wellspring", covers: "wellspring.reattune", role: "re-drinks a new source while held under that chill", w: 30, h: 26, seed: 129, ticks: 8000,
     paint: (p) => { p(15, 19, 1, M.Wellspring); p(15, 16, 1, M.Water); },
     act: (p, t) => {
       if (t > 600 && t % 200 === 0) { p(11, 19, 2, M.Ice); p(19, 19, 2, M.Ice); }
@@ -833,33 +840,60 @@ const CHECKS = [
     } },
 ];
 
-// Coverage is enforced against docs/MATERIAL_AUDIT.md rather than trusted. Its matrix is
-// the contract for what each material promises a player; if a row grows a clause and no
-// check follows it, the promise is undocumented by anything executable.
-const matrixRows = (await readFile(resolve(root, "docs/MATERIAL_AUDIT.md"), "utf8"))
+// Coverage is enforced against docs/MATERIAL_AUDIT.md, clause by clause. Each role there
+// carries a stable `[material.slug]` id and each check names the id it covers, so the
+// binding survives rewording — which a count, or matching on the prose, would not.
+//
+// What this catches: a clause added with no check, a clause deleted while a check still
+// claims it, a typo'd id. What it does NOT catch: a clause reworded into a *different*
+// promise while keeping its id. Identity is stable by design, which is exactly why it
+// cannot notice meaning changing underneath it — that one still needs a human reading the
+// diff. Binding on the prose instead would catch it, at the cost of breaking on every typo.
+const matrixLines = (await readFile(resolve(root, "docs/MATERIAL_AUDIT.md"), "utf8"))
   .split(/\r?\n/)
-  .map((line) => line.trim())
-  .filter((line) => line.startsWith("|") && line.split("|").length > 3);
+  .map((line) => line.trim());
 const documented = new Map();
 let inMatrix = false;
-for (const line of matrixRows) {
+for (const line of matrixLines) {
   if (line.startsWith("| Material | Interaction roles")) { inMatrix = true; continue; }
-  if (!inMatrix || /^\|[-\s|]+\|$/.test(line)) continue;
+  if (!inMatrix) continue;
+  if (!line.startsWith("|")) break;
+  if (/^\|[-\s|]+\|$/.test(line)) continue;
   const cols = line.slice(1, -1).split("|").map((c) => c.trim());
   if (cols.length < 2 || !cols[0] || cols[0] === "Material") continue;
-  documented.set(cols[0], cols[1].split(";").filter((c) => c.trim()).length);
+  for (const clause of cols[1].split(";")) {
+    const tag = clause.trim().match(/^\[([a-z0-9.]+)\]\s*(.+)$/i);
+    if (!tag) {
+      console.error(`\nInteraction audit FAILED: an interaction role in docs/MATERIAL_AUDIT.md has no\n` +
+        `stable id. Every clause must start with one, e.g. "[wall.blocks] Blocks flow...":\n  ${cols[0]}: ${clause.trim().slice(0, 80)}`);
+      process.exit(1);
+    }
+    if (documented.has(tag[1])) {
+      console.error(`\nInteraction audit FAILED: duplicate role id "${tag[1]}" in docs/MATERIAL_AUDIT.md.`);
+      process.exit(1);
+    }
+    documented.set(tag[1], { material: cols[0], text: tag[2] });
+  }
 }
-const checksPer = new Map();
-for (const c of CHECKS) checksPer.set(c.m, (checksPer.get(c.m) ?? 0) + 1);
-const uncovered = [...documented].filter(([m, n]) => (checksPer.get(m) ?? 0) < n);
-if (uncovered.length) {
-  console.error(
-    `\nInteraction audit FAILED: docs/MATERIAL_AUDIT.md documents interaction roles that no\n` +
-      `check covers:\n` +
-      uncovered.map(([m, n]) => `  - ${m}: ${n} documented role(s), ${checksPer.get(m) ?? 0} check(s)`).join("\n") +
-      `\n\nEvery clause in that matrix is a promise to the player. Add a check, or if the\n` +
-      `promise is not real any more, take the clause out of the matrix.`,
-  );
+
+const claimed = new Set(CHECKS.map((c) => c.covers));
+const unknown = CHECKS.filter((c) => !documented.has(c.covers));
+const uncovered = [...documented].filter(([id]) => !claimed.has(id));
+const misfiled = CHECKS.filter((c) => documented.get(c.covers) && documented.get(c.covers).material !== c.m);
+if (unknown.length || uncovered.length || misfiled.length) {
+  const parts = [];
+  if (uncovered.length)
+    parts.push(`Documented roles with no check:\n` +
+      uncovered.map(([id, d]) => `  - ${id} (${d.material}): ${d.text.slice(0, 70)}`).join("\n"));
+  if (unknown.length)
+    parts.push(`Checks naming a role id that is not in the matrix — renamed or deleted?\n` +
+      unknown.map((c) => `  - ${c.covers} (claimed by ${c.m}: ${c.role})`).join("\n"));
+  if (misfiled.length)
+    parts.push(`Checks bound to another material's role:\n` +
+      misfiled.map((c) => `  - ${c.m} check claims ${c.covers}, which belongs to ${documented.get(c.covers).material}`).join("\n"));
+  console.error(`\nInteraction audit FAILED: the matrix and this gate disagree.\n\n${parts.join("\n\n")}\n\n` +
+    `Every clause in that matrix is a promise to the player. Add a check, fix the id, or if\n` +
+    `the promise is not real any more, take the clause out of the matrix.`);
   process.exit(1);
 }
 
@@ -934,6 +968,6 @@ if (invisible.length) {
   process.exit(1);
 }
 
-console.log(`\nInteraction audit passed: ${results.length} checks covering all ${[...documented.values()].reduce((a, b) => a + b, 0)} roles`);
+console.log(`\nInteraction audit passed: ${results.length} checks bound to all ${documented.size} role ids`);
 console.log(`documented in docs/MATERIAL_AUDIT.md. Every one happens from a painted scene, and`);
 console.log(`every one is visible at play zoom.`);

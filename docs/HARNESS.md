@@ -17,7 +17,9 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
 
   **It also asserts a visible footprint**, because firing and being seen are different things — the second half of what went wrong with flowers. A check returns the *cell indices* that are the outcome, and the gate measures three things about them: how many cells the outcome ever occupies, how many ticks it is on screen, and its median colour distance from what it replaced, computed by compiling the **real renderer** and asking it for the pixels. Floors are 4 cells, 30 ticks (0.5s at 60fps), and 24 contrast. Reimplementing the colour rules in the harness would only prove the harness agrees with itself.
 
-  **Coverage is enforced, not trusted.** The gate parses `docs/MATERIAL_AUDIT.md` and fails if any material documents more interaction roles than it has checks. Every clause in that matrix is a promise to the player; without this, a row could grow a clause and nothing executable would follow it.
+  **Coverage is enforced clause by clause, not trusted.** Every role in `docs/MATERIAL_AUDIT.md` carries a stable `[material.slug]` id, and every check names the id it covers. The gate fails on a clause with no check, a check naming an id the matrix no longer has, a check bound to another material's clause, a duplicate id, or a clause with no id at all.
+
+  Ids rather than prose on purpose: identity survives rewording, so fixing a typo in a clause does not break the build. The cost is the flip side of the same coin — **a clause reworded into a genuinely different promise while keeping its id will pass**, and only a human reading the diff will catch that. Binding on the clause text instead would catch it, at the price of breaking on every wording tweak.
 
   Two lessons are baked into the metrics. Size is the union over the outcome's whole life, not the peak at one instant, or a gradual rule like a fungus mat reverting to soil scores as invisible while being perfectly obvious. And an outcome that is a *transition* ("was glass, is sand now") must be made sticky, or it scores 2 ticks no matter how permanent its result is.
 
