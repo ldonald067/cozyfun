@@ -366,27 +366,6 @@ export function App() {
     setStatus(exported ? "clip WebM exported" : "clip unavailable");
   }
 
-  async function handleCopyShareNote() {
-    if (!engine || !navigator.clipboard?.writeText) {
-      setStatus("clipboard unavailable");
-      return;
-    }
-
-    const shareSummary = [
-      "Night Desk Terrarium scene",
-      `Room: ${activeSceneEnvironment.title}`,
-      `Sound: ${activeMood.title} / ${soundSourceLabel}`,
-      `Sim: ${engine.source.toUpperCase()}, tick ${engine.tickCount()}`
-    ].join("\n");
-
-    try {
-      await navigator.clipboard.writeText(shareSummary);
-      setStatus("share note copied");
-    } catch {
-      setStatus("clipboard unavailable");
-    }
-  }
-
   async function handleToggleSound() {
     if (audioPrefs.enabled) {
       const nextPrefs = { ...audioPrefs, enabled: false };
@@ -592,7 +571,6 @@ export function App() {
               sceneTitle={activeSceneEnvironment.title}
               moodTitle={activeMood.title}
               soundSource={soundSourceLabel}
-              onCopyNote={handleCopyShareNote}
               onExportClip={handleClip}
               onExportPostcard={handlePostcard}
               onExportScene={handleExport}

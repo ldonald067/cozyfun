@@ -174,7 +174,7 @@ async function main() {
     assert(state.providerLabels.join("|") === "Native|Desk Radio", `unexpected sound providers: ${state.providerLabels.join(", ")}`);
     assert(state.nativeProviderActive, "legacy generated audio provider did not normalize to native");
     assert(state.storedAudioProvider === "native", `legacy generated audio provider was not migrated in prefs: ${state.storedAudioProvider}`);
-    assert(state.shareActions === 5, `expected five share actions, found ${state.shareActions}`);
+    assert(state.shareActions === 4, `expected four share actions, found ${state.shareActions}`);
     assert(state.sceneEnvironments === 6, `expected six room buttons, found ${state.sceneEnvironments}`);
     assert(state.roomImage.includes("rain-desk.jpg"), `default room image was not applied: ${state.roomImage}`);
     assert(state.status.includes("online"), `engine did not report online: ${state.status}`);
