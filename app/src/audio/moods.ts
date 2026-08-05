@@ -3,8 +3,8 @@ import type { AudioMood, AudioMoodDef } from "./types";
 export const AUDIO_MOODS: AudioMoodDef[] = [
   {
     id: "rain",
-    label: "Rain",
-    title: "Rain",
+    label: "Rainfall",
+    title: "Rainfall",
     status: "rain on",
     ambience: {
       purrGain: 0.01,
@@ -29,8 +29,8 @@ export const AUDIO_MOODS: AudioMoodDef[] = [
   },
   {
     id: "fire",
-    label: "Fire",
-    title: "Fireplace",
+    label: "Crackle",
+    title: "Hearth Crackle",
     status: "fireplace crackle on",
     ambience: {
       purrGain: 0.006,

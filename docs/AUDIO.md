@@ -12,7 +12,7 @@ Focused implementation modules live under `app/src/audio`:
 
 - `types.ts`: shared audio types.
 - `preferences.ts`: localStorage shape, defaults, channel list, and normalization.
-- `moods.ts`: native ambience moods for Rain, Cat Purr, and Fireplace.
+- `moods.ts`: native ambience moods for Rainfall, Cat Purr, and Hearth Crackle. They are named for the SOUND, not the place — "Rain" and "Fire" collided with the Rain and Fire room backdrops in the same column, identically styled.
 - `rooms.ts`: room-linked ambience profiles that bias native ambience without adding controls.
 - `providers.ts`: native/Desk Radio source definitions and compatibility rules.
 - `mixer.ts`: Web Audio graph for `master` and `ambience`.
@@ -39,9 +39,9 @@ Focused implementation modules live under `app/src/audio`:
 
 Sound moods are small balance presets over local ambience recordings:
 
-- Rain: recorded rain forward, with cat purr and fire lower in the room.
+- Rainfall: recorded rain forward, with cat purr and fire lower in the room.
 - Purr: recorded cat purr forward, with rain and fire lower in the room.
-- Fire: recorded fireplace crackle forward, with light weather still present.
+- Hearth Crackle: recorded fireplace crackle forward, with light weather still present.
 
 Mood definitions live in `moods.ts`. Keep mood names user-facing and calm; keep implementation details inside the preset config.
 

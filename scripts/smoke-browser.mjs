@@ -383,7 +383,7 @@ async function main() {
     await click(cdp, '[data-testid="audio-mute"]');
     await waitForStatus(cdp, "audio unmuted");
     await click(cdp, '[data-testid="audio-toggle"]');
-    await waitForStatus(cdp, "Fireplace resting");
+    await waitForStatus(cdp, "Hearth Crackle resting");
   });
 
   await check("desk radio handles playable and blocked YouTube embeds", async () => {
