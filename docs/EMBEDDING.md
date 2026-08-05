@@ -110,9 +110,29 @@ know what you are re-granting — the default omission is what lets the app keep
 storage access, and `sandbox` without `allow-same-origin` reintroduces exactly the storage
 problem described above.
 
-Height is a judgment call — the layout is responsive and the controls sit under the canvas,
-so around 620px gives them room. The `loading="lazy"` attribute defers even the poster until
-it scrolls into view.
+**Width decides whether the controls are reachable, and it is not a judgment call.** The app
+only collapses to a single 620px-tall screen once the frame is wide enough for its two-column
+desktop layout. Measured against the live build at a 620px height:
+
+| Frame width | App content height | Fits 620? |
+| --- | --- | --- |
+| 700px | 2178px | no — every control is below the fold |
+| 900px | 1455px | no |
+| 1024px | 1534px | no |
+| 1200px | 620px | yes |
+
+Under about 900px the layout stacks vertically and the canvas alone fills the frame, so the
+visitor sees a sandbox with no visible tray and has to scroll inside the iframe to reach any
+material. **Give the frame at least 1200px of width**, or expect to hand it far more height
+than 620px. An earlier version of this file guessed "around 620px gives them room" without
+measuring; that guess is what put the live embed at 700x620, where the tray starts below the
+fold. Measure with `document.documentElement.scrollHeight` at the frame's real size before
+choosing.
+
+Even at 1200x620 the last three materials (Wellspring, Rocket, Moonwater) and the sound
+controls sit just past the fold — worth knowing when picking a height.
+
+The `loading="lazy"` attribute defers even the poster until it scrolls into view.
 
 ### What the poster draws
 
