@@ -122,8 +122,9 @@ desktop layout. Measured against the live build at a 620px height:
 | 1200px | 620px | yes |
 
 Under about 900px the layout stacks vertically and the canvas alone fills the frame, so the
-visitor sees a sandbox with no visible tray and has to scroll inside the iframe to reach any
-material. **Give the frame at least 1200px of width**, or expect to hand it far more height
+visitor sees a sandbox with no visible tray. Scrolling inside the frame works normally, so
+this is a discoverability cost rather than a blocker — but nothing on that first screen hints
+that a tray exists below it. **Give the frame at least 1200px of width**, or expect to hand it far more height
 than 620px. An earlier version of this file guessed "around 620px gives them room" without
 measuring; that guess is what put the live embed at 700x620, where the tray starts below the
 fold. Measure with `document.documentElement.scrollHeight` at the frame's real size before
