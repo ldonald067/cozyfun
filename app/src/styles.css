@@ -493,11 +493,15 @@ input:focus-visible {
   gap: 6px;
 }
 
+/* Colour carries meaning in this panel: WARM is the sandbox — the tray, the Room and
+   Share selection, and this brush — while BLUE is sound, and only sound (.audio-slider
+   below). Do not "unify" the two; the split is the point, and it is why the brush slider
+   looks unlike the two volume sliders directly under it. */
 .brush-control input {
   grid-column: 1 / -1;
   width: 100%;
   min-width: 0;
-  accent-color: #dfb65e;
+  accent-color: #ffe4ad;
 }
 
 .brush-control output {
@@ -851,6 +855,7 @@ input:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
+/* Blue means sound. See the note on .brush-control input above. */
 .audio-slider input {
   grid-column: 1 / -1;
   width: 100%;
