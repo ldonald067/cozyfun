@@ -16,7 +16,7 @@ export type SceneEnvironment = {
 };
 
 const SCENE_ENVIRONMENT_KEY = "cozy-pixel-sandbox:room:v1";
-export const DEFAULT_SCENE_ENVIRONMENT: SceneEnvironmentId = "rain-desk";
+const DEFAULT_SCENE_ENVIRONMENT: SceneEnvironmentId = "rain-desk";
 
 export const SCENE_ENVIRONMENTS: SceneEnvironment[] = [
   {

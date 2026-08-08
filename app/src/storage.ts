@@ -48,7 +48,7 @@ export type SceneSnapshotApplyResult = {
   metadata: SceneSnapshotMetadata | null;
 };
 
-export function createSnapshot(engine: SandboxEngine, context?: SceneSnapshotContext): SceneSnapshot {
+function createSnapshot(engine: SandboxEngine, context?: SceneSnapshotContext): SceneSnapshot {
   return {
     format: FORMAT,
     width: engine.width(),

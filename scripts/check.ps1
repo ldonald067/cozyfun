@@ -29,20 +29,12 @@ function Invoke-CheckStep {
 
 Push-Location $Root
 try {
-  Invoke-CheckStep "Material identity audit" { & $Npm run material:audit }
-  Invoke-CheckStep "Material contrast floor" { & $Npm run material:contrast }
-  Invoke-CheckStep "Rust simulation tests" { & $Npm run test:sim }
-  Invoke-CheckStep "Production build" { & $Npm run build }
-  Invoke-CheckStep "WASM smoke checks" { & (Join-Path $Root ".tools\node\node.exe") "scripts/smoke-wasm.mjs" }
-  Invoke-CheckStep "JavaScript fallback smoke checks" { & $Npm run test:js-fallback }
-  Invoke-CheckStep "Rust/JS parity harness" { & $Npm run test:parity }
-  Invoke-CheckStep "Subpath build gate" { & $Npm run test:subpath }
-  Invoke-CheckStep "Audio reaction smoke checks" { & $Npm run test:audio-reactions }
-  Invoke-CheckStep "Browser smoke checks" { & $Npm run test:browser }
-  Invoke-CheckStep "Audio QA" { & $Npm run audio:qa }
-  Invoke-CheckStep "Visual QA captures" { & $Npm run visual:qa }
-  Write-Host ""
-  Write-Host "Full local check passed."
+  # One stage list, one owner. This wrapper used to enumerate every stage itself and
+  # has now drifted from package.json twice — first shipping as a silent nine-stage
+  # subset of twelve, then missing the interaction audit when the gate grew to thirteen.
+  # It exists to put the repo-local toolchains on PATH, so that is all it does; the
+  # stages come from `npm run check`, where they are defined.
+  Invoke-CheckStep "Full gate (npm run check)" { & $Npm run check }
 }
 finally {
   Pop-Location
