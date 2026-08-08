@@ -501,7 +501,9 @@ input:focus-visible {
 
 .control-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* auto-fit, not a fixed count: the fullscreen button only renders where the browser
+     supports it (iOS iframes do not), so the row holds three or four buttons. */
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 8px;
 }
 

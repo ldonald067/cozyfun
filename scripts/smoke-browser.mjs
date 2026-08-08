@@ -540,6 +540,20 @@ async function main() {
     await click(cdp, '[data-testid="window-toggle"]'); // leave it open, the default
   });
 
+  await check("a newer window takes over and play reclaims", async () => {
+    // A second surface (embed vs new tab) announcing itself must pause THIS one with a
+    // plain explanation — two live engines diverging from one autosave was the "why does
+    // it look different over there" bug. Unpausing takes the terrarium back.
+    const fullscreenButton = await evaluate(cdp, `Boolean(document.querySelector('[data-testid="fullscreen-toggle"]')) === document.fullscreenEnabled`);
+    assert(fullscreenButton, "fullscreen button should render exactly when the browser supports it");
+    await evaluate(cdp, `new BroadcastChannel("cozy-pixel-sandbox:owner").postMessage({ type: "claim", id: "smoke-foreign" })`);
+    await waitForStatus(cdp, "another window is tending this terrarium — press play to take over", 10_000);
+    const pausedBadge = await evaluate(cdp, `Boolean(document.querySelector(".status-paused"))`);
+    assert(pausedBadge, "takeover should pause this window");
+    await click(cdp, '[data-testid="pause-toggle"]');
+    await waitUntil(async () => !(await evaluate(cdp, `Boolean(document.querySelector(".status-paused"))`)), "play to reclaim", 5_000);
+  });
+
   await check("narrow desktop layout keeps controls from overlapping the tray", async () => {
     await cdp.send("Emulation.setDeviceMetricsOverride", {
       width: 960,

@@ -1,5 +1,5 @@
 import { ChangeEvent, PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Brush, Eraser, FolderOpen, Pause, Play, RotateCcw, Save } from "lucide-react";
+import { Brush, Eraser, FolderOpen, Maximize2, Minimize2, Pause, Play, RotateCcw, Save } from "lucide-react";
 import {
   AUDIO_MOODS,
   createAudioController,
@@ -94,6 +94,12 @@ export function App() {
   const activeSceneEnvironment = getSceneEnvironment(sceneEnvironment);
   const [brushSize, setBrushSize] = useState(4);
   const [paused, setPaused] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  // One window tends the terrarium at a time. The newest surface (embed, tab, whatever)
+  // claims it over a BroadcastChannel; everyone else pauses with a clear status. Two live
+  // engines diverging from the same autosave was the "why does it look different over
+  // there" bug — ownership makes the second copy impossible instead of merely less likely.
+  const ownershipRef = useRef<{ channel: BroadcastChannel | null; id: string }>({ channel: null, id: "" });
   const [status, setStatus] = useState("warming tray");
   const [fps, setFps] = useState(0);
   const [fieldNote, setFieldNote] = useState<string | null>(null);
@@ -338,10 +344,12 @@ export function App() {
         engine.paint(x, y, brushSize, selected, density);
       }
       lastPaintCellRef.current = { x, y };
+      if (paused) setPaused(false);
+      claimOwnership();
       fieldNoteJournalRef.current?.notePaint(selected, performance.now());
       audio.playPaintCue(selected);
     },
-    [audio, brushSize, engine, selected]
+    [audio, brushSize, engine, paused, selected]
   );
 
   function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
@@ -409,6 +417,30 @@ export function App() {
   }, [sceneEnvironment]);
 
   useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return;
+    const id = crypto.randomUUID();
+    const channel = new BroadcastChannel("cozy-pixel-sandbox:owner");
+    ownershipRef.current = { channel, id };
+    channel.onmessage = (event) => {
+      if (event.data?.type !== "claim" || event.data.id === id) return;
+      // Someone else took the desk chair. Sit back; unpausing or painting reclaims it.
+      setPaused(true);
+      setStatus("another window is tending this terrarium — press play to take over");
+    };
+    channel.postMessage({ type: "claim", id });
+    return () => {
+      channel.close();
+      ownershipRef.current = { channel: null, id: "" };
+    };
+  }, []);
+
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  useEffect(() => {
     if (!engine) return;
     // Autosave makes "grow while you were away" real: without it only players who
     // pressed Save ever had a scene to come back to. pagehide catches tab closes.
@@ -430,6 +462,25 @@ export function App() {
       window.removeEventListener("pagehide", save);
     };
   }, [engine]);
+
+  function claimOwnership() {
+    ownershipRef.current.channel?.postMessage({ type: "claim", id: ownershipRef.current.id });
+  }
+
+  async function handleFullscreen() {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        // Inside the embed iframe this fills the whole screen (allow="fullscreen" is
+        // already on the iframe), which makes opening a second copy in a new tab
+        // unnecessary — and a second copy is a second, diverging terrarium.
+        await document.documentElement.requestFullscreen();
+      }
+    } catch {
+      setStatus("fullscreen unavailable");
+    }
+  }
 
   function handleSave() {
     if (!engine) return;
@@ -636,10 +687,27 @@ export function App() {
               className="icon-button"
               title={paused ? "Play" : "Pause"}
               aria-label={paused ? "Play simulation" : "Pause simulation"}
-              onClick={() => setPaused((value) => !value)}
+              data-testid="pause-toggle"
+              onClick={() => {
+                setPaused((value) => {
+                  if (value) claimOwnership();
+                  return !value;
+                });
+              }}
             >
               {paused ? <Play size={18} /> : <Pause size={18} />}
             </button>
+            {document.fullscreenEnabled && (
+              <button
+                type="button"
+                title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+                aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                data-testid="fullscreen-toggle"
+                onClick={handleFullscreen}
+              >
+                {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+              </button>
+            )}
             <button type="button" className="icon-button" title="Clear" aria-label="Clear tray" data-testid="clear-scene" onClick={handleClear}>
               <RotateCcw size={18} />
             </button>

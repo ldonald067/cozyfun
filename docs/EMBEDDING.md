@@ -137,6 +137,21 @@ controls sit just past the fold — worth knowing when picking a height.
 
 The `loading="lazy"` attribute defers even the poster until it scrolls into view.
 
+## One window at a time
+
+The game carries a fullscreen button (top control row) that works from inside the iframe —
+`allow="fullscreen"` above is what permits it — so the embed can BE the full-size
+experience. Prefer that over a "Play in New Tab" link as the primary path: a second open
+surface is a second live simulation diverging from the same autosave, which players read
+as "the game is different over there". If the site keeps a new-tab link at all, demote it
+to a fallback for iOS Safari, which cannot fullscreen an iframe (the game hides its
+fullscreen button there).
+
+If two surfaces do end up open, the game itself arbitrates: the newest window claims the
+terrarium over a BroadcastChannel and the older one pauses with "another window is tending
+this terrarium". Pressing play (or painting) takes it back. Hidden tabs also skip the
+interval autosave, so the visible window owns the save.
+
 ### What the poster draws
 
 Rain falling in three sheets, condensation beaded on the glass in front of it, distant
