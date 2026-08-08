@@ -505,6 +505,43 @@ async function main() {
     );
   });
 
+  await check("a saved scene grows while the player is away", async () => {
+    // Age the manual save two hours into the past, promote it to the autosave slot the
+    // boot path restores from, and reload. The app should resume the scene AND fast-
+    // forward it, announcing the growth. This is the whole "living terrarium" loop:
+    // storage timestamp -> boot restore -> chunked catch-up in the render loop.
+    const staged = await evaluate(cdp, `(() => {
+      const raw = localStorage.getItem("cozy-pixel-sandbox:scene:v1");
+      if (!raw) return false;
+      const snapshot = JSON.parse(raw);
+      snapshot.savedAt = new Date(Date.now() - 2 * 3600 * 1000).toISOString();
+      localStorage.setItem("cozy-pixel-sandbox:scene:auto:v1", JSON.stringify(snapshot));
+      return true;
+    })()`);
+    assert(staged, "no manual save found to stage the away-growth scenario");
+    // Reloads below reset window.__smokeErrors, so bank the pre-reload errors first —
+    // otherwise the final error check would silently cover only the last page load.
+    const preReloadErrors = await evaluate(cdp, `window.__smokeErrors ?? []`);
+    assert(preReloadErrors.length === 0, `page errors before reload: ${preReloadErrors.join("; ")}`);
+    // Hop through a no-autosave page to do the staging: leaving a normal page fires the
+    // pagehide autosave, which faithfully overwrites the staged timestamp with "now" —
+    // correct in production, and exactly what makes this scenario impossible to set up
+    // without the QA hook.
+    await cdp.send("Page.navigate", { url: `${appUrl}?cozyNoAutosave=1` });
+    await waitUntil(async () => (await statusText(cdp)).length > 0, "no-autosave page", 20_000);
+    const restaged = await evaluate(cdp, `(() => {
+      const raw = localStorage.getItem("cozy-pixel-sandbox:scene:v1");
+      if (!raw) return false;
+      const snapshot = JSON.parse(raw);
+      snapshot.savedAt = new Date(Date.now() - 2 * 3600 * 1000).toISOString();
+      localStorage.setItem("cozy-pixel-sandbox:scene:auto:v1", JSON.stringify(snapshot));
+      return true;
+    })()`);
+    assert(restaged, "manual save disappeared before staging");
+    await cdp.send("Page.navigate", { url: appUrl });
+    await waitForStatus(cdp, "your terrarium kept growing while you were away", 20_000);
+  });
+
   await check("page stayed free of browser errors", async () => {
     const pageErrors = await evaluate(cdp, `window.__smokeErrors ?? []`);
     assert(pageErrors.length === 0, `page errors: ${pageErrors.join("; ")}`);

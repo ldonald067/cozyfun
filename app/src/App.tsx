@@ -31,7 +31,9 @@ import { MATERIAL, MATERIALS, type MaterialDef, type MaterialId } from "./materi
 import {
   applySnapshot,
   downloadSnapshot,
+  loadAutoLocal,
   loadLocal,
+  saveAutoLocal,
   readSnapshotFile,
   saveLocal,
   type SceneSnapshotContext,
@@ -47,6 +49,11 @@ import {
 } from "./sceneEnvironments";
 
 const WORLD_WIDTH = 220;
+// Away-time growth: one tick per second away, capped at ~66 sim-seconds so a long
+// absence enriches a scene without eroding it beyond recognition.
+const MAX_AWAY_GROWTH_TICKS = 4000;
+const FAST_FORWARD_TICKS_PER_FRAME = 250;
+const AUTOSAVE_INTERVAL_MS = 30_000;
 const WORLD_HEIGHT = 140;
 const DEFAULT_SEED = 1107;
 const SIM_TICK_MS = 38;
@@ -81,6 +88,8 @@ export function App() {
   const [paused, setPaused] = useState(false);
   const [status, setStatus] = useState("warming tray");
   const [fps, setFps] = useState(0);
+  const fastForwardRef = useRef(0);
+  const snapshotContextRef = useRef<SceneSnapshotContext | null>(null);
   const baseCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const glowCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const motesCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -98,7 +107,26 @@ export function App() {
       }
       createdEngine = created;
       setEngine(created);
-      setStatus(created.source === "wasm" ? "wasm sim online" : "js fallback online");
+      // Resume the saved terrarium, and let it grow by the time the player was away:
+      // one sim tick per real second, capped so an overnight absence reads as "the
+      // garden moved on" rather than "everything I built eroded". The catch-up runs
+      // chunked inside the render loop (fastForwardRef), not here, so boot never blocks.
+      const auto = loadAutoLocal(created);
+      const restored = auto.loaded ? auto : loadLocal(created);
+      if (restored.loaded) {
+        applySnapshotMetadata(restored.metadata);
+        const savedAtMs = restored.savedAt ? Date.parse(restored.savedAt) : Number.NaN;
+        const secondsAway = Number.isFinite(savedAtMs) ? Math.floor((Date.now() - savedAtMs) / 1000) : 0;
+        const growth = Math.max(0, Math.min(secondsAway, MAX_AWAY_GROWTH_TICKS));
+        if (growth >= 60) {
+          fastForwardRef.current = growth;
+          setStatus("your terrarium kept growing while you were away");
+        } else {
+          setStatus("terrarium resumed");
+        }
+      } else {
+        setStatus(created.source === "wasm" ? "wasm sim online" : "js fallback online");
+      }
     });
     return () => {
       active = false;
@@ -138,7 +166,14 @@ export function App() {
     let frames = 0;
 
     const loop = (time: number) => {
-      if (!paused && time - lastSimTick >= SIM_TICK_MS) {
+      if (fastForwardRef.current > 0) {
+        // Catching up on time away. Chunked so even the JS fallback stays responsive,
+        // and reaction cues are skipped — 4000 ticks of retroactive pops would be noise.
+        const chunk = Math.min(FAST_FORWARD_TICKS_PER_FRAME, fastForwardRef.current);
+        for (let i = 0; i < chunk; i++) engine.tick();
+        fastForwardRef.current -= chunk;
+        lastSimTick = time;
+      } else if (!paused && time - lastSimTick >= SIM_TICK_MS) {
         const reactionCellsBefore = audio.canPlayReactionCues() ? engine.getCellBytes() : null;
         engine.tick();
         if (reactionCellsBefore) {
@@ -312,6 +347,26 @@ export function App() {
     engine.clear();
     setStatus("tray cleared");
   }
+
+  useEffect(() => {
+    snapshotContextRef.current = snapshotContext;
+  }, [snapshotContext]);
+
+  useEffect(() => {
+    if (!engine) return;
+    // Autosave makes "grow while you were away" real: without it only players who
+    // pressed Save ever had a scene to come back to. pagehide catches tab closes.
+    // ?cozyNoAutosave=1 is a QA hook: the pagehide save records "last seen" so
+    // faithfully that a test can never stage an old timestamp without it.
+    if (new URLSearchParams(window.location.search).has("cozyNoAutosave")) return;
+    const save = () => saveAutoLocal(engine, snapshotContextRef.current ?? undefined);
+    const interval = window.setInterval(save, AUTOSAVE_INTERVAL_MS);
+    window.addEventListener("pagehide", save);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("pagehide", save);
+    };
+  }, [engine]);
 
   function handleSave() {
     if (!engine) return;

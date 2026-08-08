@@ -8,7 +8,7 @@ This project is a static browser toy: React owns the interface, Rust/WASM owns t
 2. `app/src/engine.ts` loads the Rust/WASM simulation when available and falls back to a JavaScript simulation if the WASM file is missing.
 3. `sim` contains the Rust cellular automata rules.
 4. `app/src/renderer.ts` converts the engine cell bytes into the base, glow, and motes canvas layers.
-5. `app/src/storage.ts` handles browser-local saves and JSON scene import/export.
+5. `app/src/storage.ts` handles browser-local saves and JSON scene import/export. The manual Save/Load pair and the 30-second autosave use separate localStorage keys on purpose: a shared key would let the autosave overwrite a deliberate checkpoint with a cleared board. On boot the app restores the autosave (falling back to the manual save) and grows the scene by one tick per second away, capped at 4000, so a terrarium lives between visits.
 6. `app/src/audio.ts` exposes the optional local native audio controller.
 7. `app/src/deskRadio.ts` validates user-provided YouTube Desk Radio sources and builds the visible watch URL and display label; the embedded player itself is constructed in `DeskRadioPanel.tsx`.
 8. `app/src/sceneEnvironments.ts` provides non-destructive room/backdrop definitions and their local image metadata.

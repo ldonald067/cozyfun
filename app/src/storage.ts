@@ -6,6 +6,11 @@ import { CELL_STRIDE } from "./materials";
 import { isSceneEnvironmentId, type SceneEnvironmentId } from "./sceneEnvironments";
 
 const STORAGE_KEY = "cozy-pixel-sandbox:scene:v1";
+// Autosave lives under its own key so it can never clobber a deliberate Save. Without
+// the split, paint -> Save -> Clear -> 30s of idling would overwrite the checkpoint
+// with the cleared board. Boot restores the autosave (always the freshest state) and
+// falls back to the manual save; the Load button still reads the manual key only.
+const AUTOSAVE_KEY = "cozy-pixel-sandbox:scene:auto:v1";
 const APP_NAME = "cozy-pixel-sandbox";
 const FORMAT = "CXS2";
 const LEGACY_FORMAT = "CXS1";
@@ -46,6 +51,8 @@ export type SceneSnapshot = {
 export type SceneSnapshotApplyResult = {
   loaded: boolean;
   metadata: SceneSnapshotMetadata | null;
+  /** When the snapshot was written, so the app can grow a resumed scene by time away. */
+  savedAt?: string;
 };
 
 function createSnapshot(engine: SandboxEngine, context?: SceneSnapshotContext): SceneSnapshot {
@@ -73,7 +80,28 @@ export function applySnapshot(engine: SandboxEngine, snapshot: unknown): SceneSn
   }
 
   if (cellBytes.byteLength !== engine.width() * engine.height() * CELL_STRIDE) return failedApplyResult();
-  return engine.loadCellBytes(cellBytes) ? { loaded: true, metadata: scene.metadata ?? null } : failedApplyResult();
+  return engine.loadCellBytes(cellBytes)
+    ? { loaded: true, metadata: scene.metadata ?? null, savedAt: scene.savedAt }
+    : failedApplyResult();
+}
+
+export function saveAutoLocal(engine: SandboxEngine, context?: SceneSnapshotContext) {
+  try {
+    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(createSnapshot(engine, context)));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function loadAutoLocal(engine: SandboxEngine): SceneSnapshotApplyResult {
+  const raw = localStorage.getItem(AUTOSAVE_KEY);
+  if (!raw) return failedApplyResult();
+  try {
+    return applySnapshot(engine, JSON.parse(raw));
+  } catch {
+    return failedApplyResult();
+  }
 }
 
 export function saveLocal(engine: SandboxEngine, context?: SceneSnapshotContext) {

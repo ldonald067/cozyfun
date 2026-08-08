@@ -161,8 +161,10 @@ so a subpath regression — especially the silent wasm one — would otherwise s
 
 1. Open the embed page. The poster should appear without any large network requests.
 2. Click through. The status line should say **"wasm sim online"**, not "js fallback".
-3. Paint something, reload the page, and confirm the scene is still there — that proves
-   storage is not being blocked or partitioned.
+3. Paint something, reload the page, and confirm the scene comes back on its own (the
+   status line says "terrarium resumed") — that proves storage is not being blocked or
+   partitioned. Until 2026-08 this step was aspirational: nothing auto-loaded, so a
+   reload silently discarded unsaved scenes and this check could never have passed.
 4. Turn on sound and confirm ambience plays.
 
 ## Triage from the embedding site's side

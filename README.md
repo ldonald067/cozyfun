@@ -66,7 +66,7 @@ npm run dev:fallback
 - Pause/play the simulation from the control panel.
 - Change the room backdrop without replacing your sandbox, including rainy, moonlit, hearth, fireplace, forest, and snow scenes.
 - Enable optional local audio, pick a sound mood for rain, cat purr, or fireplace crackle, choose native ambience or a visible YouTube Desk Radio, and tune master and ambience volume.
-- Clear, save/load in the browser, download/import a scene JSON file, export a postcard PNG, or export a short WebM clip from the right controls.
+- The terrarium autosaves and resumes on its own, growing a little while you are away. Clear, save/load a deliberate checkpoint, download/import a scene JSON file, export a postcard PNG, or export a short WebM clip from the right controls.
 
 Native ambience is local: credited recordings provide the rain, cat purr, and fireplace crackle beds. Short material cues still use Web Audio, but long-running ambience is recorded audio only. Desk Radio is user-controlled: paste a YouTube video, playlist, timestamped URL, or raw video ID and the visible player embeds that source when YouTube allows embedded playback. If YouTube blocks a link from playing in the sandbox, the app returns to native ambience, keeps the URL available to edit, and asks for another embeddable link. The app does not search YouTube, pick playlists, use an API key, or play hidden audio.
 
