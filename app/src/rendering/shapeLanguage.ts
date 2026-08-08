@@ -171,6 +171,15 @@ function wallColor({ color, variant, age, energy, flags, cells, width, height, x
     if (brickX === 0 || brickY === 0 || dampContact.top) out = mixRgb(out, [129, 164, 173], 0.18);
     if ((brickX === 1 || brickY === 3) && hash % 4 === 0) out = mixRgb(out, [154, 184, 188], 0.18);
   }
+  if (flags & CELL_FLAG.Wet) {
+    // Condensation proper — the Wet flag steam leaves — reads as beads, not just a tint.
+    // The flag branch used to share the mild damp wash above, and the whole interaction
+    // measured a colour delta of 37: it fired constantly and showed almost nothing. Beads
+    // echo the glass-dew language so "condensed" looks like the same physics everywhere.
+    out = mixRgb(out, [66, 88, 99], 0.3);
+    if (hash % 5 === 0) out = mixRgb(out, [196, 226, 234], 0.5);
+    else if ((hash + x) % 7 === 0) out = mixRgb(out, [44, 58, 68], 0.34);
+  }
   if (plantContact.count > 0 && (brickY === 3 || plantContact.bottom)) {
     out = mixRgb(out, [70, 112, 70], 0.28);
     if (hash % 11 === 0) out = mixRgb(out, [116, 151, 91], 0.36);
@@ -202,9 +211,10 @@ function wallColor({ color, variant, age, energy, flags, cells, width, height, x
     else if (vein === 1 || branch === 1) out = mixRgb(out, [172, 180, 194], 0.32 + 0.2 * stress);
   }
   if (cosmic) {
-    out = mixRgb(out, [119, 139, 211], 0.24);
-    if (hash % 17 === 0) out = mixRgb(out, [199, 188, 255], 0.44);
-    if (brickX === 1 && hash % 13 === 0) out = mixRgb(out, [236, 222, 255], 0.34);
+    // Same star density as stone's etching — see the note there.
+    out = mixRgb(out, [119, 139, 211], 0.26);
+    if (hash % 5 === 0) out = mixRgb(out, [236, 226, 255], 0.48);
+    else if (((x + y * 2) & 7) === 3) out = mixRgb(out, [168, 176, 238], 0.24);
   }
   if (moonContact.count > 0) {
     out = mixRgb(out, [93, 125, 184], 0.18);
@@ -281,6 +291,15 @@ function soilColor({ color, variant, energy, flags, cells, width, height, x, y }
   if (wet) {
     out = mixRgb(out, [48, 43, 38], waterContact.top ? 0.32 : 0.24);
     if (surface || waterContact.top) out = mixRgb(out, [73, 87, 74], 0.22);
+  }
+  if (flags & CELL_FLAG.Wet) {
+    // Soaked earth goes properly dark, the way real soil does, with a glisten on the
+    // surface row. The shared wet tint above also fires on mere water adjacency, so the
+    // flag alone measured a delta of 81 — hydration is the root of the whole garden loop
+    // and deserves to be seen landing.
+    out = mixRgb(out, [30, 25, 22], 0.34);
+    if (surface) out = mixRgb(out, [104, 122, 108], 0.3);
+    else if (hash % 7 === 0) out = mixRgb(out, [118, 136, 124], 0.26);
   }
   if (hash % 19 === 0 || (kindAt(cells, width, height, x, y - 1) === MATERIAL.Moss && hash % 5 === 0)) {
     out = mixRgb(out, [89, 126, 70], wet ? 0.44 : 0.32);
@@ -761,6 +780,13 @@ function stoneColor({ color, variant, energy, flags, cells, width, height, x, y 
     if (edge.top || localY === 0 || dampContact.bottom) out = mixRgb(out, [128, 166, 179], 0.22);
     if ((localX === 1 || localY === 0) && facet % 4 === 0) out = mixRgb(out, [150, 181, 185], 0.18);
   }
+  if (flags & CELL_FLAG.Wet) {
+    // Condensation beads for the Wet flag itself — see the matching note on wallColor.
+    // Stone condenses harder than wall, so its beads sit a touch denser.
+    out = mixRgb(out, [64, 90, 102], 0.32);
+    if (facet % 4 === 0) out = mixRgb(out, [192, 224, 232], 0.5);
+    else if ((facet + x) % 7 === 0) out = mixRgb(out, [42, 60, 70], 0.34);
+  }
   if (plantContact.count > 0 && (edge.top || edge.left || plantContact.bottom)) {
     out = mixRgb(out, [78, 105, 75], 0.24);
     if (facet % 9 === 0 || localX === 1) out = mixRgb(out, [109, 145, 83], 0.34);
@@ -781,9 +807,12 @@ function stoneColor({ color, variant, energy, flags, cells, width, height, x, y 
     out = frostFerns(out, facet, x, y);
   }
   if (cosmic) {
-    out = mixRgb(out, [118, 134, 204], 0.26);
-    if (facet % 17 === 0) out = mixRgb(out, [195, 184, 255], 0.42);
-    if (localX === 2 && facet % 19 === 0) out = mixRgb(out, [237, 224, 255], 0.32);
+    // A constellation needs visible stars: at 1-in-17 flecks a ten-cell etching drew
+    // none at all (measured delta 77 against plain stone). Star density is 1-in-5 now,
+    // with a faint diagonal glimmer threading between them like a chart line.
+    out = mixRgb(out, [118, 134, 204], 0.28);
+    if (facet % 5 === 0) out = mixRgb(out, [235, 226, 255], 0.5);
+    else if (((x + y * 2) & 7) === 3) out = mixRgb(out, [166, 172, 236], 0.26);
   }
   if (moonContact.count > 0) {
     out = mixRgb(out, [94, 145, 203], 0.24);
@@ -988,6 +1017,16 @@ function growthColor({ kind, color, variant, age, energy, flags, cells, width, h
   if (edge.bottom || localY === 3 || hash % 11 === 0) out = mixRgb(out, rottingSeed ? [86, 33, 65] : digestingWood ? [98, 58, 42] : [83, 45, 104], 0.42);
   if (spore) out = mixRgb(out, sporeColor, 0.72);
   if (damp) out = mixRgb(out, cosmic ? [195, 190, 255] : [168, 216, 190], cosmic ? 0.36 : 0.22);
+  if (flags & CELL_FLAG.Cosmic) {
+    // The stored charge, as opposed to standing near something cosmic. Proximity already
+    // drives every cosmic palette above, so a fungus that actually absorbed the charge
+    // used to look identical to its merely-adjacent neighbour (measured delta 48). This
+    // sits AFTER the cap/gill/spore painting on purpose — an earlier draft ran before it
+    // and the 0.6-0.72 role mixes simply painted the charge back out. The charged one is
+    // the one that sows fairy rings; it reads lit from within, with star-flecks.
+    out = mixRgb(out, [150, 112, 244], 0.34);
+    if (hash % 4 === 0) out = mixRgb(out, [240, 231, 255], 0.6);
+  }
   if (age > 110 && !damp) out = mixRgb(out, [93, 68, 84], 0.24);
   if (scorched) {
     out = mixRgb(out, [50, 34, 38], 0.58);
