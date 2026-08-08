@@ -680,6 +680,12 @@ function emberColor({ variant, energy, flags, time, x, y }: ShapeContext) {
     const pulse = (Math.sin(time * 0.008 + hash * 0.7 + x + y) + 1) * 0.5;
     out = mixRgb(out, [255, 120, 40], heat * (0.4 + pulse * 0.3));
     if ((hash & 7) === 0) out = mixRgb(out, [255, 208, 120], heat * 0.7);
+  } else if (!(flags & CELL_FLAG.Wet) && (hash % 13 === 0 || hash % 17 === 0)) {
+    // Idle life: cold dry char keeps a memory of fire. A few scattered cells wink a dim
+    // orange on a slow cycle — far below live ember so a dead hearth never reads as lit,
+    // but a settled scene keeps breathing instead of going entirely still.
+    const wink = Math.max(0, Math.sin(time * 0.0012 + hash * 1.31));
+    if (wink > 0.82) out = mixRgb(out, [141, 74, 32], (wink - 0.82) * 2.2);
   }
   if (flags & CELL_FLAG.Wet) out = mixRgb(out, [40, 52, 58], 0.4);
   return out;
@@ -902,7 +908,7 @@ function liquidColor({ kind, color, variant, energy, flags, time, cells, width, 
   return out;
 }
 
-function growthColor({ kind, color, variant, age, energy, flags, cells, width, height, x, y }: ShapeContext) {
+function growthColor({ kind, color, variant, age, energy, flags, time, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
   const edge = edgeInfo(cells, width, height, x, y, kind);
   const moonFed = hasNearbyKind(cells, width, height, x, y, MOONWATER_KINDS);
@@ -940,6 +946,12 @@ function growthColor({ kind, color, variant, age, energy, flags, cells, width, h
     if (edge.top && age > 150 && damp && hash % 5 === 0) {
       // Mature damp moss raises tiny sporophyte tufts, like the real plant.
       out = mixRgb(out, [186, 224, 120], 0.5);
+    }
+    if (edge.top && age > 120 && hash % 31 === 0) {
+      // Idle life: a firefly blink over old moss. Rare cells, short duty cycle, so a
+      // settled carpet twinkles once in a while rather than strobing.
+      const blink = Math.sin(time * 0.0018 + hash * 2.7);
+      if (blink > 0.88) out = mixRgb(out, [228, 255, 158], (blink - 0.88) * 6);
     }
     if (oilContact.count > 0) {
       out = mixRgb(out, [32, 42, 27], oilContact.top ? 0.42 : 0.28);

@@ -95,6 +95,13 @@ Current cosmic rules:
 - Rocket powder is inert until any flame lights its fuse; the lit grain climbs fast and bursts into a spark shell that droops, twinkles out, and can light more powder.
 - Wellspring blocks drink the first touching source material and pour it back out from open faces. Nearby ice stills the flow *and* reopens the drinking branch, so a chilled spring re-drinks whatever touches it next: attunement is re-teachable rather than a permanent first-touch commitment.
 
+Idle life:
+
+- Settled scenes keep breathing on the renderer's own clock, cheaply: scattered cold-char
+  cells wink a dim orange memory of fire, and old damp moss blinks an occasional firefly.
+  Both are deterministic (time + cell hash), far below source-glow brightness, and sparse
+  by construction — a dead hearth must never read as lit, and a carpet must not strobe.
+
 Visual state polish:
 
 - Wet, rooted, frozen, scorched, and cosmic flags are intentionally visible before a cell changes kind.
