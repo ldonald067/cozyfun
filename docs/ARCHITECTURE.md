@@ -12,7 +12,8 @@ This project is a static browser toy: React owns the interface, Rust/WASM owns t
 6. `app/src/audio.ts` exposes the optional local native audio controller.
 7. `app/src/deskRadio.ts` validates user-provided YouTube Desk Radio sources and builds the visible watch URL and display label; the embedded player itself is constructed in `DeskRadioPanel.tsx`.
 8. `app/src/sceneEnvironments.ts` provides non-destructive room/backdrop definitions and their local image metadata.
-9. `app/src/assetUrl.ts` prefixes runtime-fetched asset URLs with the deploy base. It uses `import.meta`, so it MUST NOT be reachable from `engine.ts` or `materials.ts` — the parity harness compiles those two to CommonJS, where that is a compile error.
+9. `app/src/fieldNotes.ts` detects first-ever generated outcomes from cheap periodic cell-count samples and issues one mystical field note per discovery. Its constraints are the design: one note at a time, an 8s linger in its own UI line, a 45s cooldown so chaos yields one note rather than five, once-ever persistence in localStorage, and only unpaintable kinds (with a recently-painted guard for the two exceptions) so a note is never about the player's own brushwork.
+10. `app/src/assetUrl.ts` prefixes runtime-fetched asset URLs with the deploy base. It uses `import.meta`, so it MUST NOT be reachable from `engine.ts` or `materials.ts` — the parity harness compiles those two to CommonJS, where that is a compile error.
 
 The built app is static. There is no account system, database, cloud save, hidden streaming dependency, or paid API. The one server is `scripts/serve-static.mjs`, which only hands out the built files for the standalone deploy — it holds no state and knows nothing about the game. Native ambience is the default sound path; Desk Radio is an optional browser-side YouTube player selected by the user.
 

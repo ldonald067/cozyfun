@@ -188,6 +188,44 @@ async function main() {
     assert(before !== after, "canvas signature did not change after painting");
   });
 
+  await check("a first-time outcome earns a lingering field note", async () => {
+    // Wood, then fire on top of it: within seconds the log ignites into ember, a
+    // generated kind this profile has never seen, so the journal's first note fires.
+    // The note must appear in its own element — never the functional status line —
+    // and hold long enough to actually read (the linger is the whole point).
+    await evaluate(cdp, `(() => {
+      const pick = (title) => [...document.querySelectorAll("button")].find((b) => (b.getAttribute("title") || "").startsWith(title))?.click();
+      pick("Wood");
+      return true;
+    })()`);
+    await click(cdp, '[data-testid="sandbox-tray"]', { xRatio: 0.4, yRatio: 0.8 });
+    await sleep(150);
+    await evaluate(cdp, `(() => {
+      const pick = (title) => [...document.querySelectorAll("button")].find((b) => (b.getAttribute("title") || "").startsWith(title))?.click();
+      pick("Fire");
+      return true;
+    })()`);
+    await click(cdp, '[data-testid="sandbox-tray"]', { xRatio: 0.4, yRatio: 0.78 });
+    await waitUntil(
+      async () => ((await evaluate(cdp, `document.querySelector('[data-testid="field-note"]')?.textContent ?? ""`)).trim().length > 0),
+      "field note to appear",
+      30_000
+    );
+    const note = (await evaluate(cdp, `document.querySelector('[data-testid="field-note"]').textContent`)).trim();
+    const ledger = await evaluate(cdp, `JSON.parse(localStorage.getItem("cozy-pixel-sandbox:fieldnotes:v1") ?? "[]")`);
+    assert(ledger.length === 1, `expected exactly one witnessed note, got ${JSON.stringify(ledger)}`);
+    // Reset the tray and selection so the checks downstream start from the same
+    // state they always did.
+    await evaluate(cdp, `(() => {
+      const pick = (title) => [...document.querySelectorAll("button")].find((b) => (b.getAttribute("title") || "").startsWith(title))?.click();
+      pick("Sand");
+      return true;
+    })()`);
+    await click(cdp, '[data-testid="clear-scene"]');
+    await waitForStatus(cdp, "tray cleared");
+    console.log(`    field note: "${note}" (${ledger[0]})`);
+  });
+
   await check("native ambience recordings are served and decodable", async () => {
     const assets = await evaluate(
       cdp,

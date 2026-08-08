@@ -27,6 +27,7 @@ import {
   type DeskRadioSource
 } from "./deskRadio";
 import { createEngine, type SandboxEngine } from "./engine";
+import { FieldNoteJournal, NOTE_LINGER_MS, SAMPLE_EVERY_TICKS } from "./fieldNotes";
 import { MATERIAL, MATERIALS, type MaterialDef, type MaterialId } from "./materials";
 import {
   applySnapshot,
@@ -53,6 +54,11 @@ const WORLD_WIDTH = 220;
 // absence enriches a scene without eroding it beyond recognition.
 const MAX_AWAY_GROWTH_TICKS = 4000;
 const FAST_FORWARD_TICKS_PER_FRAME = 250;
+// The last stretch of catch-up plays on screen at roughly 4x, so returning to a grown
+// garden means WATCHING the buds you came back to actually open, not teleporting to
+// the aftermath. Everything before this window still runs invisibly fast.
+const WAKE_UP_REPLAY_TICKS = 600;
+const WAKE_UP_TICKS_PER_FRAME = 2;
 const AUTOSAVE_INTERVAL_MS = 30_000;
 const WORLD_HEIGHT = 140;
 const DEFAULT_SEED = 1107;
@@ -88,6 +94,9 @@ export function App() {
   const [paused, setPaused] = useState(false);
   const [status, setStatus] = useState("warming tray");
   const [fps, setFps] = useState(0);
+  const [fieldNote, setFieldNote] = useState<string | null>(null);
+  const fieldNoteJournalRef = useRef<FieldNoteJournal | null>(null);
+  const fieldNoteTimerRef = useRef(0);
   const fastForwardRef = useRef(0);
   const snapshotContextRef = useRef<SceneSnapshotContext | null>(null);
   const baseCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -169,7 +178,10 @@ export function App() {
       if (fastForwardRef.current > 0) {
         // Catching up on time away. Chunked so even the JS fallback stays responsive,
         // and reaction cues are skipped — 4000 ticks of retroactive pops would be noise.
-        const chunk = Math.min(FAST_FORWARD_TICKS_PER_FRAME, fastForwardRef.current);
+        // The final WAKE_UP_REPLAY_TICKS play at ~4x so the wake-up is watched, not skipped.
+        const chunk = fastForwardRef.current > WAKE_UP_REPLAY_TICKS
+          ? Math.min(FAST_FORWARD_TICKS_PER_FRAME, fastForwardRef.current - WAKE_UP_REPLAY_TICKS)
+          : Math.min(WAKE_UP_TICKS_PER_FRAME, fastForwardRef.current);
         for (let i = 0; i < chunk; i++) engine.tick();
         fastForwardRef.current -= chunk;
         lastSimTick = time;
@@ -178,6 +190,17 @@ export function App() {
         engine.tick();
         if (reactionCellsBefore) {
           audio.playReactionCues(detectReactionCues(reactionCellsBefore, engine.getCellBytes()));
+        }
+        // Field notes sample on a slow cadence, never during catch-up: a retroactive
+        // discovery is exactly the "wait, what was that?" confusion they exist to avoid.
+        if (engine.tickCount() % SAMPLE_EVERY_TICKS === 0) {
+          fieldNoteJournalRef.current ??= new FieldNoteJournal();
+          const note = fieldNoteJournalRef.current.sample(engine.getCellBytes(), performance.now());
+          if (note) {
+            setFieldNote(note.text);
+            window.clearTimeout(fieldNoteTimerRef.current);
+            fieldNoteTimerRef.current = window.setTimeout(() => setFieldNote(null), NOTE_LINGER_MS);
+          }
         }
         lastSimTick = time;
       }
@@ -292,6 +315,7 @@ export function App() {
         engine.paint(x, y, brushSize, selected, density);
       }
       lastPaintCellRef.current = { x, y };
+      fieldNoteJournalRef.current?.notePaint(selected, performance.now());
       audio.playPaintCue(selected);
     },
     [audio, brushSize, engine, selected]
@@ -556,6 +580,9 @@ export function App() {
           </div>
           <div className="status-bar">
             <span data-testid="status-message" role="status" aria-live="polite">{status}</span>
+            <span className="field-note" data-testid="field-note" aria-live="polite">
+              {fieldNote ?? ""}
+            </span>
             <span className="status-meta">
               {paused && <span className="status-paused">paused</span>}
               {engine?.source ?? "loading"} - {fps} fps

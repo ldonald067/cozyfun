@@ -429,6 +429,26 @@ input:focus-visible {
   pointer-events: none;
 }
 
+/* A field note is the terrarium noticing something, not the app reporting something:
+   it gets its own centered line so functional statuses never overwrite a discovery
+   mid-linger, and it fades rather than blinks. */
+.field-note {
+  flex: 1;
+  text-align: center;
+  font-style: italic;
+  color: #ffe4ad;
+  opacity: 0.92;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: opacity 1.2s ease;
+}
+
+.field-note:empty {
+  opacity: 0;
+}
+
 .status-bar {
   width: min(100%, 1050px);
   margin: 0 auto;
@@ -1023,7 +1043,27 @@ input:focus-visible {
     border-width: 8px;
   }
 
-  .status-bar {
+  /* A field note is the terrarium noticing something, not the app reporting something:
+   it gets its own centered line so functional statuses never overwrite a discovery
+   mid-linger, and it fades rather than blinks. */
+.field-note {
+  flex: 1;
+  text-align: center;
+  font-style: italic;
+  color: #ffe4ad;
+  opacity: 0.92;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: opacity 1.2s ease;
+}
+
+.field-note:empty {
+  opacity: 0;
+}
+
+.status-bar {
     min-height: 38px;
   }
 
