@@ -453,7 +453,7 @@ Status: complete. Cozy translations of the two classic sandbox elements the proj
 
 ## Phase 12: Heat Identity + Discovery Moments
 
-Status: 12A and 12B complete; 12C shipped, then removed after play testing; 12D open.
+Status: 12A and 12B complete; 12C shipped, then removed after play testing; 12D shipped 2026-08.
 
 Completed:
 
@@ -481,10 +481,11 @@ Interactions should pop at the instant they happen instead of quietly swapping p
 - One-shot renderer flashes (3-6 ticks, keyed off young cell age after a kind transition) for vitrify, starfire, quench, wall crumble, bloom, and moonwater oil-cleaning.
 - Matching sparse native audio cues through the existing post-tick reaction detector: glass ting, quench hiss, starfire chime, crumble grumble, bloom note. Audio stays optional, throttled, and recorded/generated-cue based per the Phase 8 guardrails.
 
-### Phase 12D: Room Weather Play — the one open item
+### Phase 12D: Room Weather Play — shipped
 
-- An optional, off-by-default "open window" toggle lets the backdrop weather lean into the tray: light rain drizzle in Rain Desk, snow specks in Snow Window, rare meteor streaks in Stardust Hearth.
-- Strictly opt-in so room backdrops stay non-destructive; painting remains the core verb.
+- An "open window" toggle (`app/src/weather.ts`) lets the backdrop weather lean into the tray as real cells: drizzle in Rain Desk, snow settling in Snow Window, rare meteors over Stardust Hearth, moon-drips in the Moonlit Garden, the odd falling seed by the Forest Hut. The Cozy Fireplace stays indoors on purpose.
+- Shipped ON by default, revisiting the original off-by-default plan: an opt-in ambience feature does not drive return visits, and the rates are a whisper. Every drop type carries a cell-count ceiling so an open window left overnight reaches a drizzly equilibrium instead of flooding the toy. The toggle persists, and shut means shut.
+- Tonight's sky is seeded by the local date, so each day has its own temperament per room with no server involved — the daily-visit rhythm the album club already lives by.
 
 ## Phase 18: Living-World Batch (design-feedback pass)
 

@@ -13,7 +13,8 @@ This project is a static browser toy: React owns the interface, Rust/WASM owns t
 7. `app/src/deskRadio.ts` validates user-provided YouTube Desk Radio sources and builds the visible watch URL and display label; the embedded player itself is constructed in `DeskRadioPanel.tsx`.
 8. `app/src/sceneEnvironments.ts` provides non-destructive room/backdrop definitions and their local image metadata.
 9. `app/src/fieldNotes.ts` detects first-ever generated outcomes from cheap periodic cell-count samples and issues one mystical field note per discovery. Its constraints are the design: one note at a time, an 8s linger in its own UI line, a 45s cooldown so chaos yields one note rather than five, once-ever persistence in localStorage, and only unpaintable kinds (with a recently-painted guard for the two exceptions) so a note is never about the player's own brushwork.
-10. `app/src/assetUrl.ts` prefixes runtime-fetched asset URLs with the deploy base. It uses `import.meta`, so it MUST NOT be reachable from `engine.ts` or `materials.ts` — the parity harness compiles those two to CommonJS, where that is a compile error.
+10. `app/src/weather.ts` is Phase 12D: with the window open, the room backdrop drops real cells into the tray (drizzle, settling snow, rare meteors) through the same `engine.paint` API as the brush. Weather is date-seeded input, never a simulation rule — the engines stay byte-identical by construction — and every drop type has a cell-count ceiling so it cannot flood a scene.
+11. `app/src/assetUrl.ts` prefixes runtime-fetched asset URLs with the deploy base. It uses `import.meta`, so it MUST NOT be reachable from `engine.ts` or `materials.ts` — the parity harness compiles those two to CommonJS, where that is a compile error.
 
 The built app is static. There is no account system, database, cloud save, hidden streaming dependency, or paid API. The one server is `scripts/serve-static.mjs`, which only hands out the built files for the standalone deploy — it holds no state and knows nothing about the game. Native ambience is the default sound path; Desk Radio is an optional browser-side YouTube player selected by the user.
 
@@ -76,7 +77,7 @@ The app should favor compact controls over explanatory panels. Tooltips and titl
 
 ## Room Backdrops
 
-Visible room controls change CSS atmosphere, local backdrop images, and the default audio mood without mutating the simulation. The selected room is persisted in localStorage and included as metadata in `CXS2` scene JSON so shared scenes can restore their atmosphere without replacing the user's pixels with a preset.
+Visible room controls change CSS atmosphere, local backdrop images, and the default audio mood without mutating the simulation. The one deliberate exception is the open-window weather above: it feeds the sim real cells, but only as ordinary paint input, and the toggle shuts it off entirely. The selected room is persisted in localStorage and included as metadata in `CXS2` scene JSON so shared scenes can restore their atmosphere without replacing the user's pixels with a preset.
 
 Room images are served from `app/public/rooms` and referenced through scene metadata, then softened by CSS lighting, weather, and darkening layers. This keeps the source of truth in one small data file and prevents image paths from spreading across the UI. Third-party sources belong in `ASSET_CREDITS.md` and should be updated in the same change as any asset replacement.
 

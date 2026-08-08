@@ -28,6 +28,7 @@ import {
 } from "./deskRadio";
 import { createEngine, type SandboxEngine } from "./engine";
 import { FieldNoteJournal, NOTE_LINGER_MS, SAMPLE_EVERY_TICKS } from "./fieldNotes";
+import { RoomWeather } from "./weather";
 import { MATERIAL, MATERIALS, type MaterialDef, type MaterialId } from "./materials";
 import {
   applySnapshot,
@@ -60,6 +61,7 @@ const FAST_FORWARD_TICKS_PER_FRAME = 250;
 const WAKE_UP_REPLAY_TICKS = 600;
 const WAKE_UP_TICKS_PER_FRAME = 2;
 const AUTOSAVE_INTERVAL_MS = 30_000;
+const WINDOW_OPEN_KEY = "cozy-pixel-sandbox:window:v1";
 const WORLD_HEIGHT = 140;
 const DEFAULT_SEED = 1107;
 const SIM_TICK_MS = 38;
@@ -95,6 +97,10 @@ export function App() {
   const [status, setStatus] = useState("warming tray");
   const [fps, setFps] = useState(0);
   const [fieldNote, setFieldNote] = useState<string | null>(null);
+  const [windowOpen, setWindowOpen] = useState(() => localStorage.getItem(WINDOW_OPEN_KEY) !== "shut");
+  const windowOpenRef = useRef(windowOpen);
+  const sceneEnvironmentRef = useRef<SceneEnvironmentId | null>(null);
+  const weatherRef = useRef<RoomWeather | null>(null);
   const fieldNoteJournalRef = useRef<FieldNoteJournal | null>(null);
   const fieldNoteTimerRef = useRef(0);
   const fastForwardRef = useRef(0);
@@ -120,6 +126,7 @@ export function App() {
       // one sim tick per real second, capped so an overnight absence reads as "the
       // garden moved on" rather than "everything I built eroded". The catch-up runs
       // chunked inside the render loop (fastForwardRef), not here, so boot never blocks.
+      weatherRef.current = new RoomWeather();
       const auto = loadAutoLocal(created);
       const restored = auto.loaded ? auto : loadLocal(created);
       if (restored.loaded) {
@@ -200,6 +207,22 @@ export function App() {
             setFieldNote(note.text);
             window.clearTimeout(fieldNoteTimerRef.current);
             fieldNoteTimerRef.current = window.setTimeout(() => setFieldNote(null), NOTE_LINGER_MS);
+          }
+        }
+        // Room weather: real cells through the same paint API as the brush. The drop is
+        // also registered as "brushwork" with the journal, so tonight's sky can never
+        // masquerade as a discovery the player made.
+        if (windowOpenRef.current && sceneEnvironmentRef.current) {
+          const drop = weatherRef.current?.drop(
+            sceneEnvironmentRef.current,
+            engine.tickCount(),
+            engine.width(),
+            engine.height(),
+            () => engine.getCellBytes()
+          );
+          if (drop) {
+            engine.paint(drop.x, drop.y, drop.radius, drop.material, drop.density);
+            fieldNoteJournalRef.current?.notePaint(drop.material, performance.now());
           }
         }
         lastSimTick = time;
@@ -377,6 +400,15 @@ export function App() {
   }, [snapshotContext]);
 
   useEffect(() => {
+    windowOpenRef.current = windowOpen;
+    localStorage.setItem(WINDOW_OPEN_KEY, windowOpen ? "open" : "shut");
+  }, [windowOpen]);
+
+  useEffect(() => {
+    sceneEnvironmentRef.current = sceneEnvironment;
+  }, [sceneEnvironment]);
+
+  useEffect(() => {
     if (!engine) return;
     // Autosave makes "grow while you were away" real: without it only players who
     // pressed Save ever had a scene to come back to. pagehide catches tab closes.
@@ -384,7 +416,14 @@ export function App() {
     // faithfully that a test can never stage an old timestamp without it.
     if (new URLSearchParams(window.location.search).has("cozyNoAutosave")) return;
     const save = () => saveAutoLocal(engine, snapshotContextRef.current ?? undefined);
-    const interval = window.setInterval(save, AUTOSAVE_INTERVAL_MS);
+    // A hidden tab must not keep overwriting the autosave the visible tab is writing:
+    // with the game open embedded AND in its own tab, both run live engines against the
+    // same storage key, and the background one clobbering the foreground one is how
+    // "my scene looks different over there" happens. pagehide still saves regardless,
+    // because closing the only tab has to record "last seen".
+    const interval = window.setInterval(() => {
+      if (!document.hidden) save();
+    }, AUTOSAVE_INTERVAL_MS);
     window.addEventListener("pagehide", save);
     return () => {
       window.clearInterval(interval);
@@ -642,6 +681,16 @@ export function App() {
                 className="scene-environment-control"
                 onChange={handleSceneEnvironment}
               />
+              <button
+                type="button"
+                className="window-toggle"
+                data-testid="window-toggle"
+                title="With the window open, the room's weather drifts into the tray as real material"
+                aria-pressed={windowOpen}
+                onClick={() => setWindowOpen((open) => !open)}
+              >
+                {windowOpen ? "window: open" : "window: shut"}
+              </button>
             </div>
             <button type="button" title="Save in this browser" data-testid="save-scene" onClick={handleSave}>
               <Save size={16} /> Save

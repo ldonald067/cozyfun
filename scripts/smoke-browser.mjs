@@ -516,6 +516,30 @@ async function main() {
     }
   });
 
+  await check("an open window lets tonight's weather into the tray", async () => {
+    // Rain Desk with the window open: within seconds real water cells should drift in
+    // and change the (cleared, otherwise static) canvas. Shut the window and the same
+    // empty tray must stay byte-still — weather is input, and shut means shut.
+    await click(cdp, '[data-testid="scene-environment-rain-desk"]');
+    await waitForStatus(cdp, "rain desk backdrop on");
+    const windowState = await evaluate(cdp, `document.querySelector('[data-testid="window-toggle"]')?.textContent`);
+    assert(windowState?.includes("open"), `window should default open, reads: ${windowState}`);
+    await click(cdp, '[data-testid="clear-scene"]');
+    await waitForStatus(cdp, "tray cleared");
+    const before = await canvasSignature(cdp);
+    await waitUntil(async () => (await canvasSignature(cdp)) !== before, "drizzle to reach the tray", 25_000);
+
+    await click(cdp, '[data-testid="window-toggle"]');
+    await click(cdp, '[data-testid="clear-scene"]');
+    await waitForStatus(cdp, "tray cleared");
+    await sleep(1000); // let any mid-air drop land before taking the reference frame
+    const shutBefore = await canvasSignature(cdp);
+    await sleep(6000);
+    const shutAfter = await canvasSignature(cdp);
+    assert(shutBefore === shutAfter, "weather leaked into the tray with the window shut");
+    await click(cdp, '[data-testid="window-toggle"]'); // leave it open, the default
+  });
+
   await check("narrow desktop layout keeps controls from overlapping the tray", async () => {
     await cdp.send("Emulation.setDeviceMetricsOverride", {
       width: 960,
