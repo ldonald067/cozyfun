@@ -97,20 +97,20 @@ Current cosmic rules:
 
 The slow world (between sessions only):
 
-- Two rules run on their own clock at wake, never during play: cold, uncovered char
+- Two rules run on their own clock at wake, never during play: cold char that is not
+  under water
   settles into fresh soil, and a spent seed head sows a seed clear of its own shadow.
   Both live in `Universe::slow_step`, are mirrored in `engine.ts`, and consume the same
   RNG stream as `tick()`, so parity applies to them exactly as it does to movement.
-- **Absence needs its own unit because ticks cannot express it.** Catch-up saturates
-  after about 66 minutes, so measured in ticks two days away is identical to one hour;
-  and a ten-minute session runs roughly four times more ticks than any absence can buy.
-  Anything slow enough to be invisible while playing is far too slow to show after a
-  night. Slow steps break that tie by running only on return: 1h earns 4, a day 18, and
-  the curve caps at 24 so a week away does not erase what you built. Under an hour earns
-  none — that is a reload, not an absence.
-- **Only what you left living changes.** A scene of walls, sand and glass comes back
-  byte-identical, and there is a cargo test that says so. Char under water is spared
-  too: a quenched hearth is a look somebody chose.
+- **Absence needs its own unit because ticks cannot express it** — the argument is
+  written out once, in `app/src/slowWorld.ts`, which owns the whole absence policy.
+  The curve: 1h earns 4 steps, a day 18, capped at 24 so a week away does not erase what
+  you built. Under an hour earns none — that is a reload, not an absence.
+- **Only what you left living changes.** The slow world leaves a scene of walls, sand
+  and glass byte-identical — a cargo test and the audit's raw-byte inert check both say
+  so. (The ordinary catch-up ticks that follow are a separate thing and will still
+  settle anything mid-fall, as they would during play.) Char under water is spared too:
+  a quenched hearth is a look somebody chose.
 - A sown seed **displaces the one patch of moss it lands on back to soil**. A watered bed
   is a solid moss carpet within about twenty seconds of play and moss does not root a
   seed, so without that the whole arm produced inert grains — measured, not reasoned.

@@ -357,22 +357,17 @@ impl Universe {
     /// One step of the slow world: the changes a terrarium makes while nobody is
     /// watching it.
     ///
-    /// This runs on its own clock, driven by how long the player was away, and
-    /// **never during play** — which is the whole point. Absence should be felt as
-    /// "my terrarium is different" on the next visit, not watched happening. Ticks
-    /// cannot express that: a ten-minute session runs ~15,800 of them while the
-    /// away-catch-up is capped at 4,000, so playing already advances the world
-    /// several times faster than leaving it, and anything slow enough to be
-    /// invisible in a session is far too slow to show up after a day.
+    /// Runs only when the player returns, on a clock derived from how long they were
+    /// away, and **never during play**. A slow step is deliberately not a slow tick:
+    /// it is a small set of transformations each too consequential to fire while
+    /// watched, and each touches only something the player left living — a scene of
+    /// bare walls and sand comes back byte-identical.
     ///
-    /// So a slow step is deliberately NOT a slow tick. It is a small set of
-    /// transformations that are each too consequential to fire while watched, and
-    /// each one only touches something the player built. A scene of bare walls and
-    /// sand comes back byte-identical; what changes is what you left living.
-    ///
-    /// Slow steps are applied before the tick catch-up, so the conditions they
-    /// create — fresh soil, a scattered seed — get played forward by the ordinary
-    /// sim and arrive as a garden rather than as a diff.
+    /// Why absence needs a unit of its own, and the curve that converts hours into
+    /// steps, both live in `app/src/slowWorld.ts`, which owns the absence policy for
+    /// the app and the harness alike. `wakeTerrarium` there is also what guarantees
+    /// these steps land BEFORE the tick catch-up, so the conditions they create get
+    /// played forward and arrive as a garden rather than as a diff.
     pub fn slow_step(&mut self) {
         let old = self.cells.clone();
         let mut next = old.clone();
@@ -3895,7 +3890,7 @@ mod tests {
         assert_eq!(
             count_kind(&u, Material::Ember),
             10,
-            "only cold, uncovered char settles into soil"
+            "only cold char that is not under water settles into soil"
         );
     }
 

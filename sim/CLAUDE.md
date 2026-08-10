@@ -30,9 +30,9 @@ mirrored in `app/src/engine.ts` and behave byte-for-byte identically — see the
 ## `slow_step` is not a slow `tick`
 
 `Universe::slow_step` runs only when the player returns, on a clock derived from how long
-they were away. It is a separate entry point on purpose: the app's tick catch-up saturates
-after about 66 minutes, so in ticks a two-day absence and a one-hour one are the same
-thing, and a ten-minute session outruns either.
+they were away. It is a separate entry point on purpose; the argument for why ticks cannot
+express an absence lives in `app/src/slowWorld.ts`, which owns that policy for both the app
+and the harness.
 
 Rules belong there only if they are too consequential to fire while watched, and only if
 they touch something the player left living — a scene of walls and sand must come back

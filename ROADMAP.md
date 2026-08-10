@@ -496,7 +496,7 @@ session runs four times more ticks than any absence can buy — so absence got i
 
 - `Universe::slow_step` (mirrored in `engine.ts`, parity-gated) runs only at wake, on a
   count derived from hours away: 1h earns 4 steps, a day 18, capped at 24. Two rules so
-  far — cold uncovered char settles into fresh soil, and a spent seed head sows a seed
+  far — cold char that is not under water settles into fresh soil, and a spent seed head sows a seed
   clear of its own shadow, displacing the one patch of moss it lands on so the grain can
   actually root.
 - Slow steps run **before** the tick catch-up, so the sim plays the new conditions forward

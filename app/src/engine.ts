@@ -235,7 +235,8 @@ class JsSandboxEngine implements SandboxEngine {
       const kind = old[idx];
       const flags = readU16(old, idx + 6);
 
-      // The hearth goes back to the ground: cold, uncovered char crumbles into soil.
+      // The hearth goes back to the ground: cold char that is not under water
+      // crumbles into soil.
       if (kind === MATERIAL.Ember) {
         if (
           readU16(old, idx + 4) < COLD_CHAR_ENERGY &&

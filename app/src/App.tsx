@@ -42,7 +42,7 @@ import {
   type SceneSnapshotMetadata
 } from "./storage";
 import { exportClip, exportPostcard, renderSandbox } from "./renderer";
-import { slowStepsForAbsence } from "./slowWorld";
+import { wakeTerrarium } from "./slowWorld";
 import {
   getSceneEnvironment,
   loadSceneEnvironmentId,
@@ -52,9 +52,9 @@ import {
 } from "./sceneEnvironments";
 
 const WORLD_WIDTH = 220;
-// Away-time growth: one tick per second away, capped at ~66 sim-seconds so a long
-// absence enriches a scene without eroding it beyond recognition.
-const MAX_AWAY_GROWTH_TICKS = 4000;
+// How much an absence is worth, and in what order it is spent, belongs to
+// `slowWorld.ts` — see `wakeTerrarium`. What lives here is only the PACING of the
+// catch-up it hands back, which is a presentation choice.
 const FAST_FORWARD_TICKS_PER_FRAME = 250;
 // The last stretch of catch-up plays on screen at roughly 4x, so returning to a grown
 // garden means WATCHING the buds you came back to actually open, not teleporting to
@@ -129,10 +129,9 @@ export function App() {
       }
       createdEngine = created;
       setEngine(created);
-      // Resume the saved terrarium, and let it grow by the time the player was away:
-      // one sim tick per real second, capped so an overnight absence reads as "the
-      // garden moved on" rather than "everything I built eroded". The catch-up runs
-      // chunked inside the render loop (fastForwardRef), not here, so boot never blocks.
+      // Resume the saved terrarium and wake it: `wakeTerrarium` takes the slow steps
+      // the absence earned and hands back the ordinary catch-up still owed, which runs
+      // chunked inside the render loop (fastForwardRef) so boot never blocks.
       weatherRef.current = new RoomWeather();
       const auto = loadAutoLocal(created);
       const restored = auto.loaded ? auto : loadLocal(created);
@@ -140,18 +139,11 @@ export function App() {
         applySnapshotMetadata(restored.metadata);
         const savedAtMs = restored.savedAt ? Date.parse(restored.savedAt) : Number.NaN;
         const secondsAway = Number.isFinite(savedAtMs) ? Math.floor((Date.now() - savedAtMs) / 1000) : 0;
-        const growth = Math.max(0, Math.min(secondsAway, MAX_AWAY_GROWTH_TICKS));
-        // The slow world first, then the catch-up. Order is the whole trick: a slow
-        // step only changes conditions — cold char becomes plantable ground, a spent
-        // head sows a seed — and the ordinary sim then plays those conditions forward,
-        // so the player arrives to a garden rather than to a diff. Running it after
-        // the catch-up would leave bare seeds sitting on the soil instead.
-        const slowSteps = slowStepsForAbsence(secondsAway);
-        for (let step = 0; step < slowSteps; step++) created.slowStep();
-        if (growth >= 60) {
-          fastForwardRef.current = growth;
+        const woken = wakeTerrarium(created, secondsAway);
+        if (woken.catchUpTicks >= 60) {
+          fastForwardRef.current = woken.catchUpTicks;
           setStatus(
-            slowSteps > 0
+            woken.slowSteps > 0
               ? "your terrarium changed while you were away"
               : "your terrarium kept growing while you were away"
           );

@@ -615,10 +615,11 @@ async function main() {
     })()`);
     assert(restaged, "manual save disappeared before staging");
     await cdp.send("Page.navigate", { url: appUrl });
-    // Two hours earns slow steps as well as tick catch-up, so this status is the
-    // end-to-end proof that the between-sessions world ran in a real browser — not
-    // just that the scene was replayed forward. The "kept growing" wording is what a
-    // shorter absence still says.
+    // Two hours earns slow steps as well as tick catch-up, so this wording proves the
+    // real browser took the slow-world branch at boot and survived it. It does NOT
+    // prove a cell changed: the string is chosen from the step COUNT alone, so gutting
+    // `slowStep()` would leave this green. Whether an absence is actually visible is
+    // `npm run slow-world:audit`'s job, and it measures pixels.
     await waitForStatus(cdp, "your terrarium changed while you were away", 20_000);
   });
 

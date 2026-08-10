@@ -27,7 +27,11 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
 
 - `npm run slow-world:audit`: plays a scene in — a watered garden, a hearth burned to char, and a sand pile that must not move — then leaves for an hour, half a day, a day, two days and a week, and measures what came back. It is the only gate that asks whether **absence is worth anything**, which cargo tests and parity cannot: both pass happily while the slow world changes four cells nobody would see.
 
-  It asserts three things, each a way the feature could be a lie. A day away must visibly change the scene (cell count and colour distance, judged by compiling the real renderer rather than restating its rules). A day must change **more than an hour**, or the curve has flattened and "come back tomorrow" means nothing. And the garden must stand in **new columns** — a scattered seed that never comes up is clutter, not spread.
+  It asserts four things, each a way the feature could be a lie. A day away must visibly change the scene (cell count and colour distance, judged by compiling the real renderer rather than restating its rules). A day must change **more than an hour**, or the curve has flattened and "come back tomorrow" means nothing. The garden must stand in **new columns** — a scattered seed that never comes up is clutter, not spread. And the inert zone must be untouched, compared **byte for byte** against the board that went in, since a rendered-difference check could never see age, energy or flag changes.
+
+  It drives the same `wakeTerrarium` the app does rather than a local copy, so it cannot certify an order or a tick cap that production does not perform. It runs the JS engine; parity is what carries the result across to wasm.
+
+  Its baseline is honest rather than perfect: a slow step consumes engine RNG, so the two branches enter catch-up with slightly different trajectories. That noise floor is measured, not assumed — deleting both slow-world writes while keeping every `chance()` roll leaves 5 changed cells and 0 new plant columns, against floors of 20 and 1.
 
   Two measurements shaped the rule itself and are worth not rediscovering. Seeds sown onto a mature bed landed on **moss**, which does not root them, so the scatter arm read as inert specks until the landing displaced that one patch of carpet back to soil. And the scene must be watered before the absence: a dry bed cannot sprout anything, which is the intended shape of the rule but understates it to the point of looking broken if the fixture forgets.
 

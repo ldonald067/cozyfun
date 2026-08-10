@@ -42,7 +42,10 @@ if (compile.status !== 0) throw new Error("slow-world audit: TypeScript compile 
 await writeFile(resolve(outDir, "package.json"), JSON.stringify({ type: "commonjs" }));
 const require = createRequire(import.meta.url);
 const { createFallbackEngine } = require(resolve(outDir, "engine.js"));
-const { slowStepsForAbsence } = require(resolve(outDir, "slowWorld.js"));
+// The SAME absence policy the app runs, not a copy of it. `wakeTerrarium` owns the
+// step count, the tick count, and the order they are applied in, so this gate cannot
+// certify a return path that production does not perform.
+const { planAbsence, wakeTerrarium } = require(resolve(outDir, "slowWorld.js"));
 const { colorForCell } = require(resolve(outDir, "rendering/materialColor.js"));
 
 const STRIDE = 8;
@@ -51,8 +54,6 @@ const KIND_NAME = ["empty", "wall", "sand", "water", "smoke", "soil", "fire", "w
   "stone", "moss", "seed", "fungus", "oil", "ice", "steam", "stardust", "meteor", "moonwater",
   "flower", "glass", "ember", "pollen", "stem", "rocket", "wellspring", "spark"];
 
-// Matches the app: catch-up is one tick per second away, capped.
-const MAX_AWAY_GROWTH_TICKS = 4000;
 // Long enough for a painted seed to grow, bloom, and spend itself, and for a lit log
 // to burn down to cold char — i.e. long enough to be a scene somebody played in.
 const PLAY_IN_TICKS = 2400;
@@ -113,13 +114,15 @@ played.dispose();
 function visitAfter(secondsAway) {
   const engine = createFallbackEngine(W, H, SEED);
   if (!engine.loadCellBytes(playedIn)) throw new Error("slow-world audit: could not restore the scene");
-  const steps = slowStepsForAbsence(secondsAway);
-  for (let s = 0; s < steps; s++) engine.slowStep();
-  const catchUp = Math.max(0, Math.min(Math.floor(secondsAway), MAX_AWAY_GROWTH_TICKS));
-  for (let t = 0; t < catchUp; t++) engine.tick();
+  const plan = wakeTerrarium(engine, secondsAway);
+  // The board the instant the slow world is done and before a single ordinary tick.
+  // Only here can the "it touched nothing I did not leave alive" claim be checked
+  // exactly, because catch-up ticks legitimately move things afterwards.
+  const afterSlowSteps = engine.getCellBytes();
+  for (let t = 0; t < plan.catchUpTicks; t++) engine.tick();
   const cells = engine.getCellBytes();
   engine.dispose();
-  return { steps, cells };
+  return { steps: plan.slowSteps, afterSlowSteps, cells };
 }
 
 function cellAt(cells, i) {
@@ -151,7 +154,9 @@ function compare(baseline, visit) {
   const median = visible.length
     ? visible.map((d) => d.distance).sort((a, b) => a - b)[Math.floor(visible.length / 2)]
     : 0;
-  return { changed: distances.length, visible: visible.length, median, cells: visible };
+  // NOT `cells`: `visitAfter` already returns a `cells` byte array, and spreading both
+  // into one result object silently shadowed the bytes with this list.
+  return { changed: distances.length, visible: visible.length, median, visibleCells: visible };
 }
 
 const ABSENCES = [
@@ -164,9 +169,16 @@ const ABSENCES = [
 
 // The baseline is the same absence WITHOUT the slow world, so what is measured is the
 // slow world's own contribution and not the tick catch-up's.
+//
+// It is not a perfectly clean control and the report says so: a slow step consumes
+// engine RNG, so the two branches enter catch-up with different RNG state and a few
+// cells differ purely from the divergent trajectory. That noise floor is MEASURED, not
+// assumed — deleting both slow-world writes while keeping every `chance()` roll leaves
+// 5 changed cells and 0 new plant columns, against the floors of 20 and 1 below. The
+// signal sits well clear of the noise, and the assertions fail hard without the rules.
 const control = createFallbackEngine(W, H, SEED);
 control.loadCellBytes(playedIn);
-for (let t = 0; t < MAX_AWAY_GROWTH_TICKS; t++) control.tick();
+for (let t = 0; t < planAbsence(24 * 3600).catchUpTicks; t++) control.tick();
 const baseline = control.getCellBytes();
 control.dispose();
 
@@ -220,8 +232,7 @@ function plantColumns(cells) {
   return columns;
 }
 const before = plantColumns(baseline);
-const dayVisit = visitAfter(24 * 3600);
-const grown = [...plantColumns(dayVisit.cells)].filter((column) => !before.has(column));
+const grown = [...plantColumns(day.cells)].filter((column) => !before.has(column));
 if (!grown.length) {
   failures.push(
     `after a day away the garden stands in exactly the same columns it started in.\n` +
@@ -230,13 +241,26 @@ if (!grown.length) {
   );
 }
 
-// 4. What the player did not leave living must come back untouched. The sand pile and
-//    glass pane occupy x >= 76; nothing in the slow world may reach them.
-const trespass = day.cells.filter((c) => c.x >= 76);
+// 4. What the player did not leave living must come back untouched — and that is a
+//    BYTE claim, not a colour one. Comparing rendered differences after catch-up could
+//    only ever show that no *visible kind change* landed there; age, energy, flags and
+//    variant would all slip through, and the catch-up ticks are entitled to move things
+//    anyway. So this compares the raw bytes of the board immediately after the slow
+//    steps against the board that went in. The sand pile and glass pane occupy x >= 76.
+const trespass = [];
+for (let i = 0; i < W * H; i++) {
+  if (i % W < 76) continue;
+  for (let b = 0; b < STRIDE; b++) {
+    if (playedIn[i * STRIDE + b] !== day.afterSlowSteps[i * STRIDE + b]) {
+      trespass.push({ x: i % W, y: Math.floor(i / W), byte: b });
+      break;
+    }
+  }
+}
 if (trespass.length) {
-  const { x, y } = trespass[0];
+  const { x, y, byte } = trespass[0];
   failures.push(
-    `the slow world changed ${trespass.length} cells in the inert zone, first at (${x},${y}).\n` +
+    `the slow world altered ${trespass.length} cells in the inert zone, first at (${x},${y}) byte ${byte}.\n` +
       `    Walls, sand and glass are not the game's to rearrange while the player is gone.`,
   );
 }
@@ -244,7 +268,7 @@ if (trespass.length) {
 // What actually changed, so a future reader can see whether the number above is one
 // rule carrying the whole feature or several pulling together.
 const transitions = new Map();
-for (const cell of day.cells) {
+for (const cell of day.visibleCells) {
   const key = `${KIND_NAME[cell.from] ?? cell.from} -> ${KIND_NAME[cell.to] ?? cell.to}`;
   transitions.set(key, (transitions.get(key) ?? 0) + 1);
 }
