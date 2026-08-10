@@ -26,3 +26,16 @@ mirrored in `app/src/engine.ts` and behave byte-for-byte identically — see the
    shouldn't" one. A single-sided test cannot tell a working rule from one that always fires.
 4. Add a parity scenario, and a check in `scripts/interaction-audit.mjs` if a player is meant
    to see the outcome.
+
+## `slow_step` is not a slow `tick`
+
+`Universe::slow_step` runs only when the player returns, on a clock derived from how long
+they were away. It is a separate entry point on purpose: the app's tick catch-up saturates
+after about 66 minutes, so in ticks a two-day absence and a one-hour one are the same
+thing, and a ten-minute session outruns either.
+
+Rules belong there only if they are too consequential to fire while watched, and only if
+they touch something the player left living — a scene of walls and sand must come back
+byte-identical, and `slow_steps_leave_an_unliving_scene_byte_identical` enforces that.
+Everything else about it is ordinary: same RNG stream, same parity obligation, same
+mirroring in `engine.ts`.

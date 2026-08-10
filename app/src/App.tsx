@@ -42,6 +42,7 @@ import {
   type SceneSnapshotMetadata
 } from "./storage";
 import { exportClip, exportPostcard, renderSandbox } from "./renderer";
+import { slowStepsForAbsence } from "./slowWorld";
 import {
   getSceneEnvironment,
   loadSceneEnvironmentId,
@@ -140,9 +141,20 @@ export function App() {
         const savedAtMs = restored.savedAt ? Date.parse(restored.savedAt) : Number.NaN;
         const secondsAway = Number.isFinite(savedAtMs) ? Math.floor((Date.now() - savedAtMs) / 1000) : 0;
         const growth = Math.max(0, Math.min(secondsAway, MAX_AWAY_GROWTH_TICKS));
+        // The slow world first, then the catch-up. Order is the whole trick: a slow
+        // step only changes conditions — cold char becomes plantable ground, a spent
+        // head sows a seed — and the ordinary sim then plays those conditions forward,
+        // so the player arrives to a garden rather than to a diff. Running it after
+        // the catch-up would leave bare seeds sitting on the soil instead.
+        const slowSteps = slowStepsForAbsence(secondsAway);
+        for (let step = 0; step < slowSteps; step++) created.slowStep();
         if (growth >= 60) {
           fastForwardRef.current = growth;
-          setStatus("your terrarium kept growing while you were away");
+          setStatus(
+            slowSteps > 0
+              ? "your terrarium changed while you were away"
+              : "your terrarium kept growing while you were away"
+          );
         } else {
           setStatus("terrarium resumed");
         }

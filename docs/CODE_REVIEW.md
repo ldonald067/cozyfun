@@ -59,6 +59,7 @@ Use the smallest honest gate for the change:
 
 - Docs only: `git diff --check`.
 - Sim behavior: `npm run test:sim`, `npm run test:wasm`, `npm run test:js-fallback`, and **`npm run test:parity`** — the first three each drive one engine and can all pass while the two have drifted apart; only parity compares them.
+- Between-sessions behavior: add `npm run slow-world:audit`. Every other sim gate can pass while an absence changes nothing a player would see.
 - Native audio direction: `npm run audio:qa`.
 - UI, browser, visual, audio, export, or cross-boundary work: `npm run check`.
 - Stale-preview or visual concern: rebuild, then serve `app/dist` with `node scripts/preview-dist.mjs` (Windows has `.\scripts\preview-current.ps1 -Port 4181`), then browser or script-based visual QA against that URL.

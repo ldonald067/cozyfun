@@ -95,6 +95,30 @@ Current cosmic rules:
 - Rocket powder is inert until any flame lights its fuse; the lit grain climbs fast and bursts into a spark shell that droops, twinkles out, and can light more powder.
 - Wellspring blocks drink the first touching source material and pour it back out from open faces. Nearby ice stills the flow *and* reopens the drinking branch, so a chilled spring re-drinks whatever touches it next: attunement is re-teachable rather than a permanent first-touch commitment.
 
+The slow world (between sessions only):
+
+- Two rules run on their own clock at wake, never during play: cold, uncovered char
+  settles into fresh soil, and a spent seed head sows a seed clear of its own shadow.
+  Both live in `Universe::slow_step`, are mirrored in `engine.ts`, and consume the same
+  RNG stream as `tick()`, so parity applies to them exactly as it does to movement.
+- **Absence needs its own unit because ticks cannot express it.** Catch-up saturates
+  after about 66 minutes, so measured in ticks two days away is identical to one hour;
+  and a ten-minute session runs roughly four times more ticks than any absence can buy.
+  Anything slow enough to be invisible while playing is far too slow to show after a
+  night. Slow steps break that tie by running only on return: 1h earns 4, a day 18, and
+  the curve caps at 24 so a week away does not erase what you built. Under an hour earns
+  none — that is a reload, not an absence.
+- **Only what you left living changes.** A scene of walls, sand and glass comes back
+  byte-identical, and there is a cargo test that says so. Char under water is spared
+  too: a quenched hearth is a look somebody chose.
+- A sown seed **displaces the one patch of moss it lands on back to soil**. A watered bed
+  is a solid moss carpet within about twenty seconds of play and moss does not root a
+  seed, so without that the whole arm produced inert grains — measured, not reasoned.
+  It opens a planting hole, it does not strip a carpet.
+- The payoff is conditional by design: a seed only comes up in damp ground, so a tended
+  garden travels across visits and an abandoned one holds still. Measured on a watered
+  bed left overnight, the garden grows into nine columns it did not stand in before.
+
 Idle life:
 
 - Settled scenes keep breathing on the renderer's own clock, cheaply: scattered cold-char

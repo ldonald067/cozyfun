@@ -88,6 +88,24 @@ dominate that layer by design — anything merely *lit by* a source, steam above
 must stay well under them, or a kettle outshines its own flame. `hasGlow` takes full
 cell state deliberately: defaulting energy/age would fail open and light everything.
 
+## Why the slow world is not in the matrix
+
+Two rules run only between sessions: cold char settles into soil, and a spent seed head
+sows a seed into the bed beside it. Both change materials, so they look like matrix
+candidates, and they are deliberately not.
+
+The matrix documents what a player can **do** — reactions they can set up, watch, and
+learn from. The slow world is the opposite by construction: it never runs while anyone
+is watching, so it cannot be demonstrated, discovered mid-play, or made into an
+interaction-audit check, which starts from painted materials and ticks forward.
+
+The practical tell is that its natural homes are all full anyway. Ember, Flower and
+Soil are each at their documented cap, so filing these rules there would have meant
+either breaking the caps or rewording an existing clause into a different promise while
+keeping its id — the one drift the coverage gate explicitly cannot catch. Instead the
+slow world has its own gate, `npm run slow-world:audit`, which measures the thing the
+matrix could not: whether an absence is visible when you come back.
+
 ## A note on Ember's documented depth
 
 Ember's interaction row lists 3 roles because generated-only materials are capped at

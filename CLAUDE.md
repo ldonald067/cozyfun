@@ -11,6 +11,7 @@ source "$HOME/.cargo/env"   # cargo is not on PATH by default
 npm run check               # the full gate; read the stage list from package.json, not memory
 npm run test:parity         # strictest single gate: both engines must agree byte-for-byte
 npm run interaction:audit   # does each documented interaction actually HAPPEN in play
+npm run slow-world:audit    # is an absence visible when you come back to it
 npm run build               # cargo -> wasm32, then Vite
 ```
 
@@ -27,7 +28,8 @@ and behave byte-for-byte identically.** When you add a rule:
 3. Give the scenario `observe`/`expect` callbacks that assert what it actually witnessed.
 
 RNG consumption is the classic divergence: a `chance()` call on one side but not the other,
-or in a different order, desynchronises both engines permanently.
+or in a different order, desynchronises both engines permanently. This covers
+`slow_step` too — the between-sessions rules draw on the same stream as `tick`.
 
 ## A passing test does not mean a reachable feature
 
@@ -49,8 +51,13 @@ check fail when it stops witnessing it.
 
 - **A missing wasm does not throw.** It silently drops to the slower JS engine, so a broken
   deploy looks fine. After deploying, confirm the status line reads "wasm sim online".
-- **`engine.ts` and `materials.ts` MUST NOT use `import.meta`**, directly or through an
-  import. `scripts/smoke-parity.mjs` compiles them to CommonJS, where it is a compile error.
+- **A rule that only runs between sessions still needs a visibility gate.** The slow world
+  ships correct-and-pointless very easily: cargo tests and parity both pass while the
+  effect is four cells nobody would notice. `npm run slow-world:audit` is what asks
+  whether being away was worth anything, and it is where the two measurements that
+  shaped the rules live.
+- **`engine.ts`, `materials.ts` and `slowWorld.ts` MUST NOT use `import.meta`**, directly
+  or through an import. `scripts/smoke-parity.mjs` compiles them to CommonJS, where it is a compile error.
   Engine-side URLs are passed in from the app layer instead.
 - **`material:contrast` only checks averaged palettes.** It cannot see per-variant colours,
   interaction states, glow, shape or animation, so it is a floor and not a verdict.

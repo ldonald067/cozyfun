@@ -36,9 +36,17 @@ type RoomPattern = {
 };
 
 // Rates are means, jittered per-drop. Caps are fractions of total cells.
+//
+// The two window rooms were originally an order of magnitude busier than the rest:
+// measured over five-minute runs across six seed days, Rain Desk dropped every 1.8s
+// and Snow Window every 2.8s, against roughly one a minute for Stardust Hearth and
+// Forest Hut. That reads as constant weather rather than weather — water was always
+// falling somewhere, and the 6% cap is a puddle about eight cells deep across the
+// whole floor, which nothing drains. Both are now brought toward the calmer rooms:
+// a shower is something that arrives, not the room's default state.
 const PATTERNS: Partial<Record<SceneEnvironmentId, RoomPattern>> = {
-  "rain-desk": { material: MATERIAL.Water, every: 70, density: 22, cap: 0.06 },
-  "snow-window": { material: MATERIAL.Ice, every: 110, density: 25, cap: 0.04, settles: true },
+  "rain-desk": { material: MATERIAL.Water, every: 340, density: 22, cap: 0.02 },
+  "snow-window": { material: MATERIAL.Ice, every: 420, density: 25, cap: 0.015, settles: true },
   "stardust-hearth": { material: MATERIAL.Meteor, every: 2600, density: 100, cap: 0.0005 },
   "moonwater-garden": { material: MATERIAL.Moonwater, every: 420, density: 20, cap: 0.03 },
   "forest-hut": { material: MATERIAL.Seed, every: 3600, density: 25, cap: 0.002 },

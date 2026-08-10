@@ -43,7 +43,7 @@ const STRIDE = 8;
 const M = {
   Wall: 1, Sand: 2, Water: 3, Smoke: 4, Soil: 5, Fire: 6, Wood: 7, Lava: 8, Stone: 9, Moss: 10,
   Seed: 11, Fungus: 12, Oil: 13, Ice: 14, Steam: 15, Stardust: 16, Meteor: 17, Moonwater: 18,
-  Glass: 20, Rocket: 24, Wellspring: 25,
+  Flower: 19, Glass: 20, Ember: 21, Pollen: 22, Stem: 23, Rocket: 24, Wellspring: 25, Spark: 26,
 };
 const BYTE_NAME = ["kind", "variant", "age.lo", "age.hi", "energy.lo", "energy.hi", "flags.lo", "flags.hi"];
 
@@ -53,7 +53,7 @@ function wasmCells(uni) {
   return new Uint8Array(wasm.memory.buffer, ptr, len).slice();
 }
 
-function runScenario({ name, w, h, seed, ticks, paint, observe, expect }) {
+function runScenario({ name, w, h, seed, ticks, paint, observe, expect, slowSteps = [] }) {
   const js = createFallbackEngine(w, h, seed);
   const uni = wasm.universe_new(w, h, seed);
   paint((x, y, r, mat, d = 100) => js.paint(x, y, r, mat, d));
@@ -64,7 +64,7 @@ function runScenario({ name, w, h, seed, ticks, paint, observe, expect }) {
   // and `expect` make a scenario assert that it actually saw what it claims to cover.
   const seen = {};
 
-  const compare = (tick) => {
+  const compare = (tick, label = `tick ${tick}`) => {
     const a = js.getCellBytes();
     const b = wasmCells(uni);
     if (observe) observe(seen, a, w, h, tick);
@@ -76,17 +76,33 @@ function runScenario({ name, w, h, seed, ticks, paint, observe, expect }) {
       const jsCell = [...a.slice(cell * STRIDE, cell * STRIDE + STRIDE)];
       const wasmCell = [...b.slice(cell * STRIDE, cell * STRIDE + STRIDE)];
       throw new Error(
-        `[${name}] divergence at tick ${tick}, cell (${cx},${cy}), byte ${i % STRIDE} (${BYTE_NAME[i % STRIDE]}): js=${a[i]} wasm=${b[i]}\n` +
+        `[${name}] divergence at ${label}, cell (${cx},${cy}), byte ${i % STRIDE} (${BYTE_NAME[i % STRIDE]}): js=${a[i]} wasm=${b[i]}\n` +
           `  js  cell: [${jsCell}]\n  wasm cell: [${wasmCell}]`,
       );
     }
   };
 
+  // The slow world runs on its own clock and consumes the same RNG stream, so an
+  // unmirrored roll in it desynchronises the engines exactly as one in tick() would.
+  // `slowSteps: [{ at, count }]` takes `count` slow steps at the end of tick `at`.
+  const slowAt = new Map(slowSteps.map(({ at, count }) => [at, count]));
+  const takeSlowSteps = (tick) => {
+    const count = slowAt.get(tick);
+    if (!count) return;
+    for (let s = 1; s <= count; s++) {
+      js.slowStep();
+      wasm.universe_slow_step(uni);
+      compare(tick, `slow step ${s} after tick ${tick}`);
+    }
+  };
+
   compare(0);
+  takeSlowSteps(0);
   for (let t = 1; t <= ticks; t++) {
     js.tick();
     wasm.universe_tick(uni);
     compare(t);
+    takeSlowSteps(t);
   }
   wasm.universe_free(uni);
   js.dispose();
@@ -334,6 +350,90 @@ const scenarios = [
       if ((seen.maxCosmicHead ?? 0) < 4) return `cosmic head never opened into a multi-cell bloom (peaked at ${seen.maxCosmicHead ?? 0})`;
       if ((seen.pollenTicks ?? 0) < 20) return `pollen was airborne on only ${seen.pollenTicks ?? 0} ticks`;
       if (!seen.shed) return "no bloom ever shed a petal";
+      return null;
+    },
+  },
+  {
+    // The slow world's scatter arm. It needs a crown that has actually lived out its
+    // bloom, so this scene grows one from a painted seed and then leaves for a night
+    // at tick 2200 — by which point the crown is past PETAL_SHED_AGE with an empty
+    // budget. The remaining ticks play forward what it sowed, exactly as the app
+    // does at wake.
+    //
+    // The bed carpets into moss well before the plant is spent, which is why moss
+    // counts as sowable ground: requiring bare soil would have made this rule
+    // unreachable in the one scene that most obviously wants it.
+    name: "a garden bed left overnight",
+    w: 48, h: 28, seed: 777, ticks: 2400,
+    slowSteps: [{ at: 2200, count: 10 }],
+    paint(p) {
+      for (let x = 0; x < 48; x++) p(x, 25, 1, M.Wall);
+      for (let x = 4; x <= 43; x++) p(x, 24, 1, M.Soil);
+      p(24, 23, 1, M.Seed);
+      for (let x = 20; x <= 28; x++) p(x, 20, 1, M.Water);
+    },
+    observe(seen, cells, w, h, tick) {
+      let seeds = 0, spentCrown = 0;
+      for (let i = 0; i < w * h; i++) {
+        const o = i * STRIDE;
+        if (cells[o] === M.Seed) seeds++;
+        else if (cells[o] === M.Flower && cells[o + 6] & 2) {
+          const age = cells[o + 2] + cells[o + 3] * 256;
+          const energy = cells[o + 4] + cells[o + 5] * 256;
+          if (age > 1200 && energy < 40) spentCrown++;
+        }
+      }
+      // `compare` runs once before the slow steps and again after each of them, all
+      // labelled with the same tick, so the first reading at 2200 is the "before".
+      if (tick === 2200 && seen.seedsBeforeNight === undefined) {
+        seen.seedsBeforeNight = seeds;
+        seen.spentCrowns = spentCrown;
+      }
+      if (tick >= 2200) seen.maxSeedsAfterNight = Math.max(seen.maxSeedsAfterNight ?? 0, seeds);
+    },
+    expect(seen) {
+      if (!seen.spentCrowns) return "no plant ever reached a spent seed head, so nothing could sow";
+      if ((seen.maxSeedsAfterNight ?? 0) <= (seen.seedsBeforeNight ?? 0)) {
+        return `the night away sowed nothing (${seen.seedsBeforeNight ?? 0} seeds before, ${seen.maxSeedsAfterNight ?? 0} after)`;
+      }
+      return null;
+    },
+  },
+  {
+    // The slow world's other arm, on a scene cheap enough to run on its own: burn a
+    // log down to cold char, leave for a night, come back to ground you can plant in.
+    // The `expect` is the guard against the whole thing quietly becoming a no-op —
+    // both engines would still agree byte-for-byte about nothing happening.
+    name: "a hearth burned out and left overnight",
+    w: 32, h: 24, seed: 4001, ticks: 700,
+    slowSteps: [{ at: 600, count: 12 }],
+    paint(p) {
+      for (let x = 0; x < 32; x++) p(x, 21, 1, M.Wall);
+      for (let x = 8; x <= 24; x++) p(x, 20, 1, M.Wood);
+      p(10, 19, 1, M.Fire); p(20, 19, 1, M.Fire);
+    },
+    observe(seen, cells, w, h, tick) {
+      let char = 0, soil = 0;
+      for (let i = 0; i < w * h; i++) {
+        const kind = cells[i * STRIDE];
+        // Ember below COLD_CHAR_ENERGY is char that has gone out.
+        if (kind === M.Ember && cells[i * STRIDE + 4] + cells[i * STRIDE + 5] * 256 < 30) char++;
+        else if (kind === M.Soil) soil++;
+      }
+      if (tick === 600 && seen.charBeforeNight === undefined) {
+        seen.charBeforeNight = char;
+        seen.soilBeforeNight = soil;
+      }
+      seen.soilAfterNight = soil;
+    },
+    expect(seen) {
+      if ((seen.charBeforeNight ?? 0) < 4) {
+        return `the fire left only ${seen.charBeforeNight ?? 0} cold char cells, so the slow rule had nothing to act on`;
+      }
+      if ((seen.soilBeforeNight ?? 0) !== 0) return "this scene is supposed to start with no soil at all";
+      if ((seen.soilAfterNight ?? 0) < 3) {
+        return `a night away turned only ${seen.soilAfterNight ?? 0} char cells into soil`;
+      }
       return null;
     },
   },

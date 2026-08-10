@@ -6,6 +6,8 @@ export type SandboxEngine = {
   height(): number;
   tickCount(): number;
   tick(): void;
+  /** One step of the between-sessions slow world. Never called during play. */
+  slowStep(): void;
   clear(): void;
   paint(x: number, y: number, radius: number, material: number, density?: number): void;
   getCellBytes(): Uint8Array;
@@ -21,6 +23,7 @@ type WasmModule = {
   universe_height(ptr: number): number;
   universe_tick_count(ptr: number): number;
   universe_tick(ptr: number): void;
+  universe_slow_step(ptr: number): void;
   universe_clear(ptr: number): void;
   universe_paint(ptr: number, x: number, y: number, radius: number, material: number, density: number): void;
   universe_cells_ptr(ptr: number): number;
@@ -85,6 +88,10 @@ class WasmSandboxEngine implements SandboxEngine {
 
   tick() {
     this.wasm.universe_tick(this.ptr);
+  }
+
+  slowStep() {
+    this.wasm.universe_slow_step(this.ptr);
   }
 
   clear() {
@@ -211,6 +218,108 @@ class JsSandboxEngine implements SandboxEngine {
     }
 
     this.cells.set(next);
+  }
+
+  /**
+   * One step of the slow world — the changes a terrarium makes while nobody is
+   * watching. Mirrors `Universe::slow_step` in `sim/src/lib.rs`, which carries the
+   * design rationale; the ORDER of the `chance()` rolls here has to match it cell
+   * for cell or the two engines desynchronise permanently.
+   */
+  slowStep() {
+    const old = this.cells.slice();
+    const next = this.cells.slice();
+
+    for (let cellIndex = 0; cellIndex < this.w * this.h; cellIndex++) {
+      const idx = cellIndex * CELL_STRIDE;
+      const kind = old[idx];
+      const flags = readU16(old, idx + 6);
+
+      // The hearth goes back to the ground: cold, uncovered char crumbles into soil.
+      if (kind === MATERIAL.Ember) {
+        if (
+          readU16(old, idx + 4) < COLD_CHAR_ENERGY &&
+          !(flags & CELL_FLAG.Wet) &&
+          this.chance(SLOW_CHAR_SETTLES)
+        ) {
+          writeCellBytes(next, idx, MATERIAL.Soil, old[idx + 1], 0, 0, 0);
+        }
+        continue;
+      }
+
+      // A spent seed head sows itself clear of its own shadow. "Spent" is age plus an
+      // empty budget, not the absence of petals — see the sim for the measurement
+      // that ruled out a bare-crown check.
+      if (
+        kind === MATERIAL.Flower &&
+        flags & CELL_FLAG.Rooted &&
+        readU16(old, idx + 2) > PETAL_SHED_AGE &&
+        readU16(old, idx + 4) < POLLEN_RESERVE &&
+        this.chance(SLOW_SEED_SCATTERS)
+      ) {
+        const site = this.scatterSite(
+          cellIndex % this.w,
+          Math.floor(cellIndex / this.w),
+          old[idx + 1],
+          old,
+          next
+        );
+        if (site >= 0) {
+          const below = site + this.w * CELL_STRIDE;
+          const groundFlags = readU16(old, below + 6);
+          const groundEnergy = readU16(old, below + 4);
+          const damp = Boolean(groundFlags & CELL_FLAG.Wet) || groundEnergy > SOIL_DAMP_ENERGY;
+          // The seed works its way down to ground: a watered bed is solid moss within
+          // seconds and moss does not root a seed, so the landing displaces that one
+          // patch of carpet back to the soil under it, moisture and all.
+          if (old[below] === MATERIAL.Moss) {
+            writeCellBytes(
+              next,
+              below,
+              MATERIAL.Soil,
+              old[below + 1],
+              groundEnergy,
+              0,
+              groundFlags & (CELL_FLAG.Wet | CELL_FLAG.Cosmic)
+            );
+          }
+          writeCellBytes(
+            next,
+            site,
+            MATERIAL.Seed,
+            old[idx + 1],
+            0,
+            0,
+            (flags & CELL_FLAG.Cosmic) | (damp ? CELL_FLAG.Wet : 0)
+          );
+        }
+      }
+    }
+
+    this.cells.set(next);
+  }
+
+  /** Open air resting on soil or moss, searched outward past PLANT_SPACING. */
+  private scatterSite(x: number, y: number, variant: number, old: Uint8Array, next: Uint8Array) {
+    const start = variant % SCATTER_OFFSETS.length;
+    for (let step = 0; step < SCATTER_OFFSETS.length; step++) {
+      const nx = x + SCATTER_OFFSETS[(start + step) % SCATTER_OFFSETS.length];
+      if (!this.inBounds(nx, y)) continue;
+      const limit = Math.min(y + SCATTER_REACH, this.h - 1);
+      for (let ny = y; ny < limit; ny++) {
+        if (ny < 0) continue;
+        const site = this.index(nx, ny);
+        const ground = old[this.index(nx, ny + 1)];
+        if (
+          old[site] === MATERIAL.Empty &&
+          next[site] === MATERIAL.Empty &&
+          (ground === MATERIAL.Soil || ground === MATERIAL.Moss)
+        ) {
+          return site;
+        }
+      }
+    }
+    return -1;
   }
 
   getCellBytes() {
@@ -1335,6 +1444,19 @@ const FACE_OFFSETS: ReadonlyArray<readonly [number, number]> = [
 
 // Moisture lost per cell as water soaks down through a seed bed.
 const SEED_SOAK_LOSS = 20;
+
+// Below this an ember has gone out: inert char that only relights from outside.
+const COLD_CHAR_ENERGY = 30;
+// Stored moisture that still counts as damp ground under a seed.
+const SOIL_DAMP_ENERGY = 60;
+
+// The slow world. Odds are per slow step — roughly "a few hours away" — and every
+// scatter offset clears PLANT_SPACING so a sown seed lands where it can grow.
+// See `Universe::slow_step` in sim/src/lib.rs for the reasoning behind the tuning.
+const SLOW_CHAR_SETTLES = 6;
+const SLOW_SEED_SCATTERS = 3;
+const SCATTER_OFFSETS: readonly number[] = [6, -6, 9, -9, 12, -12, 15, -15];
+const SCATTER_REACH = 14;
 
 // A seed will not germinate this close to an existing plant. Without it every cell of a
 // watered bed sprouts and the meadow becomes one solid wall of blooms with no silhouette.

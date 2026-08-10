@@ -4,7 +4,7 @@ This roadmap keeps the project focused: make the toy feel good, keep the codebas
 
 ## Status Snapshot
 
-Every phase through 18 is complete except two open items: Phase 8's remaining subjective listening pass, and Phase 12D (room weather play).
+Every phase through 18 is complete except one open item: Phase 8's remaining subjective listening pass.
 
 The sandbox is a playable, deployed browser toy: React/Vite UI, Rust/WASM sim with a byte-identical JS fallback, 18 paintable materials plus the Eraser on the toolbar and 8 generated-only outcomes, six credited room backdrops with room-linked native ambience, optional YouTube Desk Radio, local save/share/postcard/clip export, a click-to-load embed poster, and deterministic sim/parity/browser/visual/audio QA wired into local scripts and CI. It runs at `pixelfun.littlealbumclub.net` and is iframed into `littlealbumclub.net`. Details live in the phase sections below.
 
@@ -453,7 +453,7 @@ Status: complete. Cozy translations of the two classic sandbox elements the proj
 
 ## Phase 12: Heat Identity + Discovery Moments
 
-Status: 12A and 12B complete; 12C shipped, then removed after play testing; 12D shipped 2026-08.
+Status: 12A and 12B complete; 12C shipped, then removed after play testing; 12D and 12E shipped 2026-08.
 
 Completed:
 
@@ -486,6 +486,30 @@ Interactions should pop at the instant they happen instead of quietly swapping p
 - An "open window" toggle (`app/src/weather.ts`) lets the backdrop weather lean into the tray as real cells: drizzle in Rain Desk, snow settling in Snow Window, rare meteors over Stardust Hearth, moon-drips in the Moonlit Garden, the odd falling seed by the Forest Hut. The Cozy Fireplace stays indoors on purpose.
 - Shipped ON by default, revisiting the original off-by-default plan: an opt-in ambience feature does not drive return visits, and the rates are a whisper. Every drop type carries a cell-count ceiling so an open window left overnight reaches a drizzly equilibrium instead of flooding the toy. The toggle persists, and shut means shut.
 - Tonight's sky is seeded by the local date, so each day has its own temperament per room with no server involved — the daily-visit rhythm the album club already lives by.
+
+### Phase 12E: The Slow World — shipped
+
+The return-visit mechanic, separated from the weather it had been confused with. Weather is
+ambience; what makes a terrarium worth coming back to is that it changed while you were
+gone. Ticks could not express that — catch-up saturates after ~66 minutes, and a ten-minute
+session runs four times more ticks than any absence can buy — so absence got its own unit.
+
+- `Universe::slow_step` (mirrored in `engine.ts`, parity-gated) runs only at wake, on a
+  count derived from hours away: 1h earns 4 steps, a day 18, capped at 24. Two rules so
+  far — cold uncovered char settles into fresh soil, and a spent seed head sows a seed
+  clear of its own shadow, displacing the one patch of moss it lands on so the grain can
+  actually root.
+- Slow steps run **before** the tick catch-up, so the sim plays the new conditions forward
+  and the player arrives to a garden rather than to a diff.
+- `npm run slow-world:audit` is the gate, because every other sim check passes happily on a
+  correct-and-invisible rule. Measured on a watered garden beside a burned-out hearth: a day
+  away visibly changes 105 cells at median contrast 267 (against 65 for an hour) and grows
+  the garden into 9 columns it did not stand in before. A scene with nothing alive in it
+  comes back byte-identical.
+- Rain Desk and Snow Window were cut back in the same change — one drop every 7.6s and 9.4s
+  respectively, from 1.8s and 2.8s, with their cell caps cut to 2% and 1.5%. They had been
+  an order of magnitude busier than every other room, which read as constant weather rather
+  than weather, and confused ambience with the growth mechanic above.
 
 ## Phase 18: Living-World Batch (design-feedback pass)
 

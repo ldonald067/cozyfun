@@ -142,6 +142,22 @@ const POLLEN_RESERVE: u16 = 40;
 const POLLEN_COST: u16 = 15;
 const PETAL_SHED_AGE: u16 = 1200;
 
+/// Below this an ember has gone out: inert char that only relights from outside.
+const COLD_CHAR_ENERGY: u16 = 30;
+/// Stored moisture that still counts as damp ground under a seed.
+const SOIL_DAMP_ENERGY: u16 = 60;
+
+// ── The slow world ───────────────────────────────────────────────────────────
+// Odds are per slow step, and a step is roughly "a few hours away" — see
+// `Universe::slow_step`. They are tuned so a night away moves a hearth
+// noticeably and a day away moves it most of the way, without any single step
+// being large enough to feel like the scene was edited.
+const SLOW_CHAR_SETTLES: u32 = 6;
+const SLOW_SEED_SCATTERS: u32 = 3;
+/// Every offset clears PLANT_SPACING, so a scattered seed lands where it can grow.
+const SCATTER_OFFSETS: [i32; 8] = [6, -6, 9, -9, 12, -12, 15, -15];
+const SCATTER_REACH: i32 = 14;
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Cell {
@@ -337,6 +353,122 @@ impl Universe {
 
         self.cells = next;
     }
+
+    /// One step of the slow world: the changes a terrarium makes while nobody is
+    /// watching it.
+    ///
+    /// This runs on its own clock, driven by how long the player was away, and
+    /// **never during play** — which is the whole point. Absence should be felt as
+    /// "my terrarium is different" on the next visit, not watched happening. Ticks
+    /// cannot express that: a ten-minute session runs ~15,800 of them while the
+    /// away-catch-up is capped at 4,000, so playing already advances the world
+    /// several times faster than leaving it, and anything slow enough to be
+    /// invisible in a session is far too slow to show up after a day.
+    ///
+    /// So a slow step is deliberately NOT a slow tick. It is a small set of
+    /// transformations that are each too consequential to fire while watched, and
+    /// each one only touches something the player built. A scene of bare walls and
+    /// sand comes back byte-identical; what changes is what you left living.
+    ///
+    /// Slow steps are applied before the tick catch-up, so the conditions they
+    /// create — fresh soil, a scattered seed — get played forward by the ordinary
+    /// sim and arrive as a garden rather than as a diff.
+    pub fn slow_step(&mut self) {
+        let old = self.cells.clone();
+        let mut next = old.clone();
+
+        for idx in 0..old.len() {
+            let cell = old[idx];
+
+            // The hearth goes back to the ground. Cold char left standing in the
+            // open crumbles into fresh soil, so a fire you burned out last night is
+            // a bed you can plant in tomorrow. Char under water is spared: a
+            // quenched hearth is a deliberate look, and running water already has
+            // its own rule for washing char away.
+            if cell.kind == Material::Ember as u8 {
+                if cell.energy < COLD_CHAR_ENERGY
+                    && cell.flags & FLAG_WET == 0
+                    && self.chance(SLOW_CHAR_SETTLES)
+                {
+                    next[idx] = Cell::new(Material::Soil as u8, cell.variant, 0);
+                }
+                continue;
+            }
+
+            // A spent seed head sows. The crown drops a seed clear of its own shadow,
+            // so a garden walks across the tray over successive visits instead of
+            // standing exactly where it was planted forever. The seed inherits the
+            // damp of the ground it lands in, which is what decides whether it comes
+            // up: a garden you keep watered spreads, a dry one holds still.
+            //
+            // "Spent" is age plus an empty budget, NOT the absence of petals. A
+            // measured garden showed why: crowns reliably run to energy 0 by ~1200
+            // ticks, but a head almost always keeps one stubborn petal that never
+            // meets the shed rule's own energy test, so a bare-crown check fired
+            // essentially never and the whole rule was dead on arrival.
+            if cell.kind == Material::Flower as u8
+                && cell.flags & FLAG_ROOTED != 0
+                && cell.age > PETAL_SHED_AGE
+                && cell.energy < POLLEN_RESERVE
+                && self.chance(SLOW_SEED_SCATTERS)
+            {
+                let site = self.scatter_site(idx, cell.variant, &old, &next);
+                if let Some(site) = site {
+                    let below = site + self.width as usize;
+                    let ground = old[below];
+                    let damp = ground.flags & FLAG_WET != 0 || ground.energy > SOIL_DAMP_ENERGY;
+                    // The seed works its way down to ground. A watered bed is a solid
+                    // moss carpet within about twenty seconds of play, and moss does
+                    // not root a seed — measured on a real garden, every seed a head
+                    // sowed landed on moss and sat there as an inert grain forever.
+                    // So the landing displaces that one patch of carpet back to the
+                    // soil under it, carrying the moss's moisture down with it. One
+                    // cell per seed: this opens a planting hole, it does not strip a
+                    // carpet the player grew.
+                    if ground.kind == Material::Moss as u8 {
+                        next[below] = Cell::new(Material::Soil as u8, ground.variant, ground.energy);
+                        next[below].flags = ground.flags & (FLAG_WET | FLAG_COSMIC);
+                    }
+                    next[site] = Cell::new(Material::Seed as u8, cell.variant, 0);
+                    next[site].flags =
+                        (cell.flags & FLAG_COSMIC) | if damp { FLAG_WET } else { 0 };
+                }
+            }
+        }
+
+        self.cells = next;
+    }
+
+    /// Somewhere a scattered seed could actually come up: open air resting on soil
+    /// or moss, searched outward from the parent. Every offset clears
+    /// `PLANT_SPACING`, because a seed dropped inside the parent's shadow can never
+    /// germinate and would only litter the bed with grains that do nothing.
+    fn scatter_site(&self, idx: usize, variant: u8, old: &[Cell], next: &[Cell]) -> Option<usize> {
+        let (x, y) = self.xy(idx);
+        let start = variant as usize % SCATTER_OFFSETS.len();
+        for step in 0..SCATTER_OFFSETS.len() {
+            let dx = SCATTER_OFFSETS[(start + step) % SCATTER_OFFSETS.len()];
+            let nx = x + dx;
+            if !self.in_bounds(nx, y) {
+                continue;
+            }
+            for ny in y..(y + SCATTER_REACH).min(self.height as i32 - 1) {
+                if ny < 0 {
+                    continue;
+                }
+                let site = self.idx(nx as u32, ny as u32);
+                let below = self.idx(nx as u32, (ny + 1) as u32);
+                let ground = old[below].kind;
+                if old[site].kind == Material::Empty as u8
+                    && next[site].kind == Material::Empty as u8
+                    && (ground == Material::Soil as u8 || ground == Material::Moss as u8)
+                {
+                    return Some(site);
+                }
+            }
+        }
+        None
+    }
 }
 
 #[no_mangle]
@@ -408,6 +540,13 @@ pub unsafe extern "C" fn universe_paint(
 pub unsafe extern "C" fn universe_tick(ptr: *mut Universe) {
     if let Some(universe) = ptr.as_mut() {
         universe.tick();
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn universe_slow_step(ptr: *mut Universe) {
+    if let Some(universe) = ptr.as_mut() {
+        universe.slow_step();
     }
 }
 
@@ -795,7 +934,7 @@ impl Universe {
                             next[nidx].flags = FLAG_SCORCHED;
                             continue;
                         }
-                        if other.kind == Material::Ember as u8 && other.energy < 30 && self.chance(12) {
+                        if other.kind == Material::Ember as u8 && other.energy < COLD_CHAR_ENERGY && self.chance(12) {
                             // Charcoal wash: running water crumbles cold char away.
                             next[nidx] = Cell::empty();
                             continue;
@@ -1778,7 +1917,7 @@ impl Universe {
             return;
         }
         next[idx].energy = next[idx].energy.saturating_sub(10);
-        if next[idx].energy < 30 {
+        if next[idx].energy < COLD_CHAR_ENERGY {
             next[idx] = if self.chance(6) {
                 Cell::new(Material::Stardust as u8, cell.variant, 120)
             } else {
@@ -3715,5 +3854,125 @@ mod tests {
             }
         }
         assert!(sparked, "a meteor should shed sparks from the cells it falls through");
+    }
+
+    fn count_kind(u: &Universe, material: Material) -> usize {
+        u.cells.iter().filter(|c| c.kind == material as u8).count()
+    }
+
+    /// A hearth burned out last night comes back as ground you can plant in.
+    #[test]
+    fn slow_steps_settle_a_cold_hearth_into_soil() {
+        let mut u = Universe::new(24, 24, 7);
+        for x in 4..14 {
+            set_cell_state(&mut u, x, 18, Material::Ember, 400, 5, 0);
+        }
+        assert_eq!(count_kind(&u, Material::Soil), 0);
+        for _ in 0..12 {
+            u.slow_step();
+        }
+        let soil = count_kind(&u, Material::Soil);
+        assert!(
+            soil >= 7,
+            "a dozen slow steps should settle most of a ten-cell hearth into soil, saw {soil}"
+        );
+    }
+
+    /// The pairing test: a hearth still holding heat is not ash, and a quenched one
+    /// is a look the player chose. Neither may be quietly turned into a garden bed.
+    #[test]
+    fn slow_steps_leave_hot_and_drowned_embers_alone() {
+        let mut u = Universe::new(24, 24, 7);
+        for x in 4..9 {
+            set_cell_state(&mut u, x, 18, Material::Ember, 400, 220, 0);
+        }
+        for x in 12..17 {
+            set_cell_state(&mut u, x, 18, Material::Ember, 400, 5, FLAG_WET);
+        }
+        for _ in 0..20 {
+            u.slow_step();
+        }
+        assert_eq!(
+            count_kind(&u, Material::Ember),
+            10,
+            "only cold, uncovered char settles into soil"
+        );
+    }
+
+    /// The promise the whole feature rests on: what you did not leave living does
+    /// not change while you are gone.
+    #[test]
+    fn slow_steps_leave_an_unliving_scene_byte_identical() {
+        let mut u = Universe::new(24, 24, 7);
+        for x in 2..22 {
+            set_cell(&mut u, x, 20, Material::Wall);
+            set_cell(&mut u, x, 19, Material::Sand);
+            set_cell(&mut u, x, 6, Material::Stone);
+        }
+        set_cell(&mut u, 10, 12, Material::Glass);
+        let before = u.cells.clone();
+        for _ in 0..24 {
+            u.slow_step();
+        }
+        assert_eq!(before, u.cells, "a scene with nothing alive in it must come back unchanged");
+    }
+
+    /// A finished plant sows itself onto the next patch of ground, clear of its own
+    /// shadow, and the new seed carries the damp of the bed it lands in.
+    #[test]
+    fn a_spent_seed_head_scatters_onto_open_ground() {
+        let mut u = Universe::new(40, 24, 7);
+        for x in 2..38 {
+            set_cell(&mut u, x, 21, Material::Wall);
+            set_cell_state(&mut u, x, 20, Material::Soil, 0, 120, FLAG_WET);
+        }
+        set_cell_state(&mut u, 20, 19, Material::Flower, PETAL_SHED_AGE + 50, 0, FLAG_ROOTED);
+        for _ in 0..10 {
+            u.slow_step();
+        }
+        let seeds: Vec<(i32, i32)> = u
+            .cells
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| c.kind == Material::Seed as u8)
+            .map(|(i, _)| u.xy(i))
+            .collect();
+        assert!(!seeds.is_empty(), "a spent seed head should scatter");
+        for (x, _) in &seeds {
+            assert!(
+                (x - 20).abs() >= PLANT_SPACING,
+                "a scattered seed at x={x} lands inside the parent's shadow and could never grow"
+            );
+        }
+        let seed_idx = u.cells.iter().position(|c| c.kind == Material::Seed as u8).unwrap();
+        assert!(
+            u.cells[seed_idx].flags & FLAG_WET != 0,
+            "a seed sown into damp soil should arrive damp"
+        );
+    }
+
+    /// The pairing test, and it guards both halves of "spent": a young bud is not a
+    /// seed head, and neither is an old bloom that still has budget to spend on its
+    /// own petals and pollen.
+    #[test]
+    fn a_bloom_still_in_its_prime_scatters_nothing() {
+        let mut u = Universe::new(40, 24, 7);
+        for x in 2..38 {
+            set_cell(&mut u, x, 21, Material::Wall);
+            set_cell_state(&mut u, x, 20, Material::Soil, 0, 120, FLAG_WET);
+        }
+        // Young and full of energy.
+        set_cell_state(&mut u, 10, 19, Material::Flower, 60, 220, FLAG_ROOTED);
+        // Old, but still spending: this is the one a bare-crown check would have
+        // caught by accident and an age-only check would wrongly sow from.
+        set_cell_state(&mut u, 28, 19, Material::Flower, PETAL_SHED_AGE + 50, 220, FLAG_ROOTED);
+        for _ in 0..20 {
+            u.slow_step();
+        }
+        assert_eq!(
+            count_kind(&u, Material::Seed),
+            0,
+            "a bloom that has not spent its budget has nothing to sow yet"
+        );
     }
 }

@@ -581,7 +581,7 @@ async function main() {
     );
   });
 
-  await check("a saved scene grows while the player is away", async () => {
+  await check("a saved scene changes while the player is away", async () => {
     // Age the manual save two hours into the past, promote it to the autosave slot the
     // boot path restores from, and reload. The app should resume the scene AND fast-
     // forward it, announcing the growth. This is the whole "living terrarium" loop:
@@ -615,7 +615,11 @@ async function main() {
     })()`);
     assert(restaged, "manual save disappeared before staging");
     await cdp.send("Page.navigate", { url: appUrl });
-    await waitForStatus(cdp, "your terrarium kept growing while you were away", 20_000);
+    // Two hours earns slow steps as well as tick catch-up, so this status is the
+    // end-to-end proof that the between-sessions world ran in a real browser — not
+    // just that the scene was replayed forward. The "kept growing" wording is what a
+    // shorter absence still says.
+    await waitForStatus(cdp, "your terrarium changed while you were away", 20_000);
   });
 
   await check("page stayed free of browser errors", async () => {
