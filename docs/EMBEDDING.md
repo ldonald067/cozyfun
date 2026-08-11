@@ -149,8 +149,14 @@ fullscreen button there).
 
 If two surfaces do end up open, the game itself arbitrates: the newest window claims the
 terrarium over a BroadcastChannel and the older one pauses with "another window is tending
-this terrarium". Pressing play (or painting) takes it back. Hidden tabs also skip the
-interval autosave, so the visible window owns the save.
+this terrarium". Pressing play (or painting) takes it back.
+
+**Ownership gates writes, not just the clock**, and that distinction is the whole point. A
+window that has lost the claim stops any wake-up catch-up still in flight and gives up the
+right to save at all — including on close. Pausing alone was not enough: the damaging write
+is the one on the way out, so a stale second copy closing *last* would overwrite the scene
+the player had just been tending in the other window. Hidden tabs skip the interval save on
+top of that, so the visible owner is the only writer.
 
 ### What the poster draws
 

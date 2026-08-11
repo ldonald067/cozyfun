@@ -527,7 +527,17 @@ async function main() {
     await click(cdp, '[data-testid="clear-scene"]');
     await waitForStatus(cdp, "tray cleared");
     const before = await canvasSignature(cdp);
-    await waitUntil(async () => (await canvasSignature(cdp)) !== before, "drizzle to reach the tray", 25_000);
+    // The budget is DERIVED from the pattern, not guessed, because clearing the tray can
+    // land just after a drop and leave a full interval to wait out. Rain Desk means 340
+    // ticks between drops, divided by the day's intensity (calmest tier 0.55) and the
+    // swell (1 when not gathering), times the per-drop jitter (up to 1.4):
+    // 340 / 0.55 * 1.4 = 866 ticks, and at SIM_TICK_MS = 38 that is ~33s. It is a hard
+    // ceiling rather than a likely wait — a typical day drops within a few seconds.
+    //
+    // This margin is worth keeping honest: cutting Rain Desk from `every: 70` to 340 took
+    // the worst case from ~7s to ~33s and quietly left this check's old 25s budget below
+    // it, which shows up later as an intermittent CI failure rather than an obvious one.
+    await waitUntil(async () => (await canvasSignature(cdp)) !== before, "drizzle to reach the tray", 40_000);
 
     await click(cdp, '[data-testid="window-toggle"]');
     await click(cdp, '[data-testid="clear-scene"]');
@@ -550,8 +560,30 @@ async function main() {
     await waitForStatus(cdp, "another window is tending this terrarium — press play to take over", 10_000);
     const pausedBadge = await evaluate(cdp, `Boolean(document.querySelector(".status-paused"))`);
     assert(pausedBadge, "takeover should pause this window");
+
+    // Pausing the loser is not enough on its own: the dangerous write is the one on the
+    // way out. A stale second copy closing LAST used to overwrite the scene the player
+    // had just been tending in the other window, because the close handler saved
+    // unconditionally. Dispatching pagehide here drives that exact handler.
+    const beforeLoserClose = await evaluate(cdp, `localStorage.getItem("cozy-pixel-sandbox:scene:auto:v1")`);
+    await evaluate(cdp, `window.dispatchEvent(new Event("pagehide"))`);
+    const afterLoserClose = await evaluate(cdp, `localStorage.getItem("cozy-pixel-sandbox:scene:auto:v1")`);
+    assert(
+      afterLoserClose === beforeLoserClose,
+      "a window that lost the terrarium must not write the autosave when it closes"
+    );
+
     await click(cdp, '[data-testid="pause-toggle"]');
     await waitUntil(async () => !(await evaluate(cdp, `Boolean(document.querySelector(".status-paused"))`)), "play to reclaim", 5_000);
+
+    // ...and the pairing half, so the guard above cannot pass by having broken saving
+    // outright: once this window owns the terrarium again, closing DOES record it.
+    await evaluate(cdp, `window.dispatchEvent(new Event("pagehide"))`);
+    const afterOwnerClose = await evaluate(cdp, `localStorage.getItem("cozy-pixel-sandbox:scene:auto:v1")`);
+    assert(
+      afterOwnerClose && afterOwnerClose !== beforeLoserClose,
+      "the window that owns the terrarium must still record it on close"
+    );
   });
 
   await check("narrow desktop layout keeps controls from overlapping the tray", async () => {

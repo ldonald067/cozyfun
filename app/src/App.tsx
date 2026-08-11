@@ -101,6 +101,12 @@ export function App() {
   // engines diverging from the same autosave was the "why does it look different over
   // there" bug — ownership makes the second copy impossible instead of merely less likely.
   const ownershipRef = useRef<{ channel: BroadcastChannel | null; id: string }>({ channel: null, id: "" });
+  // Ownership has to gate WRITES, not just the tick loop. Pausing a losing window still
+  // left it finishing its wake-up catch-up and still let its unconditional close-handler
+  // save fire, so closing a stale second copy could overwrite the scene the player had
+  // just been tending in the other one. Defaults to true: a lone window in a browser
+  // without BroadcastChannel is the owner by default, or nothing would ever save.
+  const ownsTerrariumRef = useRef(true);
   const [status, setStatus] = useState("warming tray");
   const [fps, setFps] = useState(0);
   const [fieldNote, setFieldNote] = useState<string | null>(null);
@@ -192,7 +198,7 @@ export function App() {
     let frames = 0;
 
     const loop = (time: number) => {
-      if (fastForwardRef.current > 0) {
+      if (fastForwardRef.current > 0 && ownsTerrariumRef.current) {
         // Catching up on time away. Chunked so even the JS fallback stays responsive,
         // and reaction cues are skipped — 4000 ticks of retroactive pops would be noise.
         // The final WAKE_UP_REPLAY_TICKS play at ~4x so the wake-up is watched, not skipped.
@@ -428,6 +434,9 @@ export function App() {
     channel.onmessage = (event) => {
       if (event.data?.type !== "claim" || event.data.id === id) return;
       // Someone else took the desk chair. Sit back; unpausing or painting reclaims it.
+      // Standing up means stopping any catch-up still in flight AND giving up the right
+      // to write the save, not merely stopping the clock.
+      ownsTerrariumRef.current = false;
       setPaused(true);
       setStatus("another window is tending this terrarium — press play to take over");
     };
@@ -451,15 +460,20 @@ export function App() {
     // ?cozyNoAutosave=1 is a QA hook: the pagehide save records "last seen" so
     // faithfully that a test can never stage an old timestamp without it.
     if (new URLSearchParams(window.location.search).has("cozyNoAutosave")) return;
-    const save = () => saveAutoLocal(engine, snapshotContextRef.current ?? undefined);
-    // A hidden tab must not keep overwriting the autosave the visible tab is writing:
-    // with the game open embedded AND in its own tab, both run live engines against the
-    // same storage key, and the background one clobbering the foreground one is how
-    // "my scene looks different over there" happens. pagehide still saves regardless,
-    // because closing the only tab has to record "last seen".
+    // Only the window tending the terrarium may write it. Two windows run live engines
+    // against the same storage key, so any write from the other one is how "my scene
+    // looks different over there" happens — and on close it is worse than a diff, it is
+    // the stale copy landing last. The visibility check stays on top of ownership: a
+    // background tab that still holds the claim has nothing new worth saving either.
+    const save = () => {
+      if (!ownsTerrariumRef.current) return;
+      saveAutoLocal(engine, snapshotContextRef.current ?? undefined);
+    };
     const interval = window.setInterval(() => {
       if (!document.hidden) save();
     }, AUTOSAVE_INTERVAL_MS);
+    // pagehide is what records "last seen" for the away-time growth, so the owner must
+    // still save on close even though it is about to become hidden.
     window.addEventListener("pagehide", save);
     return () => {
       window.clearInterval(interval);
@@ -468,6 +482,7 @@ export function App() {
   }, [engine]);
 
   function claimOwnership() {
+    ownsTerrariumRef.current = true;
     ownershipRef.current.channel?.postMessage({ type: "claim", id: ownershipRef.current.id });
   }
 
