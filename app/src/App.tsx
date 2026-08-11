@@ -482,8 +482,15 @@ export function App() {
   }, [engine]);
 
   function claimOwnership() {
+    // Only say something when this is an actual take-back. claimOwnership also runs on
+    // every paint stroke, and announcing ownership there would stamp over the material
+    // description the tray is showing.
+    const takingBack = !ownsTerrariumRef.current;
     ownsTerrariumRef.current = true;
     ownershipRef.current.channel?.postMessage({ type: "claim", id: ownershipRef.current.id });
+    // Without this the instruction that got you here — "press play to take over" — stays
+    // on screen after you have taken over, reading as though nothing happened.
+    if (takingBack) setStatus("this window is tending the terrarium now");
   }
 
   async function handleFullscreen() {

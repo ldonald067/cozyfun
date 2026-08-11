@@ -575,6 +575,10 @@ async function main() {
 
     await click(cdp, '[data-testid="pause-toggle"]');
     await waitUntil(async () => !(await evaluate(cdp, `Boolean(document.querySelector(".status-paused"))`)), "play to reclaim", 5_000);
+    // Reclaiming has to SAY so. Caught on the live site: the status kept reading "press
+    // play to take over" after the player had done exactly that, so taking the terrarium
+    // back looked like it had failed.
+    await waitForStatus(cdp, "this window is tending the terrarium now", 5_000);
 
     // ...and the pairing half, so the guard above cannot pass by having broken saving
     // outright: once this window owns the terrarium again, closing DOES record it.
