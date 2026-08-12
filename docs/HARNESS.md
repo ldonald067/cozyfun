@@ -43,6 +43,17 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
 - `npm run test:wasm`: validates the WASM bridge and key sim outcomes from JavaScript.
 - `npm run test:js-fallback`: validates JS fallback parity for user-visible sim behavior.
 - `npm run test:browser`: drives the built app through core UI, local ambience asset decoding, sharing, import/export, and Desk Radio paths. It starts its own static server.
+
+  **`COZY_QA_URL` points it at a deployment instead**, which is how to answer "does it work in production" rather than "does this build pass":
+
+  ```sh
+  COZY_QA_URL=https://pixelfun.littlealbumclub.net npm run test:browser
+  COZY_QA_URL=https://pixelfun.littlealbumclub.net npm run visual:qa
+  ```
+
+  Both scripts drive a real headless Chrome over CDP, so unlike an embedded preview pane they never get `requestAnimationFrame` throttled — the simulation actually runs while a check waits on it. The app has no backend, so a run only touches the throwaway browser profile's own localStorage.
+
+  It earned itself on the first run: it caught `/favicon.ico` 404ing in production, which the local path **cannot** see, because `startStaticServer` answers `/favicon.ico` with a 204. That is the classic shape of a verification gap — the QA surface and the user surface differed at exactly the point where the bug lived.
 - `npm run visual:qa`: captures deterministic material scenes, room backdrops, and responsive layout metrics into `.tmp/visual-qa`.
 - `npm run audio:qa`: writes a native ambience manifest for local audio asset size, target loop length, and mood/room balance review into `.tmp/audio-qa`.
 - `node scripts/preview-dist.mjs 4181`: serves the built `app/dist` with bundle badges so stale browser sessions are obvious. Build first. (Windows: `.\scripts\preview-current.ps1 -Port 4181` rebuilds and serves in one step.)

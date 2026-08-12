@@ -10,7 +10,7 @@ import {
   setText,
   sleep,
   startBrowser,
-  startStaticServer,
+  startAppTarget,
   statusText,
   waitForStatus,
   waitUntil
@@ -23,9 +23,12 @@ const checks = [];
 const protocolErrors = [];
 
 async function main() {
-  await assertDistExists(distDir, "Build the app before running browser smoke checks: npm run build");
+  // Only the local build needs to exist; a COZY_QA_URL run tests something already deployed.
+  if (!process.env.COZY_QA_URL) {
+    await assertDistExists(distDir, "Build the app before running browser smoke checks: npm run build");
+  }
 
-  const staticServer = await startStaticServer(distDir);
+  const target = await startAppTarget(distDir);
   const browser = await startBrowser({
     profilePrefix: "cozy-browser-",
     downloadPrefix: "cozy-downloads-",
@@ -139,7 +142,7 @@ async function main() {
     `
     });
 
-    const appUrl = `http://127.0.0.1:${staticServer.port}/`;
+    const appUrl = target.url;
     await cdp.send("Page.navigate", { url: appUrl });
     await waitUntil(
       () => evaluate(cdp, `document.readyState === "complete" && Boolean(document.querySelector('[data-testid="sandbox-tray"]'))`),
@@ -668,7 +671,7 @@ async function main() {
     await cdp.close();
   } finally {
     await browser.close();
-    await staticServer.close();
+    await target.close();
   }
 
   for (const name of checks) console.log(`OK ${name}`);

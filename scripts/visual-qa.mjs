@@ -12,7 +12,7 @@ import {
   evaluate,
   sleep,
   startBrowser,
-  startStaticServer,
+  startAppTarget,
   statusText,
   waitUntil
 } from "./browser-qa-helpers.mjs";
@@ -26,7 +26,7 @@ async function main() {
   await assertDistExists(distDir, "Build the app before running visual QA: npm run build");
   await mkdir(outputDir, { recursive: true });
 
-  const staticServer = await startStaticServer(distDir);
+  const target = await startAppTarget(distDir);
   const browser = await startBrowser({ profilePrefix: "cozy-visual-", windowSize: "1280,900" });
 
   try {
@@ -40,7 +40,7 @@ async function main() {
       mobile: false
     });
 
-    const appUrl = `http://127.0.0.1:${staticServer.port}/?visualQa=${MATERIAL_SHOWCASE_QA_LABEL}`;
+    const appUrl = `${target.url}?visualQa=${MATERIAL_SHOWCASE_QA_LABEL}`;
     await cdp.send("Page.navigate", { url: appUrl });
     await waitUntil(
       () => evaluate(cdp, `document.readyState === "complete" && Boolean(document.querySelector('[data-testid="sandbox-tray"]'))`),
@@ -81,7 +81,7 @@ async function main() {
     if (screenshotCapture) console.log(`- ${screenshotCapture}`);
   } finally {
     await browser.close();
-    await staticServer.close();
+    await target.close();
   }
 }
 

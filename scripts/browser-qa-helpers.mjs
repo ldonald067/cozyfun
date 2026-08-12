@@ -57,6 +57,41 @@ export async function assertAppReachable(port, hint = "Run scripts/preview-built
   if (!response.ok) throw new Error(`Preview server on 127.0.0.1:${port} returned ${response.status}. ${hint}`);
 }
 
+/**
+ * Where the QA browser should point.
+ *
+ * By default: a throwaway static server over the local `app/dist`, which is what every
+ * gate wants — it tests the build you just made.
+ *
+ * With `COZY_QA_URL` set, the same checks run against a URL you already deployed:
+ *
+ *   COZY_QA_URL=https://pixelfun.littlealbumclub.net npm run test:browser
+ *
+ * That exists because "does it work in production" is a different question from "does
+ * this build pass", and the honest way to answer it is to drive the deployed bundle
+ * with the same script rather than to hand-click a browser and describe what happened.
+ * These scripts launch a real headless Chrome over CDP, so unlike an embedded preview
+ * pane they never get their `requestAnimationFrame` throttled — the simulation actually
+ * runs at full speed while a check waits on it.
+ *
+ * Nothing here writes to the target: the app has no backend, so a run only touches the
+ * throwaway browser profile's own localStorage.
+ */
+export async function startAppTarget(distDir) {
+  const external = process.env.COZY_QA_URL?.trim();
+  if (external) {
+    const url = external.endsWith("/") ? external : `${external}/`;
+    console.log(`QA target: ${url} (COZY_QA_URL — the local build is NOT being tested)`);
+    return { url, isExternal: true, close: async () => {} };
+  }
+  const server = await startStaticServer(distDir);
+  return {
+    url: `http://127.0.0.1:${server.port}/`,
+    isExternal: false,
+    close: () => server.close()
+  };
+}
+
 export async function startStaticServer(distDir) {
   const server = http.createServer(async (request, response) => {
     try {
