@@ -96,12 +96,11 @@ export async function startStaticServer(distDir) {
   const server = http.createServer(async (request, response) => {
     try {
       const url = new URL(request.url ?? "/", "http://127.0.0.1");
-      if (url.pathname === "/favicon.ico") {
-        response.writeHead(204);
-        response.end();
-        return;
-      }
-
+      // No favicon shim here. This server used to answer /favicon.ico with a 204,
+      // which meant a site shipping no favicon at all looked perfectly healthy
+      // locally while every real visitor's browser took a 404 — and that is exactly
+      // how it shipped, until a COZY_QA_URL run against production caught it. Serve
+      // the same 404 a real host would, so the gate cannot flatter the build.
       const pathname = decodeURIComponent(url.pathname === "/" ? "/index.html" : url.pathname);
       const filePath = path.resolve(distDir, `.${pathname}`);
       if (!isInsideDir(distDir, filePath)) {
