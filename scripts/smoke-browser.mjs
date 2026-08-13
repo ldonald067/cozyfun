@@ -530,17 +530,47 @@ async function main() {
     await click(cdp, '[data-testid="clear-scene"]');
     await waitForStatus(cdp, "tray cleared");
     const before = await canvasSignature(cdp);
-    // The budget is DERIVED from the pattern, not guessed, because clearing the tray can
-    // land just after a drop and leave a full interval to wait out. Rain Desk means 340
-    // ticks between drops, divided by the day's intensity (calmest tier 0.55) and the
-    // swell (1 when not gathering), times the per-drop jitter (up to 1.4):
-    // 340 / 0.55 * 1.4 = 866 ticks, and at SIM_TICK_MS = 38 that is ~33s. It is a hard
-    // ceiling rather than a likely wait — a typical day drops within a few seconds.
+
+    // The budget is in SIM TICKS, converted to wall-clock using the rate this machine
+    // actually achieves. Clearing the tray can land just after a drop and leave a full
+    // interval to wait out, and Rain Desk's worst case is 340 ticks between drops
+    // divided by the calmest intensity tier (0.55) times the per-drop jitter (1.4) —
+    // about 866 ticks.
     //
-    // This margin is worth keeping honest: cutting Rain Desk from `every: 70` to 340 took
-    // the worst case from ~7s to ~33s and quietly left this check's old 25s budget below
-    // it, which shows up later as an intermittent CI failure rather than an obvious one.
-    await waitUntil(async () => (await canvasSignature(cdp)) !== before, "drizzle to reach the tray", 40_000);
+    // A fixed number of SECONDS cannot express that, which is the mistake this line has
+    // already made twice. Cutting Rain Desk from `every: 70` to 340 took the worst case
+    // from ~7s to ~33s and left the old 25s budget below it. Raising it to 40s then
+    // failed on CI, because 866 ticks is only ~33 seconds on a machine that sustains 26
+    // ticks/second, and a loaded runner does not. Ticks are the unit the rule is written
+    // in, so measure the tick rate and derive the deadline from it.
+    const tickCount = async () => {
+      await click(cdp, '[data-testid="save-scene"]');
+      return evaluate(cdp, `JSON.parse(localStorage.getItem("cozy-pixel-sandbox:scene:v1") || "{}").tick ?? 0`);
+    };
+    // One interval is at most 866 ticks, but two things can swallow an interval whole,
+    // and both were missed the first time this budget was computed:
+    //   - `drop()` advances `nextDropAt` BEFORE the cell-count cap check, so a
+    //     suppressed drop costs a full interval and returns nothing.
+    //   - the census behind that cap only recounts every 300 ticks, so a stale count
+    //     from a busier moment can suppress drops for a while after the tray is cleared.
+    // 2200 covers a swallowed interval, a real one, and the census lag, with headroom.
+    //
+    // This is a CEILING, not an expected wait: an ordinary day drops every ~340 ticks
+    // and the check returns the moment the canvas moves, so the common case is seconds.
+    const TICK_BUDGET = 2200;
+    const sampleMs = 2000;
+    const firstTick = await tickCount();
+    await sleep(sampleMs);
+    const ticksPerMs = Math.max((await tickCount() - firstTick) / sampleMs, 0.002);
+    // The ceiling is sized so it cannot itself become the flake, but past 240s the
+    // simulation is not really running, which is a failure worth reporting rather than
+    // waiting out.
+    const budgetMs = Math.min(240_000, Math.max(30_000, Math.ceil(TICK_BUDGET / ticksPerMs)));
+    await waitUntil(
+      async () => (await canvasSignature(cdp)) !== before,
+      `drizzle to reach the tray (${TICK_BUDGET} sim ticks at ${(ticksPerMs * 1000).toFixed(1)}/s)`,
+      budgetMs
+    );
 
     await click(cdp, '[data-testid="window-toggle"]');
     await click(cdp, '[data-testid="clear-scene"]');
