@@ -662,6 +662,98 @@ async function main() {
     await waitForStatus(cdp, "your terrarium changed while you were away", 20_000);
   });
 
+  await check("a garden planted in the app actually blooms", async () => {
+    // The one thing every other gate proves about a DIFFERENT surface. The interaction
+    // audit already grows a flower from painted soil/seed/water, but it drives the
+    // engine compiled straight out of the repo — it cannot tell you the shipped bundle
+    // in a real browser does the same, and with COZY_QA_URL this check runs against
+    // production. "No player has ever seen a flower" is a mistake this repo has already
+    // made once, and it was invisible to every test that did not start from the brush.
+    //
+    // Waiting for a bloom in real time would take about two and a half minutes at 26
+    // ticks/second. So the scene is planted, aged two days, and reloaded: the wake-up
+    // catch-up replays 4,000 ticks in seconds. That also makes this the check that
+    // proves the absence path GROWS something, which the status-text assertion above
+    // deliberately does not.
+    const pickMaterial = async (label) => {
+      const picked = await evaluate(cdp, `(() => {
+        const button = [...document.querySelectorAll("button.material-button")]
+          .find((b) => b.textContent.trim() === ${JSON.stringify(label)});
+        if (!button) return false;
+        button.click();
+        return true;
+      })()`);
+      assert(picked, `no material button labelled ${label}`);
+      // React commits between round trips, so the next paint uses the new material.
+      // Selecting and painting inside ONE evaluate silently paints with the PREVIOUS
+      // material, which is exactly how a hand-run of this scene came out as sand.
+      await sleep(120);
+      const active = await evaluate(cdp, `document.querySelector("button.material-button.active")?.textContent.trim()`);
+      assert(active === label, `expected ${label} selected, got ${active}`);
+    };
+
+    await click(cdp, '[data-testid="clear-scene"]');
+    await waitForStatus(cdp, "tray cleared");
+
+    await pickMaterial("Soil");
+    for (const xRatio of [0.3, 0.4, 0.5, 0.6, 0.7]) {
+      await click(cdp, '[data-testid="sandbox-tray"]', { xRatio, yRatio: 0.92 });
+    }
+    await pickMaterial("Seed");
+    await click(cdp, '[data-testid="sandbox-tray"]', { xRatio: 0.5, yRatio: 0.84 });
+    await pickMaterial("Water");
+    for (const xRatio of [0.42, 0.5, 0.58]) {
+      await click(cdp, '[data-testid="sandbox-tray"]', { xRatio, yRatio: 0.45 });
+    }
+
+    // Census straight off a scene snapshot, so this counts SIM CELLS rather than
+    // guessing at pixels: a green-ish pixel could be moss, and moss is not a bloom.
+    const census = async () => {
+      await click(cdp, '[data-testid="save-scene"]');
+      return evaluate(cdp, `(() => {
+        const raw = localStorage.getItem("cozy-pixel-sandbox:scene:v1");
+        if (!raw) return null;
+        const bytes = atob(JSON.parse(raw).cells);
+        const counts = {};
+        for (let i = 0; i < bytes.length; i += 8) {
+          const kind = bytes.charCodeAt(i);
+          if (kind) counts[kind] = (counts[kind] ?? 0) + 1;
+        }
+        return { flower: counts[19] ?? 0, stem: counts[23] ?? 0, seed: counts[11] ?? 0, soil: counts[5] ?? 0 };
+      })()`);
+    };
+
+    const planted = await census();
+    assert(planted, "planting produced no saveable scene");
+    assert(planted.soil > 0 && planted.seed > 0, `expected painted soil and seed, saw ${JSON.stringify(planted)}`);
+    assert(planted.flower === 0, `the scene already had ${planted.flower} flower cells before growing anything`);
+
+    await cdp.send("Page.navigate", { url: `${appUrl}?cozyNoAutosave=1` });
+    await waitUntil(async () => (await statusText(cdp)).length > 0, "no-autosave page", 20_000);
+    const aged = await evaluate(cdp, `(() => {
+      const raw = localStorage.getItem("cozy-pixel-sandbox:scene:v1");
+      if (!raw) return false;
+      const snapshot = JSON.parse(raw);
+      snapshot.savedAt = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
+      localStorage.setItem("cozy-pixel-sandbox:scene:auto:v1", JSON.stringify(snapshot));
+      return true;
+    })()`);
+    assert(aged, "the planted scene disappeared before it could be aged");
+    await cdp.send("Page.navigate", { url: appUrl });
+    await waitUntil(
+      () => evaluate(cdp, `Boolean(document.querySelector('[data-testid="sandbox-tray"]'))`),
+      "app to come back after the absence"
+    );
+
+    let grown = null;
+    await waitUntil(async () => {
+      grown = await census();
+      // Four is the smallest real head: a crown plus the three-petal poppy silhouette.
+      return Boolean(grown && grown.flower >= 4);
+    }, "a bloom to open in the app", 90_000);
+    assert(grown.stem > 0, `flowers appeared with no stalk under them: ${JSON.stringify(grown)}`);
+  });
+
   await check("page stayed free of browser errors", async () => {
     const pageErrors = await evaluate(cdp, `window.__smokeErrors ?? []`);
     assert(pageErrors.length === 0, `page errors: ${pageErrors.join("; ")}`);
