@@ -7,7 +7,7 @@ Harness engineering means improving the feedback loops around the sandbox so goo
 The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `scripts/` that adds repo-local tool paths; the wrappers run the same underlying steps.
 
 - `npm run build`: builds Rust/WASM, copies the WASM into `app/public/sim`, and builds the Vite app.
-- `npm run check`: the full local gate, in order — material identity audit, material contrast floor, Rust sim tests, production build, WASM smoke, JS fallback smoke, cross-engine parity, interaction reachability, slow-world visibility, subpath build, audio reactions, browser smoke, audio QA, and visual QA. If you are listing the stages anywhere, take the list from `package.json` rather than from memory.
+- `npm run check`: the full local gate, in order — material identity audit, material contrast floor, site-icon freshness, Rust sim tests, production build, WASM smoke, JS fallback smoke, cross-engine parity, interaction reachability, slow-world visibility, subpath build, audio reactions, browser smoke, audio QA, and visual QA. If you are listing the stages anywhere, take the list from `package.json` rather than from memory.
 - `npm run test:parity`: drives its scenarios through the Rust/WASM sim and the JS fallback together and asserts every cell byte matches on every tick. This is the only gate that can see the two engines diverge — the single-engine smokes below can both pass while behaviour has drifted.
 
   A scenario may also declare `slowSteps: [{ at, count }]` to take between-session slow steps at the end of a given tick. The slow world draws on the same RNG stream as `tick()`, so an unmirrored roll in it desynchronises the engines exactly as one in a movement rule would, and it has to be gated here for the same reason.
@@ -35,6 +35,7 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
 
   Two measurements shaped the rule itself and are worth not rediscovering. Seeds sown onto a mature bed landed on **moss**, which does not root them, so the scatter arm read as inert specks until the landing displaced that one patch of carpet back to soil. And the scene must be watered before the absence: a dry bed cannot sprout anything, which is the intended shape of the rule but understates it to the point of looking broken if the fixture forgets.
 
+- `npm run icons:check`: fails when the committed site icons no longer match `scripts/make-favicon.mjs`. The generator colours the cornflower from `SPECIES[0]` and the Stem entry — **imported, not copied** — so a renderer or materials palette edit changes the icon, and this is what says so. Regenerate with `npm run icons`. Without it the generator and its committed output are simply two sources of truth wearing one coat.
 - `npm run material:contrast`: fails when any two material palettes fall below the averaged-colour distance floor. It cannot see per-variant, interaction-state, glow, shape or animation differences, so it is a floor and not a verdict.
 - `npm run test:audio-reactions`: asserts the post-tick reaction detector emits the right cues for each material transition.
 - `npm run test:subpath`: builds at a non-root base and asserts no root-absolute asset path survives, so embedding the sandbox under a path on another site cannot silently regress into the JS fallback engine.

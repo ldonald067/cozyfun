@@ -41,7 +41,9 @@ const EARTH_CONTACT_KINDS = [MATERIAL.Sand, MATERIAL.Soil, MATERIAL.Stone, MATER
 // belongs. Tulip, lavender and bluebell carry their petals *above* the crown, so gilding
 // it would put a dot at the bloom's base rather than its heart.
 type Species = { readonly light: Rgb; readonly dark: Rgb; readonly eye: Rgb | null };
-const SPECIES: readonly Species[] = [
+// Exported so `scripts/make-favicon.mjs` can colour the site icon from the real
+// cornflower rather than a hand-copied hex triple that silently goes stale.
+export const SPECIES: readonly Species[] = [
   { light: [126, 188, 242], dark: [58, 122, 200], eye: [255, 216, 104] },  // 0 cornflower
   { light: [236, 92, 86], dark: [172, 38, 44], eye: [46, 32, 30] },        // 1 poppy, dark heart
   { light: [248, 247, 238], dark: [198, 196, 182], eye: [255, 216, 104] }, // 2 daisy

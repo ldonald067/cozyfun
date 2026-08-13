@@ -23,6 +23,10 @@ Any change to `materials.ts`, this directory, or reaction rules MUST regenerate 
 and be judged on it. `material:contrast` only compares averaged palettes — it cannot see
 per-variant colour, interaction states, glow, shape or animation.
 
+A palette edit also moves the **site icon**, which imports `SPECIES[0]` and the Stem entry
+rather than copying them. `npm run icons:check` fails the gate until `npm run icons`
+regenerates the committed files.
+
 Crop and look at the actual pixels rather than the whole board. Two silhouettes in this repo
 were redrawn only after a crop showed them reading as coloured rectangles.
 

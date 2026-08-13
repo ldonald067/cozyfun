@@ -3,38 +3,71 @@
 //   node scripts/make-favicon.mjs
 //
 // The icon is GENERATED rather than checked in as a mystery binary, for the same
-// reason the sandbox itself is procedural: the source of truth is a readable cell
-// grid, the colours are lifted from the game's real palettes, and regenerating it
-// after a palette change is one command instead of a round trip through an editor.
+// reason the sandbox itself is procedural: the source of truth is a readable cell grid
+// plus the game's own palettes.
 //
-// Colours come from `SPECIES[0]` in app/src/rendering/shapeLanguage.ts (cornflower)
-// and the Stem palette in app/src/materials.ts. The silhouette is the same shape the
-// sim grows: BLOOM_SHAPES[0], a round head with its corners knocked off, on a stalk
-// with leaves on alternating sides.
+// Colours are IMPORTED, not copied. `SPECIES[0]` (cornflower) comes from
+// app/src/rendering/shapeLanguage.ts and the stalk greens from the Stem entry in
+// app/src/materials.ts, both compiled to CommonJS the same way the parity and audit
+// harnesses do it. An earlier version pasted the hex triples under a comment claiming
+// they tracked the app, which is a promise nothing could keep: a palette edit would
+// have left the icon quietly wrong forever.
+//
+//   node scripts/make-favicon.mjs           regenerate the committed icons
+//   node scripts/make-favicon.mjs --check   fail if the committed icons are stale
+//
+// The --check mode runs in `npm run check`, because a generator whose output is
+// committed and never verified is just two sources of truth wearing one coat.
 //
 // Outputs, all into app/public/:
 //   favicon.svg          - what modern browsers actually use
 //   favicon.ico          - so a bare /favicon.ico request can never 404 again
 //   apple-touch-icon.png - iOS home screen; opaque, because Apple masks transparency
-//
-// Regenerate after a palette change; the outputs are committed. See docs/HARNESS.md.
 
 import { deflateSync } from "node:zlib";
-import { writeFile, mkdir } from "node:fs/promises";
+import { writeFile, mkdir, readFile, rm } from "node:fs/promises";
+import { createRequire } from "node:module";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outDir = path.join(root, "app", "public");
+const check = process.argv.includes("--check");
 
-// SPECIES[0] cornflower + the Stem palette. Keep these in step with the app.
+// Pull the real palettes out of the app, compiled to CommonJS exactly as the parity
+// and audit harnesses do. Neither module may use `import.meta`, which is already an
+// invariant for materials.ts and holds for the renderer.
+const cjsDir = path.join(root, ".tmp/favicon-cjs");
+await rm(cjsDir, { recursive: true, force: true });
+const compiled = spawnSync(
+  process.execPath,
+  [path.join(root, "app/node_modules/typescript/bin/tsc"),
+   "--target", "ES2022", "--module", "CommonJS", "--moduleResolution", "Node", "--lib",
+   "ES2022,DOM", "--strict", "true", "--skipLibCheck", "true", "--esModuleInterop", "true",
+   "--outDir", cjsDir, "app/src/rendering/shapeLanguage.ts", "app/src/materials.ts"],
+  { cwd: root, stdio: "inherit" }
+);
+if (compiled.status !== 0) throw new Error("make-favicon: TypeScript compile failed");
+await writeFile(path.join(cjsDir, "package.json"), JSON.stringify({ type: "commonjs" }));
+const require = createRequire(import.meta.url);
+const { SPECIES } = require(path.join(cjsDir, "rendering/shapeLanguage.js"));
+const { MATERIAL, MATERIALS } = require(path.join(cjsDir, "materials.js"));
+
+const rgb = ([r, g, b]) => `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+const cornflower = SPECIES[0];
+const stem = MATERIALS.find((m) => m.id === MATERIAL.Stem);
+if (!cornflower?.eye || !stem) throw new Error("make-favicon: the app palettes moved; update this script");
+
 const C = {
-  L: "#7ebcf2", // petal, lit
-  D: "#3a7ac8", // petal, shaded — outer edge, so the head reads round at 16px
-  E: "#ffd868", // the golden disc at the crown
-  S: "#7cc258", // stalk
-  F: "#4c8f38", // leaf, the flatter green the renderer uses beside a lit stalk
-  bg: "#080c12" // the app's own night background, for the opaque iOS icon
+  L: rgb(cornflower.light), // petal, lit
+  D: rgb(cornflower.dark),  // petal, shaded — outer edge, so the head reads round at 16px
+  E: rgb(cornflower.eye),   // the golden disc at the crown
+  S: stem.color,            // stalk
+  F: stem.palette[3],       // leaf, the flatter green the renderer uses beside a lit stalk
+  // Not in any palette module: this is the app shell's own background from styles.css,
+  // used only to make the iOS icon opaque.
+  bg: "#080c12"
 };
 
 // 16x16 cells. Row 0 is the top; a dot is empty.
@@ -171,19 +204,37 @@ function ico(pngBuffer, size) {
   return Buffer.concat([header, entry, pngBuffer]);
 }
 
+// Opaque and padded for iOS: it composites onto its own rounded tile and does not
+// honour transparency, so a transparent icon comes out as a black square.
+const wanted = [
+  ["favicon.svg", Buffer.from(svg(), "utf8")],
+  ["favicon.ico", ico(png(32, null), 32)],
+  ["apple-touch-icon.png", png(160, C.bg)]
+];
+
 await mkdir(outDir, { recursive: true });
-const written = [];
 
-await writeFile(path.join(outDir, "favicon.svg"), svg());
-written.push("favicon.svg");
-
-const icoPng = png(32, null);
-await writeFile(path.join(outDir, "favicon.ico"), ico(icoPng, 32));
-written.push("favicon.ico");
-
-// Opaque and padded: iOS composites onto its own rounded tile and does not honour
-// transparency, so a transparent icon comes out as a black square.
-await writeFile(path.join(outDir, "apple-touch-icon.png"), png(160, C.bg));
-written.push("apple-touch-icon.png");
-
-for (const name of written) console.log(`wrote app/public/${name}`);
+if (check) {
+  const stale = [];
+  for (const [name, bytes] of wanted) {
+    const onDisk = await readFile(path.join(outDir, name)).catch(() => null);
+    if (!onDisk) stale.push(`${name} is missing`);
+    else if (!onDisk.equals(bytes)) stale.push(`${name} does not match the generator`);
+  }
+  if (stale.length) {
+    console.error(
+      `\nFavicon check FAILED:\n${stale.map((line) => `  - ${line}`).join("\n")}\n\n` +
+        `  The committed icons and scripts/make-favicon.mjs have drifted. Usually this means\n` +
+        `  a palette moved under the icon: it colours itself from SPECIES[0] and the Stem\n` +
+        `  entry, so a renderer or materials edit changes it. Regenerate and commit:\n\n` +
+        `      node scripts/make-favicon.mjs\n`
+    );
+    process.exit(1);
+  }
+  console.log(`Favicon check passed: ${wanted.length} committed icons match the generator (${C.L} petals, ${C.E} centre, ${C.S} stalk).`);
+} else {
+  for (const [name, bytes] of wanted) {
+    await writeFile(path.join(outDir, name), bytes);
+    console.log(`wrote app/public/${name}`);
+  }
+}
