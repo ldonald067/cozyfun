@@ -17,8 +17,7 @@
 //   favicon.ico          - so a bare /favicon.ico request can never 404 again
 //   apple-touch-icon.png - iOS home screen; opaque, because Apple masks transparency
 //
-// The 404 these fix went unnoticed for months because the local QA server answered
-// /favicon.ico with a 204. That shim is gone; see docs/HARNESS.md.
+// Regenerate after a palette change; the outputs are committed. See docs/HARNESS.md.
 
 import { deflateSync } from "node:zlib";
 import { writeFile, mkdir } from "node:fs/promises";
@@ -41,15 +40,10 @@ const C = {
 // 16x16 cells. Row 0 is the top; a dot is empty.
 //
 // Drawn to match the pixel-flower reference this project's blooms were designed from:
-// a squarish head with a darker rim and a gold centre, over a stalk with bold leaves
-// in a symmetric pair. Two earlier passes were wrong about that. At 8x8 the head was
-// too coarse to be anything but a blue box, and at 16 with a *round* head plus two
-// small offset leaves it read as a lollipop — the reference's leaves are large, and
-// they are most of what makes a stick with a blob on top read as a flower.
-//
-// The sim's own BLOOM_SHAPES[0] is rounder than this, which is right on a 220x140
-// tray where a head is five cells. An icon is 16 across in total; it needs the
-// reference's blockier read, not a faithful scale model of the in-game silhouette.
+// a squarish head with a darker rim and a gold centre, over a stalk with a symmetric
+// pair of bold leaves. Those leaves are load-bearing — without them a head on a stalk
+// reads as a lollipop. The sim's own BLOOM_SHAPES[0] is rounder, which is right on a
+// tray where a head is five cells and wrong on an icon that is 16 across in total.
 const GRID = [
   "................",
   "....DDDDDDDD....",

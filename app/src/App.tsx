@@ -43,6 +43,7 @@ import {
 } from "./storage";
 import { exportClip, exportPostcard, renderSandbox } from "./renderer";
 import { wakeTerrarium } from "./slowWorld";
+import { claimWins, openOwnerChannel, type OwnerChannel } from "./windowOwnership";
 import {
   getSceneEnvironment,
   loadSceneEnvironmentId,
@@ -97,16 +98,19 @@ export function App() {
   const [paused, setPaused] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   // One window tends the terrarium at a time. The newest surface (embed, tab, whatever)
-  // claims it over a BroadcastChannel; everyone else pauses with a clear status. Two live
-  // engines diverging from the same autosave was the "why does it look different over
-  // there" bug — ownership makes the second copy impossible instead of merely less likely.
-  const ownershipRef = useRef<{ channel: BroadcastChannel | null; id: string }>({ channel: null, id: "" });
-  // Ownership has to gate WRITES, not just the tick loop. Pausing a losing window still
-  // left it finishing its wake-up catch-up and still let its unconditional close-handler
-  // save fire, so closing a stale second copy could overwrite the scene the player had
-  // just been tending in the other one. Defaults to true: a lone window in a browser
-  // without BroadcastChannel is the owner by default, or nothing would ever save.
+  // claims it; everyone else pauses with a clear status. Two live engines diverging from
+  // the same autosave was the "why does it look different over there" bug. The channel
+  // and the arbitration rules live in `windowOwnership.ts`.
+  const ownershipRef = useRef<OwnerChannel | null>(null);
+  // Ownership gates WRITES, not just the tick loop. Pausing a losing window still left it
+  // finishing its wake-up catch-up and still let its close handler save, so closing a
+  // stale second copy could overwrite the scene the player had just been tending.
+  // Defaults to true: a lone window owns the terrarium until told otherwise, or nothing
+  // would ever save.
   const ownsTerrariumRef = useRef(true);
+  // Whether the pause was imposed by a takeover rather than chosen by the player. Only a
+  // takeover pause is lifted automatically when the other window releases the terrarium.
+  const pausedByTakeoverRef = useRef(false);
   const [status, setStatus] = useState("warming tray");
   const [fps, setFps] = useState(0);
   const [fieldNote, setFieldNote] = useState<string | null>(null);
@@ -427,23 +431,44 @@ export function App() {
   }, [sceneEnvironment]);
 
   useEffect(() => {
-    if (typeof BroadcastChannel === "undefined") return;
-    const id = crypto.randomUUID();
-    const channel = new BroadcastChannel("cozy-pixel-sandbox:owner");
-    ownershipRef.current = { channel, id };
-    channel.onmessage = (event) => {
-      if (event.data?.type !== "claim" || event.data.id === id) return;
-      // Someone else took the desk chair. Sit back; unpausing or painting reclaims it.
+    const channel = openOwnerChannel((message) => {
+      if (message.type === "release") {
+        // The window that held it has gone. Take the terrarium back rather than sitting
+        // demoted forever, showing a status about a window that no longer exists and
+        // refusing to save. Re-claiming broadcasts, so if several windows react at once
+        // the claim order settles it and exactly one ends up holding it.
+        if (ownsTerrariumRef.current) return;
+        // Read this BEFORE claiming: claimOwnership clears the flag, so checking it
+        // afterwards always saw false and left the window paused with the terrarium.
+        const resumeAfterTakeover = pausedByTakeoverRef.current;
+        claimOwnership();
+        if (resumeAfterTakeover) setPaused(false);
+        return;
+      }
+      // A claim only wins if it outranks ours. Demoting on ANY claim looks right until
+      // two windows start together, each hears the other, and nobody owns the terrarium
+      // or saves it.
+      if (!claimWins(message, { id: channel.id, at: channel.claimedAt() })) return;
       // Standing up means stopping any catch-up still in flight AND giving up the right
       // to write the save, not merely stopping the clock.
       ownsTerrariumRef.current = false;
+      pausedByTakeoverRef.current = true;
       setPaused(true);
       setStatus("another window is tending this terrarium — press play to take over");
+    });
+    ownershipRef.current = channel;
+    channel.claim();
+    // Announce departure so the window left behind can pick the terrarium back up.
+    // pagehide covers tab closes, which is where this actually matters.
+    const announceRelease = () => {
+      if (ownsTerrariumRef.current) channel.release();
     };
-    channel.postMessage({ type: "claim", id });
+    window.addEventListener("pagehide", announceRelease);
     return () => {
+      window.removeEventListener("pagehide", announceRelease);
+      announceRelease();
       channel.close();
-      ownershipRef.current = { channel: null, id: "" };
+      ownershipRef.current = null;
     };
   }, []);
 
@@ -487,7 +512,8 @@ export function App() {
     // description the tray is showing.
     const takingBack = !ownsTerrariumRef.current;
     ownsTerrariumRef.current = true;
-    ownershipRef.current.channel?.postMessage({ type: "claim", id: ownershipRef.current.id });
+    pausedByTakeoverRef.current = false;
+    ownershipRef.current?.claim();
     // Without this the instruction that got you here — "press play to take over" — stays
     // on screen after you have taken over, reading as though nothing happened.
     if (takingBack) setStatus("this window is tending the terrarium now");

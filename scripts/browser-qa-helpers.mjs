@@ -58,49 +58,70 @@ export async function assertAppReachable(port, hint = "Run scripts/preview-built
 }
 
 /**
- * Where the QA browser should point.
- *
- * By default: a throwaway static server over the local `app/dist`, which is what every
- * gate wants — it tests the build you just made.
- *
- * With `COZY_QA_URL` set, the same checks run against a URL you already deployed:
+ * Where the QA browser should point, and the sole owner of whether a local build is
+ * required. Default: a throwaway static server over `app/dist`. With `COZY_QA_URL`:
  *
  *   COZY_QA_URL=https://pixelfun.littlealbumclub.net npm run test:browser
  *
- * That exists because "does it work in production" is a different question from "does
- * this build pass", and the honest way to answer it is to drive the deployed bundle
- * with the same script rather than to hand-click a browser and describe what happened.
- * These scripts launch a real headless Chrome over CDP, so unlike an embedded preview
- * pane they never get their `requestAnimationFrame` throttled — the simulation actually
- * runs at full speed while a check waits on it.
- *
- * Nothing here writes to the target: the app has no backend, so a run only touches the
- * throwaway browser profile's own localStorage.
+ * "Does it work in production" is a different question from "does this build pass".
+ * Nothing here writes to the target — the app has no backend, so a run only touches the
+ * throwaway browser profile's own localStorage. See docs/HARNESS.md.
  */
 export async function startAppTarget(distDir) {
   const external = process.env.COZY_QA_URL?.trim();
-  if (external) {
-    const url = external.endsWith("/") ? external : `${external}/`;
-    console.log(`QA target: ${url} (COZY_QA_URL — the local build is NOT being tested)`);
-    return { url, isExternal: true, close: async () => {} };
+  if (!external) {
+    await assertDistExists(distDir, "Build the app first: npm run build");
+    const server = await startStaticServer(distDir);
+    return { url: `http://127.0.0.1:${server.port}/`, isExternal: false, close: () => server.close() };
   }
-  const server = await startStaticServer(distDir);
-  return {
-    url: `http://127.0.0.1:${server.port}/`,
-    isExternal: false,
-    close: () => server.close()
-  };
+
+  // Callers append `?cozyNoAutosave=1` to this, so a target carrying its own query or
+  // fragment would silently produce a URL that means something else.
+  let parsed;
+  try {
+    parsed = new URL(external);
+  } catch {
+    throw new Error(`COZY_QA_URL is not a URL: ${external}`);
+  }
+  if (parsed.search || parsed.hash) {
+    throw new Error(`COZY_QA_URL must not carry a query or fragment: ${external}`);
+  }
+  const url = parsed.href.endsWith("/") ? parsed.href : `${parsed.href}/`;
+
+  // Reach the target BEFORE launching Chrome. Without this a typo, a DNS failure or a
+  // login wall all surface much later as "timed out waiting for app shell to load",
+  // which reads like the app is broken rather than the target being wrong.
+  let html;
+  try {
+    const response = await fetch(url, { redirect: "follow" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    html = await response.text();
+  } catch (error) {
+    throw new Error(`COZY_QA_URL is not serving the app: ${url} (${error.message})`);
+  }
+
+  // Say WHICH build is under test. Nothing here can prove a deployment contains the
+  // change you just wrote, but an unannounced stale deploy passing every check is the
+  // failure mode worth making visible, so print the bundle and flag a mismatch against
+  // the local build when there is one to compare with.
+  const served = html.match(/assets\/index-[A-Za-z0-9_-]+\.js/)?.[0] ?? "unknown bundle";
+  console.log(`QA target: ${url}`);
+  console.log(`  serving ${served} (COZY_QA_URL — the local build is NOT being tested)`);
+  const localHtml = await readFile(path.join(distDir, "index.html"), "utf8").catch(() => null);
+  const local = localHtml?.match(/assets\/index-[A-Za-z0-9_-]+\.js/)?.[0];
+  if (local && local !== served) {
+    console.log(`  WARNING: local build is ${local} — the deployment is a DIFFERENT build`);
+  }
+
+  return { url, isExternal: true, close: async () => {} };
 }
 
 export async function startStaticServer(distDir) {
   const server = http.createServer(async (request, response) => {
     try {
       const url = new URL(request.url ?? "/", "http://127.0.0.1");
-      // No favicon shim here. This server used to answer /favicon.ico with a 204,
-      // which meant a site shipping no favicon at all looked perfectly healthy
-      // locally while every real visitor's browser took a 404 — and that is exactly
-      // how it shipped, until a COZY_QA_URL run against production caught it. Serve
-      // the same 404 a real host would, so the gate cannot flatter the build.
+      // Deliberately no favicon shim: serve the same 404 a real host would. Answering
+      // /favicon.ico with a 204 here once hid a site that shipped no favicon at all.
       const pathname = decodeURIComponent(url.pathname === "/" ? "/index.html" : url.pathname);
       const filePath = path.resolve(distDir, `.${pathname}`);
       if (!isInsideDir(distDir, filePath)) {

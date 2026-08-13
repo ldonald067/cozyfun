@@ -2,7 +2,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   assert,
-  assertDistExists,
   clickSelector as click,
   connectToFirstPage,
   evaluate,
@@ -23,11 +22,8 @@ const checks = [];
 const protocolErrors = [];
 
 async function main() {
-  // Only the local build needs to exist; a COZY_QA_URL run tests something already deployed.
-  if (!process.env.COZY_QA_URL) {
-    await assertDistExists(distDir, "Build the app before running browser smoke checks: npm run build");
-  }
-
+  // startAppTarget owns "what am I testing", including whether a local build is even
+  // required — a COZY_QA_URL run tests something already deployed.
   const target = await startAppTarget(distDir);
   const browser = await startBrowser({
     profilePrefix: "cozy-browser-",
@@ -537,12 +533,21 @@ async function main() {
     // divided by the calmest intensity tier (0.55) times the per-drop jitter (1.4) —
     // about 866 ticks.
     //
-    // A fixed number of SECONDS cannot express that, which is the mistake this line has
-    // already made twice. Cutting Rain Desk from `every: 70` to 340 took the worst case
-    // from ~7s to ~33s and left the old 25s budget below it. Raising it to 40s then
-    // failed on CI, because 866 ticks is only ~33 seconds on a machine that sustains 26
-    // ticks/second, and a loaded runner does not. Ticks are the unit the rule is written
-    // in, so measure the tick rate and derive the deadline from it.
+    // A budget whose unit is ticks cannot be written as a constant number of seconds:
+    // 866 ticks is ~33s only on a machine sustaining 26 ticks/second, and a loaded CI
+    // runner does not. So measure the rate and derive the deadline from it.
+    // Saving is the only way to read the engine's tick count from outside, but it
+    // overwrites the manual save — and the away-growth check downstream stages exactly
+    // that key. Left unrestored, that check silently ended up ageing this cleared tray
+    // instead of a real scene, and still passed because its assertion reads a status
+    // string. So put the manual save back exactly as it was.
+    const manualSave = await evaluate(cdp, `localStorage.getItem("cozy-pixel-sandbox:scene:v1")`);
+    const restoreManualSave = () => evaluate(cdp, `(() => {
+      const raw = ${JSON.stringify(manualSave)};
+      if (raw === null) localStorage.removeItem("cozy-pixel-sandbox:scene:v1");
+      else localStorage.setItem("cozy-pixel-sandbox:scene:v1", raw);
+      return true;
+    })()`);
     const tickCount = async () => {
       await click(cdp, '[data-testid="save-scene"]');
       return evaluate(cdp, `JSON.parse(localStorage.getItem("cozy-pixel-sandbox:scene:v1") || "{}").tick ?? 0`);
@@ -562,6 +567,7 @@ async function main() {
     const firstTick = await tickCount();
     await sleep(sampleMs);
     const ticksPerMs = Math.max((await tickCount() - firstTick) / sampleMs, 0.002);
+    await restoreManualSave();
     // The ceiling is sized so it cannot itself become the flake, but past 240s the
     // simulation is not really running, which is a failure worth reporting rather than
     // waiting out.
@@ -589,7 +595,19 @@ async function main() {
     // it look different over there" bug. Unpausing takes the terrarium back.
     const fullscreenButton = await evaluate(cdp, `Boolean(document.querySelector('[data-testid="fullscreen-toggle"]')) === document.fullscreenEnabled`);
     assert(fullscreenButton, "fullscreen button should render exactly when the browser supports it");
-    await evaluate(cdp, `new BroadcastChannel("cozy-pixel-sandbox:owner").postMessage({ type: "claim", id: "smoke-foreign" })`);
+    const send = (message) => evaluate(cdp, `new BroadcastChannel("cozy-pixel-sandbox:owner").postMessage(${JSON.stringify(message)})`);
+
+    // A claim OLDER than this window's must be ignored. Without a total order on claims,
+    // two windows starting together each demote on the other's claim and NOBODY owns the
+    // terrarium or saves it — so this half is what keeps the tiebreak honest.
+    await send({ type: "claim", id: "smoke-stale", at: 1 });
+    await sleep(400);
+    assert(
+      !(await evaluate(cdp, `Boolean(document.querySelector(".status-paused"))`)),
+      "a claim older than this window's must not take the terrarium away"
+    );
+
+    await send({ type: "claim", id: "smoke-foreign", at: Date.now() });
     await waitForStatus(cdp, "another window is tending this terrarium — press play to take over", 10_000);
     const pausedBadge = await evaluate(cdp, `Boolean(document.querySelector(".status-paused"))`);
     assert(pausedBadge, "takeover should pause this window");
@@ -606,11 +624,23 @@ async function main() {
       "a window that lost the terrarium must not write the autosave when it closes"
     );
 
+    // The owner leaving must hand the terrarium back. Without a release, closing the
+    // newest window strands this one demoted forever: paused, refusing to save, and
+    // advertising a window that no longer exists.
+    await send({ type: "release", id: "smoke-foreign" });
+    await waitForStatus(cdp, "this window is tending the terrarium now", 5_000);
+    await waitUntil(
+      async () => !(await evaluate(cdp, `Boolean(document.querySelector(".status-paused"))`)),
+      "the released terrarium to resume here",
+      5_000
+    );
+
+    // Reclaiming by pressing play has to SAY so too. Caught on the live site: the status
+    // kept reading "press play to take over" after the player had done exactly that.
+    await send({ type: "claim", id: "smoke-foreign-2", at: Date.now() });
+    await waitForStatus(cdp, "another window is tending this terrarium — press play to take over", 10_000);
     await click(cdp, '[data-testid="pause-toggle"]');
     await waitUntil(async () => !(await evaluate(cdp, `Boolean(document.querySelector(".status-paused"))`)), "play to reclaim", 5_000);
-    // Reclaiming has to SAY so. Caught on the live site: the status kept reading "press
-    // play to take over" after the player had done exactly that, so taking the terrarium
-    // back looked like it had failed.
     await waitForStatus(cdp, "this window is tending the terrarium now", 5_000);
 
     // ...and the pairing half, so the guard above cannot pass by having broken saving
@@ -651,44 +681,20 @@ async function main() {
   });
 
   await check("a saved scene changes while the player is away", async () => {
-    // Age the manual save two hours into the past, promote it to the autosave slot the
-    // boot path restores from, and reload. The app should resume the scene AND fast-
-    // forward it, announcing the growth. This is the whole "living terrarium" loop:
-    // storage timestamp -> boot restore -> chunked catch-up in the render loop.
-    const staged = await evaluate(cdp, `(() => {
-      const raw = localStorage.getItem("cozy-pixel-sandbox:scene:v1");
-      if (!raw) return false;
-      const snapshot = JSON.parse(raw);
-      snapshot.savedAt = new Date(Date.now() - 2 * 3600 * 1000).toISOString();
-      localStorage.setItem("cozy-pixel-sandbox:scene:auto:v1", JSON.stringify(snapshot));
-      return true;
-    })()`);
-    assert(staged, "no manual save found to stage the away-growth scenario");
-    // Reloads below reset window.__smokeErrors, so bank the pre-reload errors first —
+    // The whole "living terrarium" loop: storage timestamp -> boot restore -> slow
+    // steps -> chunked catch-up in the render loop.
+    //
+    // Reloads reset window.__smokeErrors, so bank the pre-reload errors first —
     // otherwise the final error check would silently cover only the last page load.
     const preReloadErrors = await evaluate(cdp, `window.__smokeErrors ?? []`);
     assert(preReloadErrors.length === 0, `page errors before reload: ${preReloadErrors.join("; ")}`);
-    // Hop through a no-autosave page to do the staging: leaving a normal page fires the
-    // pagehide autosave, which faithfully overwrites the staged timestamp with "now" —
-    // correct in production, and exactly what makes this scenario impossible to set up
-    // without the QA hook.
-    await cdp.send("Page.navigate", { url: `${appUrl}?cozyNoAutosave=1` });
-    await waitUntil(async () => (await statusText(cdp)).length > 0, "no-autosave page", 20_000);
-    const restaged = await evaluate(cdp, `(() => {
-      const raw = localStorage.getItem("cozy-pixel-sandbox:scene:v1");
-      if (!raw) return false;
-      const snapshot = JSON.parse(raw);
-      snapshot.savedAt = new Date(Date.now() - 2 * 3600 * 1000).toISOString();
-      localStorage.setItem("cozy-pixel-sandbox:scene:auto:v1", JSON.stringify(snapshot));
-      return true;
-    })()`);
-    assert(restaged, "manual save disappeared before staging");
-    await cdp.send("Page.navigate", { url: appUrl });
+
+    await stageAgedAutosave(cdp, appUrl, 2);
+
     // Two hours earns slow steps as well as tick catch-up, so this wording proves the
     // real browser took the slow-world branch at boot and survived it. It does NOT
-    // prove a cell changed: the string is chosen from the step COUNT alone, so gutting
-    // `slowStep()` would leave this green. Whether an absence is actually visible is
-    // `npm run slow-world:audit`'s job, and it measures pixels.
+    // prove a cell changed — the string is chosen from the step COUNT alone. That claim
+    // belongs to the bloom check below and to `npm run slow-world:audit`.
     await waitForStatus(cdp, "your terrarium changed while you were away", 20_000);
   });
 
@@ -758,29 +764,16 @@ async function main() {
     assert(planted.soil > 0 && planted.seed > 0, `expected painted soil and seed, saw ${JSON.stringify(planted)}`);
     assert(planted.flower === 0, `the scene already had ${planted.flower} flower cells before growing anything`);
 
-    await cdp.send("Page.navigate", { url: `${appUrl}?cozyNoAutosave=1` });
-    await waitUntil(async () => (await statusText(cdp)).length > 0, "no-autosave page", 20_000);
-    const aged = await evaluate(cdp, `(() => {
-      const raw = localStorage.getItem("cozy-pixel-sandbox:scene:v1");
-      if (!raw) return false;
-      const snapshot = JSON.parse(raw);
-      snapshot.savedAt = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
-      localStorage.setItem("cozy-pixel-sandbox:scene:auto:v1", JSON.stringify(snapshot));
-      return true;
-    })()`);
-    assert(aged, "the planted scene disappeared before it could be aged");
-    await cdp.send("Page.navigate", { url: appUrl });
-    await waitUntil(
-      () => evaluate(cdp, `Boolean(document.querySelector('[data-testid="sandbox-tray"]'))`),
-      "app to come back after the absence"
-    );
+    await stageAgedAutosave(cdp, appUrl, 48);
 
     let grown = null;
     await waitUntil(async () => {
       grown = await census();
       // Four is the smallest real head: a crown plus the three-petal poppy silhouette.
       return Boolean(grown && grown.flower >= 4);
-    }, "a bloom to open in the app", 90_000);
+      // Poll slowly: every census clicks Save and rewrites localStorage, and the default
+      // 80ms cadence would do that hundreds of times to watch one plant grow.
+    }, "a bloom to open in the app", 90_000, 750);
     assert(grown.stem > 0, `flowers appeared with no stalk under them: ${JSON.stringify(grown)}`);
   });
 
@@ -841,8 +834,50 @@ function assertNativeStart(starts, id, url, minimumDuration, options = {}) {
   assert(start.gain >= minGain && start.gain <= maxGain, `${id} gain ${start.gain} outside expected range ${minGain}-${maxGain}`);
 }
 
+/**
+ * Age the manual save into the past, promote it to the autosave slot the boot path
+ * restores from, and reload — the only way to exercise the return-from-absence path.
+ *
+ * The hop through `?cozyNoAutosave=1` is load-bearing: leaving a normal page fires the
+ * pagehide autosave, which faithfully overwrites the staged timestamp with "now". That
+ * is correct in production and exactly what makes this scenario impossible to set up
+ * without the QA hook.
+ */
+async function stageAgedAutosave(cdp, appUrl, hoursAway) {
+  await cdp.send("Page.navigate", { url: `${appUrl}?cozyNoAutosave=1` });
+  await waitUntil(async () => (await statusText(cdp)).length > 0, "no-autosave page", 20_000);
+  const staged = await evaluate(cdp, `(() => {
+    const raw = localStorage.getItem("cozy-pixel-sandbox:scene:v1");
+    if (!raw) return false;
+    const snapshot = JSON.parse(raw);
+    snapshot.savedAt = new Date(Date.now() - ${hoursAway} * 3600 * 1000).toISOString();
+    localStorage.setItem("cozy-pixel-sandbox:scene:auto:v1", JSON.stringify(snapshot));
+    return true;
+  })()`);
+  assert(staged, "no manual save found to stage an absence from");
+  await cdp.send("Page.navigate", { url: appUrl });
+  await waitUntil(
+    () => evaluate(cdp, `Boolean(document.querySelector('[data-testid="sandbox-tray"]'))`),
+    "app to come back after the absence"
+  );
+}
+
 async function check(name, task) {
-  await task();
+  // One outer deadline per check. Individual waits have their own budgets, but an
+  // awaited CDP evaluate that never settles has none — and that hangs the whole CI job
+  // instead of failing it.
+  const CHECK_TIMEOUT_MS = 300_000;
+  let timer;
+  try {
+    await Promise.race([
+      task(),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`check "${name}" exceeded ${CHECK_TIMEOUT_MS / 1000}s`)), CHECK_TIMEOUT_MS);
+      })
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
   checks.push(name);
 }
 

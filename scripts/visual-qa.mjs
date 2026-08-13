@@ -3,7 +3,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   assert,
-  assertDistExists,
   captureScreenshot,
   clickPoint as click,
   clickSelector,
@@ -23,9 +22,11 @@ const distDir = path.join(root, "app", "dist");
 const outputDir = path.join(root, ".tmp", "visual-qa");
 
 async function main() {
-  await assertDistExists(distDir, "Build the app before running visual QA: npm run build");
   await mkdir(outputDir, { recursive: true });
 
+  // startAppTarget owns the dist requirement. Asserting it here unconditionally made the
+  // documented `COZY_QA_URL=... npm run visual:qa` fail on a clean machine, which is the
+  // exact command this option exists to provide.
   const target = await startAppTarget(distDir);
   const browser = await startBrowser({ profilePrefix: "cozy-visual-", windowSize: "1280,900" });
 
