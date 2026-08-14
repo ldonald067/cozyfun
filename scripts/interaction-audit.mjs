@@ -213,8 +213,30 @@ const CHECKS = [
     paint: (p) => { p(15, 20, 3, M.Sand); p(15, 15, 2, M.Lava); },
     outcome: (g, before) => g.appeared(M.Glass, before) },
   { m: "Water", covers: "water.boils", role: "boils away to steam over sustained flame", w: 30, h: 26, seed: 9, ticks: 2000,
-    paint: (p) => { p(15, 20, 3, M.Wall); p(15, 16, 3, M.Water); p(15, 21, 2, M.Lava); },
-    outcome: (g, before) => g.appeared(M.Steam, before) },
+    // A pot on a grate with a flame held under it. The previous scene put LAVA under the
+    // water, which the water quenches within ten ticks — there was never a sustained flame,
+    // and the check passed on the flash of steam thrown off by the quench, which is
+    // `water.quenches`, a different clause. It only came to light when an unrelated fix
+    // stopped that flash landing.
+    //
+    // `act` is the sustaining: a player keeping a fire lit under a vessel. A single painted
+    // fire burns out long before the water reaches boiling — measured, one cell boils.
+    paint: (p) => {
+      for (const x of [10, 13, 16, 19, 21]) p(x, 20, 1, M.Wall);
+      p(9, 18, 2, M.Wall); p(21, 18, 2, M.Wall);
+      p(15, 18, 3, M.Water);
+    },
+    act: (p, t) => { if (t % 40 === 1 && t < 1200) p(15, 21, 1, M.Fire); },
+    // Steam that was HOT WATER an instant ago. `appeared(Steam)` cannot tell boiling from
+    // a fire softening into steam against the water, or from a quench flash; requiring the
+    // cell to have been water above simmer is what makes this clause and no other.
+    outcome: (g, before, memo, prev) => {
+      memo.boiled ??= new Set();
+      for (const i of g.all(M.Steam)) {
+        if (prev.kindOf(i) === M.Water && prev.energyAt(i) > 150) memo.boiled.add(i);
+      }
+      return [...memo.boiled];
+    } },
   { m: "Water", covers: "water.rinses", role: "rinses soot from scorched stone", w: 30, h: 26, seed: 10, ticks: 2500,
     paint: (p) => { p(15, 20, 3, M.Stone); p(15, 17, 1, M.Fire); p(15, 12, 4, M.Water); },
     outcome: (g, before, memo) => {
@@ -368,7 +390,13 @@ const CHECKS = [
     absent: true,
     // Moss and its water on the left, a sealed wall down the middle. Nothing should appear
     // on the far side; moss crosses damp stone happily, which is the contrast being drawn.
-    paint: (p) => { p(8, 20, 3, M.Soil); p(8, 16, 2, M.Water); p(8, 20, 1, M.Moss); for (let y = 14; y < 22; y += 2) p(17, y, 1, M.Wall); p(24, 20, 3, M.Soil); },
+    //
+    // The water is deliberately a SMALL pour. The clause is about *casual* crossing, and
+    // wall does admit moss that is strongly fed — so an over-watered bed is not a test of
+    // this claim, it is a test of the exception to it. At radius 2 the bed soaked the wall
+    // and the moss crossed at tick 469, correctly. At radius 1 the carpet still reaches
+    // ~30 cells and never crosses in 2500 ticks.
+    paint: (p) => { p(8, 20, 3, M.Soil); p(8, 16, 1, M.Water); p(8, 20, 1, M.Moss); for (let y = 14; y < 22; y += 2) p(17, y, 1, M.Wall); p(24, 20, 3, M.Soil); },
     outcome: (g) => g.all(M.Moss).filter((i) => g.xyOf(i)[0] > 18) },
   { m: "Wall", covers: "wall.stains", role: "takes damp and frost stains", w: 30, h: 26, seed: 53, ticks: 1500,
     paint: (p) => { p(15, 19, 3, M.Wall); p(15, 15, 2, M.Water); p(19, 15, 1, M.Ice); },
