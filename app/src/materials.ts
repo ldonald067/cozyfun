@@ -310,8 +310,8 @@ export const MATERIALS: MaterialDef[] = [
     slug: "wellspring",
     description: "Carved block that drinks the first material to touch it and pours it back out forever.",
     identity: ["Identity-drinking carved block", "Endlessly pours its remembered material"],
-    color: "#41598c",
-    palette: ["#2a3a5e", "#354a74", "#1f2c49", "#7e97c4"],
+    color: "#33303f",
+    palette: ["#26232f", "#3d3949", "#1b1924", "#6d6682"],
     group: "cosmic"
   },
   {

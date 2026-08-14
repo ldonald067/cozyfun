@@ -407,9 +407,12 @@ export const WELLSPRING_TINTS: Record<number, Rgb> = {
 function wellspringColor({ color, variant, energy, time, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
   const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Wellspring);
-  // Moonlit carved stone, not night-camouflage: lift the body toward slate-silver so
-  // the block silhouettes against the #091018 sky instead of melting into it.
-  let out = mixRgb(color, [96, 112, 148], 0.3 - (hash & 3) * 0.05);
+  // Dark basalt, lifted just enough to silhouette against the #091018 sky. It used to
+  // be slate-BLUE, which was the whole problem: the block's own colour sat in the same
+  // hue family as the water it pours, so an attuned spring measured 77 redmean from its
+  // own fountain and disappeared into it. A near-neutral dark body means the remembered
+  // tint always reads as an inlay of light on stone, whichever material it remembers.
+  let out = mixRgb(color, [112, 106, 126], 0.3 - (hash & 3) * 0.05);
   // Chiselled rim: bright top/left, deep shadow bottom/right — a carved block reads
   // from its edges even at a two-cell placement.
   if (edge.top || edge.left) out = mixRgb(out, [168, 186, 218], 0.42);
@@ -424,10 +427,25 @@ function wellspringColor({ color, variant, energy, time, cells, width, height, x
   const tint = WELLSPRING_TINTS[energy & 255];
   if (tint) {
     const pulse = (Math.sin(time * 0.006 + hash * 0.9) + 1) * 0.5;
-    out = mixRgb(out, tint, 0.55 + pulse * 0.3);
+    // The tint is an INLAY in carved stone, not a coat of paint. At 0.55-0.85 an
+    // attuned block took on the full colour of the material it pours: a water spring
+    // measured only 77 redmean from its own fountain — a lighter blue standing in a
+    // blue stream — so the source of the water was invisible in the water. Capped
+    // here, the stone body still reads through and the block stays a carved thing
+    // that happens to be lit, which is what "remembers what it drank" should look
+    // like. Legibility moves to the rune cores below, which are hue-independent.
+    // A rune GLOWS with the memory rather than being painted in it. Mixing the raw
+    // material colour in — at any strength — just makes the block that material: an
+    // attuned water spring measured 25-55 redmean from its own fountain even after the
+    // body went basalt, because a cell tinted water-blue is water-blue. Lifting the
+    // hue toward light first gives a pale, lit version that keeps the material's
+    // identity while reading unmistakably as carved stone lit from within.
+    const emberGlow = mixRgb(tint, [255, 255, 255], 0.55);
+    out = mixRgb(out, emberGlow, 0.46 + pulse * 0.2);
     // Lit rune cores: a few near-white pixels make attunement legible when the
-    // spring is only a couple of cells on screen.
-    if (hash % 5 === 0) out = mixRgb(out, [255, 253, 244], 0.4 + pulse * 0.2);
+    // spring is only a couple of cells on screen, and they read against ANY
+    // remembered material rather than depending on its hue.
+    if (hash % 5 === 0) out = mixRgb(out, [255, 253, 244], 0.5 + pulse * 0.24);
     return out;
   }
   // Dormant runes sleep in colourless pewter. Deliberately desaturated rather than
