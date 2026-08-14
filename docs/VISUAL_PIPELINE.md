@@ -93,7 +93,12 @@ Current cosmic rules:
 - A falling meteor sheds sparks in its wake, so a shower streaks instead of dropping silently — and those sparks can light rocket fuses on the way down, or hiss into steam over water.
 - A cosmic-charged fungus sows a stardust grain instead of spreading as it digests, spending the charge: the fairy ring.
 - Rocket powder is inert until any flame lights its fuse; the lit grain climbs fast and bursts into a spark shell that droops, twinkles out, and can light more powder.
-- Wellspring blocks drink the first touching source material and pour it back out from open faces. Nearby ice stills the flow *and* reopens the drinking branch, so a chilled spring re-drinks whatever touches it next: attunement is re-teachable rather than a permanent first-touch commitment.
+- Wellspring blocks drink the first touching source material and pour it back out, feeding
+  *through* their own pool rather than only into bare faces. A spring submerges itself within
+  seconds, and an adjacent-empty rule then blocks every face and stops the source dead —
+  measured at a permanent 3-4 cells of standing water. There is deliberately no output cap:
+  one was tried and no scene could be built where it changed the outcome, because the pour is
+  already bounded by filling only empty cells and by every substrate drinking standing water. Nearby ice stills the flow *and* reopens the drinking branch, so a chilled spring re-drinks whatever touches it next: attunement is re-teachable rather than a permanent first-touch commitment.
 
 The slow world (between sessions only):
 

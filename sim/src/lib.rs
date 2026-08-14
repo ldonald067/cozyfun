@@ -148,6 +148,13 @@ const POLLEN_RESERVE: u16 = 40;
 const POLLEN_COST: u16 = 15;
 const PETAL_SHED_AGE: u16 = 1200;
 
+/// One open face in this many pours per tick. Tuned against a measurement, not taste:
+/// at 26 an attuned spring held a permanent 3-4 cells of standing water because soil
+/// absorbed it as fast as it arrived.
+const WELLSPRING_POUR: u32 = 7;
+/// How far a spring will push through its own material to reach open space.
+const WELLSPRING_REACH: i32 = 4;
+
 /// Below this an ember has gone out: inert char that only relights from outside.
 const COLD_CHAR_ENERGY: u16 = 30;
 /// Stored moisture that still counts as damp ground under a seed.
@@ -746,19 +753,49 @@ impl Universe {
                             }
                         }
                     } else if is_wellspring_source(cell.energy as u8) {
-                        // Attuned: gently emit the remembered material from open faces.
-                        // The source guard rejects out-of-range ids from imported scenes.
+                        // Attuned: pour the remembered material, feeding THROUGH its own
+                        // body rather than only into a bare face. The source guard rejects
+                        // out-of-range ids from imported scenes.
+                        //
+                        // A spring submerges itself within seconds, and an adjacent-empty
+                        // rule then blocks every face and stops the source dead. Measured
+                        // before this: a permanent 3-4 cells of standing water, so the only
+                        // endless source in the game watered its own footprint and nothing
+                        // else. Raising the rate alone changed nothing, because the faces
+                        // were the limit, not the odds — walking past its own material to
+                        // the edge of the pool is what lets it actually pump.
+                        //
+                        // No output cap here on purpose. One was tried — resting once a 5x5
+                        // held enough of its own material — and no scene could be built in
+                        // which it changed the outcome, because the pour is already bounded
+                        // twice over: it only fills empty cells, and every substrate in the
+                        // game (wall, soil, sand, stone) drinks standing water. An unproven
+                        // guard plus a test that cannot fail is worse than neither.
                         let (cx, cy) = self.xy(idx);
                         let source = cell.energy as u8;
                         for (dx, dy) in [(0, -1), (-1, 0), (1, 0), (0, 1)] {
-                            let (nx, ny) = (cx + dx, cy + dy);
-                            if !self.in_bounds(nx, ny) {
-                                continue;
+                            let mut target = None;
+                            for step in 1..=WELLSPRING_REACH {
+                                let (nx, ny) = (cx + dx * step, cy + dy * step);
+                                if !self.in_bounds(nx, ny) {
+                                    break;
+                                }
+                                let nidx = self.idx(nx as u32, ny as u32);
+                                if old[nidx].is_empty() && next[nidx].is_empty() {
+                                    target = Some(nidx);
+                                    break;
+                                }
+                                if old[nidx].kind != source {
+                                    break;
+                                }
                             }
-                            let nidx = self.idx(nx as u32, ny as u32);
-                            if old[nidx].is_empty() && next[nidx].is_empty() && self.chance(26) {
-                                let variant = (self.rand() & 3) as u8;
-                                next[nidx] = Cell::new(source, variant, starting_energy(source));
+                            // The roll happens only once a target exists, in both engines,
+                            // or the two RNG streams part company.
+                            if let Some(nidx) = target {
+                                if self.chance(WELLSPRING_POUR) {
+                                    let variant = (self.rand() & 3) as u8;
+                                    next[nidx] = Cell::new(source, variant, starting_energy(source));
+                                }
                             }
                         }
                     }
@@ -3860,6 +3897,42 @@ mod tests {
     fn count_kind(u: &Universe, material: Material) -> usize {
         u.cells.iter().filter(|c| c.kind == material as u8).count()
     }
+
+    /// A spring submerges itself within seconds. If it can only pour into a bare face it
+    /// then chokes on its own output — measured at a permanent 3-4 cells of standing
+    /// water, which is why the only endless source in the game watered nothing.
+    ///
+    /// The shaft is what makes this decisive. Sealed sides and floor mean the water above
+    /// the spring CANNOT flow away, so every cardinal face stays blocked forever: under an
+    /// adjacent-only rule the count can never rise. A first attempt at this test used an
+    /// open basin and passed with the reach disabled, because the water simply drained off
+    /// the faces and let the old rule pour normally — it proved nothing.
+    #[test]
+    fn a_submerged_spring_pumps_up_through_its_own_water() {
+        let mut u = Universe::new(40, 30, 77);
+        for y in 18..=26 {
+            set_cell(&mut u, 19, y, Material::Wall);
+            set_cell(&mut u, 21, y, Material::Wall);
+        }
+        for x in 18..=22 {
+            set_cell(&mut u, x, 26, Material::Wall);
+        }
+        set_cell_state(&mut u, 20, 25, Material::Wellspring, 0, Material::Water as u16, 0);
+        set_cell(&mut u, 20, 24, Material::Water);
+        set_cell(&mut u, 20, 23, Material::Water);
+        let submerged = count_kind(&u, Material::Water);
+
+        for _ in 0..600 {
+            u.tick();
+        }
+        let pumped = count_kind(&u, Material::Water);
+        assert!(
+            pumped > submerged,
+            "a spring walled in under its own water must push up through it; it stayed at \
+             {submerged} cells (saw {pumped}), which is the choke that made it inert"
+        );
+    }
+
 
     /// A hearth burned out last night comes back as ground you can plant in.
     #[test]

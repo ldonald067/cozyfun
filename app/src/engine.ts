@@ -874,16 +874,24 @@ class JsSandboxEngine implements SandboxEngine {
         }
       }
     } else if (wellspringSource(energy & 255)) {
-      // Attuned: gently emit the remembered material from open faces.
-      // The source guard rejects out-of-range ids from imported scenes.
+      // Attuned: pour the remembered material, feeding THROUGH its own body rather than
+      // only into a bare face. See `apply_reactions` in sim/src/lib.rs for the
+      // measurement behind this and for why there is no output cap.
       const source = energy & 255;
       for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0], [0, 1]]) {
-        const nx = x + dx;
-        const ny = y + dy;
-        if (!this.inBounds(nx, ny)) continue;
-        const nidx = this.index(nx, ny);
-        if (old[nidx] === MATERIAL.Empty && next[nidx] === MATERIAL.Empty && this.chance(26)) {
-          writeCellBytes(next, nidx, source, this.rand() & 3, startEnergy(source));
+        let target = -1;
+        for (let step = 1; step <= WELLSPRING_REACH; step++) {
+          const nx = x + dx * step;
+          const ny = y + dy * step;
+          if (!this.inBounds(nx, ny)) break;
+          const nidx = this.index(nx, ny);
+          if (old[nidx] === MATERIAL.Empty && next[nidx] === MATERIAL.Empty) { target = nidx; break; }
+          if (old[nidx] !== source) break;
+        }
+        // The roll happens only once a target exists, matching the sim, or the two RNG
+        // streams part company.
+        if (target >= 0 && this.chance(WELLSPRING_POUR)) {
+          writeCellBytes(next, target, source, this.rand() & 3, startEnergy(source));
         }
       }
     }
@@ -1445,6 +1453,12 @@ const FACE_OFFSETS: ReadonlyArray<readonly [number, number]> = [
 
 // Moisture lost per cell as water soaks down through a seed bed.
 const SEED_SOAK_LOSS = 20;
+
+// One open face in this many pours per tick, and how far a spring pushes through its
+// own material to reach open space. Mirrors sim/src/lib.rs, which carries the
+// measurement these come from.
+const WELLSPRING_POUR = 7;
+const WELLSPRING_REACH = 4;
 
 // Below this an ember has gone out: inert char that only relights from outside.
 const COLD_CHAR_ENERGY = 30;
