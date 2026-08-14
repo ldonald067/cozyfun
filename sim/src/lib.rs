@@ -155,6 +155,18 @@ const WELLSPRING_POUR: u32 = 7;
 /// How far a spring will push through its own material to reach open space.
 const WELLSPRING_REACH: i32 = 4;
 
+/// One roll in this many, per damp neighbour per tick, for hearth masonry drying its nook.
+///
+/// It was 10, which lost a race it needs to win. A damp cell holds its moisture for only
+/// a handful of ticks — energy drains 1 a tick, 2 while wet and absorbent — and a hearth
+/// that only caught one neighbour in ten mostly arrived after the cell had dried on its
+/// own. Measured across eight geometries, the masonry accounted for ONE cell of its nook
+/// while everything else simply evaporated. At 2 it dries the pocket it encloses, which is
+/// what the clause has always claimed.
+const WALL_HEARTH_DRIES: u32 = 2;
+/// How far warmth carries through masonry from a flame, in cells.
+const HEARTH_WARMTH: i32 = 2;
+
 /// Below this an ember has gone out: inert char that only relights from outside.
 const COLD_CHAR_ENERGY: u16 = 30;
 /// Stored moisture that still counts as damp ground under a seed.
@@ -807,19 +819,50 @@ impl Universe {
                     if cell.flags & FLAG_FROZEN != 0 {
                         continue;
                     }
-                    let hearth = neighbors.iter().any(|&nidx| {
-                        let other = old[nidx];
+                    // Warmth carries along the masonry, so the whole chimney breast dries
+                    // its nook and not just the single brick the flame happens to touch.
+                    //
+                    // Adjacency alone was why this clause read as broken. Measured over
+                    // eight geometries: exactly ONE wall cell was ever both touching the
+                    // flame and touching the damp, so the nook dried one cell no matter how
+                    // eagerly the rule rolled. Raising the odds could not fix a reach
+                    // problem.
+                    //
+                    // THAWING deliberately keeps strict contact. Giving it the same reach
+                    // made every wall within two cells of any flame melt the ice around it,
+                    // and four unrelated frost interactions immediately went too faint to
+                    // see. Radiant warmth drying a damp wall is a different thing from heat
+                    // enough to melt ice, and the split keeps this change to what it claims.
+                    let (wx, wy) = self.xy(idx);
+                    let is_flame = |other: Cell| {
                         is_hot(other.kind)
                             || (other.kind == Material::Ember as u8 && other.energy > 90)
-                    });
+                    };
+                    let touching_flame = neighbors.iter().any(|&nidx| is_flame(old[nidx]));
+                    let mut warm = touching_flame;
+                    if !warm {
+                        'warmth: for dy in -HEARTH_WARMTH..=HEARTH_WARMTH {
+                            for dx in -HEARTH_WARMTH..=HEARTH_WARMTH {
+                                let (nx, ny) = (wx + dx, wy + dy);
+                                if !self.in_bounds(nx, ny) {
+                                    continue;
+                                }
+                                if is_flame(old[self.idx(nx as u32, ny as u32)]) {
+                                    warm = true;
+                                    break 'warmth;
+                                }
+                            }
+                        }
+                    }
+                    let hearth = warm;
                     if !hearth {
                         continue;
                     }
                     for nidx in neighbors {
                         let other = old[nidx];
-                        if other.flags & FLAG_FROZEN != 0 && self.chance(6) {
+                        if other.flags & FLAG_FROZEN != 0 && touching_flame && self.chance(6) {
                             next[nidx].flags = thawed_flags(other.kind, next[nidx].flags);
-                        } else if other.flags & FLAG_WET != 0 && self.chance(10) {
+                        } else if other.flags & FLAG_WET != 0 && self.chance(WALL_HEARTH_DRIES) {
                             next[nidx].flags &= !FLAG_WET;
                         }
                     }

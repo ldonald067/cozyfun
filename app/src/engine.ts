@@ -903,19 +903,26 @@ class JsSandboxEngine implements SandboxEngine {
   private wallReact(idx: number, x: number, y: number, old: Uint8Array, next: Uint8Array) {
     if (readU16(old, idx + 6) & CELL_FLAG.Frozen) return;
     const neighbors = this.neighbors(x, y);
-    const hearth = neighbors.some((nidx) => {
-      const other = old[nidx];
-      return (
-        HOT_MATERIALS.includes(other as (typeof HOT_MATERIALS)[number]) ||
-        (other === MATERIAL.Ember && readU16(old, nidx + 4) > 90)
-      );
-    });
+    // Warmth carries along the masonry for DRYING; thawing keeps strict contact. See
+    // sim/src/lib.rs — giving thaw the same reach made four frost interactions too faint.
+    const isFlame = (o: number) => { const k = old[o];
+      return k === MATERIAL.Fire || k === MATERIAL.Lava || k === MATERIAL.Meteor ||
+        (k === MATERIAL.Ember && readU16(old, o + 4) > 90); };
+    const touchingFlame = neighbors.some((nidx) => isFlame(nidx));
+    let hearth = touchingFlame;
+    for (let dy = -HEARTH_WARMTH; dy <= HEARTH_WARMTH && !hearth; dy++) {
+      for (let dx = -HEARTH_WARMTH; dx <= HEARTH_WARMTH && !hearth; dx++) {
+        const nx = x + dx, ny = y + dy;
+        if (!this.inBounds(nx, ny)) continue;
+        if (isFlame(this.index(nx, ny))) hearth = true;
+      }
+    }
     if (!hearth) return;
     for (const nidx of neighbors) {
       const otherFlags = readU16(old, nidx + 6);
-      if (otherFlags & CELL_FLAG.Frozen && this.chance(6)) {
+      if (otherFlags & CELL_FLAG.Frozen && touchingFlame && this.chance(6)) {
         writeU16(next, nidx + 6, thawedFlags(old[nidx], readU16(next, nidx + 6)));
-      } else if (otherFlags & CELL_FLAG.Wet && this.chance(10)) {
+      } else if (otherFlags & CELL_FLAG.Wet && this.chance(WALL_HEARTH_DRIES)) {
         writeU16(next, nidx + 6, readU16(next, nidx + 6) & ~CELL_FLAG.Wet);
       }
     }
@@ -1461,6 +1468,11 @@ const SEED_SOAK_LOSS = 20;
 // measurement these come from.
 const WELLSPRING_POUR = 7;
 const WELLSPRING_REACH = 4;
+
+// One roll in this many, per damp neighbour per tick, for hearth masonry drying its nook.
+// Mirrors sim/src/lib.rs, which carries the measurement behind it.
+const WALL_HEARTH_DRIES = 2;
+const HEARTH_WARMTH = 2;
 
 // Below this an ember has gone out: inert char that only relights from outside.
 const COLD_CHAR_ENERGY = 30;
