@@ -2017,7 +2017,9 @@ impl Universe {
         nx: i32,
         ny: i32,
         cell: Cell,
-        old: &[Cell],
+        // Kept for signature symmetry with every other movement helper; the destination
+        // test deliberately no longer consults it.
+        _old: &[Cell],
         next: &mut [Cell],
         can_sink_through_gas: bool,
     ) -> bool {
@@ -2029,12 +2031,24 @@ impl Universe {
             return false;
         }
         let target = self.idx(nx as u32, ny as u32);
-        let target_old = old[target];
+        // Judged on `next`, the authoritative state of this tick.
+        //
+        // This used to also accept a target that was empty in `old`, as an OR. That let a
+        // mover step into a square something else had already filled THIS tick and
+        // overwrite it, because anything a reaction creates exists only in `next`.
+        // Measured: an attuned wellspring emitted 130 cells over 300 ticks and held 3-4 of
+        // them — roughly 97% clobbered by its own water sloshing back over the square it
+        // had just filled. It read as a feeble spring; it was a feeble primitive, and the
+        // same tax fell on every generated outcome a moving cell could step on.
+        //
+        // `old` is still the right basis for DECIDING to move, so that rules cannot depend
+        // on iteration order; it is only the destination test that must respect what has
+        // already happened this tick.
         let target_next = next[target];
-        let can_move = target_old.is_empty()
-            || target_next.is_empty()
+        let can_move = target_next.is_empty()
             || (can_sink_through_gas
-                && (target_old.kind == Material::Smoke as u8 || target_old.kind == Material::Steam as u8));
+                && (target_next.kind == Material::Smoke as u8
+                    || target_next.kind == Material::Steam as u8));
         if !can_move {
             return false;
         }
@@ -3896,6 +3910,36 @@ mod tests {
 
     fn count_kind(u: &Universe, material: Material) -> usize {
         u.cells.iter().filter(|c| c.kind == material as u8).count()
+    }
+
+    /// A cell created during `apply_reactions` exists only in `next`. If movement judges
+    /// its destination on `old`, a mover steps into that square and overwrites it, and the
+    /// creation silently never happened.
+    ///
+    /// A wellspring is the loudest victim, so it is the fixture: measured with the old
+    /// rule it emitted 130 cells over 300 ticks and held 3-4 of them, because its own
+    /// water sloshed back over the square it had just filled. The pool it builds is
+    /// therefore a direct read on whether fresh cells survive their first tick.
+    #[test]
+    fn a_reaction_cell_is_not_overwritten_by_a_mover_in_the_same_tick() {
+        let mut u = Universe::new(40, 30, 77);
+        for x in 8..=32 {
+            set_cell(&mut u, x, 26, Material::Wall);
+        }
+        for y in 18..26 {
+            set_cell(&mut u, 8, y, Material::Wall);
+            set_cell(&mut u, 32, y, Material::Wall);
+        }
+        set_cell_state(&mut u, 20, 25, Material::Wellspring, 0, Material::Water as u16, 0);
+        for _ in 0..1500 {
+            u.tick();
+        }
+        let pool = count_kind(&u, Material::Water);
+        assert!(
+            pool > 40,
+            "a spring should build a real pool; holding {pool} cells means fresh water is \
+             being overwritten by movement in the tick it was created"
+        );
     }
 
     /// A spring submerges itself within seconds. If it can only pour into a bare face it

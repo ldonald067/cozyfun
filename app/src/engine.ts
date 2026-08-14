@@ -1388,10 +1388,12 @@ class JsSandboxEngine implements SandboxEngine {
     const movingCell = next.slice(idx, idx + CELL_STRIDE);
     if (movingCell[0] !== cell[0]) return false;
     const target = this.index(x, y);
+    // Judged on `next`, the authoritative state of this tick — see `try_move` in
+    // sim/src/lib.rs for the measurement. Accepting a target that was merely empty in
+    // `old` let a mover overwrite whatever a reaction had created there this tick.
     const canMove =
-      old[target] === MATERIAL.Empty ||
       next[target] === MATERIAL.Empty ||
-      (canSinkThroughGas && (old[target] === MATERIAL.Smoke || old[target] === MATERIAL.Steam));
+      (canSinkThroughGas && (next[target] === MATERIAL.Smoke || next[target] === MATERIAL.Steam));
     if (!canMove) return false;
     next.fill(0, idx, idx + CELL_STRIDE);
     next.set(movingCell, target);
