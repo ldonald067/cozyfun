@@ -1471,10 +1471,10 @@ const PLANT_SPACING = 5;
 // the renderer. Petals are listed in opening order and every offset touches one already
 // placed. Mirrors BLOOM_SHAPES in sim/src/lib.rs.
 const BLOOM_SHAPES: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [
-  // 0 Cornflower: a round, ragged head with its corners knocked off.
-  [[0, -1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-2, 0], [2, 0], [-2, -1], [2, -1], [0, -2], [-1, -2], [1, -2], [-1, 1], [1, 1]],
-  // 1 Poppy: four broad petals around an open notch at the crest.
-  [[0, -1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-2, 0], [2, 0]],
+  // 0 Cornflower: a frilled rosette with a notched crest — see sim/src/lib.rs.
+  [[0, -1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-2, 0], [2, 0], [-2, -1], [2, -1], [-1, -2], [1, -2], [-1, 1], [1, 1]],
+  // 1 Poppy: a broad bowl whose outer petals droop below the rim.
+  [[0, -1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-2, 0], [2, 0], [-2, 1], [2, 1]],
   // 2 Daisy: the same span opened out into a star, so the gaps do the work.
   [[0, -1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-2, 0], [2, 0], [0, -2], [-1, 1], [1, 1]],
   // 3 Sunflower: the biggest head, a full disc under a crown of rays.

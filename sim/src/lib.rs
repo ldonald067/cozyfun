@@ -92,16 +92,22 @@ const PLANT_SPACING: i32 = 5;
 /// stranded cells. Offsets are relative to the crown, which sits directly above the tip of
 /// the stalk. `app/src/rendering/shapeLanguage.ts` holds the matching hue and eye per index.
 const BLOOM_SHAPES: [&[(i32, i32)]; 8] = [
-    // 0 Cornflower: a round, ragged head with its corners knocked off.
+    // 0 Cornflower: a frilled rosette. The crest is NOTCHED — filling it made this the
+    // solidest head in the set, a plain ball that read as a lump beside the poppy in a
+    // desaturated crop. The notch sits above a full row, so unlike the poppy's crest it
+    // cannot split the head; the poppy's dark eye already cuts its lower row, this one's
+    // gold disc does not.
     &[
         (0, -1), (-1, 0), (1, 0), (-1, -1), (1, -1), (-2, 0), (2, 0),
-        (-2, -1), (2, -1), (0, -2), (-1, -2), (1, -2), (-1, 1), (1, 1),
+        (-2, -1), (2, -1), (-1, -2), (1, -2), (-1, 1), (1, 1),
     ],
-    // 1 Poppy: a broad shallow bowl. Leaving a notch at the crest split the head into
-    // two separate red blocks, because the dark eye cuts the middle of the lower row too.
+    // 1 Poppy: a broad bowl whose outer petals DROOP below the rim, which is what a
+    // poppy does and what separates it from the cornflower at a glance — compact rosette
+    // versus wide flopping cap. Leaving a notch at the crest split the head into two
+    // separate red blocks, because the dark eye cuts the middle of the lower row too.
     // Filling the notch instead made a solid 5x2 bar, so the top corners come off: the
     // bowl has to be rounded at the crest or it is just a rectangle.
-    &[(0, -1), (-1, 0), (1, 0), (-1, -1), (1, -1), (-2, 0), (2, 0)],
+    &[(0, -1), (-1, 0), (1, 0), (-1, -1), (1, -1), (-2, 0), (2, 0), (-2, 1), (2, 1)],
     // 2 Daisy: the same span opened out into a star, so the gaps do the work.
     &[(0, -1), (-1, 0), (1, 0), (-1, -1), (1, -1), (-2, 0), (2, 0), (0, -2), (-1, 1), (1, 1)],
     // 3 Sunflower: the biggest head, a full disc under a crown of rays.

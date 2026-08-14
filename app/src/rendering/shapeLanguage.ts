@@ -698,7 +698,13 @@ function glassColor({ color, variant, age, energy, flags, time, cells, width, he
   const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Glass);
   // A pane is mostly the night behind it: start from the sky and lay only a whisper
   // of mint film over it, so glass reads transparent instead of as solid chalk.
-  let out = mixRgb([9, 14, 20], color, 0.18);
+  //
+  // The film was 0.18, which put the interior 90 redmean units from the night behind
+  // it — twice the distance `material:contrast` demands between two DIFFERENT
+  // materials, so a sealed dome went murky inside and the fill was doing the rim's
+  // job. Measured, not eyeballed: at 0.085 the interior sits ~45 from night while the
+  // rim stays ~590, which is what "the rims carry the identity" was supposed to mean.
+  let out = mixRgb([9, 14, 20], color, 0.085);
   // A slow diagonal sheen drifts across the pane — the moving band of caught light
   // that says "glass" even where the interior is nearly see-through.
   const band = (x + y + Math.floor(time * 0.004)) % 11;
