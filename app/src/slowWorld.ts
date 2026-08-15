@@ -18,6 +18,8 @@
 // the engine and the real renderer, and that is the second consumer that makes this
 // a module rather than a private helper in `App.tsx`.
 
+import { CELL_STRIDE, MATERIAL } from "./materials";
+
 /** Slow steps added by each doubling of the time away. */
 const SLOW_STEPS_PER_DOUBLING = 4;
 /** A week away and a month away are the same visit; the world waits, it does not rot. */
@@ -32,6 +34,26 @@ const SLOW_WORLD_MIN_AWAY_SECONDS = 3600;
  * absence enriches a scene without eroding it beyond recognition.
  */
 const MAX_AWAY_GROWTH_TICKS = 4000;
+
+/**
+ * How many Flower NEIGHBOURS a cell needs before it counts as the crown of an open head.
+ *
+ * Counting Flower cells was the obvious version and it was wrong: a spent crown is still a
+ * Flower cell, so four scattered sticks across a meadow scored as a bloom. The audit caught
+ * it — with the stop-early rule sabotaged, the "arrived in flower" assertion still passed.
+ * An opened head is a crown ringed by petals, so it is ADJACENCY that separates a flower
+ * from its own leftovers: an unopened bud has no Flower neighbours by construction, and a
+ * shed crown is alone again.
+ */
+const CROWN_NEIGHBOURS = 3;
+/**
+ * Catch-up left to run once a head has opened. Not zero: stopping dead would hand over a
+ * garden that bloomed entirely off-screen, which is the same complaint as arriving after it.
+ * This tail is spent on screen (App paces it at ~4x) so the arrival is WATCHED. It is short
+ * enough to be safe — measured live, a head takes roughly 2,000 ticks to shed back down to
+ * a bare crown, so 600 lands well inside the flower's life.
+ */
+export const WAKE_BLOOM_TAIL_TICKS = 600;
 
 /** Anything that can take a slow step — the engine, without importing its module. */
 type SlowSteppable = { slowStep(): void };
@@ -63,6 +85,58 @@ export function planAbsence(secondsAway: number): AbsencePlan {
  * bare seeds sitting on soil. Both the app and `scripts/slow-world-audit.mjs` come
  * through here, so the gate cannot measure an order the app does not perform.
  */
+/**
+ * How much catch-up is left, given what the scene now looks like.
+ *
+ * **An absence should end on the rising action, not after it.** `catchUpTicks` saturates at
+ * MAX_AWAY_GROWTH_TICKS and a bloom runs about that same length end to end, so any absence
+ * over an hour used to spend the ENTIRE flowering invisibly: measured against the live
+ * deployment, a player coming back after two days arrived at two or three Flower cells —
+ * spent crowns, which read as sticks — with the whole event already over. Worse, the first
+ * 3,400 of those ticks run 250 to a frame, a quarter-second of wall clock.
+ *
+ * So the wake stops early once a real head is open, leaving only the tail to play on screen.
+ * A scene with nothing growing in it never trips this and spends its full budget exactly as
+ * before, which is why the check is on the flowers rather than on a shorter cap: there is no
+ * single tick count that lands mid-bloom for every scene, and picking one would be tuning to
+ * whichever fixture was measured last.
+ *
+ * Deliberately NOT an engine rule — it changes how many ticks the app runs, not what a tick
+ * does, so both engines stay byte-identical and parity is untouched.
+ */
+export function catchUpRemaining(cells: Uint8Array, remaining: number, width: number): number {
+  if (remaining <= WAKE_BLOOM_TAIL_TICKS) return remaining;
+  return aHeadIsOpen(cells, width) ? WAKE_BLOOM_TAIL_TICKS : remaining;
+}
+
+/**
+ * Is any bloom currently OPEN — a crown with petals around it, rather than a bud that has
+ * not unfurled or a crown that has already shed? Shared with
+ * `scripts/slow-world-audit.mjs` on purpose, the same way `wakeTerrarium` is: a gate that
+ * restated this would be free to drift from the rule the app actually applies.
+ */
+export function aHeadIsOpen(cells: Uint8Array, width: number): boolean {
+  const count = cells.length / CELL_STRIDE;
+  for (let i = 0; i < count; i++) {
+    if (cells[i * CELL_STRIDE] !== MATERIAL.Flower) continue;
+    const x = i % width;
+    const y = Math.floor(i / width);
+    let petals = 0;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue;
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= width || ny * width + nx >= count) continue;
+        if (cells[(ny * width + nx) * CELL_STRIDE] === MATERIAL.Flower && ++petals >= CROWN_NEIGHBOURS) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 export function wakeTerrarium(engine: SlowSteppable, secondsAway: number): AbsencePlan {
   const plan = planAbsence(secondsAway);
   for (let step = 0; step < plan.slowSteps; step++) engine.slowStep();

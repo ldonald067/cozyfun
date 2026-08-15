@@ -43,7 +43,7 @@ import {
 } from "./storage";
 import { exportClip, exportPostcard, renderSandbox } from "./renderer";
 import { BUILD_COMMIT } from "./buildStamp";
-import { wakeTerrarium } from "./slowWorld";
+import { catchUpRemaining, wakeTerrarium, WAKE_BLOOM_TAIL_TICKS } from "./slowWorld";
 import { claimWins, openOwnerChannel, type OwnerChannel } from "./windowOwnership";
 import {
   getSceneEnvironment,
@@ -61,7 +61,11 @@ const FAST_FORWARD_TICKS_PER_FRAME = 250;
 // The last stretch of catch-up plays on screen at roughly 4x, so returning to a grown
 // garden means WATCHING the buds you came back to actually open, not teleporting to
 // the aftermath. Everything before this window still runs invisibly fast.
-const WAKE_UP_REPLAY_TICKS = 600;
+//
+// It is the same number `slowWorld.ts` leaves on the clock when it lands the wake on an
+// open bloom, and imported rather than repeated so the two cannot drift: the tail exists
+// precisely so that arrival is watched.
+const WAKE_UP_REPLAY_TICKS = WAKE_BLOOM_TAIL_TICKS;
 const WAKE_UP_TICKS_PER_FRAME = 2;
 const AUTOSAVE_INTERVAL_MS = 30_000;
 const WINDOW_OPEN_KEY = "cozy-pixel-sandbox:window:v1";
@@ -211,7 +215,11 @@ export function App() {
           ? Math.min(FAST_FORWARD_TICKS_PER_FRAME, fastForwardRef.current - WAKE_UP_REPLAY_TICKS)
           : Math.min(WAKE_UP_TICKS_PER_FRAME, fastForwardRef.current);
         for (let i = 0; i < chunk; i++) engine.tick();
-        fastForwardRef.current -= chunk;
+        // Stop the invisible fast-forward once the garden is actually in flower, leaving
+        // only the on-screen tail. `slowWorld.ts` argues why; the short version is that an
+        // absence should end on the rising action, and a full budget spends the whole bloom
+        // where nobody can see it. Checked once per chunk, so at most ~16 reads per wake.
+        fastForwardRef.current = catchUpRemaining(engine.getCellBytes(), fastForwardRef.current - chunk, engine.width());
         lastSimTick = time;
       } else if (!paused && time - lastSimTick >= SIM_TICK_MS) {
         const reactionCellsBefore = audio.canPlayReactionCues() ? engine.getCellBytes() : null;

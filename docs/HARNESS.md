@@ -33,6 +33,11 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
 
   Its baseline is honest rather than perfect: a slow step consumes engine RNG, so the two branches enter catch-up with slightly different trajectories. That noise floor is measured, not assumed — deleting both slow-world writes while keeping every `chance()` roll leaves 5 changed cells and 0 new plant columns, against floors of 20 and 1.
 
+  It also asserts you arrive **in flower** — a crown ringed by petals, using the app's own
+  `aHeadIsOpen` rather than a restatement of it. Every other assertion here passed happily
+  while a player arrived after the bloom: the scene had changed, in new columns, by plenty
+  of cells; it had just changed into stalks.
+
   Two measurements shaped the rule itself and are worth not rediscovering. Seeds sown onto a mature bed landed on **moss**, which does not root them, so the scatter arm read as inert specks until the landing displaced that one patch of carpet back to soil. And the scene must be watered before the absence: a dry bed cannot sprout anything, which is the intended shape of the rule but understates it to the point of looking broken if the fixture forgets.
 
 - `npm run icons:check`: fails when the committed site icons no longer match `scripts/make-favicon.mjs`. The generator colours the cornflower from `SPECIES[0]` and the Stem entry — **imported, not copied** — so a renderer or materials palette edit changes the icon, and this is what says so. Regenerate with `npm run icons`. Without it the generator and its committed output are simply two sources of truth wearing one coat.

@@ -120,6 +120,15 @@ The slow world (between sessions only):
   is a solid moss carpet within about twenty seconds of play and moss does not root a
   seed, so without that the whole arm produced inert grains — measured, not reasoned.
   It opens a planting hole, it does not strip a carpet.
+- **You arrive while it is in flower.** The catch-up saturates at the same length a bloom
+  takes end to end, so any absence over an hour used to spend the whole flowering
+  invisibly — measured against the live deployment, a player back after two days found two
+  or three Flower cells, which are spent crowns and read as sticks. The wake now stops its
+  fast-forward once a crown is ringed by petals and plays out a short tail on screen. An
+  open head is an ADJACENCY question, not a count: a spent crown is still a Flower cell, and
+  the first version of the gate for this passed with the rule sabotaged for exactly that
+  reason. Measured on the audit's garden, a day away arrives with 23 new flower cells
+  against 3 before.
 - The payoff is conditional by design: a seed only comes up in damp ground, so a tended
   garden travels across visits and an abandoned one holds still. Measured on a watered
   bed left overnight, the garden grows into nine columns it did not stand in before.

@@ -45,7 +45,8 @@ const { createFallbackEngine } = require(resolve(outDir, "engine.js"));
 // The SAME absence policy the app runs, not a copy of it. `wakeTerrarium` owns the
 // step count, the tick count, and the order they are applied in, so this gate cannot
 // certify a return path that production does not perform.
-const { planAbsence, wakeTerrarium } = require(resolve(outDir, "slowWorld.js"));
+const FAST_FORWARD_CHUNK = 250; // matches App.tsx
+const { aHeadIsOpen, catchUpRemaining, planAbsence, wakeTerrarium } = require(resolve(outDir, "slowWorld.js"));
 const { colorForCell } = require(resolve(outDir, "rendering/materialColor.js"));
 
 const STRIDE = 8;
@@ -119,7 +120,16 @@ function visitAfter(secondsAway) {
   // Only here can the "it touched nothing I did not leave alive" claim be checked
   // exactly, because catch-up ticks legitimately move things afterwards.
   const afterSlowSteps = engine.getCellBytes();
-  for (let t = 0; t < plan.catchUpTicks; t++) engine.tick();
+  // The app does not simply run catchUpTicks: it stops the invisible fast-forward once a
+  // head is open, so the player arrives on the rising action. Replayed here in the same
+  // chunks for the same reason wakeTerrarium is shared — a gate that spent a budget the app
+  // does not spend would be certifying a return path nobody performs.
+  let owed = plan.catchUpTicks;
+  while (owed > 0) {
+    const chunk = Math.min(FAST_FORWARD_CHUNK, owed);
+    for (let t = 0; t < chunk; t++) engine.tick();
+    owed = catchUpRemaining(engine.getCellBytes(), owed - chunk, W);
+  }
   const cells = engine.getCellBytes();
   engine.dispose();
   return { steps: plan.slowSteps, afterSlowSteps, cells };
@@ -238,6 +248,27 @@ if (!grown.length) {
     `after a day away the garden stands in exactly the same columns it started in.\n` +
       `    Seeds may be scattering, but none of them came up, so the scene gained specks\n` +
       `    rather than plants. Check that a sown seed lands on ground that can root it.`,
+  );
+}
+
+// 3b. You arrive while the garden is IN FLOWER. The catch-up saturates at the same length
+//     a bloom takes end to end, so before the wake learned to stop early, a player who had
+//     been away over an hour reliably arrived AFTER the flowering: measured against the
+//     live deployment, two or three Flower cells, which are spent crowns and read as
+//     sticks. Every other assertion here passed happily through that — the scene had
+//     changed, in new columns, by plenty of cells. It was just changed into stalks.
+//
+//     Counting Flower cells does NOT work here and the first version of this check was
+//     wrong for that reason: a spent crown is still a Flower cell, so four scattered sticks
+//     scored as a bloom and the check passed with the rule sabotaged. An open head is a
+//     crown ringed by petals, which is an adjacency question, and `aHeadIsOpen` is imported
+//     rather than restated so the gate measures the app's own predicate.
+if (!aHeadIsOpen(day.cells, W)) {
+  failures.push(
+    `a day away ends with no OPEN bloom: there may be flower cells, but none of them is a\n` +
+      `    crown ringed by petals, so the player arrives to a garden that has already bloomed\n` +
+      `    and shed. The wake is meant to stop its invisible fast-forward once a head opens —\n` +
+      `    see catchUpRemaining in app/src/slowWorld.ts.`,
   );
 }
 
