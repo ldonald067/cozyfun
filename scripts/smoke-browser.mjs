@@ -689,7 +689,7 @@ async function main() {
     const preReloadErrors = await evaluate(cdp, `window.__smokeErrors ?? []`);
     assert(preReloadErrors.length === 0, `page errors before reload: ${preReloadErrors.join("; ")}`);
 
-    await stageAgedAutosave(cdp, appUrl, 2);
+    await stageAgedAutosave(cdp, appUrl, 2 * 3600);
 
     // Two hours earns slow steps as well as tick catch-up, so this wording proves the
     // real browser took the slow-world branch at boot and survived it. It does NOT
@@ -706,11 +706,12 @@ async function main() {
     // production. "No player has ever seen a flower" is a mistake this repo has already
     // made once, and it was invisible to every test that did not start from the brush.
     //
-    // Waiting for a bloom in real time would take about two and a half minutes at 26
-    // ticks/second. So the scene is planted, aged two days, and reloaded: the wake-up
-    // catch-up replays 4,000 ticks in seconds. That also makes this the check that
-    // proves the absence path GROWS something, which the status-text assertion above
-    // deliberately does not.
+    // Waiting for a bloom from bare seed in real time would take about two and a half
+    // minutes at 26 ticks/second. So the scene is planted, aged, and reloaded, and the
+    // wake-up catch-up covers most of that growth in seconds — which also makes this the
+    // check that proves the absence path GROWS something, where the status-text assertion
+    // above deliberately does not. How LONG an absence is staged is load-bearing and is
+    // argued at the stageAgedAutosave call below.
     const pickMaterial = async (label) => {
       const picked = await evaluate(cdp, `(() => {
         const button = [...document.querySelectorAll("button.material-button")]
@@ -731,14 +732,26 @@ async function main() {
     await click(cdp, '[data-testid="clear-scene"]');
     await waitForStatus(cdp, "tray cleared");
 
+    // A BED, not a plot. Painting is a sprinkle — PAINT_DENSITY leaves powders at 55 — so
+    // every stroke draws on engine RNG, and how far that RNG has advanced depends on how
+    // many ticks ran before the click landed. Identical clicks therefore lay a different
+    // bed on a fast local server than on a real host: measured, 138 soil / 26 seed locally
+    // against 107 / 35 live. One row of five strokes grew one to three plants, and a lone
+    // head is a transient — 14 flower cells at its peak, 1 nine seconds later — so whether
+    // this check passed was luck. Twelve strokes over two rows grow a spaced meadow whose
+    // plants bloom at staggered times, and a head is open throughout.
     await pickMaterial("Soil");
-    for (const xRatio of [0.3, 0.4, 0.5, 0.6, 0.7]) {
-      await click(cdp, '[data-testid="sandbox-tray"]', { xRatio, yRatio: 0.92 });
+    for (const yRatio of [0.92, 0.9]) {
+      for (const xRatio of [0.25, 0.35, 0.45, 0.55, 0.65, 0.75]) {
+        await click(cdp, '[data-testid="sandbox-tray"]', { xRatio, yRatio });
+      }
     }
     await pickMaterial("Seed");
-    await click(cdp, '[data-testid="sandbox-tray"]', { xRatio: 0.5, yRatio: 0.84 });
+    for (const xRatio of [0.3, 0.42, 0.54, 0.66]) {
+      await click(cdp, '[data-testid="sandbox-tray"]', { xRatio, yRatio: 0.84 });
+    }
     await pickMaterial("Water");
-    for (const xRatio of [0.42, 0.5, 0.58]) {
+    for (const xRatio of [0.32, 0.44, 0.56, 0.68]) {
       await click(cdp, '[data-testid="sandbox-tray"]', { xRatio, yRatio: 0.45 });
     }
 
@@ -764,7 +777,14 @@ async function main() {
     assert(planted.soil > 0 && planted.seed > 0, `expected painted soil and seed, saw ${JSON.stringify(planted)}`);
     assert(planted.flower === 0, `the scene already had ${planted.flower} flower cells before growing anything`);
 
-    await stageAgedAutosave(cdp, appUrl, 48);
+    // Arrive mid-bloom. catchUpTicks is min(secondsAway, 4000), and a bloom takes roughly
+    // 4,000 ticks end to end, so a two-day absence spends the ENTIRE flowering inside the
+    // catch-up — and the first 3,400 of those ticks run at 250 per frame, a quarter of a
+    // second of wall clock nobody can sample. Measured live at 48h with this same bed: the
+    // heads had already opened and shed, peak 3 flower cells, never reaching a real head.
+    // Thirty-three minutes lands the wake before the blooming and lets it happen on screen,
+    // which is also the more honest claim: a player WATCHES the garden open.
+    await stageAgedAutosave(cdp, appUrl, 2000);
 
     let grown = null;
     await waitUntil(async () => {
@@ -843,14 +863,14 @@ function assertNativeStart(starts, id, url, minimumDuration, options = {}) {
  * is correct in production and exactly what makes this scenario impossible to set up
  * without the QA hook.
  */
-async function stageAgedAutosave(cdp, appUrl, hoursAway) {
+async function stageAgedAutosave(cdp, appUrl, secondsAway) {
   await cdp.send("Page.navigate", { url: `${appUrl}?cozyNoAutosave=1` });
   await waitUntil(async () => (await statusText(cdp)).length > 0, "no-autosave page", 20_000);
   const staged = await evaluate(cdp, `(() => {
     const raw = localStorage.getItem("cozy-pixel-sandbox:scene:v1");
     if (!raw) return false;
     const snapshot = JSON.parse(raw);
-    snapshot.savedAt = new Date(Date.now() - ${hoursAway} * 3600 * 1000).toISOString();
+    snapshot.savedAt = new Date(Date.now() - ${secondsAway} * 1000).toISOString();
     localStorage.setItem("cozy-pixel-sandbox:scene:auto:v1", JSON.stringify(snapshot));
     return true;
   })()`);
