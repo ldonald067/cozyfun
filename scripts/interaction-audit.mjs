@@ -278,7 +278,11 @@ const CHECKS = [
     paint: (p) => { p(13, 18, 3, M.Water); p(13, 15, 2, M.Ice); },
     outcome: (g, before) => g.appeared(M.Ice, before) },
   { m: "Ice", covers: "ice.condenses", role: "condenses steam into frost", w: 26, h: 26, seed: 19, ticks: 900,
-    paint: (p) => { p(13, 20, 3, M.Water); p(13, 21, 2, M.Lava); p(13, 10, 2, M.Ice); },
+    // A kettle's worth of water over the heat, not a splash: the frost that comes back is
+    // proportional to the steam that goes up, and the old three-cell pool made three cells
+    // of frost. Verified steam-borne rather than the ice simply freezing water it could
+    // reach — with the lava taken out of this scene the frost count is 0.
+    paint: (p) => { p(13, 20, 5, M.Water); p(13, 21, 4, M.Lava); p(13, 10, 4, M.Ice); },
     outcome: (g, before) => g.appeared(M.Ice, before) },
   { m: "Ice", covers: "ice.stresses", role: "frost-stresses damp hard materials", w: 26, h: 26, seed: 20, ticks: 1500,
     // The stone has to be damp *where the ice touches it*, so the water runs across the
@@ -300,7 +304,11 @@ const CHECKS = [
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
     outcome: (g, before) => g.appeared(M.Pollen, before) },
   { m: "Stem", covers: "stem.climbs", role: "unfurls side leaves as it climbs", w: 40, h: 34, seed: 25, ticks: 3500,
-    paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
+    // A bed rather than a single seed. One plant carries two or three leaves and PLANT_SPACING
+    // keeps them apart, so a lone stalk can never clear a four-cell floor no matter how well
+    // the rule works — and a player waters a bed anyway. Measured: 2 leaf cells from one
+    // plant, 14 from this bed.
+    paint: (p) => { p(20, 28, 6, M.Soil); p(20, 23, 5, M.Seed); p(20, 18, 3, M.Water); },
     outcome: (g) => g.all(M.Stem).filter((i) => {
       const [x, y] = g.xyOf(i);
       return g.kindAt(x - 1, y) === M.Stem || g.kindAt(x + 1, y) === M.Stem;
@@ -512,8 +520,12 @@ const CHECKS = [
       for (const i of g.all(M.Steam)) if (g.xyOf(i)[1] < 18) memo.high.add(i);
       return [...memo.high].filter((i) => g.kindOf(i) === M.Steam);
     } },
-  { m: "Steam", covers: "steam.frosts", role: "frosts into ice near ice", w: 26, h: 30, seed: 69, ticks: 1500,
-    paint: (p) => { p(13, 24, 3, M.Water); p(13, 25, 2, M.Lava); p(13, 16, 2, M.Ice); },
+  { m: "Steam", covers: "steam.frosts", role: "frosts into ice near ice", w: 26, h: 34, seed: 69, ticks: 1500,
+    // The ice hangs TEN cells clear of the pool, which is the whole point of the scene. In
+    // its old geometry the block sat close enough to freeze the water directly, and with the
+    // lava removed it scored 47 against 15 — it was measuring ice.freezes, and the heat was
+    // suppressing the very thing being counted. At this range the control scores 0.
+    paint: (p) => { p(13, 28, 4, M.Water); p(13, 29, 3, M.Lava); p(13, 10, 4, M.Ice); },
     outcome: (g, before) => g.appeared(M.Ice, before) },
   { m: "Soil", covers: "soil.falls", role: "falls as organic substrate", w: 26, h: 26, seed: 70, ticks: 300,
     paint: (p) => { p(13, 8, 2, M.Soil); },
@@ -738,8 +750,11 @@ const CHECKS = [
       return [...memo.hot].filter((i) => g.kindOf(i) === M.Ember);
     } },
   { m: "Ember", covers: "ember.quenched", role: "quenches wet under water and washes cold char away", w: 30, h: 26, seed: 110, ticks: 4000,
-    paint: (p) => { p(15, 20, 4, M.Wood); p(15, 16, 1, M.Fire); },
-    act: (p, t) => { if (t === 1500) p(15, 13, 4, M.Water); },
+    // A drip, not a bucket. The clause is about RUNNING water washing char away, and a single
+    // splash quenches the bed in 16 ticks — a quarter-second, under the floor however many
+    // cells it hisses across. A drop a second keeps the hearth washing for 349 ticks.
+    paint: (p) => { p(15, 20, 6, M.Wood); p(15, 16, 2, M.Fire); },
+    act: (p, t) => { if (t >= 1500 && t < 3500 && t % 60 === 0) p(15, 13, 2, M.Water); },
     outcome: (g, before, memo) => {
       memo.doused ??= new Set();
       for (const i of g.all(M.Ember)) if (g.hasFlag(i, F.Wet)) memo.doused.add(i);
