@@ -12,6 +12,7 @@ npm run check               # the full gate; read the stage list from package.js
 npm run test:parity         # strictest single gate: both engines must agree byte-for-byte
 npm run interaction:audit   # does each documented interaction actually HAPPEN in play
 npm run slow-world:audit    # is an absence visible when you come back to it
+npm run deploy:verify       # is the DEPLOYMENT the commit you think it is
 npm run build               # cargo -> wasm32, then Vite
 ```
 
@@ -50,7 +51,9 @@ check fail when it stops witnessing it.
 ## Gotchas that have already cost time
 
 - **A missing wasm does not throw.** It silently drops to the slower JS engine, so a broken
-  deploy looks fine. After deploying, confirm the status line reads "wasm sim online".
+  deploy looks fine. `npm run deploy:verify` checks that mechanically, along with the
+  question that had no answer at all until 2026-08: whether the running deployment is the
+  commit you think it is. Do not verify a deploy by eye.
 - **A rule that only runs between sessions still needs a visibility gate.** The slow world
   ships correct-and-pointless very easily: cargo tests and parity both pass while the
   effect is four cells nobody would notice. `npm run slow-world:audit` is what asks

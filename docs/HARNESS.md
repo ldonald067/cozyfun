@@ -57,10 +57,55 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   Both scripts drive a real headless Chrome over CDP, so unlike an embedded preview pane they never get `requestAnimationFrame` throttled — the simulation actually runs while a check waits on it. The app has no backend, so a run only touches the throwaway browser profile's own localStorage.
 
   It earned itself on the first run: it caught `/favicon.ico` 404ing in production, which the local path **cannot** see, because `startStaticServer` answers `/favicon.ico` with a 204. That is the classic shape of a verification gap — the QA surface and the user surface differed at exactly the point where the bug lived.
+- `npm run deploy:verify`: asks whether the DEPLOYMENT is the commit you think it is, which
+  nothing could answer until 2026-08-15. The app carried no build identity — the preview
+  badge reports asset filenames and only behind a QA query parameter — so a suspicion that
+  live differed from local could be held for months and never checked. It cost an afternoon:
+  a browser check failed against production and passed locally, and before the real cause
+  could be looked for, "is the deployed binary even the same code" had to be answered by
+  hand, by running a scenario through the downloaded wasm.
+
+  Vite stamps `__COZY_COMMIT__` from `COZY_COMMIT`, the Dockerfile feeds it Railway's
+  `RAILWAY_GIT_COMMIT_SHA` (via `ARG` — the only way a Dockerfile sees a build variable), and
+  the app carries it as `data-cozy-commit`. Four assertions, each a way a deploy is wrong
+  while looking normal: the page boots and reports a commit, that commit is the expected one,
+  the wasm arrives as `application/wasm`, and the app says "wasm sim online" rather than
+  "js fallback". The last two are separate on purpose — one reads the header, the other the
+  outcome, and they can disagree. A build with no commit stamps `dev`, which the gate fails
+  on rather than passing over.
+
+- `npm run qa:live`: `deploy:verify`, then browser and visual QA against `COZY_QA_URL`. This
+  is the whole "does production work" question in one command; the local gate structurally
+  cannot answer it.
+
 - `npm run visual:qa`: captures deterministic material scenes, room backdrops, and responsive layout metrics into `.tmp/visual-qa`.
 - `npm run audio:qa`: writes a native ambience manifest for local audio asset size, target loop length, and mood/room balance review into `.tmp/audio-qa`.
 - `node scripts/preview-dist.mjs 4181`: serves the built `app/dist` with bundle badges so stale browser sessions are obvious. Build first. (Windows: `.\scripts\preview-current.ps1 -Port 4181` rebuilds and serves in one step.)
 - `npm run test:chrome` / `npm run test:firefox`: **Windows-only** — they shell out to PowerShell. They drive a *visible* browser against a preview server you started yourself, which is how to watch a QA run rather than read its result. Port via `CHROME_QA_APP_PORT` / `FIREFOX_QA_APP_PORT`, default 4173.
+
+### Painting is a sprinkle, so a painted scene is not a fixture
+
+`PAINT_DENSITY` leaves powders at 55, so every brush stroke draws on engine RNG, and how far
+that RNG has advanced depends on how many ticks ran before the stroke landed. A check that
+paints and then asserts on what GREW is therefore scene-nondeterministic, and it will be
+quietly more nondeterministic against a slower host: measured on the same five clicks,
+138 soil / 26 seed locally against 107 / 35 on the deployment.
+
+Two rules follow, both learned from "a garden planted in the app actually blooms" passing
+locally on every run and failing against production:
+
+- **Paint a bed, not a plot.** One row of five strokes grew one to three plants, and a lone
+  bloom is a transient — 14 flower cells at its peak, 1 nine seconds later — so whether the
+  check passed was luck. Twelve strokes over two rows bloom in staggered order and hold the
+  outcome open for the whole window.
+- **Never certify such a check on one local run.** The bar is several consecutive runs
+  against BOTH the local build and the deployment. That check was fixed on 5 and 5.
+
+The same file holds a related trap. `catchUpTicks` is `min(secondsAway, 4000)` and a bloom
+runs about 4,000 ticks end to end, so staging a two-day absence spends the ENTIRE flowering
+inside the catch-up — whose first 3,400 ticks run 250 to a frame, a quarter-second of wall
+clock nobody can sample. If a check needs to watch something the wake produces, stage an
+absence that lands BEFORE it, not after.
 
 ## Golden Principles
 

@@ -62,6 +62,10 @@ Use the smallest honest gate for the change:
 - Between-sessions behavior: add `npm run slow-world:audit`. Every other sim gate can pass while an absence changes nothing a player would see.
 - Native audio direction: `npm run audio:qa`.
 - UI, browser, visual, audio, export, or cross-boundary work: `npm run check`.
+- Anything that has been DEPLOYED: `npm run deploy:verify`, and `npm run qa:live` when the
+  change is user-visible. A green local gate says the build is good; it says nothing about
+  what the host is serving, and until 2026-08 the app could not even report which commit it
+  was.
 - Stale-preview or visual concern: rebuild, then serve `app/dist` with `node scripts/preview-dist.mjs` (Windows has `.\scripts\preview-current.ps1 -Port 4181`), then browser or script-based visual QA against that URL.
 
 See `docs/HARNESS.md` when a missing check, stale preview, duplicated QA helper, or repeated cleanup issue should become part of the repo's feedback loop.

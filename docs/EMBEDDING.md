@@ -38,6 +38,20 @@ through reports **wasm sim online** at 60 fps rather than the JS fallback; `.was
 `/assets/*` carry `immutable` while `embed.html`, the wasm, and the audio revalidate; a
 missing file returns a real 404 as `text/plain`; TLS valid over HTTP/2.
 
+Re-checked on 2026-08-15, this time mechanically rather than by hand. `npm run qa:live`
+against the host passed end to end: the deployment reports commit `c18fe3f`, matching local
+`HEAD`; the wasm is served as `application/wasm` and the app is on it; and all sixteen
+browser checks pass against production, including planting a garden through the tray and
+watching it bloom.
+
+**Do not verify a deploy by reading the status line by eye any more.** Until this date there
+was no build identity in the app at all, so "is production running my code" could be
+suspected but not answered — and a whole afternoon went into a browser check that failed
+against production and passed locally, where the first thing that had to be established by
+hand was whether the deployed binary was even the same code. `npm run deploy:verify` answers
+it in one command now, and this section should be re-dated from a real run of it rather than
+from reasoning about a push.
+
 ## Serve it from your own origin
 
 Host the build on the same origin as the page that embeds it, or on a subdomain of the same
@@ -179,6 +193,15 @@ being relative. It exists because the rest of the gate only ever builds and serv
 so a subpath regression — especially the silent wasm one — would otherwise ship green.
 
 ## Checking a deploy
+
+Start with the gate, which covers steps 2 and the wasm half of the hosting question outright:
+
+```sh
+COZY_QA_URL=https://pixelfun.littlealbumclub.net npm run deploy:verify
+```
+
+It fails if the deployment is not the commit you expect, if the wasm arrives as the wrong
+type, or if the app fell back to the JS engine. Then, by hand, for the things it cannot see:
 
 1. Open the embed page. The poster should appear without any large network requests.
 2. Click through. The status line should say **"wasm sim online"**, not "js fallback".
