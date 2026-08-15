@@ -128,7 +128,7 @@ Some key reactions:
 
 The app is static after build. There is no account system, database, cloud save, hidden streaming dependency, or paid API dependency; the only server is `serve-static.mjs`, which serves files and nothing else. Desk Radio is an optional visible YouTube player supplied by the user.
 
-The Rust sim and the JavaScript fallback must stay byte-for-byte identical. `npm run test:parity` drives 17 scenarios through both engines and compares every cell each tick. Changing a rule in one engine and not the other is the single easiest way to break this project.
+The Rust sim and the JavaScript fallback must stay byte-for-byte identical. `npm run test:parity` drives every scenario in `scripts/smoke-parity.mjs` through both engines and compares every cell each tick. Changing a rule in one engine and not the other is the single easiest way to break this project.
 
 `CLAUDE.md` is the operating guide for coding agents (and a fast orientation for people). Beyond it: `docs/ARCHITECTURE.md` for module boundaries, `docs/CODE_REVIEW.md` for the review checklist, `docs/HARNESS.md` for build/test/visual feedback loops, `docs/VISUAL_PIPELINE.md` for renderer and shape-language notes, `docs/AUDIO.md` for the sound foundation, `docs/MATERIAL_AUDIT.md` for the per-material interaction matrix, `docs/EMBEDDING.md` for deploying and embedding, `docs/PHASE_18_HANDOFF.md` for the living-world batch record, and `ASSET_CREDITS.md` for third-party room and audio sources.
 
@@ -163,21 +163,20 @@ The generated WASM file is created during the build and is not committed.
 
 ## Checks
 
-`npm run check` is the full gate, and CI runs exactly it on pushes and pull requests to `main`. It runs twelve steps in order:
+`npm run check` is the full gate, and CI runs exactly it on pushes and pull requests to `main`.
+
+**Read the stage list from `package.json`, not from here.** A copy of it lived in this file
+and had drifted badly: it claimed twelve steps when there were fifteen, and silently omitted
+`icons:check`, `interaction:audit` and `slow-world:audit` — the two gates that ask whether a
+rule is REACHABLE and whether an absence is worth anything. A count in prose is a second
+source of truth that nothing checks. `docs/HARNESS.md` describes what each stage proves and
+why it exists; the order and the list come from the script.
+
+Two gates sit outside `check`, because they need a deployment rather than a build:
 
 ```txt
-material:audit          material identity matrix
-material:contrast       palette contrast floor
-test:sim                Rust simulation tests
-build                   production build
-smoke-wasm.mjs          WASM engine smoke
-test:js-fallback        JavaScript engine smoke
-test:parity             Rust/JS byte-for-byte comparison
-test:subpath            COZY_BASE build gate
-test:audio-reactions    post-tick reaction cue smoke
-test:browser            Chrome + Firefox smoke
-audio:qa                ambience manifest
-visual:qa               deterministic visual captures
+deploy:verify   is the running deployment the commit you think it is, on the wasm engine
+qa:live         that, then browser and visual QA against COZY_QA_URL
 ```
 
 Any of those can be run on its own — `npm run test:parity`, `npm run visual:qa`, and so on. `npm run test:wasm` builds the sim and runs just the WASM smoke.
