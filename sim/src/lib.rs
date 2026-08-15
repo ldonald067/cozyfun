@@ -77,6 +77,11 @@ const SEED_SOAK_LOSS: u16 = 20;
 /// A seed will not germinate this close to an existing plant. Without it every cell of a
 /// watered bed sprouts and the meadow becomes one solid wall of blooms with no silhouette.
 /// Five keeps a clear gap between heads now that a head is itself five cells across.
+/// How far hearth warmth carries through masonry, in cells. DRYING only — thawing
+/// keeps strict contact, or every wall near a flame melts the ice around it.
+const HEARTH_WARMTH: i32 = 2;
+/// Odds per tick that a warmed wall dries one damp neighbour.
+const WALL_HEARTH_DRIES: u32 = 2;
 const PLANT_SPACING: i32 = 5;
 
 /// Per-plant bloom silhouettes, chosen by the plant's variant exactly as its hue is.
@@ -807,19 +812,47 @@ impl Universe {
                     if cell.flags & FLAG_FROZEN != 0 {
                         continue;
                     }
-                    let hearth = neighbors.iter().any(|&nidx| {
-                        let other = old[nidx];
+                    //
+                    // Warmth carries along the masonry, so the whole chimney breast dries its
+                    // nook and not just the brick the flame happens to touch. Adjacency alone
+                    // was why this clause read as broken: measured across eight geometries,
+                    // exactly ONE wall cell was ever both touching the flame and touching the
+                    // damp, so the nook dried one cell however eagerly the rule rolled.
+                    // Raising the odds could not fix a reach problem.
+                    //
+                    // THAWING deliberately keeps strict contact. Giving it the same reach
+                    // melted the ice around every wall within two cells of any flame, and four
+                    // unrelated frost interactions went too faint to see. Radiant warmth drying
+                    // a damp wall is not the same as heat enough to melt ice.
+                    let is_flame = |other: Cell| {
                         is_hot(other.kind)
                             || (other.kind == Material::Ember as u8 && other.energy > 90)
-                    });
+                    };
+                    let touching_flame = neighbors.iter().any(|&nidx| is_flame(old[nidx]));
+                    let mut hearth = touching_flame;
+                    if !hearth {
+                        let (wx, wy) = self.xy(idx);
+                        'warmth: for dy in -HEARTH_WARMTH..=HEARTH_WARMTH {
+                            for dx in -HEARTH_WARMTH..=HEARTH_WARMTH {
+                                let (nx, ny) = (wx + dx, wy + dy);
+                                if !self.in_bounds(nx, ny) {
+                                    continue;
+                                }
+                                if is_flame(old[self.idx(nx as u32, ny as u32)]) {
+                                    hearth = true;
+                                    break 'warmth;
+                                }
+                            }
+                        }
+                    }
                     if !hearth {
                         continue;
                     }
                     for nidx in neighbors {
                         let other = old[nidx];
-                        if other.flags & FLAG_FROZEN != 0 && self.chance(6) {
+                        if other.flags & FLAG_FROZEN != 0 && touching_flame && self.chance(6) {
                             next[nidx].flags = thawed_flags(other.kind, next[nidx].flags);
-                        } else if other.flags & FLAG_WET != 0 && self.chance(10) {
+                        } else if other.flags & FLAG_WET != 0 && self.chance(WALL_HEARTH_DRIES) {
                             next[nidx].flags &= !FLAG_WET;
                         }
                     }
@@ -2434,6 +2467,48 @@ mod tests {
         }
         assert!(dried, "a hearth wall should dry the damp cell in its nook");
         assert!(thawed, "a hearth wall should thaw the frozen cell in its nook");
+    }
+
+    /// Warmth carries along the masonry, so a chimney breast dries a nook the flame
+    /// itself never reaches. Thawing deliberately does not: heat enough to melt ice
+    /// is a different thing from radiant warmth, and giving thaw the same reach made
+    /// every wall within two cells of a flame melt the ice around it.
+    #[test]
+    fn hearth_warmth_carries_along_masonry_but_thawing_needs_contact() {
+        let mut u = Universe::new(16, 16, 11);
+        // A masonry run with the flame at one end. The brick at x=8 is two cells from
+        // the fire — warm, but not touching it.
+        for x in 6..=9 {
+            set_cell(&mut u, x, 8, Material::Wall);
+        }
+        set_cell(&mut u, 7, 10, Material::Wall);
+        set_cell_state(&mut u, 10, 8, Material::Fire, 0, 240, 0);
+        // Both sit against that warm brick and against nothing else hot.
+        set_cell_state(&mut u, 7, 7, Material::Soil, 10, 200, FLAG_WET);
+        set_cell_state(&mut u, 7, 9, Material::Soil, 10, 200, FLAG_FROZEN);
+        let mut dried = false;
+        let mut thawed = false;
+        for _ in 0..120 {
+            u.tick();
+            // Dried WHILE STILL HOLDING moisture: a wet flag also clears on its own once
+            // a cell's energy drains, so without this the assertion would pass with no
+            // hearth in the scene at all.
+            if kind_at(&u, 7, 7) == Material::Soil as u8
+                && flags_at(&u, 7, 7) & FLAG_WET == 0
+                && energy_at(&u, 7, 7) > 0
+            {
+                dried = true;
+            }
+            if kind_at(&u, 7, 9) == Material::Soil as u8 && flags_at(&u, 7, 9) & FLAG_FROZEN == 0
+            {
+                thawed = true;
+            }
+            if dried {
+                break;
+            }
+        }
+        assert!(dried, "warmth two cells along the masonry should dry the far nook");
+        assert!(!thawed, "thawing should still need a cell actually touching the flame");
     }
 
     #[test]

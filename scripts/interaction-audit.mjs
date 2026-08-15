@@ -374,13 +374,24 @@ const CHECKS = [
     paint: (p) => { p(15, 19, 3, M.Wall); p(15, 15, 2, M.Water); p(19, 15, 1, M.Ice); },
     outcome: (g, before) => [...g.gained(M.Wall, F.Wet, before), ...g.gained(M.Wall, F.Frozen, before)] },
   { m: "Wall", covers: "wall.hearth", role: "hearth masonry dries its damp nook", w: 30, h: 26, seed: 54, ticks: 3000,
-    // Damp stone in a wall nook with a flame in it. The claim is that the masonry dries its
-    // neighbours without igniting them, so the outcome is stone that got wet and then lost it.
-    paint: (p) => { p(15, 19, 2, M.Stone); p(15, 16, 2, M.Water); p(10, 19, 2, M.Wall); p(20, 19, 2, M.Wall); p(15, 13, 1, M.Fire); },
+    // A masonry column with a soaked stone face on one side and the flame on the OTHER,
+    // out of the fire's own reach, so anything that dries can only have been dried by the
+    // wall. The flame is kept alive by `act`; a single painted fire burns out in ~20 ticks.
+    paint: (p) => {
+      for (const y of [14, 16, 18, 20]) p(16, y, 0, M.Wall);
+      for (const y of [15, 17, 19]) p(14, y, 1, M.Stone);
+      p(14, 12, 2, M.Water);
+    },
+    act: (p, t) => { if (t % 30 === 1 && t < 2500) { p(18, 16, 1, M.Fire); p(18, 20, 1, M.Fire); } },
+    // Stone that lost the wet flag WHILE STILL HOLDING moisture. That qualifier is the
+    // whole check: wet flags also clear on their own once a cell's energy drains, so the
+    // previous predicate — "was wet, is dry now" — scored identically with the fire taken
+    // out of the scene entirely. It measured stone drying out, not masonry drying it.
+    // Only the hearth clears the flag without draining what is behind it.
     outcome: (g, before, memo) => {
       memo.damp ??= new Set();
       for (const i of g.all(M.Stone)) if (g.hasFlag(i, F.Wet)) memo.damp.add(i);
-      return [...memo.damp].filter((i) => g.kindOf(i) === M.Stone && !g.hasFlag(i, F.Wet));
+      return [...memo.damp].filter((i) => g.kindOf(i) === M.Stone && !g.hasFlag(i, F.Wet) && g.energyAt(i) > 0);
     } },
   { m: "Wall", covers: "wall.crumbles", role: "freeze-thaw stress crumbles it into stone", w: 30, h: 26, seed: 55, ticks: 30000,
     // Stress accrues per cycle and the wall only crumbles once it is carrying a lot of it,

@@ -903,19 +903,33 @@ class JsSandboxEngine implements SandboxEngine {
   private wallReact(idx: number, x: number, y: number, old: Uint8Array, next: Uint8Array) {
     if (readU16(old, idx + 6) & CELL_FLAG.Frozen) return;
     const neighbors = this.neighbors(x, y);
-    const hearth = neighbors.some((nidx) => {
+    // Warmth carries HEARTH_WARMTH cells along the masonry for drying; thawing keeps
+    // strict contact. See sim/src/lib.rs for why the two differ.
+    const isFlame = (nidx: number) => {
       const other = old[nidx];
       return (
         HOT_MATERIALS.includes(other as (typeof HOT_MATERIALS)[number]) ||
         (other === MATERIAL.Ember && readU16(old, nidx + 4) > 90)
       );
-    });
+    };
+    const touchingFlame = neighbors.some(isFlame);
+    let hearth = touchingFlame;
+    if (!hearth) {
+      for (let dy = -HEARTH_WARMTH; dy <= HEARTH_WARMTH && !hearth; dy++) {
+        for (let dx = -HEARTH_WARMTH; dx <= HEARTH_WARMTH && !hearth; dx++) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (!this.inBounds(nx, ny)) continue;
+          if (isFlame(this.index(nx, ny))) hearth = true;
+        }
+      }
+    }
     if (!hearth) return;
     for (const nidx of neighbors) {
       const otherFlags = readU16(old, nidx + 6);
-      if (otherFlags & CELL_FLAG.Frozen && this.chance(6)) {
+      if (otherFlags & CELL_FLAG.Frozen && touchingFlame && this.chance(6)) {
         writeU16(next, nidx + 6, thawedFlags(old[nidx], readU16(next, nidx + 6)));
-      } else if (otherFlags & CELL_FLAG.Wet && this.chance(10)) {
+      } else if (otherFlags & CELL_FLAG.Wet && this.chance(WALL_HEARTH_DRIES)) {
         writeU16(next, nidx + 6, readU16(next, nidx + 6) & ~CELL_FLAG.Wet);
       }
     }
@@ -1476,6 +1490,10 @@ const SCATTER_REACH = 14;
 // A seed will not germinate this close to an existing plant. Without it every cell of a
 // watered bed sprouts and the meadow becomes one solid wall of blooms with no silhouette.
 // Five keeps a clear gap between heads now that a head is itself five cells across.
+/// How far hearth warmth carries through masonry, in cells. Drying only.
+const HEARTH_WARMTH = 2;
+/// Odds per tick that a warmed wall dries one damp neighbour.
+const WALL_HEARTH_DRIES = 2;
 const PLANT_SPACING = 5;
 
 // Per-plant bloom silhouettes, chosen by the plant's variant exactly as its hue is.
