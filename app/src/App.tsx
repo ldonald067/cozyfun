@@ -42,6 +42,7 @@ import {
   type SceneSnapshotMetadata
 } from "./storage";
 import { exportClip, exportPostcard, renderSandbox } from "./renderer";
+import { BUILD_COMMIT } from "./buildStamp";
 import { wakeTerrarium } from "./slowWorld";
 import { claimWins, openOwnerChannel, type OwnerChannel } from "./windowOwnership";
 import {
@@ -697,7 +698,7 @@ export function App() {
   }
 
   return (
-    <main className={`app-shell ${activeSceneEnvironment.className}`} style={sceneShellStyle}>
+    <main className={`app-shell ${activeSceneEnvironment.className}`} style={sceneShellStyle} data-cozy-commit={BUILD_COMMIT}>
       <canvas ref={motesCanvasRef} className="motes-canvas" aria-hidden="true" />
       {previewBadge && (
         <div className="preview-build-badge" data-testid="preview-build-badge">

@@ -17,6 +17,8 @@
     "test:parity": "node scripts/smoke-parity.mjs",
     "test:audio-reactions": "node scripts/smoke-audio-reactions.mjs",
     "test:browser": "node scripts/smoke-browser.mjs",
+    "deploy:verify": "node scripts/deploy-verify.mjs",
+    "qa:live": "node scripts/deploy-verify.mjs && npm run test:browser && npm run visual:qa",
     "test:chrome": "powershell -ExecutionPolicy Bypass -File scripts/test-chrome.ps1",
     "test:firefox": "powershell -ExecutionPolicy Bypass -File scripts/test-firefox.ps1",
     "visual:qa": "node scripts/visual-qa.mjs",

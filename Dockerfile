@@ -26,6 +26,12 @@ COPY package.json ./
 RUN npm run build:sim
 
 COPY app ./app
+# Railway injects RAILWAY_GIT_COMMIT_SHA into GitHub-triggered builds, but a Dockerfile only
+# sees a build variable it declares with ARG, in the stage that uses it. This is what lets
+# `npm run deploy:verify` prove which commit a running deployment is, instead of inferring it
+# from an asset filename. A build without it stamps "dev" rather than a wrong commit.
+ARG RAILWAY_GIT_COMMIT_SHA=""
+ENV COZY_COMMIT=$RAILWAY_GIT_COMMIT_SHA
 # COZY_BASE is intentionally unset, and must stay unset for this image: it serves from the
 # root of its own hostname, and scripts/serve-static.mjs maps request paths straight onto
 # dist without stripping a prefix. A COZY_BASE build emits /<base>/assets/... references
