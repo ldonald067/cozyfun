@@ -4,9 +4,10 @@ This roadmap keeps the project focused: make the toy feel good, keep the codebas
 
 ## Status Snapshot
 
-Every phase through 18 is complete except one open item: Phase 8's remaining subjective listening pass.
+Every phase through 19 is complete except two open items: Phase 8's remaining subjective
+listening pass, and the shelved `fix/reaction-cell-clobber` branch described in Phase 19.
 
-The sandbox is a playable, deployed browser toy: React/Vite UI, Rust/WASM sim with a byte-identical JS fallback, 18 paintable materials plus the Eraser on the toolbar and 8 generated-only outcomes, six credited room backdrops with room-linked native ambience, optional YouTube Desk Radio, local save/share/postcard/clip export, a click-to-load embed poster, and deterministic sim/parity/browser/visual/audio QA wired into local scripts and CI. It runs at `pixelfun.littlealbumclub.net` and is iframed into `littlealbumclub.net`. Details live in the phase sections below.
+The sandbox is a playable, deployed browser toy: React/Vite UI, Rust/WASM sim with a byte-identical JS fallback, 18 paintable materials plus the Eraser on the toolbar and 8 generated-only outcomes, six credited room backdrops with room-linked native ambience, optional YouTube Desk Radio, local save/share/postcard/clip export, a click-to-load embed poster, deterministic sim/parity/browser/visual/audio QA wired into local scripts and CI, and a deploy gate that proves which commit the running host is serving. It runs at `pixelfun.littlealbumclub.net` and is iframed into `littlealbumclub.net`. Details live in the phase sections below.
 
 ## Phase 0: Playable V0
 
@@ -503,9 +504,11 @@ session runs four times more ticks than any absence can buy — so absence got i
   and the player arrives to a garden rather than to a diff.
 - `npm run slow-world:audit` is the gate, because every other sim check passes happily on a
   correct-and-invisible rule. Measured on a watered garden beside a burned-out hearth: a day
-  away visibly changes 105 cells at median contrast 267 (against 65 for an hour) and grows
+  away visibly changes 127 cells at median contrast 283 (against 77 for an hour) and grows
   the garden into 9 columns it did not stand in before. A scene with nothing alive in it
-  comes back byte-identical.
+  comes back byte-identical. (Those figures are post-Phase-19; before the wake learned to
+  stop on an open bloom they were 105 and 267 — fewer visible cells for MORE ticks spent,
+  because the change was water sloshing rather than flowers.)
 - Rain Desk and Snow Window were cut back in the same change — one drop every 7.6s and 9.4s
   respectively, from 1.8s and 2.8s, with their cell caps cut to 2% and 1.5%. They had been
   an order of magnitude busier than every other room, which read as constant weather rather
@@ -537,3 +540,54 @@ The most valuable finding of the phase was not a material rule: `saveSandboxComp
 `scripts/visual-qa.mjs` had been drawing the glow layer *underneath* the opaque base canvas,
 so every visual-QA capture reviewed the night lights as though they did not exist. Four of
 batch 5's five findings had survived earlier review passes for that reason alone.
+
+## Phase 19: Knowing What Production Is Doing
+
+Status: complete.
+
+The phase started as a routine live check and turned into the discovery that this project
+could not answer its most basic deployment question. A browser check — the one that plants a
+garden through the tray and asserts a bloom opens — passed locally on every run and failed
+against `pixelfun.littlealbumclub.net`. Before the real cause could be looked for, "is the
+deployed binary even the same code" had to be answered by hand, by downloading the wasm and
+running a scenario through it, because the app carried no build identity at all.
+
+- **Build identity.** Vite stamps `__COZY_COMMIT__` from `COZY_COMMIT`; the Dockerfile feeds
+  it Railway's `RAILWAY_GIT_COMMIT_SHA` through `ARG`, which is the only way a Dockerfile
+  sees a build variable; the app carries it as `data-cozy-commit`. `npm run deploy:verify`
+  reads it back and checks four things, each a way a deploy is wrong while looking normal:
+  the page boots and reports a commit, that commit is the expected one, the wasm arrives as
+  `application/wasm`, and the app is on the wasm engine rather than the JS fallback. A build
+  with no commit stamps `dev`, which the gate fails on. `npm run qa:live` is that plus
+  browser and visual QA against the deployment.
+- **The check was at fault, not the code.** Painting is a sprinkle — `PAINT_DENSITY` leaves
+  powders at 55 — so every stroke draws on engine RNG, and how far that RNG has advanced
+  depends on how many ticks ran before the click landed. The same five clicks laid 138 soil
+  and 26 seed locally against 107 and 35 live, which grew a different number of plants. On
+  top of that the target was transient: 14 flower cells at peak, 1 nine seconds later. The
+  fixture now plants a bed rather than a plot, and was certified on five consecutive runs
+  against each of local and production rather than one lucky run.
+- **You arrive in flower.** `catchUpTicks` saturates at 4,000 and a bloom runs about that
+  same length end to end, so any absence over an hour spent the whole flowering inside an
+  invisible fast-forward whose first 3,400 ticks run 250 to a frame. A player back after two
+  days found two or three Flower cells — spent crowns, which read as sticks. The wake now
+  stops once a head opens and plays a 600-tick tail on screen. Measured live, a day away
+  arrives at 21-36 flower cells with an open crown, against 2-3 before.
+- **Hearth warmth became real conduction.** A wall beside a flame dried exactly one cell,
+  because only ever one brick touched both the flame and the damp. Warmth now conducts one
+  brick along the stonework; thawing still needs contact, since giving it the same reach
+  melted the ice around every wall near a flame.
+- An adversarial review of the whole phase filed five findings and every one was real,
+  including that "carries along the masonry" had been implemented as a 5x5 proximity scan,
+  and that a bloom the player *left* open cancelled their next absence on its first chunk.
+
+### Open: the reaction-cell clobber
+
+`fix/reaction-cell-clobber` is pushed and deliberately **not merged**. Both engines treat a
+move target as free if it is empty in `old` *or* in `next`, so a mover can overwrite a cell
+`apply_reactions` created in the same tick — measured, about 97% of reaction-created cells.
+Correcting it is a rebalancing project, not a bug fix: with it applied, a day away produces
+zero `ember -> soil` and zero new stems against 41 and 24 on `main`, the scene drowns in
+moss, and `slow-world:audit` fails outright. The whole material balance was tuned inside
+that behaviour. Landing it means re-tuning moss spread and water emission until the garden
+grows again, then re-checking all 123 interaction checks.
