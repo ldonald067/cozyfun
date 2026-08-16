@@ -43,7 +43,7 @@ import {
 } from "./storage";
 import { exportClip, exportPostcard, renderSandbox } from "./renderer";
 import { BUILD_COMMIT } from "./buildStamp";
-import { catchUpRemaining, wakeTerrarium, WAKE_BLOOM_TAIL_TICKS } from "./slowWorld";
+import { catchUpRemaining, nextCatchUpChunk, wakeTerrarium } from "./slowWorld";
 import { claimWins, openOwnerChannel, type OwnerChannel } from "./windowOwnership";
 import {
   getSceneEnvironment,
@@ -54,19 +54,10 @@ import {
 } from "./sceneEnvironments";
 
 const WORLD_WIDTH = 220;
-// How much an absence is worth, and in what order it is spent, belongs to
-// `slowWorld.ts` — see `wakeTerrarium`. What lives here is only the PACING of the
-// catch-up it hands back, which is a presentation choice.
-const FAST_FORWARD_TICKS_PER_FRAME = 250;
-// The last stretch of catch-up plays on screen at roughly 4x, so returning to a grown
-// garden means WATCHING the buds you came back to actually open, not teleporting to
-// the aftermath. Everything before this window still runs invisibly fast.
-//
-// It is the same number `slowWorld.ts` leaves on the clock when it lands the wake on an
-// open bloom, and imported rather than repeated so the two cannot drift: the tail exists
-// precisely so that arrival is watched.
-const WAKE_UP_REPLAY_TICKS = WAKE_BLOOM_TAIL_TICKS;
-const WAKE_UP_TICKS_PER_FRAME = 2;
+// How much an absence is worth, how it is paced, and where it stops all belong to
+// `slowWorld.ts` — see `wakeTerrarium` and `nextCatchUpChunk`. Chunk size is not a free
+// presentation choice: the bloom check happens between chunks, so it decides where the
+// wake lands, and it used to be duplicated here and in the audit.
 const AUTOSAVE_INTERVAL_MS = 30_000;
 const WINDOW_OPEN_KEY = "cozy-pixel-sandbox:window:v1";
 const WORLD_HEIGHT = 140;
@@ -107,6 +98,10 @@ export function App() {
   // the same autosave was the "why does it look different over there" bug. The channel
   // and the arbitration rules live in `windowOwnership.ts`.
   const ownershipRef = useRef<OwnerChannel | null>(null);
+  // Crowns already open when the player got back. The wake stops early only for a bloom it
+  // can take credit for; without this, leaving while the garden was in flower cut the whole
+  // catch-up on the first chunk.
+  const crownsAtWakeRef = useRef<ReadonlySet<number>>(new Set());
   // Ownership gates WRITES, not just the tick loop. Pausing a losing window still left it
   // finishing its wake-up catch-up and still let its close handler save, so closing a
   // stale second copy could overwrite the scene the player had just been tending.
@@ -155,6 +150,7 @@ export function App() {
         const savedAtMs = restored.savedAt ? Date.parse(restored.savedAt) : Number.NaN;
         const secondsAway = Number.isFinite(savedAtMs) ? Math.floor((Date.now() - savedAtMs) / 1000) : 0;
         const woken = wakeTerrarium(created, secondsAway);
+        crownsAtWakeRef.current = woken.crownsAtWake;
         if (woken.catchUpTicks >= 60) {
           fastForwardRef.current = woken.catchUpTicks;
           setStatus(
@@ -210,16 +206,19 @@ export function App() {
       if (fastForwardRef.current > 0 && ownsTerrariumRef.current) {
         // Catching up on time away. Chunked so even the JS fallback stays responsive,
         // and reaction cues are skipped — 4000 ticks of retroactive pops would be noise.
-        // The final WAKE_UP_REPLAY_TICKS play at ~4x so the wake-up is watched, not skipped.
-        const chunk = fastForwardRef.current > WAKE_UP_REPLAY_TICKS
-          ? Math.min(FAST_FORWARD_TICKS_PER_FRAME, fastForwardRef.current - WAKE_UP_REPLAY_TICKS)
-          : Math.min(WAKE_UP_TICKS_PER_FRAME, fastForwardRef.current);
+        // The final stretch plays at ~4x so the wake-up is watched, not skipped.
+        const chunk = nextCatchUpChunk(fastForwardRef.current);
         for (let i = 0; i < chunk; i++) engine.tick();
         // Stop the invisible fast-forward once the garden is actually in flower, leaving
         // only the on-screen tail. `slowWorld.ts` argues why; the short version is that an
         // absence should end on the rising action, and a full budget spends the whole bloom
         // where nobody can see it. Checked once per chunk, so at most ~16 reads per wake.
-        fastForwardRef.current = catchUpRemaining(engine.getCellBytes(), fastForwardRef.current - chunk, engine.width());
+        fastForwardRef.current = catchUpRemaining(
+          engine.getCellBytes(),
+          fastForwardRef.current - chunk,
+          engine.width(),
+          crownsAtWakeRef.current
+        );
         lastSimTick = time;
       } else if (!paused && time - lastSimTick >= SIM_TICK_MS) {
         const reactionCellsBefore = audio.canPlayReactionCues() ? engine.getCellBytes() : null;

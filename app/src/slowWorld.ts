@@ -55,8 +55,20 @@ const CROWN_NEIGHBOURS = 3;
  */
 export const WAKE_BLOOM_TAIL_TICKS = 600;
 
+/**
+ * How the catch-up is spent per frame. Both numbers live here rather than in `App.tsx`
+ * because bloom detection happens between chunks, which makes chunk size part of the
+ * observable wake policy: change it and the wake lands somewhere else. `slow-world-audit`
+ * used to hard-code 250 with a "matches App.tsx" comment, which is precisely the drift this
+ * module exists to prevent.
+ */
+const WAKE_FAST_CHUNK = 250;
+const WAKE_TAIL_CHUNK = 2;
+
 /** Anything that can take a slow step — the engine, without importing its module. */
 type SlowSteppable = { slowStep(): void };
+/** What a wake needs to read back off the engine to decide where to stop. */
+type WakingTerrarium = SlowSteppable & { getCellBytes(): Uint8Array; width(): number };
 
 export type AbsencePlan = {
   /** Between-session steps earned. 1h -> 4, 12h -> 14, a day -> 18, a week -> 24. */
@@ -104,9 +116,29 @@ export function planAbsence(secondsAway: number): AbsencePlan {
  * Deliberately NOT an engine rule — it changes how many ticks the app runs, not what a tick
  * does, so both engines stay byte-identical and parity is untouched.
  */
-export function catchUpRemaining(cells: Uint8Array, remaining: number, width: number): number {
+export function catchUpRemaining(
+  cells: Uint8Array,
+  remaining: number,
+  width: number,
+  crownsAtWake: ReadonlySet<number>
+): number {
   if (remaining <= WAKE_BLOOM_TAIL_TICKS) return remaining;
-  return aHeadIsOpen(cells, width) ? WAKE_BLOOM_TAIL_TICKS : remaining;
+  for (const crown of openCrowns(cells, width)) {
+    // A head that was ALREADY open when the player left is not this wake's doing. Without
+    // this the first chunk sees yesterday's flower and cuts 4,000 ticks to 600, so leaving
+    // while the garden is in bloom — the likeliest moment to wander off — bought an absence
+    // that did almost nothing. Compared by position rather than by count, so a crown that
+    // sheds and a different one that opens still reads as new.
+    if (!crownsAtWake.has(crown)) return WAKE_BLOOM_TAIL_TICKS;
+  }
+  return remaining;
+}
+
+/** How many ticks of catch-up to spend in one frame, given what is left. */
+export function nextCatchUpChunk(remaining: number): number {
+  return remaining > WAKE_BLOOM_TAIL_TICKS
+    ? Math.min(WAKE_FAST_CHUNK, remaining - WAKE_BLOOM_TAIL_TICKS)
+    : Math.min(WAKE_TAIL_CHUNK, remaining);
 }
 
 /**
@@ -115,8 +147,9 @@ export function catchUpRemaining(cells: Uint8Array, remaining: number, width: nu
  * `scripts/slow-world-audit.mjs` on purpose, the same way `wakeTerrarium` is: a gate that
  * restated this would be free to drift from the rule the app actually applies.
  */
-export function aHeadIsOpen(cells: Uint8Array, width: number): boolean {
+export function openCrowns(cells: Uint8Array, width: number): number[] {
   const count = cells.length / CELL_STRIDE;
+  const crowns: number[] = [];
   for (let i = 0; i < count; i++) {
     if (cells[i * CELL_STRIDE] !== MATERIAL.Flower) continue;
     const x = i % width;
@@ -128,17 +161,29 @@ export function aHeadIsOpen(cells: Uint8Array, width: number): boolean {
         const nx = x + dx;
         const ny = y + dy;
         if (nx < 0 || ny < 0 || nx >= width || ny * width + nx >= count) continue;
-        if (cells[(ny * width + nx) * CELL_STRIDE] === MATERIAL.Flower && ++petals >= CROWN_NEIGHBOURS) {
-          return true;
-        }
+        if (cells[(ny * width + nx) * CELL_STRIDE] === MATERIAL.Flower) petals++;
       }
     }
+    if (petals >= CROWN_NEIGHBOURS) crowns.push(i);
   }
-  return false;
+  return crowns;
 }
 
-export function wakeTerrarium(engine: SlowSteppable, secondsAway: number): AbsencePlan {
+/** Is any bloom open at all? The gate's phrasing of the same question. */
+export function aHeadIsOpen(cells: Uint8Array, width: number): boolean {
+  return openCrowns(cells, width).length > 0;
+}
+
+export type WakeResult = AbsencePlan & {
+  /** Crowns already open when the player got back, which this wake cannot take credit for. */
+  crownsAtWake: ReadonlySet<number>;
+};
+
+export function wakeTerrarium(engine: WakingTerrarium, secondsAway: number): WakeResult {
   const plan = planAbsence(secondsAway);
   for (let step = 0; step < plan.slowSteps; step++) engine.slowStep();
-  return plan;
+  // Sampled AFTER the slow steps and before any catch-up: this is the board the player
+  // actually left, plus what the absence did to it, which is the right baseline for
+  // "did something bloom while I was coming back".
+  return { ...plan, crownsAtWake: new Set(openCrowns(engine.getCellBytes(), engine.width())) };
 }

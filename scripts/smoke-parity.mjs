@@ -187,6 +187,92 @@ const scenarios = [
     },
   },
   {
+    // Hearth conduction, with the heat reachable ONLY through masonry. An adversarial review
+    // noted the rule had no parity scenario that reached it: the terrarium scenario below
+    // mentions a hearth in a comment but asserts nothing about one, so both engines could
+    // lose the reach together and stay byte-identical.
+    //
+    // The geometry is the argument. Lava sits against the right end of a masonry slab; the
+    // soil rides on TOP of the slab around x=12-14, three or more cells from any lava, so no
+    // brick it touches is itself in contact with heat. Anything that dries up there was
+    // dried by warmth conducted one brick along the stonework.
+    //
+    // Lava rather than fire because a painted flame burns out in ~20 ticks and this needs a
+    // heat source that is still there when the water has finished soaking in.
+    //
+    // Scope: this scenario covers the DRYING reach only. The thaw half — that a
+    // conduction-warmed brick must not thaw what it touches — is covered by the cargo test
+    // `hearth_warmth_carries_along_masonry_but_thawing_needs_contact`. Staging a frozen cell
+    // here needs ice, ice never falls, and placing it where it would both freeze the soil and
+    // sit beside a conduction-warm brick puts it close enough to the lava to melt. What parity
+    // is for is exercising the branch in both engines, and the drying half does that.
+    name: "warmth conducting along a chimney breast",
+    w: 24, h: 20, seed: 811, ticks: 260,
+    paint(p) {
+      for (let x = 0; x < 24; x++) p(x, 18, 1, M.Wall);
+      // Painted before the masonry so the walls overwrite where they overlap: the brush
+      // stamps a five-cell plus at every radius, so nothing here can be placed one cell at
+      // a time and the order is what gives the layout its shape.
+      p(14, 10, 1, M.Stone);
+      for (let x = 6; x <= 14; x++) p(x, 12, 1, M.Wall);
+      for (let y = 8; y <= 11; y++) p(16, y, 1, M.Wall);
+      for (let x = 16; x <= 20; x++) p(x, 14, 1, M.Wall);
+      for (let y = 8; y <= 13; y++) p(20, y, 1, M.Wall);
+      // The firebox needs a floor or the lava simply drains out of it within 30 ticks, and
+      // the breast has to separate it from the water or the pour quenches it just as fast.
+      // Both were found by printing the board rather than by reasoning about it.
+      for (let y = 9; y <= 12; y++) p(18, y, 1, M.Lava);
+      p(14, 8, 1, M.Water);
+    },
+    observe(seen, cells, w, h, tick) {
+      const S = STRIDE;
+      const kind = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? -1 : cells[(y * w + x) * S]);
+      // Distance to the nearest heat, in cells. A brick TOUCHING lava is 1 away from it, so
+      // soil touching that brick is 2 away. Requiring a dried cell to be MORE than 2 from
+      // any lava is therefore a positional proof that the brick which dried it was not
+      // itself in contact with heat — the conduction branch, and nothing else, can reach it.
+      //
+      // The first version of this guard asserted only "dried while still holding moisture",
+      // and it passed with conduction deleted from both engines. Drying is not evidence of
+      // conduction; drying OUT OF CONTACT RANGE is.
+      const heatWithin = (x, y, r) => {
+        for (let dy = -r; dy <= r; dy++) {
+          for (let dx = -r; dx <= r; dx++) {
+            const k = kind(x + dx, y + dy);
+            if (k === 8 || k === 6 || k === 17) return true; // Lava, Fire, Meteor
+          }
+        }
+        return false;
+      };
+      let wetSoil = 0;
+      seen.wetAt ??= new Set();
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const i = (y * w + x) * S;
+          if (cells[i] !== 9) continue; // Stone — it holds damp without greening into moss
+          const flags = cells[i + 6] | (cells[i + 7] << 8);
+          const energy = cells[i + 4] | (cells[i + 5] << 8);
+          const at = y * w + x;
+          if (flags & 1) {
+            wetSoil++;
+            seen.wetAt.add(at);
+          } else if (seen.wetAt.has(at) && energy > 0 && !heatWithin(x, y, 2)) {
+            seen.driedBeyondContact = true;
+          }
+        }
+      }
+      seen.maxWet = Math.max(seen.maxWet ?? 0, wetSoil);
+      seen.lastTick = tick;
+    },
+    expect(seen) {
+      if (!seen.maxWet) return "no stone ever got damp, so nothing was there for a hearth to dry";
+      if (!seen.driedBeyondContact) {
+        return "no damp stone dried more than two cells from any heat, so nothing proves warmth conducted along the masonry rather than radiating from the lava itself";
+      }
+      return null;
+    },
+  },
+  {
     name: "glass terrarium over a hearth",
     w: 28, h: 26, seed: 313, ticks: 160,
     paint(p) {

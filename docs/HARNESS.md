@@ -10,6 +10,14 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
 - `npm run check`: the full local gate, in order — material identity audit, material contrast floor, site-icon freshness, Rust sim tests, production build, WASM smoke, JS fallback smoke, cross-engine parity, interaction reachability, slow-world visibility, subpath build, audio reactions, browser smoke, audio QA, and visual QA. If you are listing the stages anywhere, take the list from `package.json` rather than from memory.
 - `npm run test:parity`: drives its scenarios through the Rust/WASM sim and the JS fallback together and asserts every cell byte matches on every tick. This is the only gate that can see the two engines diverge — the single-engine smokes below can both pass while behaviour has drifted.
 
+  Building a scenario is fixture work, and the brush is blunter than it looks: **every
+  radius stamps the same five-cell plus**, so nothing can be placed one cell at a time and
+  paint ORDER is what gives a layout its shape (paint the target first, let the masonry
+  overwrite it). Print the board rather than reasoning about it — the chimney-breast scenario
+  needed a firebox floor, because lava drains out of an open box inside 30 ticks, and a wall
+  between the pour and the fire, because water quenches it just as fast. Neither was visible
+  from the code.
+
   A scenario may also declare `slowSteps: [{ at, count }]` to take between-session slow steps at the end of a given tick. The slow world draws on the same RNG stream as `tick()`, so an unmirrored roll in it desynchronises the engines exactly as one in a movement rule would, and it has to be gated here for the same reason.
 
   **Byte-equality cannot tell coverage from vacuity.** Delete a rule from *both* engines and every scenario still passes. A scenario may therefore carry `observe`/`expect` callbacks that assert what it actually witnessed, and it fails with `scenario is VACUOUS` when it stops witnessing it. The "germinating garden" scenario is the cautionary tale: it passed for months while its soil bed greened into moss inside 100 ticks, so no seed in it ever germinated and it proved nothing about growth. Prose in a comment claiming a scenario is non-vacuous is not a check — if you verify a scenario by hand, encode what you counted.

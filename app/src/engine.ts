@@ -903,8 +903,12 @@ class JsSandboxEngine implements SandboxEngine {
   private wallReact(idx: number, x: number, y: number, old: Uint8Array, next: Uint8Array) {
     if (readU16(old, idx + 6) & CELL_FLAG.Frozen) return;
     const neighbors = this.neighbors(x, y);
-    // Warmth carries HEARTH_WARMTH cells along the masonry for drying; thawing keeps
-    // strict contact. See sim/src/lib.rs for why the two differ.
+    // Warmth CONDUCTS along the masonry: a brick is warm if it touches the flame, or if it
+    // touches a brick that does. Mirrors sim/src/lib.rs exactly, including that thawing
+    // still needs strict contact, and including the manual loops — this runs for every wall
+    // cell every tick and a scene can be mostly wall. It was a 5x5 proximity scan until an
+    // adversarial review pointed out that a lone brick across an air gap warmed its
+    // neighbour exactly like a chimney breast.
     const isFlame = (nidx: number) => {
       const other = old[nidx];
       return (
@@ -915,12 +919,24 @@ class JsSandboxEngine implements SandboxEngine {
     const touchingFlame = neighbors.some(isFlame);
     let hearth = touchingFlame;
     if (!hearth) {
-      for (let dy = -HEARTH_WARMTH; dy <= HEARTH_WARMTH && !hearth; dy++) {
-        for (let dx = -HEARTH_WARMTH; dx <= HEARTH_WARMTH && !hearth; dx++) {
-          const nx = x + dx;
-          const ny = y + dy;
-          if (!this.inBounds(nx, ny)) continue;
-          if (isFlame(this.index(nx, ny))) hearth = true;
+      conduct: for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (!dx && !dy) continue;
+          const bx = x + dx;
+          const by = y + dy;
+          if (!this.inBounds(bx, by)) continue;
+          if (old[this.index(bx, by)] !== MATERIAL.Wall) continue;
+          for (let fy = -1; fy <= 1; fy++) {
+            for (let fx = -1; fx <= 1; fx++) {
+              const nx = bx + fx;
+              const ny = by + fy;
+              if (!this.inBounds(nx, ny)) continue;
+              if (isFlame(this.index(nx, ny))) {
+                hearth = true;
+                break conduct;
+              }
+            }
+          }
         }
       }
     }
@@ -929,7 +945,7 @@ class JsSandboxEngine implements SandboxEngine {
       const otherFlags = readU16(old, nidx + 6);
       if (otherFlags & CELL_FLAG.Frozen && touchingFlame && this.chance(6)) {
         writeU16(next, nidx + 6, thawedFlags(old[nidx], readU16(next, nidx + 6)));
-      } else if (otherFlags & CELL_FLAG.Wet && this.chance(WALL_HEARTH_DRIES)) {
+      } else if (otherFlags & CELL_FLAG.Wet && this.chance(10)) {
         writeU16(next, nidx + 6, readU16(next, nidx + 6) & ~CELL_FLAG.Wet);
       }
     }
@@ -1490,10 +1506,6 @@ const SCATTER_REACH = 14;
 // A seed will not germinate this close to an existing plant. Without it every cell of a
 // watered bed sprouts and the meadow becomes one solid wall of blooms with no silhouette.
 // Five keeps a clear gap between heads now that a head is itself five cells across.
-/// How far hearth warmth carries through masonry, in cells. Drying only.
-const HEARTH_WARMTH = 2;
-/// Odds per tick that a warmed wall dries one damp neighbour.
-const WALL_HEARTH_DRIES = 2;
 const PLANT_SPACING = 5;
 
 // Per-plant bloom silhouettes, chosen by the plant's variant exactly as its hue is.

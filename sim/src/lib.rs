@@ -77,11 +77,6 @@ const SEED_SOAK_LOSS: u16 = 20;
 /// A seed will not germinate this close to an existing plant. Without it every cell of a
 /// watered bed sprouts and the meadow becomes one solid wall of blooms with no silhouette.
 /// Five keeps a clear gap between heads now that a head is itself five cells across.
-/// How far hearth warmth carries through masonry, in cells. DRYING only — thawing
-/// keeps strict contact, or every wall near a flame melts the ice around it.
-const HEARTH_WARMTH: i32 = 2;
-/// Odds per tick that a warmed wall dries one damp neighbour.
-const WALL_HEARTH_DRIES: u32 = 2;
 const PLANT_SPACING: i32 = 5;
 
 /// Per-plant bloom silhouettes, chosen by the plant's variant exactly as its hue is.
@@ -813,34 +808,60 @@ impl Universe {
                         continue;
                     }
                     //
-                    // Warmth carries along the masonry, so the whole chimney breast dries its
-                    // nook and not just the brick the flame happens to touch. Adjacency alone
-                    // was why this clause read as broken: measured across eight geometries,
-                    // exactly ONE wall cell was ever both touching the flame and touching the
-                    // damp, so the nook dried one cell however eagerly the rule rolled.
-                    // Raising the odds could not fix a reach problem.
+                    // Warmth CONDUCTS along the masonry: a brick is warm if it touches the
+                    // flame, or if it touches a brick that does. That is one cell of reach
+                    // past contact, which is what the clause needs — measured across eight
+                    // geometries, exactly ONE wall cell was ever both touching the flame and
+                    // touching the damp, so the nook dried one cell however eagerly the rule
+                    // rolled. Adjacency was a reach problem and no amount of rolling fixes
+                    // reach.
+                    //
+                    // This was first written as a 5x5 proximity scan, which an adversarial
+                    // review correctly called out: an isolated brick two cells diagonally
+                    // from a flame, across open air, dried its neighbour exactly like a
+                    // chimney breast. The comment said conduction and the code said
+                    // proximity. Requiring the intervening brick is both truthful and
+                    // simpler than searching a square.
                     //
                     // THAWING deliberately keeps strict contact. Giving it the same reach
-                    // melted the ice around every wall within two cells of any flame, and four
-                    // unrelated frost interactions went too faint to see. Radiant warmth drying
-                    // a damp wall is not the same as heat enough to melt ice.
+                    // melted the ice around every wall near any flame, and four unrelated
+                    // frost interactions went too faint to see. Radiant warmth drying a damp
+                    // wall is not the same as heat enough to melt ice.
                     let is_flame = |other: Cell| {
                         is_hot(other.kind)
                             || (other.kind == Material::Ember as u8 && other.energy > 90)
                     };
                     let touching_flame = neighbors.iter().any(|&nidx| is_flame(old[nidx]));
+                    // Written with manual loops rather than `neighbor_indices`, which
+                    // allocates: this runs for every wall cell every tick, and a scene can
+                    // be mostly wall.
                     let mut hearth = touching_flame;
                     if !hearth {
                         let (wx, wy) = self.xy(idx);
-                        'warmth: for dy in -HEARTH_WARMTH..=HEARTH_WARMTH {
-                            for dx in -HEARTH_WARMTH..=HEARTH_WARMTH {
-                                let (nx, ny) = (wx + dx, wy + dy);
-                                if !self.in_bounds(nx, ny) {
+                        'conduct: for dy in -1..=1i32 {
+                            for dx in -1..=1i32 {
+                                if dx == 0 && dy == 0 {
                                     continue;
                                 }
-                                if is_flame(old[self.idx(nx as u32, ny as u32)]) {
-                                    hearth = true;
-                                    break 'warmth;
+                                let (bx, by) = (wx + dx, wy + dy);
+                                if !self.in_bounds(bx, by) {
+                                    continue;
+                                }
+                                if old[self.idx(bx as u32, by as u32)].kind != Material::Wall as u8
+                                {
+                                    continue;
+                                }
+                                for fy in -1..=1i32 {
+                                    for fx in -1..=1i32 {
+                                        let (nx, ny) = (bx + fx, by + fy);
+                                        if !self.in_bounds(nx, ny) {
+                                            continue;
+                                        }
+                                        if is_flame(old[self.idx(nx as u32, ny as u32)]) {
+                                            hearth = true;
+                                            break 'conduct;
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -852,7 +873,7 @@ impl Universe {
                         let other = old[nidx];
                         if other.flags & FLAG_FROZEN != 0 && touching_flame && self.chance(6) {
                             next[nidx].flags = thawed_flags(other.kind, next[nidx].flags);
-                        } else if other.flags & FLAG_WET != 0 && self.chance(WALL_HEARTH_DRIES) {
+                        } else if other.flags & FLAG_WET != 0 && self.chance(10) {
                             next[nidx].flags &= !FLAG_WET;
                         }
                     }
@@ -2509,6 +2530,30 @@ mod tests {
         }
         assert!(dried, "warmth two cells along the masonry should dry the far nook");
         assert!(!thawed, "thawing should still need a cell actually touching the flame");
+    }
+
+    /// The finding an adversarial review filed against the first version of this rule: it
+    /// scanned a 5x5 square for flame, so a lone brick across an air gap warmed its
+    /// neighbour exactly like a chimney breast. Warmth conducts through masonry or it is
+    /// not masonry warmth.
+    #[test]
+    fn hearth_warmth_does_not_jump_an_air_gap() {
+        let mut u = Universe::new(16, 16, 11);
+        // One brick, two cells from the flame, with nothing but air between them.
+        set_cell(&mut u, 6, 8, Material::Wall);
+        set_cell_state(&mut u, 9, 8, Material::Fire, 0, 240, 0);
+        set_cell(&mut u, 5, 10, Material::Wall);
+        set_cell_state(&mut u, 5, 9, Material::Soil, 10, 200, FLAG_WET);
+        for _ in 0..120 {
+            u.tick();
+            if kind_at(&u, 5, 9) != Material::Soil as u8 {
+                break;
+            }
+            assert!(
+                flags_at(&u, 5, 9) & FLAG_WET != 0 || energy_at(&u, 5, 9) == 0,
+                "a brick with an air gap to the flame is not hearth masonry",
+            );
+        }
     }
 
     #[test]

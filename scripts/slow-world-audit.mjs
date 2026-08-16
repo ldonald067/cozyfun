@@ -45,8 +45,7 @@ const { createFallbackEngine } = require(resolve(outDir, "engine.js"));
 // The SAME absence policy the app runs, not a copy of it. `wakeTerrarium` owns the
 // step count, the tick count, and the order they are applied in, so this gate cannot
 // certify a return path that production does not perform.
-const FAST_FORWARD_CHUNK = 250; // matches App.tsx
-const { aHeadIsOpen, catchUpRemaining, planAbsence, wakeTerrarium } = require(resolve(outDir, "slowWorld.js"));
+const { aHeadIsOpen, catchUpRemaining, nextCatchUpChunk, openCrowns, planAbsence, wakeTerrarium } = require(resolve(outDir, "slowWorld.js"));
 const { colorForCell } = require(resolve(outDir, "rendering/materialColor.js"));
 
 const STRIDE = 8;
@@ -126,9 +125,9 @@ function visitAfter(secondsAway) {
   // does not spend would be certifying a return path nobody performs.
   let owed = plan.catchUpTicks;
   while (owed > 0) {
-    const chunk = Math.min(FAST_FORWARD_CHUNK, owed);
+    const chunk = nextCatchUpChunk(owed);
     for (let t = 0; t < chunk; t++) engine.tick();
-    owed = catchUpRemaining(engine.getCellBytes(), owed - chunk, W);
+    owed = catchUpRemaining(engine.getCellBytes(), owed - chunk, W, plan.crownsAtWake);
   }
   const cells = engine.getCellBytes();
   engine.dispose();
@@ -270,6 +269,35 @@ if (!aHeadIsOpen(day.cells, W)) {
       `    and shed. The wake is meant to stop its invisible fast-forward once a head opens —\n` +
       `    see catchUpRemaining in app/src/slowWorld.ts.`,
   );
+}
+
+// 3c. A bloom the player LEFT open must not spend their absence. This one is checked
+//     directly against the policy rather than through a scene, because staging "already in
+//     flower when you walked away" as a played-in fixture takes thousands of ticks to reach
+//     and then depends on it not shedding. An adversarial review filed it: without the
+//     baseline, the first 250-tick chunk sees yesterday's flower and cuts a 4,000-tick
+//     catch-up to 600, so leaving while the garden is in bloom — the likeliest moment to
+//     wander off — buys an absence that does almost nothing.
+{
+  const w = 8;
+  const cells = new Uint8Array(w * 8 * STRIDE);
+  for (let y = 2; y <= 4; y++) {
+    for (let x = 2; x <= 4; x++) cells[(y * w + x) * STRIDE] = KIND_NAME.indexOf("flower");
+  }
+  // The baseline is built with the same function production uses. Hand-picking the centre
+  // cell was wrong and this check caught it: every cell of a 3x3 bloom has three flower
+  // neighbours, so a head contributes several crowns, not one.
+  const asNew = catchUpRemaining(cells, 4000, w, new Set());
+  const asOld = catchUpRemaining(cells, 4000, w, new Set(openCrowns(cells, w)));
+  if (asNew !== 600) {
+    failures.push(`a head opening during the wake should leave only the tail, got ${asNew} ticks`);
+  }
+  if (asOld !== 4000) {
+    failures.push(
+      `a head that was ALREADY open when the player left cut the catch-up to ${asOld} ticks.\n` +
+        `    The absence is then spent on a bloom this wake had nothing to do with.`,
+    );
+  }
 }
 
 // 4. What the player did not leave living must come back untouched — and that is a
