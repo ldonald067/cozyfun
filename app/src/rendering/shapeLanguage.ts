@@ -28,6 +28,7 @@ const STARDUST_KINDS = [MATERIAL.Stardust] as const;
 const WATER_KINDS = [MATERIAL.Water] as const;
 const OIL_KINDS = [MATERIAL.Oil] as const;
 const EMBER_KINDS = [MATERIAL.Ember] as const;
+const ICE_KINDS = [MATERIAL.Ice] as const;
 const STEAM_KINDS = [MATERIAL.Steam] as const;
 const EARTH_CONTACT_KINDS = [MATERIAL.Sand, MATERIAL.Soil, MATERIAL.Stone, MATERIAL.Wall, MATERIAL.Wood] as const;
 
@@ -50,9 +51,23 @@ export const SPECIES: readonly Species[] = [
   { light: [250, 206, 88], dark: [210, 150, 34], eye: [92, 58, 30] },      // 3 sunflower, brown disc
   { light: [244, 140, 178], dark: [196, 66, 116], eye: null },             // 4 tulip
   { light: [190, 130, 236], dark: [126, 70, 182], eye: null },             // 5 lavender
-  { light: [142, 150, 238], dark: [78, 86, 190], eye: null },              // 6 bluebell
-  { light: [168, 214, 246], dark: [96, 150, 206], eye: [255, 216, 104] }   // 7 forget-me-not
+  { light: [96, 108, 214], dark: [52, 60, 156], eye: null },              // 6 bluebell, deep
+  { light: [222, 86, 152], dark: [172, 44, 110], eye: [255, 216, 104] }   // 7 cosmos
 ];
+// Slots 0, 6 and 7 used to be three shades of blue. Measured on the rendered showcase
+// rather than on these triples — the contrast gate sees one "Flower" material and cannot
+// look inside it — the heads sat 77, 107 and 126 apart while every other pairing in the
+// row was 168 or more. A third of the garden's variety went to one hue family, and a
+// player who grows three plants could easily get three blues and conclude the species
+// system was not there.
+//
+// Two edits rather than one, because re-hueing a single slot cannot fix a trio. The
+// bluebell went deep — botanically truer anyway — which lifts the worst pair off 77, and
+// the forget-me-not became a COSMOS, the only change here that renames a species. Pale
+// blue had nowhere to go: lighten it and it collides with the daisy at 79, leave it and it
+// stays in the cluster. Orange was tried first and lands 81 from the poppy; magenta is the
+// one direction with real room.
+
 const COSMIC_SPECIES: Species = { light: [228, 214, 255], dark: [150, 118, 226], eye: [235, 240, 255] };
 
 export function emptyCellColor(cells: Uint8Array, width: number, height: number, x: number, y: number, time: number): Rgb {
@@ -424,6 +439,28 @@ function wellspringColor({ color, variant, energy, time, cells, width, height, x
     (x * 5 + y * 3 + (hash & 7)) % 9 === 0 ||
     ((x ^ y) + (hash >> 2)) % 11 === 0;
   if (!rune) return out;
+  // A spring held under a chill is LISTENING: the sim stills it and reopens its drinking
+  // branch, so a misattuned spring can be re-taught. Nothing said so on screen, and the
+  // interaction audit measures it as the least discoverable rule in the game — about 57
+  // seconds of setup for a 1.9-second event across four cells, with no field note possible
+  // because Wellspring is paintable. This is a third rune state, distinct from both dormant
+  // pewter and the attuned glow: a cold blue-white breathing on its own slow clock, which
+  // reads as waiting rather than as either sleeping or lit.
+  //
+  // Presentation only. Reading neighbours is allowed; the stilling itself is the sim's.
+  if (hasNearbyKind(cells, width, height, x, y, ICE_KINDS)) {
+    // Frosted DARK with bright pips, not lit. A pale blue glow was the obvious first choice
+    // and it measured 22 from a water-attuned spring — under every contrast floor in the
+    // repo, so a chilled dormant block read as "attuned to water". Hue cannot solve this:
+    // attunement borrows the remembered material's colour, so every hue is already spoken
+    // for. Lightness is free. Attuned is lit, dormant is plain pewter, listening is a cold
+    // block gone dark under a rime of frost pips — three states no two of which are the
+    // same brightness.
+    const listen = (Math.sin(time * 0.0022 + hash * 0.6) + 1) * 0.5;
+    out = mixRgb(out, [40, 56, 74], 0.52);
+    if (hash % 3 === 0) out = mixRgb(out, [214, 238, 250], 0.34 + listen * 0.22);
+    return out;
+  }
   const tint = WELLSPRING_TINTS[energy & 255];
   if (tint) {
     const pulse = (Math.sin(time * 0.006 + hash * 0.9) + 1) * 0.5;
@@ -1002,9 +1039,21 @@ function growthColor({ kind, color, variant, age, energy, flags, time, cells, wi
   const digestingWood = woodContact.count > 0;
   const overtakingMoss = mossContact.count > 0;
   const soilDecomposer = soilContact.count > 0;
-  const cap = edge.top || localY === 0 || (hash % 6 === 0 && localY < 3);
-  const gill = localY === 1 && (localX === 1 || localX === 2);
-  const spore = hash % 13 === 0 || (age > 80 && hash % 9 === 0);
+  // Fungus grows in CLUMPS; moss is an even mat. Measured on the showcase, the two used to
+  // be the same fabric — luminance 176 +/- 31 against 169 +/- 31, and a cell-to-cell step of
+  // 33 apiece — so with colour removed there was no boundary between them at all and a
+  // fungus overtaking a carpet read as a recolour rather than as something eating it.
+  //
+  // The clump hash is taken at HALF resolution so a 2x2 patch shares its fate, and it drives
+  // the CAP, which is the strongest mark on the mat. Layering a clump wash over per-cell
+  // caps was tried first and moved the step metric by one point: a 0.34 mix cannot outvote
+  // marks painted at 0.66. Spores stay per-cell but are rarer, so they read as occasional
+  // flecks on a lumpy mat instead of the grain that made it moss-shaped.
+  const clump = hashCell(x >> 1, y >> 1, (variant ^ 0x5b) & 255);
+  const capCluster = clump % 3 === 0;
+  const cap = edge.top || capCluster || (localY === 0 && clump % 3 !== 1);
+  const gill = localY === 1 && (localX === 1 || localX === 2) && clump % 3 !== 0;
+  const spore = hash % 23 === 0 || (age > 80 && hash % 17 === 0);
 
   out = mixRgb(out, [108, 61, 128], 0.16);
   if (cosmic) out = mixRgb(out, moonFed ? [158, 153, 255] : [190, 147, 255], 0.22);
@@ -1052,7 +1101,11 @@ function growthColor({ kind, color, variant, age, energy, flags, time, cells, wi
 
   if (cap) out = mixRgb(out, capColor, 0.66);
   if (gill) out = mixRgb(out, gillColor, 0.6);
-  if (edge.bottom || localY === 3 || hash % 11 === 0) out = mixRgb(out, rottingSeed ? [86, 33, 65] : digestingWood ? [98, 58, 42] : [83, 45, 104], 0.42);
+  // The shadow between caps is clump-scale too, or it re-speckles everything the caps just
+  // gathered together.
+  if (edge.bottom || (localY === 3 && clump % 3 !== 0) || clump % 7 === 1) {
+    out = mixRgb(out, rottingSeed ? [86, 33, 65] : digestingWood ? [98, 58, 42] : [83, 45, 104], 0.42);
+  }
   if (spore) out = mixRgb(out, sporeColor, 0.72);
   if (damp) out = mixRgb(out, cosmic ? [195, 190, 255] : [168, 216, 190], cosmic ? 0.36 : 0.22);
   if (flags & CELL_FLAG.Cosmic) {

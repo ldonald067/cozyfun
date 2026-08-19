@@ -140,7 +140,7 @@ export function materialShowcaseScript() {
       [[0,-1],[-1,0],[1,0],[-1,-1],[1,-1],[-2,-1],[2,-1],[-2,-2],[0,-2],[2,-2]],                                                 // 4 tulip
       [[0,-1],[-1,-2],[1,-2],[0,-3],[-1,-4],[1,-4],[0,-5]],                                                                      // 5 lavender
       [[0,-1],[0,-2],[-1,-1],[1,-2],[-2,0],[2,-1]],                                                                              // 6 bluebell
-      [[0,-1],[-1,0],[1,0],[-1,-1],[1,-1]],                                                                                      // 7 forget-me-not
+      [[0,-1],[-1,0],[1,0],[-1,-1],[1,-1]],                                                                                      // 7 cosmos
     ];
     // The bed is Wall, not Stone and not bare soil: soil is a powder, so an unsupported
     // planter falls the moment the capture's sim starts and takes the whole plant with it.
@@ -178,7 +178,7 @@ export function materialShowcaseScript() {
     bloom(44, 134, 4, 5, [[-1, 2], [1, 4]], 95, 200);        // tulip
     bloom(51, 134, 5, 5, [[1, 2], [-1, 4]], 95, 200);        // lavender
     bloom(58, 134, 6, 5, [[-1, 2], [1, 4]], 95, 200);        // bluebell
-    bloom(65, 134, 7, 5, [[1, 2], [-1, 4]], 45, 1300, 2);    // forget-me-not, spent and shedding
+    bloom(65, 134, 7, 5, [[1, 2], [-1, 4]], 45, 1300, 2);    // cosmos, spent and shedding
 
     // Geology: a larger stone mass with mineral veins and an old patinated wall.
     rect(24, 44, 44, 56, material.Stone, 0, 60);
@@ -230,6 +230,15 @@ export function materialShowcaseScript() {
     setCell(160, 116, material.Wall); setCell(168, 116, material.Wall);
     for (const [x, y] of [[163, 112], [164, 112], [165, 112]]) setCell(x, y, material.Wellspring, material.Water, 40, 0, x);
     setCell(172, 117, material.Wellspring, 0, 40, 0, 1);
+
+    // A third wellspring state: a spring held under a chill is LISTENING, and re-drinks the
+    // next source that touches it. That is the least discoverable rule in the game — the
+    // interaction audit measures ~57 seconds of setup for a 1.9-second event across four
+    // cells — and nothing said so on screen until the renderer grew a rune state for it.
+    // Placed beside the dormant block on purpose: waiting must not read as asleep.
+    setCell(176, 117, material.Wellspring, 0, 40, 0, 2);
+    setCell(176, 116, material.Ice, 0, 200, 0, 1);
+    setCell(176, 118, material.Wall);
 
     // Firework arc: an inert rocket powder charge on stone and a lit grain climbing mid-flight.
     line(126, 134, 108, material.Wall);
