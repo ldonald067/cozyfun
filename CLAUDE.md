@@ -100,10 +100,15 @@ pulled in when you read a file there. Read these when the task touches them, not
 - Deploy and embedding: @docs/EMBEDDING.md
 - Asset provenance and licences: @ASSET_CREDITS.md
 
-Two skills are worth knowing about. **Both live in the operator's `~/.claude/skills/`, not
-in this repo**, so a fresh clone on another machine will not have them — that is deliberate
-(a tracked second copy of one of them drifted 175 lines from the copy that actually ran, and
-never executed once), but it does mean these commands can be absent.
+Two skills ship **in this repo**, under `.claude/skills/`, complete — including the `brain/`
+principles the reviewer text depends on. They belong here rather than in the operator's
+`~/.claude/skills/` for two reasons: they are this project's tools (they call
+`npm run visual:qa`, name `sim/src/lib.rs`, and quote `docs/CODE_REVIEW.md`), and a machine
+directory is backed up by nothing, while a push to `main` already protects everything here.
+
+**Keep exactly one copy.** A second copy in `~/.claude/skills/` will shadow these — that is
+not a hypothesis, it is what happened: a tracked copy drifted 175 lines from a user-level one
+and never executed once, while `AGENTS.md` described it as the reviewer this repo spawns.
 
 - `/adversarial-review` spawns Codex reviewers against the current diff, picking lenses by
   what the diff touches — parity when an engine changes, perceptual when the renderer does.
