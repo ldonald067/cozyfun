@@ -586,6 +586,23 @@ running a scenario through it, because the app carried no build identity at all.
   including that "carries along the masonry" had been implemented as a 5x5 proximity scan,
   and that a bloom the player *left* open cancelled their next absence on its first chunk.
 
+- **A design pass over the roster, both lenses.** Three findings, each measured on rendered
+  pixels rather than palettes, because `material:contrast` averages a whole material and
+  cannot see inside one. Moss and fungus were the same fabric — luminance 176 +/- 31 against
+  169 +/- 31 with an identical cell-to-cell step of 33, so with colour removed there was no
+  boundary between them and a fungus overtaking a carpet read as a recolour; fungus caps now
+  cluster on a half-resolution hash (step 27). Three of the eight flower species were blue,
+  sitting 77/107/126 apart while every other pairing was 168+; the bluebell went deep and the
+  forget-me-not became a magenta **cosmos**, lifting the worst pair to 140. And a spring held
+  under ice — the least discoverable rule in the game at ~57 seconds of setup for a
+  1.9-second event — now shows a third rune state.
+- **The skills live in the repo now.** `/adversarial-review` and `/design-review` sit
+  complete under `.claude/skills/`, including the `brain/` principles the reviewer text
+  depends on. Two copies of the first one had been drifting 175 lines apart, and the tracked
+  one — better tailored to this repo — had never executed once while `AGENTS.md` described it
+  as the reviewer this project spawns. One copy, backed up by the same push that ships the
+  game.
+
 ### Open: the reaction-cell clobber
 
 `fix/reaction-cell-clobber` is pushed and deliberately **not merged**. Both engines treat a
