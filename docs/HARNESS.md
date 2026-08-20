@@ -13,7 +13,10 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   Building a scenario is fixture work, and the brush is blunter than it looks: **every
   radius stamps the same five-cell plus**, so nothing can be placed one cell at a time and
   paint ORDER is what gives a layout its shape (paint the target first, let the masonry
-  overwrite it). Print the board rather than reasoning about it — the chimney-breast scenario
+  overwrite it). **Nothing stays where you put it, either** — liquids side-hop up to two
+  cells, gases rise, powders and stone fall, so a scenario that leaves cells floating
+  diverges for a reason that has nothing to do with the rule under test. Seal enclosures
+  with Wall. Print the board rather than reasoning about it — the chimney-breast scenario
   needed a firebox floor, because lava drains out of an open box inside 30 ticks, and a wall
   between the pour and the fire, because water quenches it just as fast. Neither was visible
   from the code.

@@ -448,7 +448,12 @@ Status: complete. Cozy translations of the two classic sandbox elements the proj
 ### Phase 17A: Wellspring (the cozy cloner)
 
 - A rune-carved block that drinks the identity of the first source material to touch it (consuming that cell, with a cosmic-charge chime) and stores it in the energy field as a material id.
-- Attuned runes tint toward the remembered material with a slow pulse; dormant runes shimmer faintly silver.
+- Three rune states, separated by BRIGHTNESS rather than hue, because attunement already
+  borrows every material's colour. Attuned runes glow with the remembered material; dormant
+  runes are flat pewter, deliberately desaturated rather than silver so an unlit block cannot
+  be mistaken for the palest attunement; and a spring held under ice goes dark under frost
+  pips, which is Phase 19's answer to the state below being invisible (see `VISUAL_PIPELINE.md`
+  for the measurements).
 - Gently pours the remembered material from open faces forever (rare per-tick chance per face), so eternal waterfalls, everlasting hearths, and meteor-shower windows are one-block scenes. Sources: sand, water, soil, fire, lava, oil, seed, stardust, meteor, moonwater, rocket.
 - Nearby ice stills the spring — and reopens its drinking branch, so a chilled spring re-drinks whatever touches it next (Phase 18). Attunement is re-teachable rather than a permanent first-touch commitment. Eraser clears it like anything else.
 

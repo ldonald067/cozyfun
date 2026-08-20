@@ -18,9 +18,10 @@ gotchas this batch ran into. The copy that used to live here had already drifted
 a scenario count and a cargo-test count that were both wrong within weeks, which is the
 argument against duplicating them.
 
-One convention this batch discovered and the rest of the repo now assumes: a parity scenario
-that leaves cells **floating** must account for liquids side-hopping ±2 and gases rising.
-Seal test enclosures with walls, or the scenario diverges for the wrong reason.
+One convention this batch discovered has since been promoted into `docs/HARNESS.md`, beside
+the other parity-fixture lessons, which is where a rule the whole repo assumes belongs: a
+scenario that leaves cells floating diverges for reasons unrelated to the rule under test.
+It is not restated here — that is the mistake this section already warns about.
 
 ## Done — Batch 1: garden lineage (commit `fbaafae`)
 

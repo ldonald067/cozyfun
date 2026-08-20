@@ -100,7 +100,16 @@ pulled in when you read a file there. Read these when the task touches them, not
 - Deploy and embedding: @docs/EMBEDDING.md
 - Asset provenance and licences: @ASSET_CREDITS.md
 
-`/adversarial-review` spawns Codex reviewers against the current diff. It has caught real
-bugs — an unseamed rain loop, a crash-on-read-error, a silently-wrong gate, and a shipped
-feature no player could reach — so it is worth running before committing anything
-substantial.
+Two skills are worth knowing about. **Both live in the operator's `~/.claude/skills/`, not
+in this repo**, so a fresh clone on another machine will not have them — that is deliberate
+(a tracked second copy of one of them drifted 175 lines from the copy that actually ran, and
+never executed once), but it does mean these commands can be absent.
+
+- `/adversarial-review` spawns Codex reviewers against the current diff, picking lenses by
+  what the diff touches — parity when an engine changes, perceptual when the renderer does.
+  It has caught real bugs: an unseamed rain loop, a crash-on-read-error, a silently-wrong
+  gate, a shipped feature no player could reach, and a rule whose comment claimed conduction
+  while the code did proximity. Worth running before committing anything substantial.
+- `/design-review` is the pure design lens: how an element reads at play zoom, whether it is
+  distinguishable from its neighbours, and whether its interactions are findable. It reviews
+  PIXELS, never source, and it wants a measurement or a crop behind every claim.
