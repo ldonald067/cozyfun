@@ -201,8 +201,16 @@ const CHECKS = [
   { m: "Stone", covers: "stone.born", role: "is born from lava cooling", w: 30, h: 26, seed: 5, ticks: 900,
     paint: (p) => { p(15, 20, 3, M.Lava); p(15, 12, 3, M.Water); },
     outcome: (g, before) => g.appeared(M.Stone, before) },
+  // "Sustained water" means a stream, and the game has exactly one endless source, so this
+  // paints one: a wellspring above a stone mound, pouring over it. A finite blob of water
+  // pools in the first hollow it wears and then stops flowing — which is the rule working,
+  // not failing, but it makes a poor exhibit for a clause about SUSTAINED water.
   { m: "Stone", covers: "stone.erodes", role: "erodes into sand under sustained water", w: 30, h: 26, seed: 6, ticks: 4000,
-    paint: (p) => { p(15, 20, 3, M.Stone); p(15, 14, 4, M.Water); },
+    paint: (p) => {
+      for (let x = 2; x < 28; x++) p(x, 23, 1, M.Wall);
+      p(15, 20, 3, M.Stone);
+      p(15, 10, 1, M.Wellspring); p(15, 8, 1, M.Water);
+    },
     outcome: (g, before) => g.appeared(M.Sand, before) },
 
   // ---- Powders and liquids ------------------------------------------------------------
@@ -570,7 +578,13 @@ const CHECKS = [
     paint: (p) => { p(15, 20, 4, M.Sand); p(15, 15, 2, M.Lava); },
     outcome: (g, before) => g.appeared(M.Glass, before) },
   { m: "Lava", covers: "lava.scorches", role: "dries, scorches and thaws its neighbours", w: 30, h: 26, seed: 87, ticks: 1200,
-    paint: (p) => { p(15, 20, 3, M.Stone); p(15, 16, 2, M.Water); p(20, 20, 2, M.Lava); },
+    // A SPLASH, not a stream. At radius 2 this was a pool that sat on the stone, and once
+    // erosion started carrying grains off it became an endless stream re-wetting the rock
+    // faster than lava could dry it: the scorch outcome fell to contrast 22, under the
+    // floor. Lava drying a wet neighbour is what the clause claims, so the fixture gives it
+    // a finite wetting to dry. Measured, the outcome is more visible this way than it was
+    // before erosion ever moved: 143 against 99.
+    paint: (p) => { p(15, 20, 3, M.Stone); p(15, 16, 1, M.Water); p(20, 20, 2, M.Lava); },
     outcome: (g, before) => g.gained(M.Stone, F.Scorched, before) },
 
   { m: "Ice", covers: "ice.pauses", role: "pauses life in frozen dormancy", w: 30, h: 26, seed: 88, ticks: 2500,

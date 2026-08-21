@@ -40,7 +40,7 @@ Every toolbar material is a product choice. Each material in `app/src/materials.
 | --- | --- | --- |
 | Eraser | [eraser.clears] Clears cells without adding state. | Browser smoke: `clear, save, and load update scene state`; not a simulation material. |
 | Wall | [wall.blocks] Blocks flow as sealed construction; [wall.anchored] stays absolutely anchored where built and never falls, unlike natural stone; [wall.resists] resists casual moss crossing; [wall.stains] takes damp, soot, and frost stains; [wall.hearth] as hearth masonry it CONDUCTS a live flame's or hot ember's warmth one brick along the stonework — a brick is warm if it touches the flame or touches a brick that does — so the whole damp nook dries rather than the single brick the flame happens to touch, while frozen neighbours thaw only against a brick in actual contact, and nothing is ever ignited either way; [wall.crumbles] accumulated freeze-thaw stress cracks and crumbles it into stone. | Tests: `wall_stays_anchored_in_midair`, `moss_needs_extra_energy_to_cross_wall`, `ice_frost_stresses_damp_hard_materials`, `hearth_wall_dries_and_thaws_its_nook`, `hearth_warmth_carries_along_masonry_but_thawing_needs_contact`, `hearth_warmth_does_not_jump_an_air_gap`, `accumulated_freeze_thaw_crumbles_wall_into_stone`, `first_thaw_keeps_wall_standing`. |
-| Stone | [stone.blocks] Blocks flow as natural hard substrate; [stone.slumps] slumps straight down when left unsupported, so cliffs and crusts collapse while pillars, floors, and shelves hold; [stone.weathers] weathers and condenses harder than sealed wall; [stone.hosts] hosts damp moss colonization; [stone.born] born from cooled lava, shocked meteor, and crumbled wall; [stone.erodes] sustained soaking by water slowly erodes it into wet sand. | Tests: `unsupported_stone_falls_straight_to_the_floor`, `supported_stone_holds_and_overhangs_drop_without_slipping`, `moss_colonizes_damp_stone`, `accumulated_freeze_thaw_crumbles_wall_into_stone`, `sustained_water_erodes_saturated_stone_into_sand`, `damp_stone_without_water_contact_never_erodes`. |
+| Stone | [stone.blocks] Blocks flow as natural hard substrate; [stone.slumps] slumps straight down when left unsupported, so cliffs and crusts collapse while pillars, floors, and shelves hold; [stone.weathers] weathers and condenses harder than sealed wall; [stone.hosts] hosts damp moss colonization; [stone.born] born from cooled lava, shocked meteor, and crumbled wall; [stone.erodes] running water wears it into wet grains and carries them off, cutting a channel that deepens, while still water in a bowl carves nothing — so a pond keeps its basin and only its waterline wears. | Tests: `unsupported_stone_falls_straight_to_the_floor`, `supported_stone_holds_and_overhangs_drop_without_slipping`, `moss_colonizes_damp_stone`, `accumulated_freeze_thaw_crumbles_wall_into_stone`, `flowing_water_erodes_stone_and_carries_the_grain_off`, `still_water_with_nowhere_to_go_does_not_erode_stone`, `damp_stone_without_water_contact_never_erodes`. |
 | Sand | [sand.pours] Pours fast as dry powder, two cells per tick; [sand.clumps] clumps and slows when wet; [sand.drains] drains dry back to loose grains; [sand.vitrifies] strong heat fuses dry grains into glass. | Tests: `sand_falls`, `dry_sand_falls_two_cells_when_clear`, `wet_sand_still_falls_slowly`, `water_wets_sand_into_clumps`, `lava_vitrifies_dry_sand_into_glass`. |
 | Water | [water.flows] Flows and pools; [water.hydrates] hydrates soil, sand, and life; [water.quenches] quenches lava and shocks meteor into scorched stone; [water.boils] simmers, bubbles, and boils away to steam over sustained flame, while hot water melts ice instead of freezing; [water.rinses] rinses soot from scorched wall and stone; [water.oilblocked] blocked from feeding life by oil coating. | Tests: `water_spreads_when_blocked`, `rooted_seed_grows_a_stalk_that_blooms`, `water_quenches_lava_into_steam_and_stone`, `sustained_flame_simmers_then_boils_water`, `hot_water_melts_ice_and_resists_freezing`, `water_rinses_soot_from_hard_surfaces`. |
 | Moonwater | [moonwater.moves] Moves like water with supercharged growth; [moonwater.marks] marks touched cells cosmic; [moonwater.cleans] cleans oil into stardust; [moonwater.bursts] bursts meteor contact into stardust; [moonwater.freezes] freezes into cosmic ice. | Tests: `moonwater_cleans_oil_into_stardust`, `meteor_moonwater_contact_bursts_to_stardust`, `lava_cools_near_moonwater`; visual QA: `material-identity-showcase`. |
@@ -87,6 +87,28 @@ etched stone carries a faint starfield. Sources (fire, lava, meteor, spark, embe
 dominate that layer by design — anything merely *lit by* a source, steam above all,
 must stay well under them, or a kettle outshines its own flame. `hasGlow` takes full
 cell state deliberately: defaulting energy/age would fail open and light everything.
+
+## A clause that changed its promise
+
+`stone.erodes` was reworded in place, keeping its id, and that is the one drift the coverage
+gate explicitly cannot catch — so it is written down here instead.
+
+It used to read "sustained soaking by water slowly erodes it into wet sand", and it did
+exactly that and nothing more: the grain stayed where the stone had been, formed a one-cell
+sand skin over the rock, and the water never touched stone again. Measured on a spring
+pouring across a stone lip, the whole rule delivered **21 cells by tick 8,000 and not one
+more in the following 12,000**, with no stone left either saturated or in contact with
+water. A stream that cannot deepen its own channel is a stain, not erosion.
+
+The rule now says running water CARRIES the grain off — the water advances into the cell the
+stone gave up — and it is gated on the water having somewhere to go. Both halves matter. The
+first lets a channel deepen; the second protects what a player built, because eroding on
+contact alone took a stone bowl holding standing water from 169 stone cells to 45 in 20,000
+ticks. A pond now wears only its waterline, and a **wall** basin is untouched at any depth,
+which is the Wall/Stone split doing exactly the job it was created for.
+
+The interaction audit measures the difference: first fires at tick **44** rather than 434,
+touches **19** cells rather than 4, at contrast **178** rather than 97.
 
 ## The one rule the tray has to say out loud
 

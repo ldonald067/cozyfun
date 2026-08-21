@@ -469,6 +469,12 @@ class JsSandboxEngine implements SandboxEngine {
       }
       let fireDampened = false;
       let lavaCooling = 0;
+      // Mirrors `water_can_move` in sim/src/lib.rs: erosion needs flow, and water with an
+      // open neighbour is the cheapest honest proxy for it the reaction pass has. Computed
+      // once per cell, before the loop, exactly as the Rust arm does.
+      const waterCanMove =
+        (kind === MATERIAL.Water || kind === MATERIAL.Moonwater) &&
+        this.neighbors(x, y).some((nidx) => old[nidx] === MATERIAL.Empty);
       for (const nidx of this.neighbors(x, y)) {
         const other = old[nidx];
         if (kind === MATERIAL.Fire) {
@@ -612,8 +618,16 @@ class JsSandboxEngine implements SandboxEngine {
             if (readU16(next, nidx + 6) & CELL_FLAG.Scorched && this.chance(5)) {
               writeU16(next, nidx + 6, readU16(next, nidx + 6) & ~CELL_FLAG.Scorched);
             }
-            if (next[nidx] === MATERIAL.Stone && readU16(next, nidx + 4) >= 250 && this.chance(2000)) {
-              writeCellBytes(next, nidx, MATERIAL.Sand, old[nidx + 1], 60, 0, CELL_FLAG.Wet);
+            if (next[nidx] === MATERIAL.Stone && readU16(next, nidx + 4) >= 250 && waterCanMove && this.chance(2000)) {
+              // Mirrors the erosion arm in sim/src/lib.rs: the water TAKES the grain, so the
+              // grain lands where the water was and the water advances into the rock. Leaving
+              // it in place built a sand skin that shielded the stone and stopped erosion for
+              // good. The `break` is load-bearing for parity as much as for correctness — this
+              // cell is sand now and must not go on hydrating its remaining neighbours, and the
+              // rolls that would make are rolls the Rust side does not make either.
+              writeCellBytes(next, nidx, kind, old[idx + 1], readU16(old, idx + 4), 0, readU16(old, idx + 6));
+              writeCellBytes(next, idx, MATERIAL.Sand, old[nidx + 1], 60, 0, CELL_FLAG.Wet);
+              break;
             }
           }
           if (other === MATERIAL.Wall) {

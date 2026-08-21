@@ -336,6 +336,42 @@ const scenarios = [
     },
   },
   {
+    // Erosion. A wellspring pours over a stone lip — flowing water, which wears the rock
+    // and CARRIES the grain off, so the water advances into the cell the stone gave up and
+    // a wet grain drops where the water was. The gated-off half runs in the same scene
+    // without needing a fixture of its own: once the pour has pooled, its interior cells
+    // have no empty neighbour, so those are exactly the rolls neither engine may make.
+    //
+    // No sealed still-water pocket here, and that is deliberate rather than lazy. The brush
+    // stamps a five-cell PLUS at every radius, so two adjacent cells of different materials
+    // cannot both survive the painting — a pocket built that way quietly becomes something
+    // else, which is how the first version of this scenario failed. Still water is covered
+    // by `still_water_with_nowhere_to_go_does_not_erode_stone` in the sim instead.
+    name: "a spring wearing down a stone lip",
+    w: 44, h: 32, seed: 8123, ticks: 1400,
+    paint(p) {
+      for (let x = 0; x < 44; x++) p(x, 30, 1, M.Wall);
+      for (let y = 18; y <= 29; y++) for (let x = 6; x <= 20; x++) p(x, y, 1, M.Stone);
+      p(13, 12, 1, M.Wellspring); p(13, 11, 1, M.Water);
+    },
+    observe(seen, cells, w, h) {
+      let wetSand = 0, stone = 0;
+      for (let i = 0; i < w * h; i++) {
+        const k = cells[i * STRIDE];
+        if (k === 9) stone++;
+        else if (k === 2 && cells[i * STRIDE + 6] & 1) wetSand++;
+      }
+      seen.maxWetSand = Math.max(seen.maxWetSand ?? 0, wetSand);
+      seen.minStone = Math.min(seen.minStone ?? Infinity, stone);
+      seen.firstStone = seen.firstStone ?? stone;
+    },
+    expect(seen) {
+      if ((seen.maxWetSand ?? 0) < 1) return "the spring never wore a single grain off the lip";
+      if ((seen.minStone ?? 0) >= (seen.firstStone ?? 0)) return "the stone lip never lost a cell";
+      return null;
+    },
+  },
+  {
     // Stone gravity: a cliff block resting on bedrock holds, its overhanging ledge
     // slumps straight down, and a sky boulder drops through air, steam, and into a
     // pool. Wall bedrock never moves. Both engines must agree on every settling cell.

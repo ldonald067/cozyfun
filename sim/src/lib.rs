@@ -995,6 +995,17 @@ impl Universe {
                 x if x == Material::Water as u8 || x == Material::Moonwater as u8 => {
                     let is_moonwater = cell.kind == Material::Moonwater as u8;
                     let vigor = if is_moonwater { 96 } else { 56 };
+                    // Erosion needs FLOW, and this is the cheapest honest proxy the reaction
+                    // pass has for it: water with somewhere to go. A stream falling over a lip
+                    // always has open air around it; the still middle of a pond has none.
+                    //
+                    // Without this the rule ate the player's build. Measured on a stone bowl
+                    // holding standing water, letting every touching cell erode took the basin
+                    // from 169 stone cells to 45-60 in 20,000 ticks — the pond dissolved into a
+                    // sand pit. With it, only the waterline wears, which is what a shoreline
+                    // does. A wall basin is untouched either way; wall never erodes, and that is
+                    // what makes Wall the material to build something permanent from.
+                    let water_can_move = neighbors.iter().any(|&nidx| old[nidx].is_empty());
                     if !is_moonwater && cell.energy > 150 && self.chance(20) {
                         // Simmering water vents a wisp and loses heat to evaporation.
                         self.emit_vapor_from(idx, old, next, Material::Steam as u8, cell.variant, 120);
@@ -1098,13 +1109,30 @@ impl Universe {
                             }
                             if next[nidx].kind == Material::Stone as u8
                                 && next[nidx].energy >= 250
+                                && water_can_move
                                 && self.chance(2000)
                             {
-                                // Erosion: fully saturated stone slowly wears into wet grains that
-                                // keep the stone's variant. Rolls happen per touching water cell,
-                                // so heavier flow wears faster; sealed wall never erodes.
-                                next[nidx] = Cell::new(Material::Sand as u8, other.variant, 60);
-                                next[nidx].flags = FLAG_WET;
+                                // Erosion: fully saturated stone wears into a wet grain, and the
+                                // water TAKES it — the grain drops into the cell the water was in
+                                // and the water advances into the rock. Rolls happen per touching
+                                // water cell, so heavier flow wears faster; sealed wall never
+                                // erodes, which is what keeps Wall the material to build a
+                                // permanent basin from.
+                                //
+                                // Leaving the grain where the stone was is what this used to do,
+                                // and it made the rule self-terminating: the new sand formed a
+                                // one-cell skin over the rock, the water never touched stone
+                                // again, the stone dried back below saturation and erosion was
+                                // over PERMANENTLY. Measured on a spring pouring across a stone
+                                // lip — 21 cells by tick 8,000 and then not one more in the next
+                                // 12,000, with zero stone cells left either saturated or in
+                                // contact with water. A stream that cannot deepen its own channel
+                                // is a stain, not erosion.
+                                next[nidx] = Cell::new(cell.kind, cell.variant, cell.energy);
+                                next[nidx].flags = cell.flags;
+                                next[idx] = Cell::new(Material::Sand as u8, other.variant, 60);
+                                next[idx].flags = FLAG_WET;
+                                break;
                             }
                         }
                         if other.kind == Material::Wall as u8 {
@@ -3521,25 +3549,78 @@ mod tests {
         assert_eq!(colonized, 1, "modestly watered moss should still spread one patch at a time");
     }
 
+    /// A shaft open to the air: the water on the rock has somewhere to go, so it counts as
+    /// flowing and wears the rock. The water TAKES the grain — it advances into the cell the
+    /// stone gave up and the wet grain drops into the cell the water came from — which is the
+    /// only shape of this rule that can deepen. Leaving the grain where the stone was built a
+    /// one-cell sand skin over the rock, the water never touched stone again, the stone dried
+    /// back under saturation, and erosion was over permanently: measured on a spring pouring
+    /// across a stone lip, 21 cells by tick 8,000 and not one more in the next 12,000.
+    ///
+    /// The shaft walls are TWO cells thick on purpose. Liquids side-hop up to two cells, so a
+    /// one-thick walls does not contain them — the water simply hops the wall and the fixture
+    /// tests nothing. That is `docs/HARNESS.md`'s warning, and it cost a debugging detour here.
     #[test]
-    fn sustained_water_erodes_saturated_stone_into_sand() {
+    fn flowing_water_erodes_stone_and_carries_the_grain_off() {
         let mut u = Universe::new(16, 16, 7);
-        set_cell(&mut u, 8, 8, Material::Stone);
-        set_cell(&mut u, 7, 8, Material::Water);
-        set_cell(&mut u, 8, 7, Material::Water);
-        for (x, y) in [(6, 8), (5, 8), (6, 9), (7, 9), (8, 9), (9, 9), (9, 8), (10, 8), (7, 7), (6, 7), (9, 7), (8, 6), (7, 6), (9, 6)] {
-            set_cell(&mut u, x, y, Material::Wall);
+        for y in 3..=10 {
+            for x in [6, 7, 9, 10] {
+                set_cell(&mut u, x, y, Material::Wall);
+            }
         }
-        let mut eroded = false;
+        set_cell(&mut u, 8, 10, Material::Wall);
+        set_cell(&mut u, 8, 9, Material::Stone);
+        set_cell(&mut u, 8, 8, Material::Water);
+
+        let mut wet_grain = false;
         for _ in 0..30000 {
             u.tick();
-            if kind_at(&u, 8, 8) == Material::Sand as u8 {
-                eroded = true;
+            for y in 4..=9 {
+                if kind_at(&u, 8, y) == Material::Sand as u8 && flags_at(&u, 8, y) & FLAG_WET != 0 {
+                    wet_grain = true;
+                }
+            }
+            if wet_grain {
                 break;
             }
         }
-        assert!(eroded, "stone soaked by persistent water should erode into sand");
-        assert!(flags_at(&u, 8, 8) & FLAG_WET != 0, "eroded grains should be wet");
+        assert!(wet_grain, "flowing water on rock should wear off a wet grain");
+        assert_ne!(
+            kind_at(&u, 8, 9),
+            Material::Stone as u8,
+            "the water should have advanced into the cell the stone gave up",
+        );
+    }
+
+    /// The other half of the rule, and the half that protects what a player built: still water
+    /// carves nothing. Water with nowhere to go is a pond, not a stream. Without this the rule
+    /// ate the build — measured on a stone bowl holding standing water, eroding on contact
+    /// alone took it from 169 stone cells to 45 in 20,000 ticks, a dissolved sand pit where
+    /// the pond had been. Wall never erodes either way, which is what keeps it the material to
+    /// build something permanent out of.
+    #[test]
+    fn still_water_with_nowhere_to_go_does_not_erode_stone() {
+        let mut u = Universe::new(16, 16, 7);
+        for y in 5..=10 {
+            for x in 6..=10 {
+                set_cell(&mut u, x, y, Material::Wall);
+            }
+        }
+        set_cell(&mut u, 8, 8, Material::Stone);
+        set_cell(&mut u, 8, 7, Material::Water);
+        for _ in 0..30000 {
+            u.tick();
+        }
+        assert_eq!(
+            kind_at(&u, 8, 8),
+            Material::Stone as u8,
+            "stone under water that cannot move should not erode",
+        );
+        assert_eq!(
+            kind_at(&u, 8, 7),
+            Material::Water as u8,
+            "and the still water should still be sitting there",
+        );
     }
 
     #[test]
