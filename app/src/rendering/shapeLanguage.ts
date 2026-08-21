@@ -792,12 +792,41 @@ function iceColor({ color, variant, cells, width, height, x, y }: ShapeContext) 
   return out;
 }
 
-function emberColor({ variant, energy, flags, time, x, y }: ShapeContext) {
+// Cold char used to measure 52 redmean from the EMPTY TRAY — against a palette floor of 45
+// for two different materials, and with every other element in the roster sitting 185-578
+// from the night. A body of it read as a hole in the scene, which matters more here than
+// for any other dark material: char is where every fire a player lights ends up, the slow
+// world's headline rule acts on it, and `ember.cools` promises relightable fuel a player
+// could not find. A burnt-out hearth read as ERASED rather than as spent.
+//
+// The fix is a hearth's own physics rather than a brightness dial: char that has gone out
+// wears ASH. The mass stays dark so a cosy scene keeps its dark hearth, and the top surface
+// — the one a cooling bed actually powders over — takes a matte grey skin, the same trick
+// stone uses for its lit exposed edges. Matte is doing real work: ash must read as spent,
+// not as lit, so this deliberately lands on the base layer and touches no glow (an ember at
+// energy 0 emits none, and that stays true).
+const CHAR_BODY: Rgb = [46, 36, 30];
+const CHAR_ASH: Rgb = [132, 124, 118];
+/// Mirrored from `sim/src/lib.rs`: below this an ember has gone out. The ash reaches full
+/// exactly there, so what a player sees going grey is the same line the sim calls dead.
+const COLD_CHAR_ENERGY = 30;
+function emberColor({ variant, energy, flags, time, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
   const heat = Math.min(1, energy / 220);
-  let out: Rgb = [33, 22, 14];
+  let out: Rgb = CHAR_BODY;
   if ((x + (hash & 1)) % 3 === 0) out = mixRgb(out, [60, 41, 25], 0.5);
   if ((hash & 15) === 2) out = mixRgb(out, [74, 50, 29], 0.4);
+  // Ash builds as the bed cools rather than switching on at a threshold, so a hearth
+  // powders over while it dies instead of snapping grey in one frame. It forms only where
+  // the bed meets the air, so a deep pile keeps a dark mass under a powdered crust rather
+  // than turning into a uniformly grey slab.
+  const ashed = Math.max(0, 1 - energy / COLD_CHAR_ENERGY);
+  if (ashed > 0) {
+    const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Ember);
+    if (edge.top) out = mixRgb(out, CHAR_ASH, ashed * ((hash & 3) === 0 ? 0.34 : 0.56));
+    else if (edge.left || edge.right) out = mixRgb(out, CHAR_ASH, ashed * 0.26);
+    if (edge.top && (hash & 7) === 3) out = mixRgb(out, [178, 172, 168], ashed * 0.4);
+  }
   if (heat > 0.05) {
     const pulse = (Math.sin(time * 0.008 + hash * 0.7 + x + y) + 1) * 0.5;
     out = mixRgb(out, [255, 120, 40], heat * (0.4 + pulse * 0.3));
