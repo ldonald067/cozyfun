@@ -51,8 +51,8 @@ const SEED_HEAD_HUSK: Rgb = [82, 68, 46];
 // stops pollinating, when its petals let go, and — in `slow_step` — when it sows. The
 // renderer reads them so a seed head is drawn under exactly the condition that makes it
 // one; if these move in the sim, they must move here or the picture starts lying.
-const PETAL_SHED_AGE = 1200;
-const POLLEN_RESERVE = 40;
+export const PETAL_SHED_AGE = 1200;
+export const POLLEN_RESERVE = 40;
 
 type Species = { readonly light: Rgb; readonly dark: Rgb; readonly eye: Rgb | null };
 // Exported so `scripts/make-favicon.mjs` can colour the site icon from the real
@@ -444,17 +444,22 @@ function wellspringColor({ color, variant, energy, time, cells, width, height, x
   // Chiselled rim: bright top/left, deep shadow bottom/right — a carved block reads
   // from its edges even at a two-cell placement.
   //
-  // The two are EXCLUSIVE, and that is the whole of it. A cell exposed on opposite sides —
-  // which every arm of the five-cell plus the brush stamps is — used to take the highlight
-  // and the shadow both, and they averaged each other back to a flat mid grey: measured,
-  // all four arms of a dormant spring came out at 124-125, identical, with the lattice
-  // erased. Stone's own mottle spans luminance 45 to 136, so a dormant spring set into a
-  // stone wall had no cell anywhere outside the band stone already occupies, and a player
-  // could not find the block they had just painted. A big bank still bevels the same way —
-  // its top row is exposed upward and its bottom row downward, so each takes one treatment
-  // — only thin and isolated cells change, which is exactly where cancelling was wrong.
+  // A cell exposed on OPPOSITE faces of an axis is a thin section, not a corner. It used to
+  // take the highlight and the shadow both and they averaged back to a flat mid grey:
+  // measured, all four arms of the five-cell plus the brush stamps came out at 124-125,
+  // identical, with the rune lattice erased. Stone's own mottle spans luminance 45 to 136,
+  // so a dormant spring set into a stone wall had no cell anywhere outside the band stone
+  // already occupies, and a player could not find the block they had just painted.
+  //
+  // The test is OPPOSITE faces, not "exposed on both a lit and a shadowed side" — those are
+  // different cells and conflating them was the first fix's mistake. A bank's bottom-left
+  // corner is exposed left and bottom, which are ADJACENT faces: it is a real corner and
+  // still takes its highlight and its shadow exactly as it always did. Suppressing the
+  // shadow there silently re-lit every such corner while the commit message claimed a large
+  // bank was untouched.
+  const thinSection = (edge.top && edge.bottom) || (edge.left && edge.right);
   if (edge.top || edge.left) out = mixRgb(out, [168, 186, 218], 0.42);
-  else if (edge.bottom || edge.right) out = mixRgb(out, [8, 12, 22], 0.44);
+  if ((edge.bottom || edge.right) && !thinSection) out = mixRgb(out, [8, 12, 22], 0.44);
   // Small placements (1-2 cells, mostly exposed) always carve: a lone block must
   // still read as runed stone, and attuned-vs-dormant must survive at that size.
   const rune =
@@ -829,18 +834,30 @@ const CHAR_BODY: Rgb = [46, 36, 30];
 const CHAR_ASH: Rgb = [132, 124, 118];
 /// Mirrored from `sim/src/lib.rs`: below this an ember has gone out. The ash reaches full
 /// exactly there, so what a player sees going grey is the same line the sim calls dead.
-const COLD_CHAR_ENERGY = 30;
+export const COLD_CHAR_ENERGY = 30;
 function emberColor({ variant, energy, flags, time, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
   const heat = Math.min(1, energy / 220);
   let out: Rgb = CHAR_BODY;
   if ((x + (hash & 1)) % 3 === 0) out = mixRgb(out, [60, 41, 25], 0.5);
   if ((hash & 15) === 2) out = mixRgb(out, [74, 50, 29], 0.4);
-  // Ash builds as the bed cools rather than switching on at a threshold, so a hearth
-  // powders over while it dies instead of snapping grey in one frame. It forms only where
-  // the bed meets the air, so a deep pile keeps a dark mass under a powdered crust rather
-  // than turning into a uniformly grey slab.
-  const ashed = Math.max(0, 1 - energy / COLD_CHAR_ENERGY);
+  // Ash builds as the bed cools rather than switching on at a threshold, so a hearth powders
+  // over while it dies instead of snapping grey in one frame — and it is FULL by the moment
+  // the sim calls the ember out, not on the way to zero afterwards. Ramping to full at
+  // energy 0 instead put only 3% ash on a newly dead ember at energy 29, so the state the
+  // sim already treats as cold char, and that the slow world converts to soil, still read as
+  // the near-black hole this was meant to fix. Ash forms only where the bed meets air, so a
+  // deep pile keeps a dark mass under a powdered crust rather than a uniformly grey slab.
+  //
+  // A soaked bed grows no ash at all: wet ash is a slurry, not a powder. That is physically
+  // the obvious call and it is also what keeps `ember.quenched` visible — laying the full
+  // ash under the wet wash instead pulled dry char and wet char back to 23 redmean apart,
+  // under the interaction audit's own 24 floor, which is the state this whole treatment was
+  // meant to rescue in the first place.
+  const ashed =
+    flags & CELL_FLAG.Wet
+      ? 0
+      : Math.min(1, Math.max(0, (COLD_CHAR_ENERGY * 2 - energy) / COLD_CHAR_ENERGY));
   if (ashed > 0) {
     const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Ember);
     if (edge.top) out = mixRgb(out, CHAR_ASH, ashed * ((hash & 3) === 0 ? 0.34 : 0.56));

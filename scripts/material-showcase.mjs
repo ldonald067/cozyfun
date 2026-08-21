@@ -260,12 +260,22 @@ export function materialShowcaseScript() {
     for (const [x, y] of [[128, 107], [129, 107], [130, 107], [131, 107], [129, 106], [130, 106]]) setCell(x, y, material.Rocket, 0, 30, 0, x);
     setCell(122, 96, material.Rocket, 235, 6, 0, 2);
 
-    // Firework burst: a spark shell in festive hues (gold, rose, mint, sky, magenta) that
-    // reads apart from cool Stardust. Ages past the white-hot birth so the hues show.
-    for (const [x, y] of [
-      [130, 86], [127, 88], [133, 88], [125, 90], [135, 90], [128, 91],
-      [132, 91], [130, 89], [124, 92], [136, 92], [126, 94], [134, 94],
-    ]) setCell(x, y, material.Spark, 190, 8, 0, x);
+    // Firework burst: a spark shell in festive hues (gold, rose, mint, sky) that reads apart
+    // from cool Stardust. The variant is the spark's BIRTH DIRECTION and is what picks its
+    // hue, so each cell here carries the SPARK_DIRS index for the arm it sits on — compass
+    // order, north at 0, clockwise. Getting that wrong (it used to be variant = x) meant
+    // the board could show four colours while proving nothing about which arms match.
+    //
+    // **This exhibit is partly a lie and cannot be fixed here.** A spark loses 10 energy a
+    // tick and dies below COLD_CHAR_ENERGY, so 190 buys about 16 ticks; visual QA settles
+    // the live scene for 600ms, roughly 36 ticks, and the cap on imported energy is 255,
+    // which buys 22. No spark placed in this fixture can survive to the shutter. What the
+    // capture shows is the two or three that drifted, not a shell. Spark colour is reviewed
+    // by driving a real burst and capturing frames, not from this board.
+    for (const [x, y, dir] of [
+      [130, 86, 0], [133, 88, 1], [135, 90, 2], [134, 94, 3],
+      [130, 96, 4], [126, 94, 5], [125, 90, 6], [127, 88, 7],
+    ]) setCell(x, y, material.Spark, 190, 8, 0, dir);
 
     let binary = "";
     for (let i = 0; i < cells.length; i += 0x8000) binary += String.fromCharCode(...cells.slice(i, i + 0x8000));
