@@ -41,6 +41,19 @@ const EARTH_CONTACT_KINDS = [MATERIAL.Sand, MATERIAL.Soil, MATERIAL.Stone, MATER
 // `eye` is whether the crown sits at the middle of the head, where a bright centre
 // belongs. Tulip, lavender and bluebell carry their petals *above* the crown, so gilding
 // it would put a dot at the bloom's base rather than its heart.
+// The end of the arc has no species in it. A seed head is dry husk, and every plant's is
+// the same dry husk — which is exactly what makes it read as an ending rather than as a
+// small flower of some eighth colour.
+const SEED_HEAD_STRAW: Rgb = [156, 136, 98];
+const SEED_HEAD_HUSK: Rgb = [82, 68, 46];
+
+// Mirrored from `sim/src/lib.rs` (and `app/src/engine.ts`), where they decide when a crown
+// stops pollinating, when its petals let go, and — in `slow_step` — when it sows. The
+// renderer reads them so a seed head is drawn under exactly the condition that makes it
+// one; if these move in the sim, they must move here or the picture starts lying.
+const PETAL_SHED_AGE = 1200;
+const POLLEN_RESERVE = 40;
+
 type Species = { readonly light: Rgb; readonly dark: Rgb; readonly eye: Rgb | null };
 // Exported so `scripts/make-favicon.mjs` can colour the site icon from the real
 // cornflower rather than a hand-copied hex triple that silently goes stale.
@@ -629,9 +642,10 @@ function stemColor({ color, variant, energy, flags, cells, width, height, x, y }
 
 // A bloom is a small cluster of Flower cells, so a cell's job is read off state the sim
 // already keeps — no new cell data:
-//   no Flower neighbours          -> an unopened bud, still a green knob
-//   rooted, with petals around it -> the disc, the bright eye of an open head
-//   anything else                 -> a petal
+//   rooted, past the shed age, budget empty -> a dry seed head, the arc's end
+//   rooted, still budgeted, no neighbours   -> an unopened bud, the arc's start
+//   rooted, with petals around it           -> the disc, the bright eye of an open head
+//   anything else                           -> a petal
 // Rooted is exactly the crown the stalk produced, and the crown is the cell the petals
 // opened around, so it is the middle of the head by construction. Counting neighbours
 // alone cannot find it: the stem occupies one of the crown's four cardinal sides, so no
@@ -667,13 +681,40 @@ function flowerColor({ variant, age, energy, flags, time, cells, width, height, 
   const fade = energy < 80 ? Math.min(0.4, (80 - energy) / 150) : 0;
 
   const rooted = Boolean(flags & CELL_FLAG.Rooted);
+  // Spent is the SIM's own three-term test — rooted, past PETAL_SHED_AGE, budget below
+  // POLLEN_RESERVE — and not "has no petals left". That distinction is the whole point of
+  // this branch. Measured on a real garden, crowns run their budget to zero by ~1200 ticks
+  // but a head almost always keeps one stubborn petal, so a bare-crown test would render
+  // the seed head essentially never; `Universe::slow_step` learned the same thing when its
+  // bare-crown sow rule turned out to be dead on arrival. Reading the same three terms the
+  // sow rule reads means the picture and the rule cannot drift: what looks like a seed head
+  // IS what sows while you are away.
+  const spent = rooted && age > PETAL_SHED_AGE && energy < POLLEN_RESERVE;
   let out: Rgb;
-  if (neighbours === 0) {
+  if (spent) {
+    // A dry seed head, carrying no species hue at all. A bud and a spent crown are both a
+    // lone Flower cell on a stalk, and they used to render 5-8 redmean apart — against a
+    // floor of 24 for "visible" anywhere else in this repo — so the two ends of a plant's
+    // life were the same picture. That is the one reading a returning player most needs:
+    // a bud says wait for it, a seed head says this one is already over and will sow.
+    out = mixRgb(SEED_HEAD_STRAW, SEED_HEAD_HUSK, ((x * 5 + y * 3) & 3) === 0 ? 0.58 : 0.14);
+    if ((hash & 3) === 0) out = mixRgb(out, SEED_HEAD_HUSK, 0.44);
+    if ((hash & 7) === 1) out = mixRgb(out, [214, 198, 156], 0.4);
+    // Idle life, in the same idiom as the cold-char wink: a head this dry is FULL, and a
+    // slow deterministic gleam on a ripe pip is what says so at one cell. One cell per
+    // finished plant, well under a quarter of the cycle, so a seedy meadow glints rather
+    // than strobes. Being brown separates a seed head from a bud; being ripe is what makes
+    // it worth looking at, and it is the cell the slow world sows from.
+    const ripe = Math.max(0, Math.sin(time * 0.0011 + hash * 0.97));
+    if (ripe > 0.86) out = mixRgb(out, [236, 220, 168], (ripe - 0.86) * 2.4);
+  } else if (rooted && neighbours === 0) {
     // Unopened bud. A bud is one cell, so it gets one flat colour and cannot show sepals
-    // wrapping a tip. Leading with the plant's own dark hue under a green wash is what
-    // makes it read: a deep knob of the colour about to open, clearly not the lit stalk
-    // beneath it. Leading with green instead put a muddy olive dot on top of the stem.
-    out = mixRgb(petalDark, [58, 104, 58], 0.28 - bloom * 0.1);
+    // wrapping a tip — all four of its edges face open air, so top/bottom shading would
+    // just average back out. It leads with the plant's own hue under a green wash: a knob
+    // of the colour about to open, clearly not the lit stalk beneath it. Leading with green
+    // instead put a muddy olive dot on the stem, and leading with `dark` alone left it too
+    // close to the husk this cell becomes at the other end of the arc.
+    out = mixRgb(mixRgb(petalDark, petalLight, 0.34), [58, 104, 58], 0.26 - bloom * 0.1);
     if ((hash & 3) === 0) out = mixRgb(out, [104, 160, 82], 0.18);
   } else if (rooted && species.eye) {
     // The eye of an open head, flecked so it does not read as a flat square. A poppy's is
@@ -692,7 +733,9 @@ function flowerColor({ variant, age, energy, flags, time, cells, width, height, 
     if ((hash & 7) === 0) out = mixRgb(out, petalDark, 0.16);
   }
 
-  if (fade > 0) out = mixRgb(out, [122, 108, 88], fade);
+  // The generic dulling is the APPROACH to spent; once a head is actually spent it has its
+  // own finished palette and mixing more grey into husk only mutes the pips.
+  if (fade > 0 && !spent) out = mixRgb(out, [122, 108, 88], fade);
   if (wet) out = mixRgb(out, [146, 222, 152], 0.12);
   if (cosmic) {
     const pulse = (Math.sin(time * 0.012 + hash * 0.001) + 1) * 0.5;

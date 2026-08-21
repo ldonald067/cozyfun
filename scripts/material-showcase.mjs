@@ -148,7 +148,7 @@ export function materialShowcaseScript() {
     // the old right-hand strip could not fit these without the heads touching. It sits WEST
     // of x=72 on purpose: the sand pile and the stardust/pollen exhibits above that column
     // fall to the floor once the capture's sim starts, and they buried the first attempt.
-    line(4, 69, 135, material.Wall);
+    line(0, 69, 135, material.Wall);
     // Crown and petal energies sit below CROWN_RESERVE and above the shed floor on
     // purpose, so the exhibit cannot open extra petals or drop them while the page runs.
     const plant = (bx, by, variant, stalk, leaves) => {
@@ -168,6 +168,17 @@ export function materialShowcaseScript() {
         setCell(bx + dx, cy + dy, material.Flower, Math.max(45, energy - 5), age - 20, 0, variant);
       }
     };
+    // The two ENDS of a plant's life, deliberately side by side and the same species, so
+    // the only thing that differs between them is the tip. Both are one lone rooted Flower
+    // cell on a stalk, and they used to render 52-66 redmean apart — barely over the
+    // distance the contrast gate demands between two different MATERIALS — with the spent
+    // one still wearing its species colour, so "wait for it" and "already over" were the
+    // same picture. A returning player reads a garden off exactly this pair.
+    //
+    // A spent seed head, drawn under the sim's own test: rooted, past PETAL_SHED_AGE,
+    // budget below POLLEN_RESERVE. Those three terms are also what makes it sow at wake.
+    plant(2, 134, 2, 4, [[1, 2]]);
+    setCell(2, 129, material.Flower, 0, 1400, flag.Rooted, 2);
     // An unopened bud is a lone crown with too little budget left to open.
     plant(9, 134, 2, 4, [[-1, 2]]);
     setCell(9, 129, material.Flower, 90, 20, flag.Rooted, 2);
@@ -178,7 +189,11 @@ export function materialShowcaseScript() {
     bloom(44, 134, 4, 5, [[-1, 2], [1, 4]], 95, 200);        // tulip
     bloom(51, 134, 5, 5, [[1, 2], [-1, 4]], 95, 200);        // lavender
     bloom(58, 134, 6, 5, [[-1, 2], [1, 4]], 95, 200);        // bluebell
-    bloom(65, 134, 7, 5, [[1, 2], [-1, 4]], 45, 1300, 2);    // cosmos, spent and shedding
+    // Cosmos: the COMMON spent case, and the one a bare-crown test gets wrong. Its crown
+    // is under POLLEN_RESERVE so it renders as husk, while its petals sit at the shed
+    // floor of 45 and hold — measured on a real garden, a head runs its budget to zero
+    // by ~1200 ticks but almost always keeps a stubborn petal or two hanging on.
+    bloom(65, 134, 7, 5, [[1, 2], [-1, 4]], 20, 1300, 2);    // cosmos, spent and shedding
 
     // Geology: a larger stone mass with mineral veins and an old patinated wall.
     rect(24, 44, 44, 56, material.Stone, 0, 60);
