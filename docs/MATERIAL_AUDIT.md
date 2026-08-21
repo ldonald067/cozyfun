@@ -88,6 +88,31 @@ dominate that layer by design — anything merely *lit by* a source, steam above
 must stay well under them, or a kettle outshines its own flame. `hasGlow` takes full
 cell state deliberately: defaulting energy/age would fail open and light everything.
 
+## The one rule the tray has to say out loud
+
+Every other interaction in this matrix is reachable by putting two materials together and
+watching. `wellspring.reattune` is not, and the interaction audit measures why: it first
+fires at tick **1500**, touches **4** cells (the floor), and is on screen for **50** ticks —
+the only interaction in the game that lands in three of the audit's four bottom-twelve
+lists. The chain is chill the spring, clear the old source off its faces, then present a
+new one, and nothing in play points at any of it.
+
+Field notes cannot fix this and were considered. That module fires on a rise in the count
+of a **generated kind**, marking a discovery *after* it happens, and it deliberately never
+comments on the player's own brushwork — a chilled spring is a block the player painted ice
+next to. Notes reward discovery; they do not cause it.
+
+So this one is signposted in the **tray copy**, which is the game's existing channel for
+"what does this do" and reaches a player before they experiment rather than after. The
+Wellspring description used to end with "pours it back out **forever**", which actively
+taught that attunement is permanent — the copy was arguing against the rule. Both halves of
+the pair now name it, since either material can be the one in hand.
+
+That is a weak channel and worth being honest about: it is a hover title, so it raises this
+from unfindable to findable-by-a-curious-player, not to something everyone meets. What
+carries the rest is the renderer — a dormant spring is findable in a stone wall now, and the
+chilled state has a rune of its own, so a player who tries it gets confirmation.
+
 ## Why the slow world is not in the matrix
 
 Two rules run only between sessions: cold char settles into soil, and a spent seed head
