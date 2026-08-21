@@ -747,11 +747,21 @@ function flowerColor({ variant, age, energy, flags, time, cells, width, height, 
     // Petal: the plant's one hue, darkening toward the rim so the head reads round
     // rather than as a block. Corner cells (attached on one side only) take the most,
     // which is what rounds the silhouette.
+    //
+    // A petal exposed both ABOVE and BELOW is the exception, and it was the expensive one.
+    // It is not the edge of a mass, it is a bell hanging free in the air — so it was taking
+    // the deepest rim while qualifying for neither of the top/bottom cues below, both of
+    // which need one side attached. The species built out of those petals is the bluebell,
+    // and measured against its own stalk its head came out at p90 94 against 188: the only
+    // bloom in the row that was half the brightness of the green it stood on, which is why
+    // it read as damage rather than as a flower. A free bell is lit like a crest, because
+    // that is where the light falls on one.
     out = petalLight;
-    const rim = edge.count >= 2 ? 0.42 : edge.count === 1 ? 0.2 : 0.06;
+    const hanging = edge.top && edge.bottom;
+    const rim = hanging ? 0.16 : edge.count >= 2 ? 0.42 : edge.count === 1 ? 0.2 : 0.06;
     out = mixRgb(out, petalDark, rim);
-    if (edge.top && !edge.bottom) out = mixRgb(out, [255, 255, 255], 0.16 * bloom);
-    if (edge.bottom && !edge.top) out = mixRgb(out, petalDark, 0.22);
+    if (edge.top) out = mixRgb(out, [255, 255, 255], 0.16 * bloom);
+    else if (edge.bottom) out = mixRgb(out, petalDark, 0.22);
     if ((hash & 7) === 0) out = mixRgb(out, petalDark, 0.16);
   }
 
