@@ -506,19 +506,41 @@ function wellspringColor({ color, variant, energy, time, cells, width, height, x
 
 // Classic firework hues; each spark picks one deterministically, so every
 // burst blooms as a multicolor shell.
-// Warm-leaning festive hues (gold, rose, mint, sky, magenta) that read apart from
-// Stardust's cool blue-violet. Keep app/src/materials.ts Spark.palette in sync.
+// Warm-leaning festive hues (gold, rose, mint, sky) that read apart from Stardust's cool
+// blue-violet. Keep app/src/materials.ts Spark.palette in sync.
+//
+// FOUR, not five, and the count is load-bearing rather than a trim: `sparkColor` indexes
+// this by `variant & 3`, and SPARK_DIRS is a compass in order, so four hues are exactly
+// what makes opposite arms of a shell match and neighbouring arms differ. Five would leave
+// the shell asymmetric. The hue that went was the magenta, the closest of the set to
+// Stardust — and a burst throws stardust into its own shell, so those two are judged where
+// they actually touch. Dropping it then pulled Spark's AVERAGED palette down to 42 from
+// Steam, under the 45 floor, which is `material:contrast` earning its keep on a change made
+// for reasons it cannot see; deepening the sky from `#a4c6ff` to `#7fb0ff` puts that pair
+// back at 50 and leaves the roster's closest pair where it was.
 const FIREWORK_HUES: Rgb[] = [
   [255, 210, 126],
   [255, 133, 173],
   [127, 230, 189],
-  [164, 198, 255],
-  [224, 122, 246]
+  [127, 176, 255]
 ];
 
+// A spark's hue belongs to the SPARK, not to the cell it happens to be standing in. Keying
+// it on position — which this did — re-rolled the colour every time the spark moved, so a
+// single spark strobed gold, mint, magenta on its way across the sky and a shell had no
+// colour identity at all. Proved on a board of identical spark cells laid out in a row:
+// same kind, same variant, same age, same energy, and the row came out a rainbow.
+//
+// `variant` is the spark's birth direction and the only thing constant for its whole
+// flight, so hue rides on that. SPARK_DIRS is a compass in order, so `& 3` gives opposite
+// arms the same colour and neighbouring arms different ones: the shell reads as a
+// four-fold starburst rather than as confetti, and every spark holds its colour until it
+// twinkles out. One hue for the WHOLE shell would be truer still, but the shell's identity
+// has nowhere to live — `variant` is a 3-bit field by contract (`load_cells` masks imported
+// bytes to `& 7`) and it is already spent on direction.
 function sparkColor({ variant, age, energy, time, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
-  const hue = FIREWORK_HUES[hash % FIREWORK_HUES.length];
+  const hue = FIREWORK_HUES[variant & 3];
   if (age < 3) return mixRgb([255, 250, 230], hue, 0.25);
   const life = Math.min(1, energy / 235);
   let out = mixRgb([96, 44, 34], hue, 0.2 + life * 0.8);
