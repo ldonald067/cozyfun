@@ -443,8 +443,18 @@ function wellspringColor({ color, variant, energy, time, cells, width, height, x
   let out = mixRgb(color, [112, 106, 126], 0.3 - (hash & 3) * 0.05);
   // Chiselled rim: bright top/left, deep shadow bottom/right — a carved block reads
   // from its edges even at a two-cell placement.
+  //
+  // The two are EXCLUSIVE, and that is the whole of it. A cell exposed on opposite sides —
+  // which every arm of the five-cell plus the brush stamps is — used to take the highlight
+  // and the shadow both, and they averaged each other back to a flat mid grey: measured,
+  // all four arms of a dormant spring came out at 124-125, identical, with the lattice
+  // erased. Stone's own mottle spans luminance 45 to 136, so a dormant spring set into a
+  // stone wall had no cell anywhere outside the band stone already occupies, and a player
+  // could not find the block they had just painted. A big bank still bevels the same way —
+  // its top row is exposed upward and its bottom row downward, so each takes one treatment
+  // — only thin and isolated cells change, which is exactly where cancelling was wrong.
   if (edge.top || edge.left) out = mixRgb(out, [168, 186, 218], 0.42);
-  if (edge.bottom || edge.right) out = mixRgb(out, [8, 12, 22], 0.44);
+  else if (edge.bottom || edge.right) out = mixRgb(out, [8, 12, 22], 0.44);
   // Small placements (1-2 cells, mostly exposed) always carve: a lone block must
   // still read as runed stone, and attuned-vs-dormant must survive at that size.
   const rune =
