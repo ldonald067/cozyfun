@@ -17,10 +17,13 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
 
 - `npm run test:parity`: drives its scenarios through the Rust/WASM sim and the JS fallback together and asserts every cell byte matches on every tick. This is the only gate that can see the two engines diverge — the single-engine smokes below can both pass while behaviour has drifted.
 
-  Building a scenario is fixture work, and the brush is blunter than it looks: **every
-  radius stamps the same five-cell plus**, so nothing can be placed one cell at a time and
-  paint ORDER is what gives a layout its shape (paint the target first, let the masonry
-  overwrite it). **Nothing stays where you put it, either** — liquids side-hop up to two
+  Building a scenario is fixture work, and the brush is blunter than it looks. `paint` is a
+  **disc of the radius you ask for** — 5 cells at radius 1, 13 at 2, 49 at 4, 197 at 8 — and
+  the harnesses all pass radius 1, which is why "the brush stamps a five-cell plus" was
+  written here and is **wrong**. The app's own slider runs 1 to 12 and DEFAULTS TO 4, so the
+  shape a player actually paints is a 49-cell disc, not a plus. At radius 1 nothing can be
+  placed one cell at a time and paint ORDER is what gives a layout its shape (paint the
+  target first, let the masonry overwrite it). **Nothing stays where you put it, either** — liquids side-hop up to two
   cells, gases rise, powders and stone fall, so a scenario that leaves cells floating
   diverges for a reason that has nothing to do with the rule under test. Seal enclosures
   with Wall. Print the board rather than reasoning about it — the chimney-breast scenario
@@ -70,6 +73,13 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
 - `npm run material:contrast`: fails when any two material palettes fall below the averaged-colour distance floor. It cannot see per-variant, interaction-state, glow, shape or animation differences, so it is a floor and not a verdict.
 
   **Two traps when measuring a rendered capture by hand**, both of which have produced a wrong verdict here. Sample the CELL, not a box around it: a 10x10px box around one 4px cell is mostly night sky, and it reported a bud and a spent seed head as 5-8 redmean apart when the cells themselves were 52-66. And measure a material in the SHAPE IT TAKES: an equal-bodies board is the right way to compare identities, but oil scored 78 from the background as a 10x10 block and 182 as the one-cell film it actually forms in play, so the block reading alone would have sent someone off to fix a material that was fine.
+
+  **Neither a mean nor a band can tell a REGULAR field from an irregular one**, and that
+  flipped a verdict here. A wellspring stamped into stone and into wall scores about the same
+  on the p10-p90 test, and wall scores slightly worse — yet in a picture the wall case is the
+  *easier* one to see, because wall's brick grid is regular and a blob breaks the pattern,
+  while stone's mottle is irregular and a blob joins it. Numbers about noise cannot see
+  pattern. Look at the crop before concluding anything about a textured neighbour.
 
   **A mean is the wrong statistic when the neighbour is mottled.** Stone's own cells span luminance 45-136, so "the wellspring sits 39 from stone's mean" said nothing: every cell of a dormant spring landed *inside the band stone already occupies*, and it was invisible in a stone wall while scoring a comfortable distance. Ask whether the cell falls outside the neighbour's p10-p90, not how far it is from the middle.
 

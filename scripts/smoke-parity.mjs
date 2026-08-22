@@ -210,9 +210,10 @@ const scenarios = [
     w: 24, h: 20, seed: 811, ticks: 260,
     paint(p) {
       for (let x = 0; x < 24; x++) p(x, 18, 1, M.Wall);
-      // Painted before the masonry so the walls overwrite where they overlap: the brush
-      // stamps a five-cell plus at every radius, so nothing here can be placed one cell at
-      // a time and the order is what gives the layout its shape.
+      // Painted before the masonry so the walls overwrite where they overlap: the brush is a
+      // DISC of the radius you ask for, and every fixture in this file passes radius 1, which
+      // is a five-cell plus - so nothing here can be placed one cell at a time and the order
+      // is what gives the layout its shape.
       p(14, 10, 1, M.Stone);
       for (let x = 6; x <= 14; x++) p(x, 12, 1, M.Wall);
       for (let y = 8; y <= 11; y++) p(16, y, 1, M.Wall);
@@ -343,9 +344,10 @@ const scenarios = [
     // have no empty neighbour, so those are exactly the rolls neither engine may make.
     //
     // No sealed still-water pocket here, and that is deliberate rather than lazy. The brush
-    // stamps a five-cell PLUS at every radius, so two adjacent cells of different materials
-    // cannot both survive the painting — a pocket built that way quietly becomes something
-    // else, which is how the first version of this scenario failed. Still water is covered
+    // stamps a DISC, and this file paints at radius 1, which is a five-cell plus, so two
+    // adjacent cells of different materials cannot both survive the painting — a pocket built
+    // that way quietly becomes something else, which is how the first version of this
+    // scenario failed. Still water is covered
     // by `still_water_with_nowhere_to_go_does_not_erode_stone` in the sim instead.
     name: "a spring wearing down a stone lip",
     w: 44, h: 32, seed: 8123, ticks: 1400,

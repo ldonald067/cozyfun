@@ -446,7 +446,8 @@ function wellspringColor({ color, variant, energy, time, cells, width, height, x
   //
   // A cell exposed on OPPOSITE faces of an axis is a thin section, not a corner. It used to
   // take the highlight and the shadow both and they averaged back to a flat mid grey:
-  // measured, all four arms of the five-cell plus the brush stamps came out at 124-125,
+  // measured, all four arms of a five-cell stamp (the brush at its smallest radius) came
+  // out at 124-125,
   // identical, with the rune lattice erased. Stone's own mottle spans luminance 45 to 136,
   // so a dormant spring set into a stone wall had no cell anywhere outside the band stone
   // already occupies, and a player could not find the block they had just painted.
