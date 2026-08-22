@@ -68,6 +68,12 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
 
   It also closes a gap **four independent reviewers found**: the renderer mirrors `PETAL_SHED_AGE`, `POLLEN_RESERVE` and `COLD_CHAR_ENERGY` so a seed head is drawn under exactly the condition that makes it one, and ash is full exactly when the sim calls an ember out — but parity only compares Rust with `engine.ts`, and neither knew a third copy existed. The probe parses all three sources and fails when they disagree.
 
+  **A pair that nothing checks is a pair that will break.** The ash treatment was measured
+  against the night sky, passed, shipped — and put a spent bed 29 redmean from Stone, which
+  is the material a firebox is built from. One pair got a gate, its neighbour did not, and
+  the ungated one is the one that regressed. When adding a state here, ask what that state
+  sits NEXT TO in play and gate that too.
+
   Adding a check here means committing to a number in public. That is the point: the floors are the design claims, so a regression fails the gate instead of being rediscovered by eye two phases later.
 
 - `npm run material:contrast`: fails when any two material palettes fall below the averaged-colour distance floor. It cannot see per-variant, interaction-state, glow, shape or animation differences, so it is a floor and not a verdict.

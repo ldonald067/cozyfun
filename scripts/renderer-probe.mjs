@@ -177,6 +177,40 @@ function assertFloor(label, floor, worst, detail) {
     `worst at ${at}. Quenching a hearth is a look somebody chose; it has to be visible.`);
 }
 
+// 2b. Char against the materials a HEARTH is built from. Check 1 asks whether a spent bed is
+//     visible against the empty tray; this asks whether it is visible against the firebox
+//     around it, which is the commoner adjacency of the two — nobody burns a log in mid-air.
+//     Nothing checked this, and the ash treatment that fixed check 1 (52 to 296 from the
+//     night) quietly broke it: a spent bed landed 29 redmean from stone, under the palette
+//     floor, and a hearth is char against stone.
+{
+  const hearth = {
+    stone: [MATERIAL.Stone, 0, 60, 0],
+    wall: [MATERIAL.Wall, 0, 40, 0],
+    wood: [MATERIAL.Wood, 30, 48, 0],
+  };
+  const surround = (spec, time) => {
+    const [kind, energy, age, flags] = spec;
+    const cells = board((put) => {
+      for (let x = 0; x < W; x++) put(x, 6, MATERIAL.Wall);
+      for (let x = 3; x < 21; x++) put(x, 5, kind, energy, age, flags, x);
+    });
+    const cols = [];
+    for (let x = 5; x < 19; x++) cols.push(colourAt(cells, x, 5, time));
+    return cols.reduce((a, c) => [a[0] + c[0], a[1] + c[1], a[2] + c[2]], [0, 0, 0])
+      .map((v) => Math.round(v / cols.length));
+  };
+  let worst = Infinity, at = null;
+  for (const [name, spec] of Object.entries(hearth)) {
+    for (let e = 0; e <= shape.COLD_CHAR_ENERGY; e += 5) for (const t of TIMES) {
+      const d = redmean(bedMean(e, 0, t), surround(spec, t));
+      if (d < worst) { worst = d; at = `${name}, energy ${e}, time ${t}`; }
+    }
+  }
+  assertFloor("cold char vs its hearth surround", 45, worst,
+    `worst at ${at}. A spent bed has to read against the firebox, not only against the night.`);
+}
+
 // 3. The two ends of a plant's life. A bud says wait for it; a seed head says this one is
 //    over and will sow while you are away. They are both one lone rooted Flower cell, and
 //    they rendered 52-66 apart — barely over the distance the contrast gate demands between

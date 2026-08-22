@@ -832,7 +832,16 @@ function iceColor({ color, variant, cells, width, height, x, y }: ShapeContext) 
 // not as lit, so this deliberately lands on the base layer and touches no glow (an ember at
 // energy 0 emits none, and that stays true).
 const CHAR_BODY: Rgb = [46, 36, 30];
-const CHAR_ASH: Rgb = [132, 124, 118];
+// Pale grey, which is what wood ash actually is — and the mid warm grey this used to be
+// landed on top of Stone. Measured across the whole neighbourhood rather than one pair: at
+// [132,124,118] a spent bed sat **29 redmean from stone**, under the 45 palette floor, and a
+// hearth is precisely char against a stone firebox. The trade had been made blind — the ash
+// treatment fixed char-against-the-NIGHT (52 to 213) while quietly breaking
+// char-against-STONE (152 to 29), which is the commoner adjacency of the two. Every pair now
+// clears 70: night 281, stone 93, wall 231, wood 71, soil 159, sand 225, smoke 166, steam 70,
+// ice 185, wet char 194. Still matte and still glowless, so a dead hearth reads as ash rather
+// than as light.
+const CHAR_ASH: Rgb = [186, 180, 172];
 /// Mirrored from `sim/src/lib.rs`: below this an ember has gone out. The ash reaches full
 /// exactly there, so what a player sees going grey is the same line the sim calls dead.
 export const COLD_CHAR_ENERGY = 30;
@@ -863,7 +872,7 @@ function emberColor({ variant, energy, flags, time, cells, width, height, x, y }
     const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Ember);
     if (edge.top) out = mixRgb(out, CHAR_ASH, ashed * ((hash & 3) === 0 ? 0.34 : 0.56));
     else if (edge.left || edge.right) out = mixRgb(out, CHAR_ASH, ashed * 0.26);
-    if (edge.top && (hash & 7) === 3) out = mixRgb(out, [178, 172, 168], ashed * 0.4);
+    if (edge.top && (hash & 7) === 3) out = mixRgb(out, [222, 216, 208], ashed * 0.4);
   }
   if (heat > 0.05) {
     const pulse = (Math.sin(time * 0.008 + hash * 0.7 + x + y) + 1) * 0.5;
