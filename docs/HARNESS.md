@@ -114,12 +114,29 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
 
   Vite stamps `__COZY_COMMIT__` from `COZY_COMMIT`, the Dockerfile feeds it Railway's
   `RAILWAY_GIT_COMMIT_SHA` (via `ARG` — the only way a Dockerfile sees a build variable), and
-  the app carries it as `data-cozy-commit`. Four assertions, each a way a deploy is wrong
+  the app carries it as `data-cozy-commit`. Five assertions, each a way a deploy is wrong
   while looking normal: the page boots and reports a commit, that commit is the expected one,
-  the wasm arrives as `application/wasm`, and the app says "wasm sim online" rather than
-  "js fallback". The last two are separate on purpose — one reads the header, the other the
-  outcome, and they can disagree. A build with no commit stamps `dev`, which the gate fails
-  on rather than passing over.
+  the wasm arrives as `application/wasm`, the app says "wasm sim online" rather than
+  "js fallback", and **CI passed for the commit that is actually live**. The MIME and engine
+  checks are separate on purpose — one reads the header, the other the outcome, and they can
+  disagree. A build with no commit stamps `dev`, which the gate fails on rather than passing
+  over.
+
+  **A green deploy is not a green build.** Railway builds from `main` on push, on its own
+  clock and with no knowledge of GitHub Actions, so a commit can be serving happily while its
+  CI run is still going — or has already failed. Every other assertion here would call that
+  deployment fine. The CI check is keyed on the SERVED sha rather than local `HEAD`, because
+  the question is whether the thing users are running was ever verified, and those two differ
+  exactly when it matters. `in_progress` is a FAILURE, not a pass: a deploy beats CI to the
+  finish line far more often than it fails outright, and treating "not finished" as "fine"
+  would make the check worse than nothing. It shells out to `gh`, and says so loudly rather
+  than skipping quietly if `gh` is missing or unauthenticated.
+
+  Detection is the half this repo can own. The other half is not deploying in the first
+  place: Railway's service **Settings → Source** has a *Wait for CI* toggle that holds the
+  build until checks pass. It is a dashboard setting, not something `railway.json` carries,
+  so it has to be turned on by hand and it is worth doing — this gate tells you afterwards,
+  that toggle stops it happening.
 
 - `npm run qa:live`: `deploy:verify`, then browser and visual QA against `COZY_QA_URL`. This
   is the whole "does production work" question in one command; the local gate structurally

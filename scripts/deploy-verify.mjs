@@ -21,6 +21,11 @@
 //      to the slower JS engine and looks fine.
 //   4. The running app says "wasm sim online" rather than "js fallback". Point 3 checks the
 //      header; this checks the outcome, and they can disagree.
+//   5. CI actually passed for the commit that is live. Railway builds from `main` on push,
+//      on its own clock and with no knowledge of GitHub Actions, so a commit can be serving
+//      happily while its CI run is still going — or has already failed. Every other check
+//      here would say "green" about it. A GREEN DEPLOY IS NOT A GREEN BUILD unless somebody
+//      asks, so this asks.
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import {
@@ -60,6 +65,7 @@ record(
   `wasm served as ${wasmType} (${wasm.status})`
 );
 
+let servedCommit = "";
 const browser = await startBrowser();
 try {
   const cdp = await connectToFirstPage(browser.debugPort);
@@ -75,6 +81,7 @@ try {
   // 1 and 2. The stamp. `dev` means the build never received a commit — a local build
   // served from somewhere it should not be, or an ARG that stopped being passed through.
   const served = await evaluate(cdp, `document.querySelector(".app-shell")?.dataset.cozyCommit ?? ""`);
+  servedCommit = served;
   record(Boolean(served), `page reports a build commit: ${served || "(none — bundle carries no stamp)"}`);
   if (served === "dev") {
     record(false, "deployment is stamped 'dev': the build got no COZY_COMMIT, so its identity is unknown");
@@ -105,11 +112,51 @@ try {
   await browser.close();
 }
 
+// 5. Did CI pass for the commit that is actually live? This is deliberately keyed on the
+//    SERVED sha, not on local HEAD: the question is whether the thing users are running was
+//    ever verified, and those two differ exactly when it matters most.
+//
+//    `in_progress` is not a pass. That is the real case — a deploy beats CI to the finish
+//    line more often than it fails — and treating "not finished" as "fine" would make this
+//    check worse than nothing.
+if (servedCommit && servedCommit !== "dev") {
+  const gh = spawnSync(
+    "gh",
+    ["api", `repos/{owner}/{repo}/commits/${servedCommit}/check-runs`,
+     "--jq", ".check_runs[] | \"\\(.name)\\t\\(.status)\\t\\(.conclusion // \"pending\")\""],
+    { cwd: root, encoding: "utf8" },
+  );
+  if (gh.status !== 0) {
+    // Not a pass and not a silent skip. If nobody can answer the question, say so on the
+    // same line the other four checks print on.
+    record(false, `could not read CI for ${servedCommit.slice(0, 12)} — is the GitHub CLI installed and authenticated? (${(gh.stderr || "").trim().split("\n")[0] || "gh failed"})`);
+  } else {
+    const runs = gh.stdout.trim().split("\n").filter(Boolean).map((line) => {
+      const [name, status, conclusion] = line.split("\t");
+      return { name, status, conclusion };
+    });
+    if (!runs.length) {
+      record(false, `no CI runs found for ${servedCommit.slice(0, 12)} — the live commit was never checked`);
+    } else {
+      const unfinished = runs.filter((r) => r.status !== "completed");
+      const failed = runs.filter((r) => r.status === "completed" && r.conclusion !== "success" && r.conclusion !== "neutral" && r.conclusion !== "skipped");
+      if (unfinished.length) {
+        record(false, `CI has not finished for the live commit: ${unfinished.map((r) => `${r.name} is ${r.status}`).join(", ")}`);
+      } else if (failed.length) {
+        record(false, `CI FAILED for the live commit: ${failed.map((r) => `${r.name} → ${r.conclusion}`).join(", ")}`);
+      } else {
+        record(true, `CI passed for the live commit (${runs.length} check${runs.length === 1 ? "" : "s"})`);
+      }
+    }
+  }
+}
+
 if (failures.length) {
   console.error(`\nDeploy verification FAILED (${failures.length}):`);
   for (const line of failures) console.error(`  - ${line}`);
-  console.error("\nA redeploy that did not happen, or a host serving wasm as the wrong type,");
-  console.error("both look completely normal in a browser. That is what this gate is for.");
+  console.error("\nA redeploy that did not happen, a host serving wasm as the wrong type, or a");
+  console.error("commit that shipped before CI finished with it — all three look completely");
+  console.error("normal in a browser. That is what this gate is for.");
   process.exit(1);
 }
 console.log("\nDeploy verification passed: the deployment is the expected commit, on the wasm engine.");
