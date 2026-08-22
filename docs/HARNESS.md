@@ -8,6 +8,13 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
 
 - `npm run build`: builds Rust/WASM, copies the WASM into `app/public/sim`, and builds the Vite app.
 - `npm run check`: the full local gate, in order — material identity audit, material contrast floor, site-icon freshness, Rust sim tests, production build, WASM smoke, JS fallback smoke, cross-engine parity, interaction reachability, slow-world visibility, subpath build, audio reactions, browser smoke, audio QA, and visual QA. If you are listing the stages anywhere, take the list from `package.json` rather than from memory.
+- **`cargo build` is not `npm run build:sim`.** Parity reads the wasm from
+  `app/public/sim/`, which `scripts/copy-wasm.mjs` writes — and only `npm run build:sim`
+  runs it. Building the crate directly leaves a stale binary there, so parity compares your
+  new JS against the old Rust and reports a divergence in whatever scenario happens to drift
+  first, nowhere near what you changed. If parity fails somewhere unrelated to your edit,
+  check that before you read a single line of the rule.
+
 - `npm run test:parity`: drives its scenarios through the Rust/WASM sim and the JS fallback together and asserts every cell byte matches on every tick. This is the only gate that can see the two engines diverge — the single-engine smokes below can both pass while behaviour has drifted.
 
   Building a scenario is fixture work, and the brush is blunter than it looks: **every
