@@ -353,21 +353,37 @@ const scenarios = [
       for (let x = 0; x < 44; x++) p(x, 30, 1, M.Wall);
       for (let y = 18; y <= 29; y++) for (let x = 6; x <= 20; x++) p(x, y, 1, M.Stone);
       p(13, 12, 1, M.Wellspring); p(13, 11, 1, M.Water);
+      // A moonwater lip too. Moonwater shares the whole water arm, so it erodes on the same
+      // branch with a different `vigor` and carries FLAG_COSMIC into the liquid that advances
+      // into the rock — and none of that was demonstrated anywhere until this arm existed.
+      for (let y = 18; y <= 29; y++) for (let x = 26; x <= 40; x++) p(x, y, 1, M.Stone);
+      p(33, 12, 1, M.Wellspring); p(33, 11, 1, M.Moonwater);
     },
     observe(seen, cells, w, h) {
-      let wetSand = 0, stone = 0;
+      let wetSand = 0, stone = 0, cosmicWater = 0;
       for (let i = 0; i < w * h; i++) {
         const k = cells[i * STRIDE];
         if (k === 9) stone++;
-        else if (k === 2 && cells[i * STRIDE + 6] & 1) wetSand++;
+        if (k !== 2) continue;
+        const flags = cells[i * STRIDE + 6];
+        if (flags & 1) wetSand++;
+        // A COSMIC WET GRAIN: sand that moonwater wore off a rock and marked on the way.
+        // Two earlier versions of this counter were vacuous, both worth remembering. It first
+        // counted cosmic MOONWATER, which the scenario paints before tick zero, so it was true
+        // without erosion running at all. Then it sat in an `else if` after the wet-sand
+        // branch — and a cosmic grain is wet too, so that branch always won and this one was
+        // unreachable. Counted independently now.
+        if ((flags & 5) === 5) cosmicWater++;
       }
       seen.maxWetSand = Math.max(seen.maxWetSand ?? 0, wetSand);
       seen.minStone = Math.min(seen.minStone ?? Infinity, stone);
       seen.firstStone = seen.firstStone ?? stone;
+      seen.maxCosmicWater = Math.max(seen.maxCosmicWater ?? 0, cosmicWater);
     },
     expect(seen) {
       if ((seen.maxWetSand ?? 0) < 1) return "the spring never wore a single grain off the lip";
       if ((seen.minStone ?? 0) >= (seen.firstStone ?? 0)) return "the stone lip never lost a cell";
+      if ((seen.maxCosmicWater ?? 0) < 1) return "moonwater never wore off a cosmic grain";
       return null;
     },
   },

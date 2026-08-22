@@ -30,7 +30,8 @@ const compile = spawnSync(
     "--outDir",
     outDir,
     "app/src/audio/reactions.ts",
-    "app/src/materials.ts"
+    "app/src/materials.ts",
+    "app/src/engine.ts"
   ],
   { cwd: root, stdio: "inherit" }
 );
@@ -190,10 +191,17 @@ expectCues("meteor shatters glass to sand", (before, after) => {
   setCell(after, 1, 1, MATERIAL.Sand);
 }, ["shatter"]);
 
-expectCues("water erodes stone to sand", (before, after) => {
+expectCues("water erodes stone, taking the grain", (before, after) => {
   setCell(before, 1, 1, MATERIAL.Stone);
-  setCell(after, 1, 1, MATERIAL.Sand);
+  setCell(after, 1, 1, MATERIAL.Water);
 }, ["erode"]);
+
+// A grain settling through a pond is the same liquid -> Sand swap erosion makes at the
+// water's cell. It must stay silent, which is why the cue keys on the rock half instead.
+expectCues("a sand grain sinking through water stays silent", (before, after) => {
+  setCell(before, 1, 1, MATERIAL.Water);
+  setCell(after, 1, 1, MATERIAL.Sand, { flags: CELL_FLAG.Wet });
+}, []);
 
 expectCues("watered moss beads with dew", (before, after) => {
   setCell(before, 1, 1, MATERIAL.Moss);
@@ -223,5 +231,41 @@ expectCues("priority order and uniqueness", (before, after) => {
   setCell(before, 2, 0, MATERIAL.Oil);
   setCell(after, 2, 0, MATERIAL.Stardust);
 }, ["cleanse", "steam-flash"]);
+
+// ---------------------------------------------------------------------------------------
+// Every check above hands the detector a transition somebody typed. That is how the erosion
+// cue went stale without anything noticing: the sim stopped producing Stone -> Sand, and the
+// test kept fabricating it, so a spring wore its lip down in silence and the gate stayed
+// green. This one drives the REAL sim and feeds it consecutive frames, so the cue is bound
+// to what the simulation actually emits.
+{
+  const { createFallbackEngine } = require(resolve(outDir, "engine.js"));
+  const W = 16, H = 16;
+  const engine = createFallbackEngine(W, H, 7);
+  const bytes = engine.getCellBytes();
+  const put = (x, y, kind) => {
+    const o = (y * W + x) * CELL_STRIDE;
+    bytes[o] = kind;
+    bytes[o + 1] = (x + y) & 7;
+  };
+  // The shaft walls are TWO cells thick: liquids side-hop two, so a one-thick wall does not
+  // contain them and the water simply leaves.
+  for (let y = 3; y <= 10; y++) for (const x of [6, 7, 9, 10]) put(x, y, MATERIAL.Wall);
+  put(8, 10, MATERIAL.Wall);
+  put(8, 9, MATERIAL.Stone);
+  put(8, 8, MATERIAL.Water);
+  engine.loadCellBytes(bytes);
+
+  let heard = false;
+  let previous = engine.getCellBytes().slice();
+  for (let tick = 0; tick < 30000 && !heard; tick++) {
+    engine.tick();
+    const current = engine.getCellBytes();
+    if (detectReactionCues(previous, current, W, H).includes("erode")) heard = true;
+    previous = current.slice();
+  }
+  assert(heard, "the sim eroded stone but the detector never emitted an erode cue");
+  console.log("  sim-driven: erosion in the engine reaches the erode cue");
+}
 
 console.log("Audio reaction smoke checks passed");

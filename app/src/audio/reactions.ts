@@ -73,7 +73,12 @@ export function detectReactionCues(before: Uint8Array, after: Uint8Array): React
     if (beforeKind === MATERIAL.Glass && afterKind === MATERIAL.Sand) {
       found.add("shatter");
     }
-    if (beforeKind === MATERIAL.Stone && afterKind === MATERIAL.Sand) {
+    // Erosion is a PAIR of transitions now, not a stone turning to sand in place: the water
+    // takes the grain, so the rock cell becomes the liquid and the grain lands where the
+    // water was. Stone -> liquid is the unambiguous half. The other half, liquid -> Sand, is
+    // not usable here — a sand grain sinking through a pond produces exactly that swap, and
+    // the cue would fire on every settling grain.
+    if (beforeKind === MATERIAL.Stone && (afterKind === MATERIAL.Water || afterKind === MATERIAL.Moonwater)) {
       found.add("erode");
     }
     if (beforeKind === MATERIAL.Fire && afterKind === MATERIAL.Stardust) {

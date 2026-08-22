@@ -618,7 +618,10 @@ class JsSandboxEngine implements SandboxEngine {
             if (readU16(next, nidx + 6) & CELL_FLAG.Scorched && this.chance(5)) {
               writeU16(next, nidx + 6, readU16(next, nidx + 6) & ~CELL_FLAG.Scorched);
             }
-            if (next[nidx] === MATERIAL.Stone && readU16(next, nidx + 4) >= 250 && waterCanMove && this.chance(2000)) {
+            // `next[idx] === kind` is the ownership check mirrored from sim/src/lib.rs: an
+            // earlier neighbour may already have consumed this water cell (quenching lava
+            // writes steam into it and continues), and erosion must not overwrite that.
+            if (next[nidx] === MATERIAL.Stone && next[idx] === kind && readU16(next, nidx + 4) >= 250 && waterCanMove && this.chance(2000)) {
               // Mirrors the erosion arm in sim/src/lib.rs: the water TAKES the grain, so the
               // grain lands where the water was and the water advances into the rock. Leaving
               // it in place built a sand skin that shielded the stone and stopped erosion for
@@ -626,7 +629,8 @@ class JsSandboxEngine implements SandboxEngine {
               // cell is sand now and must not go on hydrating its remaining neighbours, and the
               // rolls that would make are rolls the Rust side does not make either.
               writeCellBytes(next, nidx, kind, old[idx + 1], readU16(old, idx + 4), 0, readU16(old, idx + 6));
-              writeCellBytes(next, idx, MATERIAL.Sand, old[nidx + 1], 60, 0, CELL_FLAG.Wet);
+              writeCellBytes(next, idx, MATERIAL.Sand, old[nidx + 1], 60, 0,
+                CELL_FLAG.Wet | (kind === MATERIAL.Moonwater ? CELL_FLAG.Cosmic : 0));
               break;
             }
           }

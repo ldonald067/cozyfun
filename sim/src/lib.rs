@@ -1107,7 +1107,15 @@ impl Universe {
                             if next[nidx].flags & FLAG_SCORCHED != 0 && self.chance(5) {
                                 next[nidx].flags &= !FLAG_SCORCHED;
                             }
+                            // `next[idx].kind == cell.kind` is an OWNERSHIP check, not a
+                            // formality. Erosion consumes this water cell, and an earlier
+                            // neighbour in the same loop may already have consumed it —
+                            // quenching lava writes steam into it and then `continue`s, and
+                            // meteor shock does the same. Without this guard erosion
+                            // overwrites that steam with sand, so one water cell quenches
+                            // the lava and then throws the result away.
                             if next[nidx].kind == Material::Stone as u8
+                                && next[idx].kind == cell.kind
                                 && next[nidx].energy >= 250
                                 && water_can_move
                                 && self.chance(2000)
@@ -1131,7 +1139,14 @@ impl Universe {
                                 next[nidx] = Cell::new(cell.kind, cell.variant, cell.energy);
                                 next[nidx].flags = cell.flags;
                                 next[idx] = Cell::new(Material::Sand as u8, other.variant, 60);
-                                next[idx].flags = FLAG_WET;
+                                // Moonwater marks what it touches, and a grain it wore off a
+                                // rock is something it touched: dropping the mark here made
+                                // `moonwater.marks` quietly untrue for this one outcome. Keyed
+                                // on `is_moonwater` like every other branch in this arm, NOT on
+                                // the liquid's own flags — moonwater is cosmic by KIND and
+                                // carries no cosmic flag of its own, so copying its flags across
+                                // set nothing at all and the grain came out plain wet.
+                                next[idx].flags = FLAG_WET | if is_moonwater { FLAG_COSMIC } else { 0 };
                                 break;
                             }
                         }
@@ -3620,6 +3635,55 @@ mod tests {
             kind_at(&u, 8, 7),
             Material::Water as u8,
             "and the still water should still be sitting there",
+        );
+    }
+
+    /// The claim the matrix actually makes about a pond, which the sealed-pocket test above
+    /// cannot reach: an OPEN stone bowl has air over its water, so its surface cells pass the
+    /// flow gate and its waterline does wear. What must be true is that it wears the waterline
+    /// and then STOPS, rather than dissolving the basin. Eroding on contact alone — the first
+    /// version of this rule — took the same bowl from 169 stone cells to 45.
+    #[test]
+    fn an_open_stone_pond_wears_its_waterline_and_then_holds() {
+        let mut u = Universe::new(40, 26, 7);
+        for x in 0..40 {
+            set_cell(&mut u, x, 25, Material::Wall);
+        }
+        for x in 8..=30 {
+            for y in 18..=24 {
+                set_cell(&mut u, x, y, Material::Stone);
+            }
+        }
+        for y in 14..=17 {
+            set_cell(&mut u, 10, y, Material::Stone);
+            set_cell(&mut u, 28, y, Material::Stone);
+            for x in 11..=27 {
+                set_cell(&mut u, x, y, Material::Water);
+            }
+        }
+        let stone_at = |u: &Universe| {
+            (0..u.cells.len())
+                .filter(|&i| u.cells[i].kind == Material::Stone as u8)
+                .count()
+        };
+        let before = stone_at(&u);
+        for _ in 0..8000 {
+            u.tick();
+        }
+        let midway = stone_at(&u);
+        for _ in 0..12000 {
+            u.tick();
+        }
+        let after = stone_at(&u);
+
+        assert!(
+            after * 4 >= before * 3,
+            "an open pond should keep most of its basin, kept {after} of {before}",
+        );
+        assert!(
+            midway - after <= (before - midway).max(1),
+            "erosion should slow as the waterline wears, not run away: \
+             {before} -> {midway} in the first 8,000 ticks, then -> {after} in the next 12,000",
         );
     }
 
