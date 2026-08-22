@@ -153,6 +153,37 @@ keeping its id — the one drift the coverage gate explicitly cannot catch. Inst
 slow world has its own gate, `npm run slow-world:audit`, which measures the thing the
 matrix could not: whether an absence is visible when you come back.
 
+## Fire and Lava share three roles, and it does not matter
+
+Read as clause lists these two look redundant: both ignite fuel, both vitrify dry sand, both
+dry/scorch/thaw their neighbours. Three of five roles each. That gets re-raised every time
+somebody audits the roster, so here is the measurement that settles it.
+
+Equal bodies — 38 cells of each on a wall shelf, no fuel, nothing to react with, so the only
+thing measured is what each one *is*:
+
+| | lasts | leaves behind |
+| --- | --- | --- |
+| Fire | **61 ticks** | nothing |
+| Lava | **485 ticks** | 8 cells of stone |
+
+And on an identical log pile: fire eats through the wood by tick 79 and is out by 86. Lava
+eats the same wood by tick **11**, seven times faster, and is still burning at 445 — after
+which it has also left stone and glass that fire never made.
+
+So every measurable thing about them differs by five to eight times, and only one of the two
+permanently changes the map. **Fire is a match; lava is terrain.** The shared clauses
+describe overlapping *capabilities*, which is not the same as a shared role — the same is
+true of the five things in this game that spread fire (fire, lava, ember, meteor, spark),
+and each of those is a different delivery: a struck flame, a slow flood, banked residue, an
+impact from above, a thrown mote. Variety in how a verb is delivered is the point.
+
+One genuine inconsistency, worth naming rather than churning: Fire documents `fire.dries`
+and `fire.thaws` as two clauses while Lava bundles the identical mechanism into one
+(`lava.scorches`). That is one idea counted twice on one side, and it flatters Fire's role
+count by one. It is left alone because both Fire clauses carry their own covered ids and
+their own audit checks, and deleting a covered id to tidy a tally is churn for no player.
+
 ## A note on Ember's documented depth
 
 Ember's interaction row lists 3 roles because generated-only materials are capped at
