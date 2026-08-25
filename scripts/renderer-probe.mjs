@@ -94,7 +94,7 @@ const redmean = ([r1, g1, b1], [r2, g2, b2]) => {
   return Math.round(Math.sqrt((2 + rm / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rm) / 256) * db * db));
 };
 
-const W = 24, H = 10, STRIDE = 8;
+const W = 26, H = 14, STRIDE = 8;
 function board(paint) {
   const cells = new Uint8Array(W * H * STRIDE);
   const put = (x, y, kind, energy = 0, age = 0, flags = 0, variant = 0) => {
@@ -243,6 +243,78 @@ function assertFloor(label, floor, worst, detail) {
   }
   assertFloor("seed head vs its own flower's hue", 60, worst,
     `worst at ${at}. A husk that resembles its own bloom is a ninth flower colour, not an ending.`);
+}
+
+// 5. The wellspring's three rune states must be mutually distinguishable. Attunement borrows
+//    every material's colour, so the states are separated by BRIGHTNESS rather than hue —
+//    which means there is no palette gate that can see them, and until now nothing checked
+//    them at all. Sampled on the arms of the smallest stamp a player can make.
+{
+  const springState = (kind, time) => {
+    const cells = board((put) => {
+      for (let x = 0; x < W; x++) put(x, 9, MATERIAL.Wall, 0, 40, 0, x);
+      const energy = kind === "attuned" ? MATERIAL.Water : 0;
+      for (const [dx, dy] of [[0, 0], [0, -1], [0, 1], [-1, 0], [1, 0]]) {
+        put(13 + dx, 6 + dy, MATERIAL.Wellspring, energy, 40, 0, 1);
+      }
+      // The ice has to TOUCH the cells being sampled: `hasNearbyKind` is per-cell, so ice off
+      // to one side chills only the arm beside it and the rest render dormant.
+      if (kind === "chilled") { put(13, 4, MATERIAL.Ice, 0, 200, 0, 1); put(11, 6, MATERIAL.Ice, 0, 200, 0, 2); }
+    });
+    const arms = [[13, 5], [12, 6]].map(([x, y]) => colourAt(cells, x, y, time));
+    return arms.reduce((a, c) => [a[0] + c[0], a[1] + c[1], a[2] + c[2]], [0, 0, 0])
+      .map((v) => Math.round(v / arms.length));
+  };
+  let worst = Infinity, at = null;
+  for (const [a, b] of [["dormant", "attuned"], ["dormant", "chilled"], ["attuned", "chilled"]]) {
+    for (const t of TIMES) {
+      const d = redmean(springState(a, t), springState(b, t));
+      if (d < worst) { worst = d; at = `${a} vs ${b}, time ${t}`; }
+    }
+  }
+  assertFloor("wellspring rune states, worst of the three pairs", 45, worst,
+    `worst at ${at}. Sleeping, remembering and listening have to be three different blocks.`);
+}
+
+// 6. The eight bloom species must stay mutually distinguishable. A third of the garden's
+//    variety once went to one hue — slots 0, 6 and 7 were three blues — and nothing stops
+//    that happening again by accident. Measured on PETAL CELLS, not on a box around the head:
+//    a box is mostly night sky and compresses every pair toward zero.
+{
+  const BLOOM_SHAPES = [
+    [[0,-1],[-1,0],[1,0],[-1,-1],[1,-1],[-2,0],[2,0],[-2,-1],[2,-1],[-1,-2],[1,-2],[-1,1],[1,1]],
+    [[0,-1],[-1,0],[1,0],[-1,-1],[1,-1],[-2,0],[2,0],[-2,1],[2,1]],
+    [[0,-1],[-1,0],[1,0],[-1,-1],[1,-1],[-2,0],[2,0],[0,-2],[-1,1],[1,1]],
+    [[0,-1],[-1,0],[1,0],[-1,-1],[1,-1],[-2,0],[2,0],[-2,-1],[2,-1],[0,-2],[-1,-2],[1,-2],[-1,1],[1,1],[-2,-2],[2,-2],[0,-3]],
+    [[0,-1],[-1,0],[1,0],[-1,-1],[1,-1],[-2,-1],[2,-1],[-2,-2],[0,-2],[2,-2]],
+    [[0,-1],[-1,-2],[1,-2],[0,-3],[-1,-4],[1,-4],[0,-5]],
+    [[0,-1],[0,-2],[-1,-1],[1,-2],[-2,0],[2,-1]],
+    [[0,-1],[-1,0],[1,0],[-1,-1],[1,-1]],
+  ];
+  const headMean = (variant, time) => {
+    const petals = [];
+    const cells = board((put) => {
+      for (let x = 0; x < W; x++) put(x, 12, MATERIAL.Wall, 0, 40, 0, x);
+      put(13, 11, MATERIAL.Soil, 120, 40, CELL_FLAG.Wet);
+      for (let i = 2; i <= 5; i++) put(13, 12 - i, MATERIAL.Stem, 20, 50, i === 2 ? CELL_FLAG.Rooted : 0, variant);
+      put(13, 6, MATERIAL.Flower, 95, 200, CELL_FLAG.Rooted, variant);
+      for (const [dx, dy] of BLOOM_SHAPES[variant]) {
+        put(13 + dx, 6 + dy, MATERIAL.Flower, 90, 180, 0, variant);
+        petals.push([13 + dx, 6 + dy]);
+      }
+    });
+    const cols = petals.map(([x, y]) => colourAt(cells, x, y, time));
+    return cols.reduce((a, c) => [a[0] + c[0], a[1] + c[1], a[2] + c[2]], [0, 0, 0])
+      .map((v) => Math.round(v / cols.length));
+  };
+  const NAMES = ["cornflower", "poppy", "daisy", "sunflower", "tulip", "lavender", "bluebell", "cosmos"];
+  let worst = Infinity, at = null;
+  for (let a = 0; a < 8; a++) for (let b = a + 1; b < 8; b++) for (const t of TIMES) {
+    const d = redmean(headMean(a, t), headMean(b, t));
+    if (d < worst) { worst = d; at = `${NAMES[a]} vs ${NAMES[b]}, time ${t}`; }
+  }
+  assertFloor("bloom species, worst of all 28 pairs", 60, worst,
+    `worst at ${at}. Two species a player cannot tell apart is variety that is not there.`);
 }
 
 if (!quiet) {
