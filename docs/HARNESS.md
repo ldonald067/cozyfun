@@ -148,8 +148,15 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   Detection is the half this repo can own. The other half is not deploying in the first
   place: Railway's service **Settings → Source** has a *Wait for CI* toggle that holds the
   build until checks pass. It is a dashboard setting, not something `railway.json` carries,
-  so it has to be turned on by hand and it is worth doing — this gate tells you afterwards,
-  that toggle stops it happening.
+  so it cannot be turned on from here — **it was enabled by hand on 2026-08-25**. With it on,
+  a push parks the deployment in `WAITING` while Actions runs, builds only if every workflow
+  succeeds, and marks the deployment `SKIPPED` if any fails. CI here runs 2-3 minutes, so
+  that is roughly what a deploy now waits before it starts building.
+
+  The two halves answer different questions and both are worth having. The toggle stops a
+  failed commit reaching the host at all; this gate still asks, of whatever IS live, whether
+  anybody ever checked it — which also covers manual redeploys and rollbacks, neither of
+  which the toggle gates.
 
 - `npm run qa:live`: `deploy:verify`, then browser and visual QA against `COZY_QA_URL`. This
   is the whole "does production work" question in one command; the local gate structurally
