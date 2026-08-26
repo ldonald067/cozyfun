@@ -159,6 +159,12 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   started, which is as clear a negative as exists. `railway.json` cannot carry the flag, so
   nothing in the repo can tell you whether it is on; the timeline is the only evidence.
 
+  Confirmed working on 2026-08-26, and this is what a good one looks like: push at 14:32:13,
+  deployment `WAITING` at 14:32:14, the CI run starting a second later, CI green at 14:34:32,
+  and the build beginning only then — parked 2m18s. Set beside the failed attempt three
+  minutes earlier (`BUILDING` at push+1s, before CI had started), the two timelines are the
+  whole test.
+
   The two halves answer different questions and both are worth having. The toggle stops a
   failed commit reaching the host at all; this gate still asks, of whatever IS live, whether
   anybody ever checked it — which also covers manual redeploys and rollbacks, neither of
