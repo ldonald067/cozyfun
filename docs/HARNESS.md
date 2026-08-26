@@ -148,10 +148,16 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   Detection is the half this repo can own. The other half is not deploying in the first
   place: Railway's service **Settings → Source** has a *Wait for CI* toggle that holds the
   build until checks pass. It is a dashboard setting, not something `railway.json` carries,
-  so it cannot be turned on from here — **it was enabled by hand on 2026-08-25**. With it on,
-  a push parks the deployment in `WAITING` while Actions runs, builds only if every workflow
-  succeeds, and marks the deployment `SKIPPED` if any fails. CI here runs 2-3 minutes, so
-  that is roughly what a deploy now waits before it starts building.
+  so it cannot be turned on from here. With it on, a push parks the deployment in `WAITING`
+  while Actions runs, builds only if every workflow succeeds, and marks the deployment
+  `SKIPPED` if any fails. CI here runs 2-3 minutes, so that is roughly what a deploy waits
+  before it starts building.
+
+  **Verify it by behaviour, not by the switch.** Push, then read the deployment state: it has
+  to pass through `WAITING`. The first attempt at this looked enabled and was not — the
+  deployment went to `BUILDING` one second after the push and two seconds BEFORE the CI run
+  started, which is as clear a negative as exists. `railway.json` cannot carry the flag, so
+  nothing in the repo can tell you whether it is on; the timeline is the only evidence.
 
   The two halves answer different questions and both are worth having. The toggle stops a
   failed commit reaching the host at all; this gate still asks, of whatever IS live, whether
