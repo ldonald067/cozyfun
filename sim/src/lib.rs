@@ -3688,6 +3688,67 @@ mod tests {
     }
 
     #[test]
+    fn a_fed_stream_wears_a_trough_and_then_holds() {
+        // The pond test above pins STILL water. This one pins the case the matrix actually
+        // promises: water being poured, continuously, onto rock. The docs used to claim that
+        // cut "a channel that deepens", and it does not — the trough it wears fills with the
+        // water that made it, that water stops reading as flow, and the rule switches itself
+        // off. Measured on a player-scale boulder (1,169 stone cells, a wellspring pouring
+        // for 20,000 ticks) only 38 cells ever wear, and every one of the 41 stone cells
+        // still touching water at the end is fully saturated with ZERO passing the flow gate.
+        //
+        // That equilibrium is the design — a stream should mark its bed, not eat the build —
+        // so it is pinned here rather than left as prose nobody checks.
+        let mut u = Universe::new(60, 40, 7);
+        for x in 0..60 {
+            set_cell(&mut u, x, 39, Material::Wall);
+        }
+        for x in 15..=44 {
+            for y in 27..=38 {
+                set_cell(&mut u, x, y, Material::Stone);
+            }
+        }
+        // A spring on top, taught water, pouring straight down onto the rock.
+        for dy in 21..=23 {
+            for dx in 29..=31 {
+                set_cell(&mut u, dx, dy, Material::Wellspring);
+            }
+        }
+        set_cell(&mut u, 30, 19, Material::Water);
+
+        let stone_at = |u: &Universe| {
+            (0..u.cells.len())
+                .filter(|&i| u.cells[i].kind == Material::Stone as u8)
+                .count()
+        };
+        let before = stone_at(&u);
+        for _ in 0..8000 {
+            u.tick();
+        }
+        let midway = stone_at(&u);
+        for _ in 0..12000 {
+            u.tick();
+        }
+        let after = stone_at(&u);
+
+        let early = before - midway;
+        let late = midway - after;
+        assert!(
+            early >= 12,
+            "a poured stream should visibly wear its bed, wore only {early} cells in 8,000 ticks",
+        );
+        assert!(
+            late * 2 <= early,
+            "erosion under a steady pour should settle, not run away: \
+             {before} -> {midway} in the first 8,000 ticks, then -> {after} in the next 12,000",
+        );
+        assert!(
+            after * 10 >= before * 8,
+            "a poured-on boulder should keep most of itself, kept {after} of {before}",
+        );
+    }
+
+    #[test]
     fn damp_stone_without_water_contact_never_erodes() {
         let mut u = Universe::new(16, 16, 7);
         set_cell_state(&mut u, 8, 15, Material::Stone, 12, 200, FLAG_WET);

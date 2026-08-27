@@ -40,7 +40,7 @@ Every toolbar material is a product choice. Each material in `app/src/materials.
 | --- | --- | --- |
 | Eraser | [eraser.clears] Clears cells without adding state. | Browser smoke: `clear, save, and load update scene state`; not a simulation material. |
 | Wall | [wall.blocks] Blocks flow as sealed construction; [wall.anchored] stays absolutely anchored where built and never falls, unlike natural stone; [wall.resists] resists casual moss crossing; [wall.stains] takes damp, soot, and frost stains; [wall.hearth] as hearth masonry it CONDUCTS a live flame's or hot ember's warmth one brick along the stonework — a brick is warm if it touches the flame or touches a brick that does — so the whole damp nook dries rather than the single brick the flame happens to touch, while frozen neighbours thaw only against a brick in actual contact, and nothing is ever ignited either way; [wall.crumbles] accumulated freeze-thaw stress cracks and crumbles it into stone. | Tests: `wall_stays_anchored_in_midair`, `moss_needs_extra_energy_to_cross_wall`, `ice_frost_stresses_damp_hard_materials`, `hearth_wall_dries_and_thaws_its_nook`, `hearth_warmth_carries_along_masonry_but_thawing_needs_contact`, `hearth_warmth_does_not_jump_an_air_gap`, `accumulated_freeze_thaw_crumbles_wall_into_stone`, `first_thaw_keeps_wall_standing`. |
-| Stone | [stone.blocks] Blocks flow as natural hard substrate; [stone.slumps] slumps straight down when left unsupported, so cliffs and crusts collapse while pillars, floors, and shelves hold; [stone.weathers] weathers and condenses harder than sealed wall; [stone.hosts] hosts damp moss colonization; [stone.born] born from cooled lava, shocked meteor, and crumbled wall; [stone.erodes] running water wears it into wet grains and carries them off, cutting a channel that deepens, while a still pond wears only at its waterline and then holds — so a basin keeps its shape instead of dissolving, and water with nowhere at all to go carves nothing. | Tests: `unsupported_stone_falls_straight_to_the_floor`, `supported_stone_holds_and_overhangs_drop_without_slipping`, `moss_colonizes_damp_stone`, `accumulated_freeze_thaw_crumbles_wall_into_stone`, `flowing_water_erodes_stone_and_carries_the_grain_off`, `still_water_with_nowhere_to_go_does_not_erode_stone`, `damp_stone_without_water_contact_never_erodes`. |
+| Stone | [stone.blocks] Blocks flow as natural hard substrate; [stone.slumps] slumps straight down when left unsupported, so cliffs and crusts collapse while pillars, floors, and shelves hold; [stone.weathers] weathers and condenses harder than sealed wall; [stone.hosts] hosts damp moss colonization; [stone.born] born from cooled lava, shocked meteor, and crumbled wall; [stone.erodes] running water wears it into wet grains and carries them off, cutting a trough that deepens until the water it holds goes still — so a stream marks its bed rather than eating through it, a still pond wears only at its waterline and then holds, a basin keeps its shape instead of dissolving, and water with nowhere at all to go carves nothing. | Tests: `unsupported_stone_falls_straight_to_the_floor`, `supported_stone_holds_and_overhangs_drop_without_slipping`, `moss_colonizes_damp_stone`, `accumulated_freeze_thaw_crumbles_wall_into_stone`, `flowing_water_erodes_stone_and_carries_the_grain_off`, `still_water_with_nowhere_to_go_does_not_erode_stone`, `damp_stone_without_water_contact_never_erodes`, `a_fed_stream_wears_a_trough_and_then_holds`. |
 | Sand | [sand.pours] Pours fast as dry powder, two cells per tick; [sand.clumps] clumps and slows when wet; [sand.drains] drains dry back to loose grains; [sand.vitrifies] strong heat fuses dry grains into glass. | Tests: `sand_falls`, `dry_sand_falls_two_cells_when_clear`, `wet_sand_still_falls_slowly`, `water_wets_sand_into_clumps`, `lava_vitrifies_dry_sand_into_glass`. |
 | Water | [water.flows] Flows and pools; [water.hydrates] hydrates soil, sand, and life; [water.quenches] quenches lava and shocks meteor into scorched stone; [water.boils] simmers, bubbles, and boils away to steam over sustained flame, while hot water melts ice instead of freezing; [water.rinses] rinses soot from scorched wall and stone; [water.oilblocked] blocked from feeding life by oil coating. | Tests: `water_spreads_when_blocked`, `rooted_seed_grows_a_stalk_that_blooms`, `water_quenches_lava_into_steam_and_stone`, `sustained_flame_simmers_then_boils_water`, `hot_water_melts_ice_and_resists_freezing`, `water_rinses_soot_from_hard_surfaces`. |
 | Moonwater | [moonwater.moves] Moves like water with supercharged growth; [moonwater.marks] marks touched cells cosmic; [moonwater.cleans] cleans oil into stardust; [moonwater.bursts] bursts meteor contact into stardust; [moonwater.freezes] freezes into cosmic ice. | Tests: `moonwater_cleans_oil_into_stardust`, `meteor_moonwater_contact_bursts_to_stardust`, `lava_cools_near_moonwater`; visual QA: `material-identity-showcase`. |
@@ -114,6 +114,32 @@ still loses its waterline (169 → 146) before it holds. Only water with no empt
 all — sealed, or deep inside a body — is exempt outright.
 `an_open_stone_pond_wears_its_waterline_and_then_holds` is the test that pins the real
 behaviour, because the sealed-pocket test cannot reach it.
+
+**It has now been reworded a second time, for the opposite reason, and the id was kept
+again.** The strengthened rule carries the grain off so a channel *can* deepen, and the
+clause said it does. At PLAYER scale it does not. Measured on a solid boulder of 1,169 stone
+cells with a wellspring pouring onto it for 20,000 ticks — about five and a half minutes of
+play — **38 cells wear, 3%, and the silhouette does not change**: what forms is a shallow
+dish, rimmed with tan grain, holding a puddle. With the water sheeting sideways across a
+solid lip instead, 55 of 1,074, 5%. Both stop dead rather than slowing.
+
+The mechanism is measured, not inferred. At the plateau all **41** stone cells still touching
+water are fully saturated — the saturation gate is wide open — and **zero** pass the flow
+gate. The trough the water cuts fills with the water that cut it, that water no longer has an
+empty neighbour, and the rock protects itself with its own puddle. This is *not* the old
+sand-skin failure wearing a new coat: only 3 stone cells were capped by sand.
+
+The behaviour is right and the claim was wrong, so the claim moved. A stream should mark its
+bed, not eat the build — unbounded erosion already dissolved a basin from 169 cells to 45
+once. `a_fed_stream_wears_a_trough_and_then_holds` pins it now, at both ends: a trough must
+appear, and it must then settle.
+
+**Why no gate caught it is worth more than the fix.** `interaction:audit` certifies
+`stone.erodes` on a 30x26 board with a radius-3 stone blob — about 29 cells — so 19 eroded
+cells is most of the rock and scores a dramatic 19 cells at contrast 178. The rule was being
+certified on a pebble. That is not a bug in the audit: its floors ask *is this visible*,
+which is a genuinely different question from *does it do what the clause says*. Only the
+second one was false, and nothing was asking it.
 
 The interaction audit measures the difference: first fires at tick **44** rather than 434,
 touches **19** cells rather than 4, at contrast **178** rather than 97.
