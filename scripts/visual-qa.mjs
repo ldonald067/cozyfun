@@ -53,9 +53,10 @@ async function main() {
     const materialCapture = await saveSandboxComposite(cdp, "current-materials.png");
     await loadMaterialShowcase(cdp);
     const materialShowcaseCapture = await saveSandboxComposite(cdp, `${MATERIAL_SHOWCASE_QA_LABEL}.png`);
-    const desktopLayout = await layoutState(cdp);
+    const desktopLayout = await settledLayout(cdp, 1280, "desktop");
     assert(desktopLayout.controlsBottom <= desktopLayout.viewportHeight + 1, `desktop controls overflow vertically: ${JSON.stringify(desktopLayout)}`);
     assert(desktopLayout.materialsBottom <= desktopLayout.viewportHeight + 1, `desktop materials overflow vertically: ${JSON.stringify(desktopLayout)}`);
+    assertTrayOnScreen(desktopLayout, "desktop");
     const roomCaptures = await saveRoomCaptures(cdp);
 
     await cdp.send("Emulation.setDeviceMetricsOverride", {
@@ -64,10 +65,10 @@ async function main() {
       deviceScaleFactor: 2,
       mobile: true
     });
-    await sleep(180);
-    const mobileLayout = await layoutState(cdp);
+    const mobileLayout = await settledLayout(cdp, 390, "mobile");
     assert(mobileLayout.viewportWidth <= 390, `unexpected mobile viewport: ${JSON.stringify(mobileLayout)}`);
     assert(mobileLayout.controlsRight <= mobileLayout.viewportWidth + 1, `mobile controls overflow: ${JSON.stringify(mobileLayout)}`);
+    assertTrayOnScreen(mobileLayout, "mobile");
 
     await writeFile(path.join(outputDir, "current-layout.json"), JSON.stringify({ desktopLayout, mobileLayout }, null, 2));
     const screenshotCapture = await trySaveScreenshot(cdp, "current-mobile-layout.png");
@@ -223,6 +224,48 @@ async function saveScreenshot(cdp, fileName) {
   return captureScreenshot(cdp, outputDir, fileName);
 }
 
+// Layout metrics are read once the viewport has stopped moving, not a fixed delay after the
+// override. `.tray` is sized purely by CSS off its containing block (`width: min(100%, 1050px)`
+// with an aspect ratio), so its rect only means anything after the browser has finished
+// reflowing — and a sleep is a guess at when that is. The guess was seen to lose the race
+// exactly once, reporting trayRight 430 on a 390px viewport, which reads as 40px of the board
+// off-screen and never reproduced. Waiting for two identical consecutive samples removes the
+// race instead of widening the guess, and that is what makes the fits-on-screen assertions
+// safe to ENFORCE rather than merely record. A flaky metric cannot be asserted, so it never
+// was, and the one number that would have caught a clipped board went unchecked for it.
+// The tray IS the game. A control sliding off the edge is a nuisance a player can scroll to;
+// a board wider than the window means cells they can never paint on, so both edges are checked.
+function assertTrayOnScreen(layout, label) {
+  assert(
+    layout.trayLeft >= -1 && layout.trayRight <= layout.viewportWidth + 1,
+    `${label} sandbox is off-screen horizontally — the player cannot reach the whole board: ${JSON.stringify(layout)}`
+  );
+}
+
+async function settledLayout(cdp, expectedWidth, label) {
+  let previous = null;
+  let settled = null;
+  await waitUntil(
+    async () => {
+      const now = await layoutState(cdp);
+      const stable =
+        now.viewportWidth === expectedWidth &&
+        previous !== null &&
+        previous.viewportWidth === expectedWidth &&
+        now.trayLeft === previous.trayLeft &&
+        now.trayRight === previous.trayRight &&
+        now.controlsRight === previous.controlsRight;
+      previous = now;
+      if (stable) settled = now;
+      return stable;
+    },
+    `${label} layout to settle at ${expectedWidth}px`,
+    8_000,
+    100
+  );
+  return settled;
+}
+
 async function layoutState(cdp) {
   return evaluate(
     cdp,
@@ -233,6 +276,7 @@ async function layoutState(cdp) {
       return {
         viewportWidth: window.innerWidth,
         viewportHeight: window.innerHeight,
+        trayLeft: tray?.left ?? 0,
         trayRight: tray?.right ?? 0,
         trayBottom: tray?.bottom ?? 0,
         controlsLeft: controls?.left ?? 0,

@@ -355,6 +355,14 @@ input:focus-visible {
   min-width: 0;
   min-height: calc(100vh - 36px);
   display: grid;
+  /* The column MUST be pinned to the container. Left implicit, it sizes to the tray's
+     max-content contribution -- and the tray has `aspect-ratio: 11 / 7`, so its row height
+     transfers back into a width. That is a feedback loop: row height -> aspect ratio ->
+     column width -> overflow, settling wherever the previous layout pass left it. On a 390px
+     phone it put a 418px board in a 366px stage with no horizontal scroll, so ~7% of the
+     world was clipped and unreachable, and the number moved run to run (378 / 394 / 430)
+     which is what made it look like a flaky metric rather than a bug. */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: 1fr auto;
   align-items: center;
 }

@@ -175,6 +175,27 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   cannot answer it.
 
 - `npm run visual:qa`: captures deterministic material scenes, room backdrops, and responsive layout metrics into `.tmp/visual-qa`.
+
+  It asserts the **sandbox fits on screen** at desktop and at 390px, both edges, and reads
+  those metrics once the layout has stopped moving rather than a fixed delay after the
+  viewport override. Both halves were added together, and the order they were added in is the
+  lesson.
+
+  `trayRight` was recorded and never asserted for as long as it existed, because it looked
+  flaky: it came back 430 on a 390px viewport once, then 378 on every rerun. The reasonable-
+  sounding conclusion — a racy metric cannot be asserted, so leave it recorded — was wrong
+  twice over. **The flake WAS the bug.** `.sandbox-stage` left its grid column implicit, so
+  the column sized to the tray's max-content contribution, and the tray has
+  `aspect-ratio: 11 / 7`: row height transferred into a width, that width sized the column,
+  and the column overflowed its own container. A feedback loop settles wherever the previous
+  pass left it, which is why the number moved between runs (378 / 394 / 430) and why it was
+  stable *within* a run. On a phone that put a 418px board in a 366px stage with no
+  horizontal scroll — about 7% of the world clipped and unreachable, at the right-hand edge
+  where a screenshot does not obviously show it.
+
+  So: a metric that will not sit still is a bug report about the thing it measures, not a
+  reason to keep it unasserted. Fix the determinism, then assert — and if the determinism
+  cannot be fixed, that is the finding.
 - `npm run audio:qa`: writes a native ambience manifest for local audio asset size, target loop length, and mood/room balance review into `.tmp/audio-qa`.
 - `node scripts/preview-dist.mjs 4181`: serves the built `app/dist` with bundle badges so stale browser sessions are obvious. Build first. (Windows: `.\scripts\preview-current.ps1 -Port 4181` rebuilds and serves in one step.)
 - `npm run test:chrome` / `npm run test:firefox`: **Windows-only** — they shell out to PowerShell. They drive a *visible* browser against a preview server you started yourself, which is how to watch a QA run rather than read its result. Port via `CHROME_QA_APP_PORT` / `FIREFOX_QA_APP_PORT`, default 4173.
