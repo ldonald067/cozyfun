@@ -4173,6 +4173,72 @@ mod tests {
         assert_eq!(kind_at(&u, 9, 8), Material::Empty as u8, "re-attunement consumes the new source cell");
     }
 
+    /// A spring attuned to a POWDER entombs itself: the grain piles up, nothing drinks it,
+    /// and once no empty cell lies within WELLSPRING_REACH of any face the pour stops. That is
+    /// the real bound on a powder spring, and it is worth pinning both halves of, because the
+    /// matrix's stated reason for having no output cap -- "every substrate in the game drinks
+    /// standing water" -- is a WATER argument and does not hold here.
+    ///
+    /// Measured on the shipped 220x140 grid at the default brush, a sand spring fills 23% of
+    /// the terrarium in about a minute and then halts for good. It is not dead, though, and
+    /// that is the half that makes the behaviour fair: give it air and it pours again with its
+    /// attunement intact.
+    #[test]
+    fn a_buried_spring_stops_and_then_resumes_when_given_air() {
+        let mut u = Universe::new(24, 24, 7);
+        // Two sealed chambers side by side, divided by a wall the test later opens.
+        for x in 2..=21 {
+            set_cell(&mut u, x, 2, Material::Wall);
+            set_cell(&mut u, x, 21, Material::Wall);
+        }
+        for y in 2..=21 {
+            set_cell(&mut u, 2, y, Material::Wall);
+            set_cell(&mut u, 21, y, Material::Wall);
+            set_cell(&mut u, 12, y, Material::Wall);
+        }
+        // Close to the dividing wall, so opening it puts empty cells inside WELLSPRING_REACH
+        // of a face -- otherwise the grain merely slumps and the spring stays entombed.
+        set_cell_state(&mut u, 10, 18, Material::Wellspring, 0, Material::Sand as u16, 0);
+
+        let sand = |u: &Universe| {
+            (0..u.cells.len())
+                .filter(|&i| u.cells[i].kind == Material::Sand as u8)
+                .count()
+        };
+        for _ in 0..4000 {
+            u.tick();
+        }
+        let filled = sand(&u);
+        for _ in 0..2000 {
+            u.tick();
+        }
+        let stalled = sand(&u);
+        assert!(filled > 20, "the spring should have filled its chamber, poured only {filled}");
+        assert_eq!(
+            stalled, filled,
+            "a spring buried in its own grain should stop, not keep pouring into a full room",
+        );
+
+        // Open the dividing wall: one empty cell within reach of a face is all it needs.
+        for y in 3..=20 {
+            set_cell(&mut u, 12, y, Material::Empty);
+        }
+        for _ in 0..2000 {
+            u.tick();
+        }
+        let resumed = sand(&u);
+        assert!(
+            resumed > stalled + 8,   // measured 33 -> 48; a few grains merely slumping is ~3
+            "an entombed spring must resume once given air -- it was blocked, not dead: \
+             {stalled} grains before the wall came down, {resumed} after",
+        );
+        assert_eq!(
+            u.cells[u.idx(10, 18)].energy,
+            Material::Sand as u16,
+            "burial must not cost the spring its attunement",
+        );
+    }
+
     #[test]
     fn an_unchilled_spring_keeps_its_first_identity() {
         let mut u = Universe::new(16, 16, 7);

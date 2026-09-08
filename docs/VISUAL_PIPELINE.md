@@ -146,7 +146,21 @@ Current cosmic rules:
   seconds, and an adjacent-empty rule then blocks every face and stops the source dead —
   measured at a permanent 3-4 cells of standing water. There is deliberately no output cap:
   one was tried and no scene could be built where it changed the outcome, because the pour is
-  already bounded by filling only empty cells and by every substrate drinking standing water. Nearby ice stills the flow *and* reopens the drinking branch, so a chilled spring re-drinks whatever touches it next: attunement is re-teachable rather than a permanent first-touch commitment.
+  already bounded by filling only empty cells and by every substrate drinking standing water.
+  **That second bound is a WATER argument and does not hold for a powder** — nothing drinks
+  sand — so it is worth saying what actually stops one. A powder spring ENTOMBS itself: the
+  grain piles up until no empty cell lies within `WELLSPRING_REACH` of any face, and the pour
+  halts. Measured on the shipped grid at the default brush, sand and rocket reach **23% of the
+  terrarium in about a minute** and then never grow again; soil takes three minutes to the same
+  ceiling, seed stops at 4%. Water sits at 1% and lava keeps creeping to 8% because both flow
+  away. The conclusion — no cap needed — survives, but for a different reason than the one
+  written down.
+
+  **It is blocked, not dead, and that is what makes it fair.** Carve a sealed cavity beside a
+  buried spring and it pours again within a few hundred ticks with its attunement intact (+299
+  cells in 400, measured). Digging with the brush alone usually does not revive it, because the
+  pile simply slumps back into the hole — which is powder behaving like powder, not a defect.
+  `a_buried_spring_stops_and_then_resumes_when_given_air` pins both halves. Nearby ice stills the flow *and* reopens the drinking branch, so a chilled spring re-drinks whatever touches it next: attunement is re-teachable rather than a permanent first-touch commitment.
 
 The slow world (between sessions only):
 
