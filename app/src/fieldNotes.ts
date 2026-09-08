@@ -34,7 +34,31 @@ type NoteRule = FieldNote & {
   requires?: readonly number[];
   // Minimum simultaneous cells before the moment is legible at play zoom.
   atLeast?: number;
+  // A moment that is a STATE rather than a new kind, so no count rises and the detector
+  // above cannot see it. Used for exactly one thing, and reluctantly: re-teaching a
+  // wellspring changes a cell's remembered material, which is invisible to a per-kind
+  // census. Measured, that interaction is TWO gestures and about two seconds -- ice beside
+  // the spring, then the new material on top -- and it is still the least discoverable rule
+  // in the game, because nothing in play suggests trying it. This is the one note that
+  // teaches rather than observes.
+  when?: (cells: Uint8Array, width: number, height: number) => boolean;
 };
+
+// A wellspring with ice against it: the sim stills it and reopens its drinking branch, so
+// this is the exact moment the player can re-teach it. Matches the sim's own test -- a
+// cardinal Ice neighbour -- rather than approximating it.
+function aSpringIsListening(cells: Uint8Array, width: number, height: number): boolean {
+  const kindAt = (x: number, y: number) =>
+    x < 0 || y < 0 || x >= width || y >= height ? -1 : cells[(y * width + x) * CELL_STRIDE];
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (kindAt(x, y) !== MATERIAL.Wellspring) continue;
+      if (kindAt(x - 1, y) === MATERIAL.Ice || kindAt(x + 1, y) === MATERIAL.Ice
+        || kindAt(x, y - 1) === MATERIAL.Ice || kindAt(x, y + 1) === MATERIAL.Ice) return true;
+    }
+  }
+  return false;
+}
 
 // Ordered by wonder: when one sample window produces several first-times, the
 // earliest entry in this list wins and the rest wait for their own moment.
@@ -47,6 +71,13 @@ const NOTE_RULES: readonly NoteRule[] = [
     text: "the heat pressed the sand into glass" },
   { id: "moonwater.charges", kind: MATERIAL.Moonwater, requires: [MATERIAL.Stardust],
     text: "the dust has taught the water to shine" },
+  // Deliberately NOT brush-guarded, which is a departure from the rule above it and worth
+  // naming. The guard exists so a note is never about the player's own brushwork, and the
+  // player did paint this ice. But the note is about what the SPRING did in response, the
+  // moment is unambiguous (one block, visibly changed), and guarding it would suppress
+  // exactly the teachable instant it exists for.
+  { id: "wellspring.listens", kind: MATERIAL.Wellspring, when: aSpringIsListening,
+    text: "the cold has hushed the spring — it will drink whatever you offer it next" },
   { id: "stone.born", kind: MATERIAL.Stone, requires: [MATERIAL.Lava],
     text: "the lava grows a skin of new stone" },
   { id: "ember.glows", kind: MATERIAL.Ember,
@@ -106,7 +137,7 @@ export class FieldNoteJournal {
    * not sample during catch-up fast-forward — retroactive discoveries are exactly
    * the "it already happened, what was it?" confusion this module exists to avoid.
    */
-  sample(cells: Uint8Array, now: number): FieldNote | null {
+  sample(cells: Uint8Array, now: number, width: number, height: number): FieldNote | null {
     const counts = new Map<number, number>();
     for (let offset = 0; offset < cells.length; offset += CELL_STRIDE) {
       const kind = cells[offset];
@@ -121,11 +152,15 @@ export class FieldNoteJournal {
 
     for (const rule of NOTE_RULES) {
       if (this.witnessed.has(rule.id)) continue;
+      if (rule.when) {
+        if (!rule.when(cells, width, height)) continue;
+      } else {
       const have = counts.get(rule.kind) ?? 0;
       const had = previous.get(rule.kind) ?? 0;
       if (have <= had || have < (rule.atLeast ?? 1)) continue;
       if (rule.requires && !rule.requires.some((kind) => (counts.get(kind) ?? 0) > 0)) continue;
       if (BRUSH_GUARDED.has(rule.kind) && now - (this.lastPaintAt.get(rule.kind) ?? -Infinity) < BRUSH_GUARD_MS) continue;
+      }
 
       this.witnessed.add(rule.id);
       this.lastNoteAt = now;

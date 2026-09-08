@@ -153,10 +153,29 @@ the only interaction in the game that lands in three of the audit's four bottom-
 lists. The chain is chill the spring, clear the old source off its faces, then present a
 new one, and nothing in play points at any of it.
 
-Field notes cannot fix this and were considered. That module fires on a rise in the count
-of a **generated kind**, marking a discovery *after* it happens, and it deliberately never
-comments on the player's own brushwork — a chilled spring is a block the player painted ice
-next to. Notes reward discovery; they do not cause it.
+**The ritual recorded here was wrong, and it made the rule sound worse than it is.** This
+section used to describe a three-step chain — chill the spring, clear the old source off its
+faces, then present a new one — and the middle step is not needed. Measured from a pooled,
+attuned spring: dropping the new material on it with no ice never works (correct, that is
+`an_unchilled_spring_keeps_its_first_identity`), but **ice beside it and the new material on
+top re-teaches it in 121 ticks — two gestures, two seconds**, with its own pool still all
+around it. The audit's "first fires at tick 1500" is its script's own schedule, not the
+rule's cost: that check simply does not start offering a new source until then.
+
+So the problem was never that the interaction is fiddly. It is that nothing in play suggests
+trying it, and the two channels that could say so were both dismissed too early.
+
+Field notes were the first dismissal. That module fires on a rise in the count of a
+**generated kind**, and re-attunement changes a cell's remembered material, so no count moves
+and nothing could fire. A note rule may now carry a `when` predicate instead — a STATE rather
+than a new kind — and `wellspring.listens` fires the moment ice touches a spring, which is
+exactly when the player can act on it. It is deliberately not brush-guarded, unlike the
+module's other paintable exceptions: the guard exists so a note is never about the player's
+own brushwork, and the player did paint that ice, but the note is about what the SPRING did
+in response and guarding it would suppress the one teachable instant it exists for. It is
+also the only note that teaches rather than observes, which is a departure worth watching.
+`npm run test:field-notes` drives the real sim from painted materials and fails if it goes
+silent.
 
 So this one is signposted in the **tray copy**, which is the game's existing channel for
 "what does this do" and reaches a player before they experiment rather than after. The

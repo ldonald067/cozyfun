@@ -230,7 +230,7 @@ export function App() {
         // discovery is exactly the "wait, what was that?" confusion they exist to avoid.
         if (engine.tickCount() % SAMPLE_EVERY_TICKS === 0) {
           fieldNoteJournalRef.current ??= new FieldNoteJournal();
-          const note = fieldNoteJournalRef.current.sample(engine.getCellBytes(), performance.now());
+          const note = fieldNoteJournalRef.current.sample(engine.getCellBytes(), performance.now(), engine.width(), engine.height());
           if (note) {
             setFieldNote(note.text);
             window.clearTimeout(fieldNoteTimerRef.current);
