@@ -540,6 +540,51 @@ const scenarios = [
     },
   },
   {
+    // Steam venting out from UNDER a lid. The heat buffer's byproduct is emitted straight
+    // up, and used to be dropped whenever that one cell was occupied -- which is the common
+    // case, since the flame doing the drying is often the thing sitting on it. The vent now
+    // falls back to the two diagonals, and this scenario exists because byte-equality could
+    // never tell that apart from the emission simply not happening: both engines would agree
+    // about nothing perfectly well. `expect` is a floor on how MUCH this lidded bed vents,
+    // because that is the only thing here that actually discriminates. Counting steam
+    // outside the lidded span looked like the natural test and was VACUOUS: the unlidded
+    // logs at either end vent straight up into those same columns, so it passed with the
+    // fallback deleted from both engines. Measured both ways -- 60 steam cells at peak with
+    // the diagonals, 18 without.
+    name: "steam venting from under a sealed lid",
+    w: 32, h: 24, seed: 4103, ticks: 240,
+    paint(p) {
+      for (let x = 0; x < 32; x++) p(x, 21, 1, M.Wall);
+      // A wet wood bed with a wall lid pressed straight down onto it, so the cell directly
+      // above every log is sealed and only the diagonals are open.
+      for (let x = 10; x <= 20; x++) p(x, 20, 1, M.Wood);
+      for (let x = 12; x <= 18; x++) p(x, 19, 1, M.Wall);
+      p(15, 18, 2, M.Water);
+      p(11, 20, 1, M.Fire); p(19, 20, 1, M.Fire);
+    },
+    observe(seen, cells, w, h) {
+      let offColumn = 0, total = 0;
+      for (let i = 0; i < w * h; i++) {
+        if (cells[i * STRIDE] !== M.Steam) continue;
+        total++;
+        const x = i % w;
+        // Under the lid (x 12..18) the only way steam reaches these columns' edges is a
+        // diagonal hop; count steam sitting outside the lidded span.
+        if (x < 12 || x > 18) offColumn++;
+      }
+      seen.maxSteam = Math.max(seen.maxSteam ?? 0, total);
+      seen.maxOffColumn = Math.max(seen.maxOffColumn ?? 0, offColumn);
+    },
+    expect(seen) {
+      // 60 with the diagonal fallback, 18 without, both measured by deleting it. A floor of
+      // 40 sits clear of the no-fallback ceiling rather than merely above zero.
+      if ((seen.maxSteam ?? 0) < 40) {
+        return `a lidded bed should still vent freely, peaked at only ${seen.maxSteam ?? 0} steam cells (a straight-up-only vent manages 18 here)`;
+      }
+      return null;
+    }
+  },
+  {
     // The slow world's other arm, on a scene cheap enough to run on its own: burn a
     // log down to cold char, leave for a night, come back to ground you can plant in.
     // The `expect` is the guard against the whole thing quietly becoming a no-op —

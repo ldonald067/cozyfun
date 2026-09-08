@@ -1138,10 +1138,16 @@ class JsSandboxEngine implements SandboxEngine {
     const x = cellNumber % this.w;
     const y = Math.floor(cellNumber / this.w);
     if (y <= 0) return -1;
-    const above = this.index(x, y - 1);
-    if (old[above] === MATERIAL.Empty && next[above] === MATERIAL.Empty) {
-      writeCellBytes(next, above, vaporKind, variant, energy);
-      return above;
+    // Mirrors emit_vapor_from in sim/src/lib.rs: straight up first, then the two diagonals,
+    // because vapour that has nowhere directly overhead was silently dropped. No RNG here.
+    for (const dx of [0, -1, 1]) {
+      const nx = x + dx;
+      if (!this.inBounds(nx, y - 1)) continue;
+      const above = this.index(nx, y - 1);
+      if (old[above] === MATERIAL.Empty && next[above] === MATERIAL.Empty) {
+        writeCellBytes(next, above, vaporKind, variant, energy);
+        return above;
+      }
     }
     return -1;
   }

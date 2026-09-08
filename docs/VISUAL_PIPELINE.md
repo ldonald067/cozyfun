@@ -84,6 +84,28 @@ Current temperature rules:
 - Ice freezes nearby water, condenses steam into frost, and marks nearby living/substrate cells as frozen.
 - Frozen seeds and growth stay dormant until they thaw.
 - Heat thaws frozen cells first, then dries wet scorchable cells, then burns only after that buffer is gone.
+- **The buffer's steam is the only part of it a player can see, so it has to have room to
+  rise.** Drying vents a wisp upward, and that vent used to be tried in exactly ONE cell —
+  straight up — and dropped in silence when something was already there. That is the usual
+  case rather than the exception: the flame doing the drying is very often the thing sitting
+  on top of what it dries. The vent now falls back to the two upper diagonals, which keeps it
+  rising without letting vapour appear beside its source, and consumes no RNG in either
+  engine so the shared stream is untouched. Measured through the interaction audit, this is
+  not a small effect: wet wood venting went from 43 cells to **115**, water boiling from 30
+  cells at contrast 115 to **93 at 395**, fire against water from 66 to 111. It also costs
+  something and the trade is real — more vapour around lava cools it faster, so
+  `lava.scorches` is on screen 281 ticks instead of 1074 and `lava.quenched` 378 instead of
+  899. Both stay far clear of the audit's floors, and lava crusting into stone is unmoved.
+  It does not fog a scene: peak steam is **0.8% of the board** with water poured straight
+  onto a lava pool, 0.5% on average.
+- **Thawing was given the same vent and it was reverted, which is worth not redoing.** The
+  reasoning was that a frost leaving a cell is the buffer's first stage and emits nothing at
+  all. Measured, the change was completely inert — the before/after audit tables were
+  byte-identical to the widening alone across all 115 checks — because the frozen cells those
+  scenes thaw are already carrying the wet flag, so the vent was firing anyway. A rule with
+  no measurable effect and a real cost is worse than no rule. The reachable case it was aimed
+  at (a *dry* frozen cell, which `ice.pauses` does produce) is real but rare, and nothing
+  showed it mattered.
 - Frozen and scorched flags are renderer cues too: they tint seeds, moss, fungus, flowers, soil, wood, and oil before a material changes.
 
 Current substrate rules:

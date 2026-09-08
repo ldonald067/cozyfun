@@ -2155,10 +2155,24 @@ impl Universe {
         if y <= 0 {
             return None;
         }
-        let above = self.idx(x as u32, (y - 1) as u32);
-        if old[above].is_empty() && next[above].is_empty() {
-            next[above] = Cell::new(vapor_kind, variant, energy);
-            return Some(above);
+        // Vapour rises, but it needs somewhere to rise INTO. Trying only the cell directly
+        // overhead dropped the emission in precisely the scenes that produce it: a flame
+        // sitting on top of what it is drying occupies that cell itself. So the byproduct
+        // that makes the heat buffer legible was mostly never placed, and drying scored
+        // contrast 95 while wet wood venting into open air scored 404 -- the same mechanic,
+        // told apart only by whether the steam had room. The two diagonals keep it rising
+        // rather than letting vapour appear beside its source. No RNG here, in either
+        // engine, so widening the search cannot shift the shared stream.
+        for dx in [0, -1, 1] {
+            let nx = x + dx;
+            if !self.in_bounds(nx, y - 1) {
+                continue;
+            }
+            let above = self.idx(nx as u32, (y - 1) as u32);
+            if old[above].is_empty() && next[above].is_empty() {
+                next[above] = Cell::new(vapor_kind, variant, energy);
+                return Some(above);
+            }
         }
         None
     }
@@ -3745,6 +3759,28 @@ mod tests {
         assert!(
             after * 10 >= before * 8,
             "a poured-on boulder should keep most of itself, kept {after} of {before}",
+        );
+    }
+
+    /// The heat buffer -- thaw, then dry, then burn -- is what keeps fire from being a
+    /// binary destroyer, and the steam it vents is the only part a player can actually see.
+    /// That vent used to be tried in ONE cell, straight up, and dropped silently when
+    /// something was there -- which is the usual case, since the flame doing the drying is
+    /// often the thing sitting on top of it.
+    #[test]
+    fn vapour_rises_diagonally_when_the_cell_overhead_is_blocked() {
+        let mut u = Universe::new(16, 16, 7);
+        set_cell_state(&mut u, 8, 8, Material::Moss, 0, 120, FLAG_WET);
+        set_cell(&mut u, 8, 7, Material::Wall); // straight up is sealed
+        set_cell(&mut u, 7, 8, Material::Fire);
+        u.tick();
+
+        let idx = u.idx(7, 7);
+        assert_eq!(
+            u.cells[idx].kind,
+            Material::Steam as u8,
+            "with the cell overhead blocked the wisp should still find a diagonal, \
+             otherwise the byproduct is dropped in exactly the scenes that produce it",
         );
     }
 
