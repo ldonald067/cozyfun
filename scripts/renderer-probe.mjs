@@ -245,35 +245,108 @@ function assertFloor(label, floor, worst, detail) {
     `worst at ${at}. A husk that resembles its own bloom is a ninth flower colour, not an ending.`);
 }
 
-// 5. The wellspring's three rune states must be mutually distinguishable. Attunement borrows
-//    every material's colour, so the states are separated by BRIGHTNESS rather than hue —
-//    which means there is no palette gate that can see them, and until now nothing checked
-//    them at all. Sampled on the arms of the smallest stamp a player can make.
+// 5. The wellspring's three rune states must be mutually distinguishable AT THE SIZE A
+//    PLAYER PAINTS THEM. Attunement borrows every material's colour, so the states are
+//    separated by BRIGHTNESS rather than hue, and no palette gate can see them.
+//
+//    This check used to build a five-cell plus and sample two of its arms, and reported 66.
+//    That number was not wrong — a whole-block sample at radius 1 measures 68 — it was
+//    simply the only size ever measured. The app's brush runs 1 to 12 and DEFAULTS TO 4, a
+//    49-cell disc, and the wellspring's entire identity is an EDGE treatment: a chiselled
+//    rim with lit and shadowed faces. Edge cells are 80% of a five-cell stamp, 41% of the
+//    default disc, 22% at radius 8 and 13% at radius 12, so the design gets HARDER to read
+//    the more of it you paint. That is why this element kept coming back: every fix was
+//    real, correctly measured, and measured at the one size where the problem does not
+//    exist — including by this gate.
+//
+//    Whole-block, worst of the three pairs, with ice ringed right around the block (the most
+//    favourable fixture the chilled state can get): 68 at radius 1, then 10 at the default
+//    brush, 8 at radius 8 and 4 at radius 12. It clears the 45 bar only at the smallest
+//    stamp a player can make, and collapses immediately after.
+//
+//    **The floors below are a RATCHET, not the design bar.** They are today's measured
+//    values less a small margin, and they exist so this cannot slide further while the block
+//    is given interior structure that does not scale away. 45 at every radius is the target
+//    and nothing here reaches it yet; raising these numbers is the point of the work, and
+//    they should be raised as it lands rather than left as a record of the bad state.
 {
-  const springState = (kind, time) => {
-    const cells = board((put) => {
-      for (let x = 0; x < W; x++) put(x, 9, MATERIAL.Wall, 0, 40, 0, x);
-      const energy = kind === "attuned" ? MATERIAL.Water : 0;
-      for (const [dx, dy] of [[0, 0], [0, -1], [0, 1], [-1, 0], [1, 0]]) {
-        put(13 + dx, 6 + dy, MATERIAL.Wellspring, energy, 40, 0, 1);
-      }
-      // The ice has to TOUCH the cells being sampled: `hasNearbyKind` is per-cell, so ice off
-      // to one side chills only the arm beside it and the rest render dormant.
-      if (kind === "chilled") { put(13, 4, MATERIAL.Ice, 0, 200, 0, 1); put(11, 6, MATERIAL.Ice, 0, 200, 0, 2); }
-    });
-    const arms = [[13, 5], [12, 6]].map(([x, y]) => colourAt(cells, x, y, time));
-    return arms.reduce((a, c) => [a[0] + c[0], a[1] + c[1], a[2] + c[2]], [0, 0, 0])
-      .map((v) => Math.round(v / arms.length));
+  // Its own board: a radius-12 disc is 25 cells across, which does not fit the shared one.
+  const SW = 34, SH = 34;
+  const springBoard = (paint) => {
+    const cells = new Uint8Array(SW * SH * STRIDE);
+    const put = (x, y, kind, energy = 0, age = 0, flags = 0, variant = 0) => {
+      if (x < 0 || y < 0 || x >= SW || y >= SH) return;
+      const o = (y * SW + x) * STRIDE;
+      cells[o] = kind; cells[o + 1] = variant & 7;
+      cells[o + 2] = age & 255; cells[o + 3] = (age >> 8) & 255;
+      cells[o + 4] = energy & 255; cells[o + 5] = (energy >> 8) & 255;
+      cells[o + 6] = flags & 255; cells[o + 7] = (flags >> 8) & 255;
+    };
+    paint(put);
+    return cells;
   };
-  let worst = Infinity, at = null;
-  for (const [a, b] of [["dormant", "attuned"], ["dormant", "chilled"], ["attuned", "chilled"]]) {
-    for (const t of TIMES) {
-      const d = redmean(springState(a, t), springState(b, t));
-      if (d < worst) { worst = d; at = `${a} vs ${b}, time ${t}`; }
+  const springColourAt = (cells, x, y, time) => {
+    const o = (y * SW + x) * STRIDE;
+    return colorForCell({
+      kind: cells[o], variant: cells[o + 1],
+      age: cells[o + 2] | (cells[o + 3] << 8),
+      energy: cells[o + 4] | (cells[o + 5] << 8),
+      flags: cells[o + 6] | (cells[o + 7] << 8),
+      time, cells, width: SW, height: SH, x, y,
+    });
+  };
+  // The sim's brush is a Euclidean disc: dx^2 + dy^2 <= r^2, which is the 5 / 13 / 49 / 197
+  // cell counts the harness doc records for radius 1 / 2 / 4 / 8.
+  const disc = (r) => {
+    const out = [];
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      if (dx * dx + dy * dy <= r * r) out.push([dx, dy]);
     }
+    return out;
+  };
+  const CX = 17, CY = 17;
+  const blockMean = (kind, r, time) => {
+    const offsets = disc(r);
+    const inBlock = new Set(offsets.map(([dx, dy]) => `${CX + dx},${CY + dy}`));
+    const cells = springBoard((put) => {
+      const energy = kind === "attuned" ? MATERIAL.Water : 0;
+      for (const [dx, dy] of offsets) {
+        put(CX + dx, CY + dy, MATERIAL.Wellspring, energy, 40, 0, (CX + dx) & 7);
+      }
+      // Ice RINGED right around the block, which is the most favourable fixture the chilled
+      // state can get: `hasNearbyKind` is per-cell, so only cells touching ice read chilled
+      // and a large block is mostly interior no matter how much ice you pile on.
+      if (kind === "chilled") {
+        for (const [dx, dy] of offsets) {
+          for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const nx = CX + dx + ax, ny = CY + dy + ay;
+            if (!inBlock.has(`${nx},${ny}`)) put(nx, ny, MATERIAL.Ice, 0, 200, 0, nx & 7);
+          }
+        }
+      }
+    });
+    const cols = offsets.map(([dx, dy]) => springColourAt(cells, CX + dx, CY + dy, time));
+    return cols.reduce((a, c) => [a[0] + c[0], a[1] + c[1], a[2] + c[2]], [0, 0, 0])
+      .map((v) => Math.round(v / cols.length));
+  };
+
+  // Today's measured worst-pair per radius, less a point of slack for arithmetic drift.
+  const RATCHET = { 1: 64, 4: 9, 8: 7, 12: 3 };
+  for (const r of [1, 4, 8, 12]) {
+    let worst = Infinity, at = null;
+    for (const [a, b] of [["dormant", "attuned"], ["dormant", "chilled"], ["attuned", "chilled"]]) {
+      for (const t of TIMES) {
+        const d = redmean(blockMean(a, r, t), blockMean(b, r, t));
+        if (d < worst) { worst = d; at = `${a} vs ${b}, time ${t}`; }
+      }
+    }
+    const label = r === 4 ? `wellspring rune states, radius ${r} (the DEFAULT brush)`
+                          : `wellspring rune states, radius ${r}`;
+    assertFloor(label, RATCHET[r], worst,
+      `worst at ${at}. Sleeping, remembering and listening have to be three different blocks, ` +
+      `and at radius ${r} they are ${worst} apart against a design bar of 45. This floor is a ` +
+      `ratchet holding today's value, not the bar.`);
   }
-  assertFloor("wellspring rune states, worst of the three pairs", 45, worst,
-    `worst at ${at}. Sleeping, remembering and listening have to be three different blocks.`);
 }
 
 // 6. The eight bloom species must stay mutually distinguishable. A third of the garden's

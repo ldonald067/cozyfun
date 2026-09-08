@@ -68,10 +68,21 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
 
   It also closes a gap **four independent reviewers found**: the renderer mirrors `PETAL_SHED_AGE`, `POLLEN_RESERVE` and `COLD_CHAR_ENERGY` so a seed head is drawn under exactly the condition that makes it one, and ash is full exactly when the sim calls an ember out — but parity only compares Rust with `engine.ts`, and neither knew a third copy existed. The probe parses all three sources and fails when they disagree.
 
-  Seven pairs are gated as of this writing: cold char against the empty tray and against its
+  Ten pairs are gated as of this writing: cold char against the empty tray and against its
   hearth surround, wet against dry char, a bud against the seed head it becomes, a seed head
-  against its own flower's hue, the wellspring's three rune states against each other, and
-  all 28 bloom-species pairs. The last two were claims the docs stated and nothing enforced —
+  against its own flower's hue, the wellspring's three rune states against each other at four
+  brush sizes, and all 28 bloom-species pairs.
+
+  **Measure the state at the SIZE a player makes it, not the size that is convenient.** The
+  wellspring check built a five-cell plus and sampled two of its arms, and reported 66. That
+  reading was accurate — a whole-block sample at radius 1 measures 68 — it was simply the
+  only size ever measured, and the app's brush runs 1 to 12 and defaults to 4. The
+  wellspring's identity is an edge treatment, so edge cells fall from 80% of a five-cell
+  stamp to 41% of the default disc and 13% at radius 12: the design gets harder to read the
+  more of it you paint. Whole-block, the worst of its three pairs is 68 / 10 / 8 / 4 at radius
+  1 / 4 / 8 / 12. Every fix that element has had was real, correctly measured, and measured at
+  the one size where the problem does not exist — including by this gate, which is why it kept
+  coming back. When a cue's strength depends on the shape it is drawn in, sweep the shape. The last two were claims the docs stated and nothing enforced —
   and neither is visible to `material:contrast`, because attunement borrows every material's
   colour and the eight species live inside one "Flower" palette.
 
