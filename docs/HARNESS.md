@@ -107,6 +107,16 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
 
   One of its checks plants a garden **through the tray, with the brush**, and asserts a real bloom opens. That is deliberately not a duplicate of the interaction audit's `flower.opens`: the audit drives the engine compiled straight out of the repo, and this drives the shipped bundle in a real browser — with `COZY_QA_URL`, the deployed one. "No player has ever seen a flower" is a mistake this repo has already made, and it was invisible to every check that did not start from the brush. It reaches bloom in seconds rather than the ~2.5 real minutes it would take from bare seed, by ageing the scene and reloading, which makes it also the check that proves an absence *grows* something rather than only changing a status line. The absence it stages is 2,000 seconds and that number is load-bearing — see the argument at the `stageAgedAutosave` call, and the sprinkle/nondeterminism section below. It used to stage two days, which is precisely why it failed against the deployment.
 
+  It announces WHICH build it is testing, keyed on the commit the app stamps rather than on
+  the bundle filename. Filenames were the first instrument and they were the wrong one:
+  Docker and a local Vite run produce different chunk hashes from identical source, so
+  "the deployment is a DIFFERENT build" fired on every correctly-deployed commit. A warning
+  that is always on is worse than no warning, because the real case it exists to catch — a
+  stale deploy quietly passing every check — looked exactly the same as the noise. Comparing
+  against the local dist was wrong twice over anyway: a local build gets no `COZY_COMMIT` and
+  stamps `dev`, so it carries no identity to compare against. It now fetches the served
+  bundle, reads the sha Vite inlined into it, and compares that with git `HEAD`.
+
   **`COZY_QA_URL` points it at a deployment instead**, which is how to answer "does it work in production" rather than "does this build pass":
 
   ```sh

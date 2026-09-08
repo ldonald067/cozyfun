@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import http from "node:http";
@@ -100,20 +100,57 @@ export async function startAppTarget(distDir) {
     throw new Error(`COZY_QA_URL is not serving the app: ${url} (${error.message})`);
   }
 
-  // Say WHICH build is under test. Nothing here can prove a deployment contains the
-  // change you just wrote, but an unannounced stale deploy passing every check is the
-  // failure mode worth making visible, so print the bundle and flag a mismatch against
-  // the local build when there is one to compare with.
-  const served = html.match(/assets\/index-[A-Za-z0-9_-]+\.js/)?.[0] ?? "unknown bundle";
+  // Say WHICH build is under test. An unannounced stale deploy passing every check is the
+  // failure mode worth making visible.
+  //
+  // The bundle FILENAME cannot answer that, and keying on it made this cry wolf on every
+  // correctly-deployed commit: Docker and a local Vite run produce different chunk hashes
+  // from identical source, so the warning fired constantly and became noise to scroll past
+  // — which is worse than no warning, because a real stale deploy would have looked exactly
+  // the same. Comparing against the local dist is doubly wrong: a local build gets no
+  // COZY_COMMIT and stamps `dev`, so it has no identity to compare with at all.
+  //
+  // The app has carried a real identity since 2026-08. Vite inlines COZY_COMMIT as a string
+  // literal, so the served bundle contains the sha (verified: exactly one 40-hex literal in
+  // it, and none in a local build). Fetch it and compare against git HEAD, which is the code
+  // the person running this actually has.
+  const served = html.match(/assets\/index-[A-Za-z0-9_-]+\.js/)?.[0] ?? null;
   console.log(`QA target: ${url}`);
-  console.log(`  serving ${served} (COZY_QA_URL — the local build is NOT being tested)`);
-  const localHtml = await readFile(path.join(distDir, "index.html"), "utf8").catch(() => null);
-  const local = localHtml?.match(/assets\/index-[A-Za-z0-9_-]+\.js/)?.[0];
-  if (local && local !== served) {
-    console.log(`  WARNING: local build is ${local} — the deployment is a DIFFERENT build`);
+  console.log(`  serving ${served ?? "an unrecognised bundle"} (COZY_QA_URL — the local build is NOT being tested)`);
+
+  const servedCommit = served ? await fetchServedCommit(url, served) : null;
+  const head = localHeadCommit();
+  if (!servedCommit) {
+    console.log("  WARNING: the deployment carries no commit stamp, so which code is live cannot be established");
+  } else if (head && servedCommit !== head) {
+    console.log(`  WARNING: the deployment is ${servedCommit.slice(0, 12)} but local HEAD is ${head.slice(0, 12)} — a DIFFERENT commit is live`);
+  } else if (head) {
+    console.log(`  deployment is ${servedCommit.slice(0, 12)}, matching local HEAD`);
+  } else {
+    console.log(`  deployment is ${servedCommit.slice(0, 12)} (no local git HEAD to compare against)`);
   }
 
   return { url, isExternal: true, close: async () => {} };
+}
+
+// The commit Vite inlined into the served bundle, or null when it cannot be established.
+// Exactly one 40-hex literal is expected; more than one and which is the commit is a guess,
+// so report nothing rather than name the wrong sha.
+async function fetchServedCommit(baseUrl, bundlePath) {
+  try {
+    const response = await fetch(new URL(bundlePath, baseUrl), { redirect: "follow" });
+    if (!response.ok) return null;
+    const matches = [...new Set((await response.text()).match(/[0-9a-f]{40}/g) ?? [])];
+    return matches.length === 1 ? matches[0] : null;
+  } catch {
+    return null;
+  }
+}
+
+function localHeadCommit() {
+  const head = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" });
+  const sha = head.status === 0 ? head.stdout.trim() : "";
+  return /^[0-9a-f]{40}$/.test(sha) ? sha : null;
 }
 
 export async function startStaticServer(distDir) {
