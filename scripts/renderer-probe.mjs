@@ -259,16 +259,17 @@ function assertFloor(label, floor, worst, detail) {
 //    real, correctly measured, and measured at the one size where the problem does not
 //    exist — including by this gate.
 //
-//    Whole-block, worst of the three pairs, with ice ringed right around the block (the most
-//    favourable fixture the chilled state can get): 68 at radius 1, then 10 at the default
-//    brush, 8 at radius 8 and 4 at radius 12. It clears the 45 bar only at the smallest
-//    stamp a player can make, and collapses immediately after.
+//    When this check was first widened it measured 68 at radius 1, then 10 at the default
+//    brush, 8 at radius 8 and 4 at radius 12 -- clearing the 45 bar only at the smallest
+//    stamp a player can make. The cause was that every state treatment was applied ONLY to
+//    rune cells, and runes are about one cell in five once a block is bigger than a couple of
+//    stamps. The state now also washes the block's BODY (see `wellspringColor`), so it
+//    survives being averaged over 197 cells, and the three pairs measure **129 / 52 / 69 /
+//    56** at radius 1 / 4 / 8 / 12 -- above the bar at every size a player can paint.
 //
-//    **The floors below are a RATCHET, not the design bar.** They are today's measured
-//    values less a small margin, and they exist so this cannot slide further while the block
-//    is given interior structure that does not scale away. 45 at every radius is the target
-//    and nothing here reaches it yet; raising these numbers is the point of the work, and
-//    they should be raised as it lands rather than left as a record of the bad state.
+//    The floors below sit just under those, so this cannot slide back. 45 is the design bar
+//    and all four now clear it; the floors are tighter than the bar deliberately, because a
+//    drift from 52 to 46 would still pass a bar-level floor while being a real regression.
 {
   // Its own board: a radius-12 disc is 25 cells across, which does not fit the shared one.
   const SW = 34, SH = 34;
@@ -305,7 +306,27 @@ function assertFloor(label, floor, worst, detail) {
     return out;
   };
   const CX = 17, CY = 17;
-  const blockMean = (kind, r, time) => {
+  // A caveat this check cannot model and nobody should read past: attunement is PER CELL and
+  // never reaches a block's interior. Each wellspring cell drinks a source touching IT, and
+  // an interior cell is surrounded by its own kind forever, so a painted block ends up an
+  // attuned shell around a permanently dormant heart. Measured by driving the real sim with
+  // a pour landing on the crown, and stable from 200 ticks to 3,000: 5/5 cells attune at
+  // radius 1, 12/13 at radius 2, 28/49 at the default brush and 60/197 at radius 8. So the
+  // uniformly-attuned block below is an UPPER BOUND on what a large spring can look like,
+  // exactly reachable only at radius 1-2. It is still the right thing to gate here -- this
+  // file asks what the renderer does with a given cell state, and "attuned cell vs dormant
+  // cell" is that question -- but the block-level claim it supports gets weaker as the brush
+  // grows, and no floor here can see that.
+  // `chilled` is a PER-CELL ice-neighbour test in the sim, so a big block's interior is not
+  // stilled and must not be drawn as though it were -- the renderer may read state, never
+  // invent it. A whole-block mean therefore averages a frosted rim into a dormant middle and
+  // reports a number describing neither: it fell 112 / 13 / 10 / 4 across the four radii
+  // purely because the rim is a smaller share of a bigger disc. The honest question is
+  // whether a frosted rim reads as frosted, so pairs involving `chilled` are sampled on the
+  // cells the sim actually stills -- the ones touching ice -- with the other state sampled on
+  // that same cell set. Pairs that do not involve chill stay whole-block, because attunement
+  // really is on every cell.
+  const blockMean = (kind, r, time, rimOnly = false) => {
     const offsets = disc(r);
     const inBlock = new Set(offsets.map(([dx, dy]) => `${CX + dx},${CY + dy}`));
     const cells = springBoard((put) => {
@@ -325,18 +346,23 @@ function assertFloor(label, floor, worst, detail) {
         }
       }
     });
-    const cols = offsets.map(([dx, dy]) => springColourAt(cells, CX + dx, CY + dy, time));
+    const sampled = rimOnly
+      ? offsets.filter(([dx, dy]) => [[1, 0], [-1, 0], [0, 1], [0, -1]]
+          .some(([ax, ay]) => !inBlock.has(`${CX + dx + ax},${CY + dy + ay}`)))
+      : offsets;
+    const cols = sampled.map(([dx, dy]) => springColourAt(cells, CX + dx, CY + dy, time));
     return cols.reduce((a, c) => [a[0] + c[0], a[1] + c[1], a[2] + c[2]], [0, 0, 0])
       .map((v) => Math.round(v / cols.length));
   };
 
   // Today's measured worst-pair per radius, less a point of slack for arithmetic drift.
-  const RATCHET = { 1: 64, 4: 9, 8: 7, 12: 3 };
+  const RATCHET = { 1: 120, 4: 48, 8: 64, 12: 52 };
   for (const r of [1, 4, 8, 12]) {
     let worst = Infinity, at = null;
     for (const [a, b] of [["dormant", "attuned"], ["dormant", "chilled"], ["attuned", "chilled"]]) {
+      const rimOnly = a === "chilled" || b === "chilled";
       for (const t of TIMES) {
-        const d = redmean(blockMean(a, r, t), blockMean(b, r, t));
+        const d = redmean(blockMean(a, r, t, rimOnly), blockMean(b, r, t, rimOnly));
         if (d < worst) { worst = d; at = `${a} vs ${b}, time ${t}`; }
       }
     }

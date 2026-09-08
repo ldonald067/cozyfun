@@ -461,6 +461,32 @@ function wellspringColor({ color, variant, energy, time, cells, width, height, x
   const thinSection = (edge.top && edge.bottom) || (edge.left && edge.right);
   if (edge.top || edge.left) out = mixRgb(out, [168, 186, 218], 0.42);
   if ((edge.bottom || edge.right) && !thinSection) out = mixRgb(out, [8, 12, 22], 0.44);
+  const chilled = hasNearbyKind(cells, width, height, x, y, ICE_KINDS);
+  const tint = WELLSPRING_TINTS[energy & 255];
+  // The state has to live in the BODY, not only in the rune marks, or it does not survive
+  // the brush. Runes are ~19% of a block's cells once it is bigger than a couple of stamps
+  // (the two lattices below, plus every cell of a small placement via `edge.count`), so a
+  // treatment applied only to rune cells is a treatment applied to one cell in five. Measured
+  // whole-block, dormant against attuned fell from 75 at radius 1 to 25 at the default brush
+  // and stayed there: every cell of the block knows it is attuned -- `energy` is the same on
+  // all of them -- and the block barely changed colour.
+  //
+  // So the body takes a WEAK wash of the same lifted tint the runes glow with. Weak is
+  // load-bearing in both directions. Too strong and the block becomes the material it pours,
+  // which is the mistake recorded below: an attuned water spring measured 25-77 redmean from
+  // its own fountain and vanished into it. Too weak and it does not survive being averaged
+  // over 197 cells. The runes stay the bright, characterful marks on top.
+  //
+  // Chill gets the same treatment for the same reason, on the cells the sim actually stills.
+  // `chilled` is a per-cell ice-neighbour test in both the sim and here, so only the rim of a
+  // large block is listening and only the rim may be drawn that way -- but within that rim it
+  // has to reach every cell, not just the lattice ones. Measured on rim cells alone, dormant
+  // against chilled was 140 at radius 1 and 19-32 above it, because the frost was landing on
+  // one rim cell in five.
+  const BODY_WASH = 0.3;
+  const CHILL_WASH = 0.6;
+  if (chilled) out = mixRgb(out, [40, 56, 74], CHILL_WASH);
+  else if (tint) out = mixRgb(out, mixRgb(tint, [255, 255, 255], 0.55), BODY_WASH);
   // Small placements (1-2 cells, mostly exposed) always carve: a lone block must
   // still read as runed stone, and attuned-vs-dormant must survive at that size.
   const rune =
@@ -477,7 +503,7 @@ function wellspringColor({ color, variant, energy, time, cells, width, height, x
   // reads as waiting rather than as either sleeping or lit.
   //
   // Presentation only. Reading neighbours is allowed; the stilling itself is the sim's.
-  if (hasNearbyKind(cells, width, height, x, y, ICE_KINDS)) {
+  if (chilled) {
     // Frosted DARK with bright pips, not lit. A pale blue glow was the obvious first choice
     // and it measured 22 from a water-attuned spring — under every contrast floor in the
     // repo, so a chilled dormant block read as "attuned to water". Hue cannot solve this:
@@ -490,7 +516,6 @@ function wellspringColor({ color, variant, energy, time, cells, width, height, x
     if (hash % 3 === 0) out = mixRgb(out, [214, 238, 250], 0.34 + listen * 0.22);
     return out;
   }
-  const tint = WELLSPRING_TINTS[energy & 255];
   if (tint) {
     const pulse = (Math.sin(time * 0.006 + hash * 0.9) + 1) * 0.5;
     // The tint is an INLAY in carved stone, not a coat of paint. At 0.55-0.85 an
