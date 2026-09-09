@@ -797,6 +797,40 @@ async function main() {
     assert(grown.stem > 0, `flowers appeared with no stalk under them: ${JSON.stringify(grown)}`);
   });
 
+  await check("a tab open across a deploy is told a newer build is live", async () => {
+    // The problem this covers is invisible to every other check here, because they all open
+    // a FRESH browser. Measured against the live deployment: a tab opened at 02:22:45 was
+    // still running commit 40f3929 four minutes after 5da8d98 went live, while a fetch made
+    // from inside that same tab returned the new bundle at once. The origin withholds
+    // nothing; a tab that never asks never learns.
+    //
+    // Rather than stage a real deploy, this stubs the ONE fetch the watch makes so it comes
+    // back naming a different bundle -- which is exactly what a real deploy looks like from
+    // the running page's side.
+    await cdp.send("Page.navigate", { url: `${appUrl}?cozyNoAutosave=1` });
+    await waitUntil(
+      () => evaluate(cdp, `document.readyState === "complete" && Boolean(document.querySelector('[data-testid="sandbox-tray"]'))`),
+      "app shell for the build-watch check",
+    );
+    // The watch does not check on mount (see App.tsx), so the stub is in place before the
+    // first question it ever asks.
+    await evaluate(cdp, `(() => {
+      window.fetch = async () => ({ text: async () => '<script src="/assets/index-NOTTHEONE.js"></scr' + 'ipt>' });
+      document.dispatchEvent(new Event("visibilitychange"));
+      return true;
+    })()`);
+    await waitUntil(
+      () => evaluate(cdp, `Boolean(document.querySelector('[data-testid="newer-build"]'))`),
+      "the newer-build notice to appear",
+      10_000,
+    );
+    // It must be an OFFER, never an automatic reload: a cozy sandbox cannot throw away the
+    // scene someone is watching. If this ever starts reloading by itself, the navigation
+    // would clear the stub and the element would vanish.
+    const stillThere = await evaluate(cdp, `Boolean(document.querySelector('[data-testid="newer-build"]'))`);
+    assert(stillThere, "the notice reloaded the page by itself instead of offering");
+  });
+
   await check("page stayed free of browser errors", async () => {
     const pageErrors = await evaluate(cdp, `window.__smokeErrors ?? []`);
     assert(pageErrors.length === 0, `page errors: ${pageErrors.join("; ")}`);

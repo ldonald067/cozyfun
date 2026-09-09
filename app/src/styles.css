@@ -498,6 +498,27 @@ input:focus-visible {
   flex-shrink: 0;
 }
 
+.status-refresh {
+  /* Quiet by default: this is an offer, not an alert. It sits in the status meta row beside
+     the engine name, borrows the selected-material accent so it reads as part of the room,
+     and never moves the layout it appears in. */
+  border: 1px solid color-mix(in srgb, var(--selected-material-color) 42%, transparent);
+  background: color-mix(in srgb, var(--selected-material-color) 12%, transparent);
+  color: inherit;
+  font: inherit;
+  padding: 1px 8px;
+  margin-right: 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.status-refresh:hover,
+.status-refresh:focus-visible {
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--selected-material-color) 70%, transparent);
+}
+
 .status-paused {
   padding: 1px 8px;
   border-radius: 999px;

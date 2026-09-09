@@ -28,6 +28,7 @@ import {
 } from "./deskRadio";
 import { createEngine, type SandboxEngine } from "./engine";
 import { FieldNoteJournal, NOTE_LINGER_MS, SAMPLE_EVERY_TICKS } from "./fieldNotes";
+import { createBuildWatch, runningBundle } from "./buildWatch";
 import { RoomWeather } from "./weather";
 import { MATERIAL, MATERIALS, type MaterialDef, type MaterialId } from "./materials";
 import {
@@ -114,10 +115,41 @@ export function App() {
   const [status, setStatus] = useState("warming tray");
   const [fps, setFps] = useState(0);
   const [fieldNote, setFieldNote] = useState<string | null>(null);
+  const [newerBuildLive, setNewerBuildLive] = useState(false);
   const [windowOpen, setWindowOpen] = useState(() => localStorage.getItem(WINDOW_OPEN_KEY) !== "shut");
   const windowOpenRef = useRef(windowOpen);
   const sceneEnvironmentRef = useRef<SceneEnvironmentId | null>(null);
   const weatherRef = useRef<RoomWeather | null>(null);
+  // A tab left open never re-requests anything, so it can run a build from hours ago while
+  // the origin happily serves the current one. Measured against the deployment rather than
+  // assumed: see the note at the top of buildWatch.ts. This asks, once the tab is looked at
+  // again, and only ever offers -- reloading is the player's call, because a reload throws
+  // away whatever the terrarium is in the middle of.
+  useEffect(() => {
+    const running = runningBundle(document.scripts);
+    if (!running) return;
+    const check = createBuildWatch(running, {
+      fetchHtml: () => fetch("/", { cache: "no-store" }).then((r) => r.text()),
+      now: () => Date.now(),
+    });
+    let cancelled = false;
+    const run = () => {
+      if (document.visibilityState !== "visible") return;
+      void check().then((stale) => { if (stale && !cancelled) setNewerBuildLive(true); });
+    };
+    // Deliberately NOT checked on mount: the page has this instant been fetched, so it is
+    // current by definition, and an eager check would spend the throttle window on a
+    // question with a known answer -- leaving the first real "came back to this tab" moment
+    // unable to ask. Events drive it.
+    document.addEventListener("visibilitychange", run);
+    window.addEventListener("focus", run);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", run);
+      window.removeEventListener("focus", run);
+    };
+  }, []);
+
   const fieldNoteJournalRef = useRef<FieldNoteJournal | null>(null);
   const fieldNoteTimerRef = useRef(0);
   const fastForwardRef = useRef(0);
@@ -734,6 +766,17 @@ export function App() {
               {fieldNote ?? ""}
             </span>
             <span className="status-meta">
+              {newerBuildLive && (
+                <button
+                  type="button"
+                  className="status-refresh"
+                  data-testid="newer-build"
+                  onClick={() => window.location.reload()}
+                  title="This tab has been open since before the last update. Reloading fetches it."
+                >
+                  a newer terrarium is ready
+                </button>
+              )}
               {paused && <span className="status-paused">paused</span>}
               {engine?.source ?? "loading"} - {fps} fps
             </span>

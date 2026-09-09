@@ -211,6 +211,35 @@ type, or if the app fell back to the JS engine. Then, by hand, for the things it
    reload silently discarded unsaved scenes and this check could never have passed.
 4. Turn on sound and confirm ambience plays.
 
+## A tab left open does not know the game moved on
+
+**This is not a caching problem, and no server header can fix it.** The origin already sends
+`cache-control: public, max-age=0, must-revalidate` for `index.html`, `embed.html` and the
+wasm, immutable only for the fingerprinted `/assets/*` whose names change every build, and it
+answers a stale `If-None-Match` with a 200 rather than a 304. All of that was verified against
+the live host. There is no service worker and no CDN cache layer in front.
+
+The measurement that settles it: a tab opened at 02:22:45 was still running commit `40f3929`
+four minutes after `5da8d98` went live — and a `fetch("/")` made **from inside that same tab**
+returned the new bundle immediately. The origin withholds nothing. `must-revalidate` simply
+has no effect on a tab that never makes a request, and this is a game people leave open.
+"Clearing the cache" appears to fix it only because it forces the request a plain reload would
+have forced anyway.
+
+Every automated check is blind to this by construction: `deploy:verify` and `qa:live` open a
+FRESH browser every run, so they can never reproduce a stale tab.
+
+So the running page asks. `app/src/buildWatch.ts` compares the hashed bundle this page is
+actually running against the one the origin serves now, on visibility and focus, throttled to
+once every five minutes, silent on failure, and once only. It deliberately does **not** check
+on mount — the page has just been fetched, so it is current by definition, and an eager check
+would spend the throttle window on a question with a known answer. When a newer build is live
+the status bar offers *"a newer terrarium is ready"*, and reloading is the player's choice:
+a cozy sandbox must never throw away the scene someone is watching.
+
+`npm run test:browser` covers it by stubbing the one fetch the watch makes so it names a
+different bundle, which is exactly what a real deploy looks like from the running page's side.
+
 ## Triage from the embedding site's side
 
 Every one of these is diagnosable without touching the game's repo.
