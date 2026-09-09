@@ -225,6 +225,49 @@ export function materialShowcaseScript() {
     rect(187, 191, 64, 70, material.Glass, 0, 220);
     line(178, 191, 71, material.Wall);
 
+    // The three rune states at the brush a player actually uses. Every other wellspring
+    // exhibit on this board is one to three cells, and that is exactly the sampling bias
+    // that let this element be "fixed" four times: its identity used to be an edge
+    // treatment, edge cells are 80% of a five-cell stamp but 41% of the default 49-cell
+    // disc, and the state wash that replaced it lives in the block's BODY, which does not
+    // exist below radius 2. npm run renderer:probe sweeps four brush sizes now; without this the
+    // picture a human reviews still showed only specks, so a body-wash regression would
+    // pass every capture.
+    //
+    // Set into a wall slab on purpose, and sealed: an attuned spring at this size pours,
+    // and an open one would flood the board before the shutter. The casing is scaffolding
+    // in the same spirit as every other Wall stand here, and it makes the three blocks a
+    // controlled comparison by giving them one identical surround.
+    {
+      const disc = (cx, cy, r, kind, energy) => {
+        for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+          if (dx * dx + dy * dy <= r * r) setCell(cx + dx, cy + dy, kind, energy, 40, 0, cx + dx + cy + dy);
+        }
+      };
+      // A ONE-CELL ring is enough to seal the pour -- it walks up to WELLSPRING_REACH
+      // through its own material and breaks on the first cell that is not, so a single
+      // course of wall stops it dead. A thick slab was the first version and it swamped
+      // the blocks at true size: the exhibit exists to be LOOKED at, and two of the three
+      // vanished into brick. Against the night they read at a glance.
+      const ring = (cx, cy, kind) => {
+        for (let dy = -5; dy <= 5; dy++) for (let dx = -5; dx <= 5; dx++) {
+          const d = dx * dx + dy * dy;
+          if (d > 16 && d <= 25) setCell(cx + dx, cy + dy, kind, 0, 200, 0, cx + dx);
+        }
+      };
+      ring(158, 8, material.Wall);
+      disc(158, 8, 4, material.Wellspring, material.Water);   // remembering
+      ring(174, 8, material.Wall);
+      disc(174, 8, 4, material.Wellspring, 0);                // sleeping
+      // Listening: the ice has to TOUCH the block, and the sim's chill is a per-cell
+      // neighbour test, so only the rim reads chilled however much ice is piled on. That
+      // is the honest picture rather than a flattering one -- see the shell-and-core note
+      // in docs/VISUAL_PIPELINE.md. Its ring is ice rather than wall for that reason, so
+      // this one exhibit does not share the others' surround.
+      ring(190, 8, material.Ice);
+      disc(190, 8, 4, material.Wellspring, 0);
+    }
+
     // Attunement legibility at the smallest placement: a single attuned block beside a
     // single dormant one. Moonwater is the closest attuned hue to the dormant pewter,
     // so this pair is the honest worst case for telling lit from unlit at one cell.
