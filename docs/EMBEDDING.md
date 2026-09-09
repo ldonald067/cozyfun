@@ -240,6 +240,19 @@ a cozy sandbox must never throw away the scene someone is watching.
 `npm run test:browser` covers it by stubbing the one fetch the watch makes so it names a
 different bundle, which is exactly what a real deploy looks like from the running page's side.
 
+**Testing it against a real deploy found a gap the stubbed check could not.** The first
+version listened only for `visibilitychange` and `focus`, which covers a player who switches
+away and comes back — and misses the one this feature exists for: a tab left open and VISIBLE
+the whole time fires neither event, so it would never ask. A `setInterval` at the same
+throttle interval covers that, with the events left in so the switch-back case answers
+faster. Confirmed against the live host: a page running `index-Bbcojey5.js` fetched the
+origin and got `index-CttUpIOq.js` back, so the comparison the notice rests on is real.
+
+One limit worth knowing before trying to reproduce this by hand: an automated browser pane
+reports `document.visibilityState === "hidden"` even when fronted, so the visibility guard
+correctly refuses to check and the notice never appears there. That is the harness, not the
+feature — drive the comparison directly if you need to see it work.
+
 ## Triage from the embedding site's side
 
 Every one of these is diagnosable without touching the game's repo.

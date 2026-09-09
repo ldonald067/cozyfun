@@ -28,7 +28,7 @@ import {
 } from "./deskRadio";
 import { createEngine, type SandboxEngine } from "./engine";
 import { FieldNoteJournal, NOTE_LINGER_MS, SAMPLE_EVERY_TICKS } from "./fieldNotes";
-import { createBuildWatch, runningBundle } from "./buildWatch";
+import { BUILD_CHECK_MIN_INTERVAL_MS, createBuildWatch, runningBundle } from "./buildWatch";
 import { RoomWeather } from "./weather";
 import { MATERIAL, MATERIALS, type MaterialDef, type MaterialId } from "./materials";
 import {
@@ -140,11 +140,19 @@ export function App() {
     // Deliberately NOT checked on mount: the page has this instant been fetched, so it is
     // current by definition, and an eager check would spend the throttle window on a
     // question with a known answer -- leaving the first real "came back to this tab" moment
-    // unable to ask. Events drive it.
+    // unable to ask.
     document.addEventListener("visibilitychange", run);
     window.addEventListener("focus", run);
+    // Events alone are not enough, and this was found by testing against a REAL deploy
+    // rather than by review: a tab that stays visible the whole time never fires
+    // visibilitychange and may never fire focus -- which is exactly the "left it open on the
+    // other monitor, watching it" case this whole thing exists for. The interval covers that;
+    // the events just make the switch-back case answer faster. `check` is throttled, so the
+    // two paths together still ask at most once per BUILD_CHECK_MIN_INTERVAL_MS.
+    const timer = window.setInterval(run, BUILD_CHECK_MIN_INTERVAL_MS);
     return () => {
       cancelled = true;
+      window.clearInterval(timer);
       document.removeEventListener("visibilitychange", run);
       window.removeEventListener("focus", run);
     };
