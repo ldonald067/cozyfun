@@ -206,6 +206,47 @@ from unfindable to findable-by-a-curious-player, not to something everyone meets
 carries the rest is the renderer — a dormant spring is findable in a stone wall now, and the
 chilled state has a rune of its own, so a player who tries it gets confirmation.
 
+## Eleven attunements, four fountains
+
+The wellspring is the only element whose value MULTIPLIES with the rest of the roster: eleven
+attunable sources, so eleven machines from one block. Nobody had ever checked whether all
+eleven are worth building. Measured at the default brush on an open board, 4,000 ticks, with
+the source verified as drunk (`shell 27/48` in every case, which is the per-cell attunement
+recorded in `docs/VISUAL_PIPELINE.md`):
+
+| attunement | its own material | what else it puts in the world |
+| --- | --- | --- |
+| Sand / Soil / Rocket | 3,504 each | nothing |
+| Lava | 907 | 59 stone |
+| Fire | 33 | **474 smoke** |
+| Oil | 220 | nothing |
+| Seed | 108 | nothing |
+| Stardust | 86 | nothing |
+| Water / Moonwater | 65 each | nothing |
+| Meteor | **0** | 42 stone, 6 stardust |
+
+**As fountains they collapse into about four behaviours**, not eleven. Sand, soil and rocket
+are mechanically the SAME machine — all three saturate at exactly 3,504 cells and make nothing
+else, because all three are powders that pile until the spring entombs itself. Water and
+moonwater are identical too, at 65 apiece, because they move identically. The variety in this
+element is real but it does not live in the pour: it lives in what the material does after it
+lands. A rocket dune is inert until a flame reaches it, a soil dune grows things, a sand dune
+vitrifies. That is worth knowing before anyone tries to make the eleven "feel more different"
+by changing the spring — the spring is not where the difference is.
+
+**Two of the eleven do something nobody would predict from the tray**, and they are the most
+interesting things here. A **meteor** spring pours zero meteors: they impact the instant they
+land, so what it actually builds is stone and stardust — a slow terrain machine wearing a
+falling-rock label. A **fire** spring is really a smoke machine, 474 smoke against 33 fire,
+because fire is the shortest-lived material in the game and the spring's visible output is
+mostly its byproduct. Both are good toys. Neither is discoverable from "drinks the first
+source material that touches it".
+
+One fixture trap, since it cost two wrong results here: **fire RISES**, so a fire source
+painted above a spring escapes upward and the block never drinks. Every source has to be
+placed touching, and attunement has to be verified rather than assumed — a first run reported
+the fire fountain as producing literally nothing, which was the fixture, not the rule.
+
 ## Why the slow world is not in the matrix
 
 Two rules run only between sessions: cold char settles into soil, and a spent seed head
