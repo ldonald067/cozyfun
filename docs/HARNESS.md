@@ -20,7 +20,13 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   Building a scenario is fixture work, and the brush is blunter than it looks. `paint` is a
   **disc of the radius you ask for** — 5 cells at radius 1, 13 at 2, 49 at 4, 197 at 8 — and
   the harnesses all pass radius 1, which is why "the brush stamps a five-cell plus" was
-  written here and is **wrong**. The app's own slider runs 1 to 12 and DEFAULTS TO 4, so the
+  written here and is **wrong**. **There is no radius 0**: `paint()` opens with
+  `let radius = radius.max(1)`, so asking for 0 gets you the five-cell plus, not one cell.
+  That is not a footnote — it has produced two wrong results in one session, both of which
+  looked like findings. An "erase around the block without touching it" scoop ate part of
+  the block and reported an entombed spring as permanently dead; a showcase erase clipped
+  the exhibit it was clearing space for. If a fixture needs single cells, write the bytes
+  directly the way `scripts/renderer-probe.mjs` does, or account for the plus. The app's own slider runs 1 to 12 and DEFAULTS TO 4, so the
   shape a player actually paints is a 49-cell disc, not a plus. At radius 1 nothing can be
   placed one cell at a time and paint ORDER is what gives a layout its shape (paint the
   target first, let the masonry overwrite it). **Nothing stays where you put it, either** — liquids side-hop up to two
