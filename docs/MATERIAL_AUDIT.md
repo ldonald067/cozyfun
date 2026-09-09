@@ -177,6 +177,24 @@ also the only note that teaches rather than observes, which is a departure worth
 `npm run test:field-notes` drives the real sim from painted materials and fails if it goes
 silent.
 
+**Leaving it unguarded was weighed and confirmed, so here is what to know before changing
+it.** The guard keys on `rule.kind`, which for this note is Wellspring — so adding
+`wellspring.listens` to `BRUSH_GUARDED` would suppress it when the player recently painted a
+SPRING, not when they painted ice. That is not what "brush-guard this note" sounds like, and
+it is the mistake to avoid: guarding on ice needs a small change, not a set entry.
+
+The deciding evidence was that ice reaches a spring without anyone painting it. The
+snow-window room drops Ice as settling weather, placed at `y: surface - 1` — directly on top
+of whatever stands in a column — so a spring that tops its column gets frosted and stops
+pouring on its own. Verified end to end: one settled speck on an exposed spring's crown, and
+the note fires. That is the most baffling thing this element can do to a player, and this note
+is the only thing in the game that explains it. An ice-keyed guard would suppress the
+deliberate path and leave mostly this one, which is a different feature rather than a
+restoration.
+
+The cost of being wrong is one sentence that never repeats, since the ledger fires each note
+once ever. If it ever reads as stating the obvious, key a guard on **Ice**.
+
 So this one is signposted in the **tray copy**, which is the game's existing channel for
 "what does this do" and reaches a player before they experiment rather than after. The
 Wellspring description used to end with "pours it back out **forever**", which actively
