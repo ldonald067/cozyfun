@@ -92,11 +92,13 @@ const PLANT_SPACING: i32 = 6;
 /// stranded cells. Offsets are relative to the crown, which sits directly above the tip of
 /// the stalk. `app/src/rendering/shapeLanguage.ts` holds the matching hue and eye per index.
 const BLOOM_SHAPES: [&[(i32, i32)]; 8] = [
-    // 0 Cornflower: a frilled rosette, seven wide. The crest keeps its ragged top row but the CENTRE
-    // of that row is filled: notching it split the head into two blobs, which is the identical
-    // failure already recorded for the poppy and was caught by looking at a render, not by
-    // reasoning about the offsets.
-    &[(-2, -2), (0, -2), (2, -2), (-3, -1), (-2, -1), (-1, -1), (0, -1), (1, -1), (2, -1), (3, -1), (-3, 0), (-2, 0), (-1, 0), (1, 0), (2, 0), (3, 0), (-2, 1), (0, 1), (2, 1)],
+    // 0 Cornflower: a ragged ROSETTE: paired petals at the crest, a full body, two outers
+    // dropped below. It must not share a rim rhythm with the tulip -- the first seven-wide
+    // pass gave both a regular notched top and a full row under it, which made the TULIP A
+    // STRICT SUBSET OF THIS SHAPE. Silhouette overlap hit 0.85, worse than any pair before
+    // the widening, and a greyscale render showed it plainly while a glance at the offsets
+    // did not.
+    &[(-2, -2), (-1, -2), (1, -2), (2, -2), (-3, -1), (-2, -1), (-1, -1), (0, -1), (1, -1), (2, -1), (3, -1), (-3, 0), (-2, 0), (-1, 0), (1, 0), (2, 0), (3, 0), (-2, 1), (2, 1)],
     // 1 Poppy: a broad bowl whose outer petals still DROOP below the rim, now two cells further
     // out each side. The crest stays rounded -- a filled top row reads as a bar.
     &[(-2, -1), (-1, -1), (0, -1), (1, -1), (2, -1), (-3, 0), (-2, 0), (-1, 0), (1, 0), (2, 0), (3, 0), (-3, 1), (-2, 1), (2, 1), (3, 1)],
@@ -106,9 +108,9 @@ const BLOOM_SHAPES: [&[(i32, i32)]; 8] = [
     // 3 Sunflower: the biggest head in the set and deliberately so: a full disc under a crown of rays,
     // seven wide and five tall.
     &[(0, -3), (-2, -2), (-1, -2), (0, -2), (1, -2), (2, -2), (-3, -1), (-2, -1), (-1, -1), (0, -1), (1, -1), (2, -1), (3, -1), (-3, 0), (-2, 0), (-1, 0), (1, 0), (2, 0), (3, 0), (0, 1)],
-    // 4 Tulip: a solid cup under a notched top edge -- the notches are the signature. Three of them
-    // now rather than four, because an even comb reads as architecture.
-    &[(-2, -2), (0, -2), (2, -2), (-3, -1), (-2, -1), (-1, -1), (0, -1), (1, -1), (2, -1), (3, -1), (-3, 0), (-2, 0), (-1, 0), (1, 0), (2, 0), (3, 0)],
+    // 4 Tulip: a CUP: a pronged rim over a full shoulder, tapering to a narrow base. The taper
+    // is what separates it from the cornflower's rounded body -- see the note there.
+    &[(-3, -2), (-1, -2), (1, -2), (3, -2), (-3, -1), (-2, -1), (-1, -1), (0, -1), (1, -1), (2, -1), (3, -1), (-2, 0), (-1, 0), (1, 0), (2, 0)],
     // 5 Lavender: UNCHANGED at three wide. A tall narrow spike is this plant's whole identity and
     // widening it would buy size at the cost of the one silhouette nothing else in the row has.
     &[(0, -1), (-1, -2), (1, -2), (0, -3), (-1, -4), (1, -4), (0, -5)],

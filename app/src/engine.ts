@@ -1540,7 +1540,7 @@ const PLANT_SPACING = 6;
 // placed. Mirrors BLOOM_SHAPES in sim/src/lib.rs.
 const BLOOM_SHAPES: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [
   // 0 Cornflower -- see sim/src/lib.rs for the shape reasoning.
-  [[-2, -2], [0, -2], [2, -2], [-3, -1], [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [3, -1], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0], [-2, 1], [0, 1], [2, 1]],
+  [[-2, -2], [-1, -2], [1, -2], [2, -2], [-3, -1], [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [3, -1], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0], [-2, 1], [2, 1]],
   // 1 Poppy -- see sim/src/lib.rs for the shape reasoning.
   [[-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0], [-3, 1], [-2, 1], [2, 1], [3, 1]],
   // 2 Daisy -- see sim/src/lib.rs for the shape reasoning.
@@ -1548,7 +1548,7 @@ const BLOOM_SHAPES: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [
   // 3 Sunflower -- see sim/src/lib.rs for the shape reasoning.
   [[0, -3], [-2, -2], [-1, -2], [0, -2], [1, -2], [2, -2], [-3, -1], [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [3, -1], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0], [0, 1]],
   // 4 Tulip -- see sim/src/lib.rs for the shape reasoning.
-  [[-2, -2], [0, -2], [2, -2], [-3, -1], [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [3, -1], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0]],
+  [[-3, -2], [-1, -2], [1, -2], [3, -2], [-3, -1], [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [3, -1], [-2, 0], [-1, 0], [1, 0], [2, 0]],
   // 5 Lavender -- see sim/src/lib.rs for the shape reasoning.
   [[0, -1], [-1, -2], [1, -2], [0, -3], [-1, -4], [1, -4], [0, -5]],
   // 6 Bluebell -- see sim/src/lib.rs for the shape reasoning.
