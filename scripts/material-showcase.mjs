@@ -131,16 +131,21 @@ export function materialShowcaseScript() {
     // sim produces — a head is a crown with its shape's petals opened around it, on a leafy
     // stalk. One specimen cannot show that shape AND hue are both chosen per plant, so the
     // row is the only place a reviewer can check that a lavender is not a daisy.
-    // These offsets mirror BLOOM_SHAPES in sim/src/lib.rs; keep them in step.
+    // These offsets mirror BLOOM_SHAPES in sim/src/lib.rs. This is the THIRD copy of that
+    // table -- sim, engine, and here -- and a comment asking for it to be kept in step is
+    // not a check: it went stale the first time the shapes changed, and the showcase quietly
+    // exhibited heads the sim could no longer grow. npm run renderer:probe now parses all
+    // three and fails when they disagree, so this block is generated-from-truth rather than
+    // remembered.
     const BLOOM_SHAPES = [
-      [[0,-1],[-1,0],[1,0],[-1,-1],[1,-1],[-2,0],[2,0],[-2,-1],[2,-1],[-1,-2],[1,-2],[-1,1],[1,1]],                            // 0 cornflower
-      [[0,-1],[-1,0],[1,0],[-1,-1],[1,-1],[-2,0],[2,0],[-2,1],[2,1]],                                                           // 1 poppy
-      [[0,-1],[-1,0],[1,0],[-1,-1],[1,-1],[-2,0],[2,0],[0,-2],[-1,1],[1,1]],                                                     // 2 daisy
-      [[0,-1],[-1,0],[1,0],[-1,-1],[1,-1],[-2,0],[2,0],[-2,-1],[2,-1],[0,-2],[-1,-2],[1,-2],[-1,1],[1,1],[-2,-2],[2,-2],[0,-3]], // 3 sunflower
-      [[0,-1],[-1,0],[1,0],[-1,-1],[1,-1],[-2,-1],[2,-1],[-2,-2],[0,-2],[2,-2]],                                                 // 4 tulip
-      [[0,-1],[-1,-2],[1,-2],[0,-3],[-1,-4],[1,-4],[0,-5]],                                                                      // 5 lavender
-      [[0,-1],[0,-2],[-1,-1],[1,-2],[-2,0],[2,-1]],                                                                              // 6 bluebell
-      [[0,-1],[-1,0],[1,0],[-1,-1],[1,-1]],                                                                                      // 7 cosmos
+      [[-2,-2],[0,-2],[2,-2],[-3,-1],[-2,-1],[-1,-1],[0,-1],[1,-1],[2,-1],[3,-1],[-3,0],[-2,0],[-1,0],[1,0],[2,0],[3,0],[-2,1],[0,1],[2,1]], // 0 cornflower
+      [[-2,-1],[-1,-1],[0,-1],[1,-1],[2,-1],[-3,0],[-2,0],[-1,0],[1,0],[2,0],[3,0],[-3,1],[-2,1],[2,1],[3,1]], // 1 poppy
+      [[0,-2],[-2,-1],[0,-1],[2,-1],[-3,0],[-2,0],[-1,0],[1,0],[2,0],[3,0],[-2,1],[0,1],[2,1]], // 2 daisy
+      [[0,-3],[-2,-2],[-1,-2],[0,-2],[1,-2],[2,-2],[-3,-1],[-2,-1],[-1,-1],[0,-1],[1,-1],[2,-1],[3,-1],[-3,0],[-2,0],[-1,0],[1,0],[2,0],[3,0],[0,1]], // 3 sunflower
+      [[-2,-2],[0,-2],[2,-2],[-3,-1],[-2,-1],[-1,-1],[0,-1],[1,-1],[2,-1],[3,-1],[-3,0],[-2,0],[-1,0],[1,0],[2,0],[3,0]], // 4 tulip
+      [[0,-1],[-1,-2],[1,-2],[0,-3],[-1,-4],[1,-4],[0,-5]], // 5 lavender
+      [[0,-1],[0,-2],[-1,-1],[1,-2],[-2,0],[2,-1],[-3,1],[3,0]], // 6 bluebell
+      [[-2,-1],[-1,-1],[1,-1],[2,-1],[-3,0],[-2,0],[-1,0],[1,0],[2,0],[3,0],[-2,1],[-1,1],[1,1],[2,1]], // 7 cosmos
     ];
     // The bed is Wall, not Stone and not bare soil: soil is a powder, so an unsupported
     // planter falls the moment the capture's sim starts and takes the whole plant with it.
@@ -180,20 +185,24 @@ export function materialShowcaseScript() {
     plant(2, 134, 2, 4, [[1, 2]]);
     setCell(2, 129, material.Flower, 0, 1400, flag.Rooted, 2);
     // An unopened bud is a lone crown with too little budget left to open.
-    plant(9, 134, 2, 4, [[-1, 2]]);
-    setCell(9, 129, material.Flower, 90, 20, flag.Rooted, 2);
-    bloom(16, 134, 0, 5, [[-1, 2], [1, 4]], 95, 200);        // cornflower
-    bloom(23, 134, 1, 5, [[1, 2], [-1, 4]], 95, 200);        // poppy
-    bloom(30, 134, 2, 5, [[-1, 2], [1, 4]], 95, 200);        // daisy
-    bloom(37, 134, 3, 6, [[1, 2], [-1, 4]], 95, 200);        // sunflower
+    plant(6, 134, 2, 4, [[-1, 2]]);
+    setCell(6, 129, material.Flower, 90, 20, flag.Rooted, 2);
+    // Heads are SEVEN cells wide now (dx -3..3), so the old seven-cell step put neighbours
+    // edge to edge with no gap and the row read as one continuous band. Step eight leaves a
+    // one-column gap. The row cannot simply spread rightward instead: the sand pile owns
+    // column 72 onward, which is why this starts at 12 and the bud/spent pair moved left.
+    bloom(12, 134, 0, 5, [[-1, 2], [1, 4]], 95, 200);        // cornflower
+    bloom(20, 134, 1, 5, [[1, 2], [-1, 4]], 95, 200);        // poppy
+    bloom(28, 134, 2, 5, [[-1, 2], [1, 4]], 95, 200);        // daisy
+    bloom(36, 134, 3, 6, [[1, 2], [-1, 4]], 95, 200);        // sunflower
     bloom(44, 134, 4, 5, [[-1, 2], [1, 4]], 95, 200);        // tulip
-    bloom(51, 134, 5, 5, [[1, 2], [-1, 4]], 95, 200);        // lavender
-    bloom(58, 134, 6, 5, [[-1, 2], [1, 4]], 95, 200);        // bluebell
+    bloom(52, 134, 5, 5, [[1, 2], [-1, 4]], 95, 200);        // lavender
+    bloom(60, 134, 6, 5, [[-1, 2], [1, 4]], 95, 200);        // bluebell
     // Cosmos: the COMMON spent case, and the one a bare-crown test gets wrong. Its crown
     // is under POLLEN_RESERVE so it renders as husk, while its petals sit at the shed
     // floor of 45 and hold — measured on a real garden, a head runs its budget to zero
     // by ~1200 ticks but almost always keeps a stubborn petal or two hanging on.
-    bloom(65, 134, 7, 5, [[1, 2], [-1, 4]], 20, 1300, 2);    // cosmos, spent and shedding
+    bloom(68, 134, 7, 5, [[1, 2], [-1, 4]], 20, 1300, 2);    // cosmos, spent and shedding
 
     // Geology: a larger stone mass with mineral veins and an old patinated wall.
     rect(24, 44, 44, 56, material.Stone, 0, 60);

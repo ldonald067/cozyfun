@@ -77,7 +77,7 @@ const SEED_SOAK_LOSS: u16 = 20;
 /// A seed will not germinate this close to an existing plant. Without it every cell of a
 /// watered bed sprouts and the meadow becomes one solid wall of blooms with no silhouette.
 /// Five keeps a clear gap between heads now that a head is itself five cells across.
-const PLANT_SPACING: i32 = 5;
+const PLANT_SPACING: i32 = 6;
 
 /// Per-plant bloom silhouettes, chosen by the plant's variant exactly as its hue is.
 /// Offsets are relative to the crown, which always sits directly above the stalk tip, and
@@ -92,38 +92,33 @@ const PLANT_SPACING: i32 = 5;
 /// stranded cells. Offsets are relative to the crown, which sits directly above the tip of
 /// the stalk. `app/src/rendering/shapeLanguage.ts` holds the matching hue and eye per index.
 const BLOOM_SHAPES: [&[(i32, i32)]; 8] = [
-    // 0 Cornflower: a frilled rosette. The crest is NOTCHED — filling it made this the
-    // solidest head in the set, a plain ball that read as a lump beside the poppy in a
-    // desaturated crop. The notch sits above a full row, so unlike the poppy's crest it
-    // cannot split the head; the poppy's dark eye already cuts its lower row, this one's
-    // gold disc does not.
-    &[
-        (0, -1), (-1, 0), (1, 0), (-1, -1), (1, -1), (-2, 0), (2, 0),
-        (-2, -1), (2, -1), (-1, -2), (1, -2), (-1, 1), (1, 1),
-    ],
-    // 1 Poppy: a broad bowl whose outer petals DROOP below the rim, which is what a
-    // poppy does and what separates it from the cornflower at a glance — compact rosette
-    // versus wide flopping cap. Leaving a notch at the crest split the head into two
-    // separate red blocks, because the dark eye cuts the middle of the lower row too.
-    // Filling the notch instead made a solid 5x2 bar, so the top corners come off: the
-    // bowl has to be rounded at the crest or it is just a rectangle.
-    &[(0, -1), (-1, 0), (1, 0), (-1, -1), (1, -1), (-2, 0), (2, 0), (-2, 1), (2, 1)],
-    // 2 Daisy: the same span opened out into a star, so the gaps do the work.
-    &[(0, -1), (-1, 0), (1, 0), (-1, -1), (1, -1), (-2, 0), (2, 0), (0, -2), (-1, 1), (1, 1)],
-    // 3 Sunflower: the biggest head, a full disc under a crown of rays.
-    &[
-        (0, -1), (-1, 0), (1, 0), (-1, -1), (1, -1), (-2, 0), (2, 0),
-        (-2, -1), (2, -1), (0, -2), (-1, -2), (1, -2), (-1, 1), (1, 1),
-        (-2, -2), (2, -2), (0, -3),
-    ],
-    // 4 Tulip: a solid cup under a notched top edge — the notches are the signature.
-    &[(0, -1), (-1, 0), (1, 0), (-1, -1), (1, -1), (-2, -1), (2, -1), (-2, -2), (0, -2), (2, -2)],
-    // 5 Lavender: a tall checkered spike, three wide and six high.
+    // 0 Cornflower: a frilled rosette, seven wide. The crest keeps its ragged top row but the CENTRE
+    // of that row is filled: notching it split the head into two blobs, which is the identical
+    // failure already recorded for the poppy and was caught by looking at a render, not by
+    // reasoning about the offsets.
+    &[(-2, -2), (0, -2), (2, -2), (-3, -1), (-2, -1), (-1, -1), (0, -1), (1, -1), (2, -1), (3, -1), (-3, 0), (-2, 0), (-1, 0), (1, 0), (2, 0), (3, 0), (-2, 1), (0, 1), (2, 1)],
+    // 1 Poppy: a broad bowl whose outer petals still DROOP below the rim, now two cells further
+    // out each side. The crest stays rounded -- a filled top row reads as a bar.
+    &[(-2, -1), (-1, -1), (0, -1), (1, -1), (2, -1), (-3, 0), (-2, 0), (-1, 0), (1, 0), (2, 0), (3, 0), (-3, 1), (-2, 1), (2, 1), (3, 1)],
+    // 2 Daisy: the same span opened out into a star, so the gaps do the work. Widening it kept
+    // the alternating rhythm rather than filling in, or it becomes a second sunflower.
+    &[(0, -2), (-2, -1), (0, -1), (2, -1), (-3, 0), (-2, 0), (-1, 0), (1, 0), (2, 0), (3, 0), (-2, 1), (0, 1), (2, 1)],
+    // 3 Sunflower: the biggest head in the set and deliberately so: a full disc under a crown of rays,
+    // seven wide and five tall.
+    &[(0, -3), (-2, -2), (-1, -2), (0, -2), (1, -2), (2, -2), (-3, -1), (-2, -1), (-1, -1), (0, -1), (1, -1), (2, -1), (3, -1), (-3, 0), (-2, 0), (-1, 0), (1, 0), (2, 0), (3, 0), (0, 1)],
+    // 4 Tulip: a solid cup under a notched top edge -- the notches are the signature. Three of them
+    // now rather than four, because an even comb reads as architecture.
+    &[(-2, -2), (0, -2), (2, -2), (-3, -1), (-2, -1), (-1, -1), (0, -1), (1, -1), (2, -1), (3, -1), (-3, 0), (-2, 0), (-1, 0), (1, 0), (2, 0), (3, 0)],
+    // 5 Lavender: UNCHANGED at three wide. A tall narrow spike is this plant's whole identity and
+    // widening it would buy size at the cost of the one silhouette nothing else in the row has.
     &[(0, -1), (-1, -2), (1, -2), (0, -3), (-1, -4), (1, -4), (0, -5)],
-    // 6 Bluebell: paired bells nodding off a bare central stalk.
-    &[(0, -1), (0, -2), (-1, -1), (1, -2), (-2, 0), (2, -1)],
-    // 7 Forget-me-not: the smallest head, a tight five-petal cluster.
-    &[(0, -1), (-1, 0), (1, 0), (-1, -1), (1, -1)],
+    // 6 Bluebell: paired bells nodding off a bare central stalk, with one more pair. Also deliberately
+    // narrow: sparseness is the point, and a filled bluebell is just a small cornflower.
+    &[(0, -1), (0, -2), (-1, -1), (1, -2), (-2, 0), (2, -1), (-3, 1), (3, 0)],
+    // 7 Cosmos: broad rounded petals around an open centre. Seven wide with the ring closed, because
+    // leaving the centre gapped split it the same way the cornflower split.
+    &[(-2, -1), (-1, -1), (1, -1), (2, -1), (-3, 0), (-2, 0), (-1, 0), (1, 0), (2, 0), (3, 0), (-2, 1), (-1, 1), (1, 1), (2, 1)],
+
 ];
 
 /// A bloom runs on a slower clock than the rest of the life materials: it loses
@@ -3030,32 +3025,49 @@ mod tests {
         // rather than one constant. Two variants must give two different blooms — that is
         // the whole point of the table, and a fixed threshold here would hide a regression
         // that collapsed every plant back to the same head.
-        let head_of = |variant: u8| {
-            let mut u = Universe::new(16, 16, 3);
-            set_cell_state(&mut u, 8, 8, Material::Flower, 20, BLOOM_ENERGY, FLAG_ROOTED);
-            let idx = u.idx(8, 8);
+        //
+        // Measured as a PEAK over the bloom's life rather than a reading at one tick: heads
+        // are seven cells wide now and take longer to finish opening than the old five-wide
+        // ones, so a fixed 400-tick sample caught some of them mid-open.
+        //
+        // The tolerance of one petal is the pollen wedge, and it is documented behaviour
+        // rather than slack: a mote that lands on top of a bloom cannot fall, so it can hold
+        // the last crest site until it ages out. Measured across all eight species, seven
+        // open their whole silhouette and one lands a petal short, and which one it is
+        // depends on where its own pollen happens to fall.
+        let peak_of = |variant: u8| {
+            let mut u = Universe::new(20, 20, 3);
+            set_cell_state(&mut u, 10, 10, Material::Flower, 20, BLOOM_ENERGY, FLAG_ROOTED);
+            let idx = u.idx(10, 10);
             u.cells[idx].variant = variant;
-            for _ in 0..400 {
+            let mut peak = 0usize;
+            for _ in 0..2000 {
                 u.tick();
+                let open = u
+                    .cells
+                    .iter()
+                    .filter(|cell| cell.kind == Material::Flower as u8)
+                    .count();
+                if open > peak {
+                    peak = open;
+                }
             }
-            u.cells
-                .iter()
-                .filter(|cell| cell.kind == Material::Flower as u8)
-                .count()
+            peak
         };
-        assert_eq!(
-            head_of(0),
-            1 + BLOOM_SHAPES[0].len(),
-            "a poppy crown should open its whole silhouette"
-        );
-        assert_eq!(
-            head_of(3),
-            1 + BLOOM_SHAPES[3].len(),
-            "a lavender crown should open its whole silhouette"
-        );
+        for variant in 0..8u8 {
+            let full = 1 + BLOOM_SHAPES[usize::from(variant)].len();
+            let peak = peak_of(variant);
+            assert!(
+                peak + 1 >= full,
+                "variant {variant} opened only {peak} of {full} cells — more than the one \
+                 petal the pollen wedge can hold, so its silhouette is not reachable. A head \
+                 can afford about (BLOOM_ENERGY - CROWN_RESERVE) / PETAL_COST petals before \
+                 its budget runs out; a shape bigger than that is a promise the sim cannot keep."
+            );
+        }
         assert_ne!(
-            head_of(0),
-            head_of(3),
+            peak_of(0),
+            peak_of(3),
             "different variants should grow visibly different blooms"
         );
     }

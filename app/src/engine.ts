@@ -1530,7 +1530,7 @@ const SCATTER_REACH = 14;
 // A seed will not germinate this close to an existing plant. Without it every cell of a
 // watered bed sprouts and the meadow becomes one solid wall of blooms with no silhouette.
 // Five keeps a clear gap between heads now that a head is itself five cells across.
-const PLANT_SPACING = 5;
+const PLANT_SPACING = 6;
 
 // Per-plant bloom silhouettes, chosen by the plant's variant exactly as its hue is.
 // Offsets are relative to the crown, which always sits directly above the stalk tip, and
@@ -1539,22 +1539,23 @@ const PLANT_SPACING = 5;
 // the renderer. Petals are listed in opening order and every offset touches one already
 // placed. Mirrors BLOOM_SHAPES in sim/src/lib.rs.
 const BLOOM_SHAPES: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [
-  // 0 Cornflower: a frilled rosette with a notched crest — see sim/src/lib.rs.
-  [[0, -1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-2, 0], [2, 0], [-2, -1], [2, -1], [-1, -2], [1, -2], [-1, 1], [1, 1]],
-  // 1 Poppy: a broad bowl whose outer petals droop below the rim.
-  [[0, -1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-2, 0], [2, 0], [-2, 1], [2, 1]],
-  // 2 Daisy: the same span opened out into a star, so the gaps do the work.
-  [[0, -1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-2, 0], [2, 0], [0, -2], [-1, 1], [1, 1]],
-  // 3 Sunflower: the biggest head, a full disc under a crown of rays.
-  [[0, -1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-2, 0], [2, 0], [-2, -1], [2, -1], [0, -2], [-1, -2], [1, -2], [-1, 1], [1, 1], [-2, -2], [2, -2], [0, -3]],
-  // 4 Tulip: a solid cup under a notched top edge — the notches are the signature.
-  [[0, -1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-2, -1], [2, -1], [-2, -2], [0, -2], [2, -2]],
-  // 5 Lavender: a tall checkered spike, three wide and six high.
+  // 0 Cornflower -- see sim/src/lib.rs for the shape reasoning.
+  [[-2, -2], [0, -2], [2, -2], [-3, -1], [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [3, -1], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0], [-2, 1], [0, 1], [2, 1]],
+  // 1 Poppy -- see sim/src/lib.rs for the shape reasoning.
+  [[-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0], [-3, 1], [-2, 1], [2, 1], [3, 1]],
+  // 2 Daisy -- see sim/src/lib.rs for the shape reasoning.
+  [[0, -2], [-2, -1], [0, -1], [2, -1], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0], [-2, 1], [0, 1], [2, 1]],
+  // 3 Sunflower -- see sim/src/lib.rs for the shape reasoning.
+  [[0, -3], [-2, -2], [-1, -2], [0, -2], [1, -2], [2, -2], [-3, -1], [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [3, -1], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0], [0, 1]],
+  // 4 Tulip -- see sim/src/lib.rs for the shape reasoning.
+  [[-2, -2], [0, -2], [2, -2], [-3, -1], [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [3, -1], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0]],
+  // 5 Lavender -- see sim/src/lib.rs for the shape reasoning.
   [[0, -1], [-1, -2], [1, -2], [0, -3], [-1, -4], [1, -4], [0, -5]],
-  // 6 Bluebell: paired bells nodding off a bare central stalk.
-  [[0, -1], [0, -2], [-1, -1], [1, -2], [-2, 0], [2, -1]],
-  // 7 Forget-me-not: the smallest head, a tight five-petal cluster.
-  [[0, -1], [-1, 0], [1, 0], [-1, -1], [1, -1]]
+  // 6 Bluebell -- see sim/src/lib.rs for the shape reasoning.
+  [[0, -1], [0, -2], [-1, -1], [1, -2], [-2, 0], [2, -1], [-3, 1], [3, 0]],
+  // 7 Cosmos -- see sim/src/lib.rs for the shape reasoning.
+  [[-2, -1], [-1, -1], [1, -1], [2, -1], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0], [-2, 1], [-1, 1], [1, 1], [2, 1]],
+
 ];
 
 // Growth may push up through standing water as well as through open air. A watered garden

@@ -147,6 +147,47 @@ const crown = (variant, energy, age) => board((put) => {
 const crownColour = (variant, energy, age, time) => colourAt(crown(variant, energy, age), 12, 2, time);
 
 const checks = [];
+// BLOOM_SHAPES exists in THREE places -- sim/src/lib.rs, app/src/engine.ts, and the visual
+// showcase -- and only the first two are covered by parity. The showcase copy carried a
+// comment asking for it to be kept in step, which is not a check: it went stale the first
+// time the shapes changed and quietly exhibited heads the sim could no longer grow. Parse
+// all three and compare, the same way the mirrored constants above are compared.
+{
+  const norm = (pairs) => pairs.map(([x, y]) => `${x},${y}`).sort().join(" ");
+  const table = (text, open, pairRe, itemRe) => {
+    const declAt = text.indexOf("const BLOOM_SHAPES");
+    if (declAt < 0) return null;
+    const from = text.indexOf(open, declAt) + open.length;
+    const block = text.slice(from, text.indexOf("\n];", from));
+    return [...block.matchAll(itemRe)].map((m) =>
+      norm([...m[1].matchAll(pairRe)].map((q) => [Number(q[1]), Number(q[2])])));
+  };
+  const rustSrc = await readFile(resolve(root, "sim/src/lib.rs"), "utf8");
+  const engineSrc = await readFile(resolve(root, "app/src/engine.ts"), "utf8");
+  const showSrc = await readFile(resolve(root, "scripts/material-showcase.mjs"), "utf8");
+  const rustShapes = table(rustSrc, "= [", /\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)/g, /&\[([^\]]*(?:\][^\]]*)*?)\],/g);
+  const engineShapes = table(engineSrc, "= [", /\[\s*(-?\d+)\s*,\s*(-?\d+)\s*\]/g, /^\s*\[((?:\s*\[-?\d+,\s*-?\d+\],?)+)\],\s*$/gm);
+  const showShapes = table(showSrc, "= [", /\[\s*(-?\d+)\s*,\s*(-?\d+)\s*\]/g, /^\s*\[((?:\[-?\d+,-?\d+\],?)+)\],/gm);
+  const counts = [rustShapes?.length, engineShapes?.length, showShapes?.length];
+  if (counts.some((n) => n !== 8)) {
+    failures.push(`BLOOM_SHAPES: parsed ${counts.join("/")} shapes from sim/engine/showcase, expected 8 each. ` +
+      `The tables moved and this check can no longer read them.`);
+  } else {
+    for (let i = 0; i < 8; i++) {
+      if (rustShapes[i] !== engineShapes[i]) {
+        failures.push(`BLOOM_SHAPES[${i}] differs between sim/src/lib.rs and app/src/engine.ts. ` +
+          `The two engines would grow different flowers, which parity catches only if a scenario blooms that species.`);
+      }
+      if (rustShapes[i] !== showShapes[i]) {
+        failures.push(`BLOOM_SHAPES[${i}] differs between sim/src/lib.rs and scripts/material-showcase.mjs. ` +
+          `The showcase would exhibit a head the sim cannot grow -- regenerate the showcase copy from the sim.`);
+      }
+    }
+    checks.push({ label: "BLOOM_SHAPES agree across sim, engine and showcase", floor: 8, worst: 8, detail: "" });
+  }
+}
+
+
 function assertFloor(label, floor, worst, detail) {
   checks.push({ label, floor, worst, detail });
   if (worst < floor) failures.push(`${label}: worst case ${worst}, floor ${floor}. ${detail}`);
