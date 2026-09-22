@@ -457,6 +457,63 @@ function assertFloor(label, floor, worst, detail) {
     `worst at ${at}. Two species a player cannot tell apart is variety that is not there.`);
 }
 
+// 8. A METEOR IN FLIGHT must not read as the fire it creates, as the sparks it sheds, or as
+//    the stardust it bursts into. This is the pair set nothing was checking, and the gap had
+//    a shape worth remembering: the audit's contrast column scores each outcome against WHAT
+//    IT REPLACED, so a meteor measured 537 against the night sky and passed everything, while
+//    sitting a median of 53 from FIRE across its whole state range — p10 48, p90 61, never
+//    far apart rather than occasionally close.
+//
+//    That matters because `meteor.impacts` rings the landing with fire and `meteor.trail`
+//    sheds sparks as it falls, so the one event that puts a meteor on screen also puts the
+//    two things it looked like directly beside it. Three of the ten shortest-lived
+//    interactions in the game were rendering in one colour.
+//
+//    Sparks are swept at age 0 as well, because a spark is WHITE-HOT at birth — an ice-white
+//    meteor core scored 22 here, worse than the collision it was meant to fix, and only this
+//    check's spark arm caught it.
+{
+  const meteorInFlight = (age) => board((put) => {
+    for (let x = 0; x < W; x++) put(x, 12, MATERIAL.Wall);   // a floor well clear of the rock
+    put(12, 4, MATERIAL.Meteor, 255, age, 0, 2);             // nothing below it: in flight
+  });
+  const fireOnFuel = (energy, age) => board((put) => {
+    for (let x = 0; x < W; x++) put(x, 8, MATERIAL.Wall);
+    for (let x = 10; x <= 14; x++) { put(x, 7, MATERIAL.Wood, 0, 40); put(x, 6, MATERIAL.Fire, energy, age, 0, x); }
+  });
+  const loneSpark = (energy, age, variant) => board((put) => {
+    for (let x = 0; x < W; x++) put(x, 12, MATERIAL.Wall);
+    put(12, 4, MATERIAL.Spark, energy, age, 0, variant);
+  });
+  const stardustDrift = (energy, age, variant) => board((put) => {
+    for (let x = 0; x < W; x++) put(x, 12, MATERIAL.Wall);
+    put(12, 4, MATERIAL.Stardust, energy, age, 0, variant);
+    put(14, 2, MATERIAL.Stardust, energy, age, 0, variant);
+  });
+
+  const rocks = [];
+  for (const age of [0, 4, 8, 12]) for (const t of TIMES) rocks.push(colourAt(meteorInFlight(age), 12, 4, t));
+
+  const rivals = [];
+  for (const e of [180, 210, 230, 255]) for (const a of [0, 6, 20, 45]) for (const t of TIMES)
+    rivals.push({ name: "fire", c: colourAt(fireOnFuel(e, a), 12, 6, t) });
+  for (const e of [120, 190, 255]) for (const a of [0, 8, 16]) for (const v of [0, 1, 2, 3]) for (const t of TIMES)
+    rivals.push({ name: `spark v${v}`, c: colourAt(loneSpark(e, a, v), 12, 4, t) });
+  for (const e of [0, 60, 120]) for (const a of [0, 40, 200]) for (const v of [0, 1, 2, 3]) for (const t of TIMES)
+    rivals.push({ name: "stardust", c: colourAt(stardustDrift(e, a, v), 12, 4, t) });
+  rivals.push({ name: "the night sky", c: NIGHT });
+
+  let worst = Infinity, at = null;
+  for (const rock of rocks) for (const r of rivals) {
+    const d = redmean(rock, r.c);
+    if (d < worst) { worst = d; at = r.name; }
+  }
+  assertFloor("meteor in flight vs fire, its own sparks and stardust", 120, worst,
+    `worst against ${at}. A meteor is the only dark-and-cold thing in a roster where every ` +
+    `other hot or cosmic material is a light source, and that luminance gap is what carries ` +
+    `it — not a hue. If this fails, something re-warmed or re-brightened the rock.`);
+}
+
 if (!quiet) {
   console.log("\nRendered state pairs, worst case over a full energy/age/species/time sweep:");
   for (const c of checks) {

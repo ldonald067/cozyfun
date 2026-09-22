@@ -398,14 +398,50 @@ function lavaColor({ color, variant, energy, time, cells, width, height, x, y }:
   return out;
 }
 
+// The cosmic core of a meteor in flight. A meteor is a COSMIC body that happens to be
+// hot, and it used to render as neither: a cream-gold cell that measured 53 redmean from
+// FIRE at the median and never rose above 61 across its whole state range, against a
+// floor of 45. That matters more than the number looks, because `meteor.impacts` rings
+// the landing with fire and the fall sheds sparks — so the one event that puts a meteor
+// on screen also puts the two things it looks like right beside it.
+//
+// The heat stays in the GLOW layer (`#ff7a30`, untouched) rather than being painted into
+// the rock, which makes the pair cool-body/hot-light — a combination nothing else in the
+// roster has. Fire is a warm body under a warm glow; Stardust is a violet body under a
+// violet one.
+//
+// **DARK cold blue, and that is the whole trick.** Two brighter cores were tried first and
+// both failed by walking into a different neighbour: a violet-white landed the rock at
+// `#debfdd` and **41 redmean from STARDUST**, and an ice-white landed it **22 from SPARK**,
+// which is worse than the fire collision it was fixing — a spark is white-hot at birth, so
+// anything pale collides with one. Fixing a pair by breaking its neighbour is not a fix.
+//
+// Sweeping candidate cores through this renderer against the whole neighbourhood found the
+// free space, and it is not a hue — it is a LUMINANCE. Every other hot or cosmic material
+// here is a light SOURCE and therefore bright; nothing in the roster is dark and cold. A
+// meteor is a rock, and the heat belongs to the air around it, so dark is also the honest
+// reading. `#3c4377` sits 404 from fire, 184 from stardust, 160 from spark and 196 from the
+// night sky, worst pair 98 against stone — more than double the floor, where the warm rock
+// cleared it by 8.
+const METEOR_CORE: Rgb = [48, 68, 124];
+
 function meteorColor({ color, variant, time, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
   const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Meteor);
   const falling = kindAt(cells, width, height, x, y + 1) === MATERIAL.Empty;
-  let out = mixRgb(color, [255, 214, 120], 0.35);
+  // In flight the gold pre-mix below is deliberately skipped: leaving it in is what tinted
+  // the cosmic core mauve and cost the Stardust pair its margin.
+  let out = falling ? color : mixRgb(color, [255, 214, 120], 0.35);
   if (falling) {
-    out = mixRgb(out, [255, 246, 200], 0.5);
-    if (edge.top) out = mixRgb(out, [255, 150, 60], 0.35);
+    out = mixRgb(out, METEOR_CORE, 0.94);
+    // The leading face burns — but only on a meteor with body ABOVE it. A cell exposed on
+    // opposite sides taking both treatments is what flattened the wellspring rim to a mid
+    // grey, and a meteor in flight is usually ONE cell, where every face is exposed. Keying
+    // the burn on the body above means the common case takes the core outright and only a
+    // real multi-cell meteor wears a hot nose.
+    if (kindAt(cells, width, height, x, y - 1) === MATERIAL.Meteor) {
+      out = mixRgb(out, [255, 150, 60], 0.5);
+    }
   } else {
     if (edge.bottom || edge.right || hash % 7 === 0) out = mixRgb(out, [45, 38, 43], 0.58);
     if (edge.top || edge.left) out = mixRgb(out, [255, 238, 158], 0.4);

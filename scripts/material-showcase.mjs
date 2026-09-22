@@ -106,11 +106,24 @@ export function materialShowcaseScript() {
     setCell(154, 67, material.Wall, 0, 20);
     rect(160, 174, 62, 71, material.Ice, 90, 24);
 
-    // Heat family lineup: airy fire, crusted lava, glowing ember, and a streaking meteor side by side.
+    // Heat family lineup: airy fire, crusted lava and a glowing ember bed, side by side.
+    //
+    // THREE materials, not four, and the meteor below is deliberately not one of them. A
+    // meteor is the only material in the roster with NO RESTING STATE: update_meteor tries
+    // to fall, and the tick it cannot, it converts itself to stone or stardust and rings
+    // itself with fire. So it either drops out of frame or detonates in the middle of the
+    // exhibit — putting it on a pedestal to hold it still would have set the lineup alight.
+    // This board caught it wherever it had fallen to, nine rows below where it was painted,
+    // while the comment claimed a four-way comparison; that hole is exactly why the meteor
+    // reading 53 redmean from fire went unnoticed for so long. The pair that matters is gated
+    // in npm run renderer:probe instead, where a falling cell can be held still because the
+    // renderer is a pure function and nothing has to tick.
     line(26, 62, 32, material.Wall, 0, 40);
     rect(27, 33, 27, 31, material.Fire, 230, 6);
     rect(39, 49, 28, 31, material.Lava, 250, 20);
     line(54, 61, 31, material.Ember, 220, 20);
+    // Caught in passing, not posed — see above. It is here so the board still exhibits
+    // every material, and it now falls wearing the cold core rather than fire's own colour.
     setCell(67, 23, material.Meteor, 255, 4, 0, 2);
 
     // Ember arc: hot embers on a burning log end, cooled char, and a quenched wet char row.
