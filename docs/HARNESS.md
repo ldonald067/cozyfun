@@ -88,12 +88,16 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   still be one material on screen, so the check scores the weaker of the two anisotropies and
   scores ZERO outright when they share an axis.
 
-  Two traps if you extend it. Measure the DIAGONALS: an h-versus-v test is blind to diagonal
-  banding, because a diagonal steps equally both ways — it reported both of these as
-  isotropic while a render showed the stripes plainly. And mirror the sim's own
-  `variant_for` in the fixture: a fixture that assigns its own variant pattern invents
-  texture the game never draws, and the first version of this measurement did exactly that,
-  flipping Sand's reading when it was corrected.
+  Three traps if you extend it. Measure the DIAGONALS: an h-versus-v test is blind to
+  diagonal banding, because a diagonal steps equally both ways — it reported both of these as
+  isotropic while a render showed the stripes plainly. Mirror the sim's own `variant_for` in
+  the fixture: one that assigns its own variant pattern invents texture the game never draws,
+  and the first version of this measurement did exactly that, flipping Sand's reading when it
+  was corrected. And **size the board to the thing being measured** — this check has its own
+  72x40 fixture rather than the shared 26x14 one, because soil's bedding repeats every eight
+  rows and a 14-row board sees under two cycles. It scored 134 there against a floor of 115
+  while the real 220x140 grid scored **114, under that floor**. 72x40 is the smallest size
+  where the number converges to what the play grid reports, and the floor is set from it.
 
   That last one covers a gap with a shape worth remembering, because the audit's own numbers
   hid it. `interaction:audit` scores each outcome's contrast against WHAT IT REPLACED, so a

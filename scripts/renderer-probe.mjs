@@ -548,10 +548,9 @@ function assertFloor(label, floor, worst, detail) {
 }
 
 // 9. SOIL AND WOOD MUST NOT WEAR THE SAME FABRIC. This gate is about texture rather than
-//    colour, which is a first here and is the point: the two softest substrates are the
-//    closest pair in the group by colour (p10 29 redmean, under the 45 floor), so the only
-//    thing that can separate them is the pattern — and for a long time the pattern was
-//    identical too.
+//    colour, which is the point: the two softest substrates are the closest pair in the
+//    group by colour (p10 29 redmean, under the 45 floor), so the only thing that can
+//    separate them is the pattern — and for a long time the pattern was identical too.
 //
 //    The cause was upstream of the renderer. `variant_for` in the sim reads like a hash and
 //    is a LINEAR FORM — (x*73856093 + y*19349663 + ...) % 8 — and a linear form mod 8 is
@@ -560,32 +559,56 @@ function assertFloor(label, floor, worst, detail) {
 //    anisotropic along NW-SE and wood 2.69x along the SAME axis, out of two four-entry
 //    palettes of overlapping browns. A wooden trough holding a soil bed read as one mass.
 //
-//    Soil now beds horizontally (sediment does) and wood keeps its diagonal (grain does).
-//    The gate asks two things: that each still HAS structure, so neither collapses into the
-//    per-cell noise that Stone is, and that their smoothest axes DIFFER. Note the measure
-//    has to consider diagonals: an h-versus-v test is blind to diagonal banding, because a
-//    diagonal steps equally both ways, and it reported both of these as isotropic.
+//    **This check has its own board, and the size is the whole point.** It first ran on the
+//    probe's shared 26x14 fixture and scored 134 against a floor of 115 — which looked like
+//    17% of headroom and was an artefact of the board. Soil's bedding repeats every eight
+//    rows, so a 14-row fixture sees under two cycles and overstates the anisotropy badly.
+//    Measured across sizes:
+//
+//        26x14 -> 134     56x32 -> 116     96x56  -> 113
+//        40x24 -> 118     72x40 -> 114     220x140 -> 114
+//
+//    The real grid is 220x140 (`WORLD_WIDTH`/`WORLD_HEIGHT` in App.tsx), where the score is
+//    **114 — below the floor the gate was asserting**. It converges by 72x40, which
+//    reproduces the play-grid number exactly for a twelfth of the cost, so that is the board.
+//    The floor is 105, set from the converged 114 rather than from the small-board 134.
+//
+//    The gate asks two things: that each material still HAS structure, so neither collapses
+//    into the per-cell noise Stone is, and that their smoothest axes DIFFER. Note the
+//    measure must consider DIAGONALS — an h-versus-v test is blind to diagonal banding,
+//    because a diagonal steps equally both ways, and it reported both of these as isotropic
+//    while a render showed the stripes plainly.
 {
+  const FW = 72, FH = 40;
   const AXES = { horizontal: [1, 0], vertical: [0, 1], "diagonal NW-SE": [1, 1], "diagonal NE-SW": [1, -1] };
   const fabric = (kind, energy, age) => {
-    const cells = board((put) => {
-      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-        // Mirror the sim's own variant assignment: a fixture that invents its own variant
-        // pattern invents texture the game never draws. This one produced a fake diagonal
-        // and flipped Sand's reading when it was corrected.
-        const mix = (Math.imul(x, 73856093) + Math.imul(y, 19349663) + Math.imul(kind, 83492791)) >>> 0;
-        put(x, y, kind, energy, age, 0, mix % 8);
-      }
-    });
+    const cells = new Uint8Array(FW * FH * STRIDE);
+    for (let y = 0; y < FH; y++) for (let x = 0; x < FW; x++) {
+      // Mirror the sim's own variant assignment: a fixture that invents its own variant
+      // pattern invents texture the game never draws. The first version of this measurement
+      // did exactly that and flipped Sand's reading when it was corrected.
+      const variant = (Math.imul(x, 73856093) + Math.imul(y, 19349663) + Math.imul(kind, 83492791)) >>> 0;
+      const o = (y * FW + x) * STRIDE;
+      cells[o] = kind; cells[o + 1] = variant % 8;
+      cells[o + 2] = age & 255; cells[o + 3] = (age >> 8) & 255;
+      cells[o + 4] = energy & 255; cells[o + 5] = (energy >> 8) & 255;
+    }
+    const sample = (x, y, time) => {
+      const o = (y * FW + x) * STRIDE;
+      return colorForCell({
+        kind, variant: cells[o + 1], age, energy, flags: 0,
+        time, cells, width: FW, height: FH, x, y,
+      });
+    };
     const step = {};
     for (const [name, [dx, dy]] of Object.entries(AXES)) {
-      const ds = [];
-      for (const t of TIMES) for (let y = 2; y < H - 2; y++) for (let x = 2; x < W - 2; x++) {
+      let total = 0, n = 0;
+      for (const t of TIMES) for (let y = 2; y < FH - 2; y++) for (let x = 2; x < FW - 2; x++) {
         const nx = x + dx, ny = y + dy;
-        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
-        ds.push(redmean(colourAt(cells, x, y, t), colourAt(cells, nx, ny, t)));
+        if (nx < 0 || ny < 0 || nx >= FW || ny >= FH) continue;
+        total += redmean(sample(x, y, t), sample(nx, ny, t)); n++;
       }
-      step[name] = ds.reduce((a, b) => a + b, 0) / ds.length;
+      step[name] = total / n;
     }
     const ranked = Object.entries(step).sort((a, b) => a[1] - b[1]);
     return { along: ranked[0][0], ratio: ranked[ranked.length - 1][1] / ranked[0][1] };
@@ -596,11 +619,12 @@ function assertFloor(label, floor, worst, detail) {
   // Scored as the weaker of the two structures, and zero outright if they share an axis --
   // two materials can each be beautifully textured and still be one material on screen.
   const worst = differ ? Math.round(Math.min(soil.ratio, wood.ratio) * 100) : 0;
-  assertFloor("soil and wood wear different fabrics", 115, worst,
+  assertFloor("soil and wood wear different fabrics", 105, worst,
     `soil runs along ${soil.along} (${soil.ratio.toFixed(2)}x), wood along ${wood.along} ` +
     `(${wood.ratio.toFixed(2)}x)${differ ? "" : " -- SAME AXIS, scored 0"}. Score is the weaker ` +
     `of the two anisotropies x100, or 0 when they share an axis. Colour cannot save this pair: ` +
-    `they sit at p10 29 redmean, under the palette floor.`);
+    `they sit at p10 29 redmean, under the palette floor. Measured on a ${FW}x${FH} board, ` +
+    `which is where this number converges to what the 220x140 play grid reports.`);
 }
 
 if (!quiet) {

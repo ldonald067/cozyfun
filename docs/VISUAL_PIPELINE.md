@@ -47,8 +47,26 @@ Shape language is intentionally procedural:
   change parity would have to carry, it moves every material at once, and it would leave soil
   and wood BOTH as flat per-cell noise — separating them by deleting the only texture either
   one has. Soil beds horizontally instead, which is what sediment does, and wood keeps its
-  diagonal, which reads as grain along the plank. Soil now measures 1.21x along the
-  horizontal; `npm run renderer:probe` gates the pair.
+  diagonal, which reads as grain along the plank. Soil measures **1.14x along the horizontal**
+  at the 220x140 play grid, and `npm run renderer:probe` gates the pair.
+
+  **That 1.14 was first written down as 1.21, and the gate first asserted a floor the real
+  grid could not clear** — both because the measurement was taken on boards smaller than
+  anything a player paints. Soil's bedding repeats every eight rows, so a short fixture sees
+  under two cycles and overstates the anisotropy: 26x14 reports 1.34, 40x24 1.18, 56x32 1.16,
+  and it converges to 1.14 by 72x40, which is what 220x140 also reports. The gate had been
+  scoring 134 on the shared 26x14 probe board against a floor of 115 — apparent headroom of
+  17% covering a play-grid value of **114, below its own floor**. It now measures on 72x40,
+  the smallest board where the number has converged, with the floor set to 105 from that.
+  The design was never wrong; only the confidence was. A floor measured on a convenient
+  board is a floor on the board.
+
+  The four bed colours are **derived from the material's own palette, never copied**. They
+  were hand-copied once, which quietly made soil two sources of truth: `soilColor` no longer
+  reads the variant-picked `color` at all, so editing `materials.ts` would have moved what
+  `material:contrast` measures without moving a single pixel on screen — verified, the
+  sampled cell stayed put under a cyan palette. Reading the palette keeps the contrast gate
+  honest about the thing actually drawn.
 
   The trade is real and mixed rather than free: `soil.breathes` rises 282 -> **342** and
   `soil.reborn` 151 -> **183**, while `soil.falls` drops 142 -> **122** and `soil.feeds`

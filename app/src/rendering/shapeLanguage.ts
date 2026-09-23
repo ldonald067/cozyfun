@@ -1,5 +1,5 @@
-import { CELL_FLAG, MATERIAL } from "../materials";
-import { adjustRgb, mixRgb, type Rgb } from "./color";
+import { CELL_FLAG, MATERIAL, MATERIAL_BY_ID, type MaterialId } from "../materials";
+import { adjustRgb, hexToRgb, mixRgb, type Rgb } from "./color";
 import { cardinalNeighborCount, contactInfo, edgeInfo, hasNearbyKind, kindAt, readU16, sameKind, sameLiquid } from "./cells";
 import { hashCell } from "./hash";
 
@@ -327,12 +327,17 @@ function sandColor({ color, variant, energy, flags, cells, width, height, x, y }
 //
 // The bed index is jittered by one bit of the cell hash so the seams wander a little rather
 // than ruling perfect lines across the tray.
-const SOIL_BEDS: Rgb[] = [
-  [91, 59, 42],
-  [112, 77, 53],
-  [136, 99, 70],
-  [76, 48, 36]
-];
+//
+// DERIVED from the material's own palette, never copied. These four browns were hand-copied
+// here once, which quietly made soil two sources of truth: `soilColor` no longer reads the
+// variant-picked `color` at all, so editing `materials.ts` would have moved what
+// `material:contrast` measures without moving a single pixel on screen. Reading the palette
+// keeps the contrast gate honest about the thing that is actually drawn.
+const SOIL_BEDS: Rgb[] = (() => {
+  const soil = MATERIAL_BY_ID.get(MATERIAL.Soil as MaterialId);
+  const beds = (soil?.palette ?? []).map(hexToRgb);
+  return beds.length ? beds : [hexToRgb(soil?.color ?? "#765238")];
+})();
 
 function soilColor({ variant, energy, flags, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
