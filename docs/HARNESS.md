@@ -74,11 +74,26 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
 
   It also closes a gap **four independent reviewers found**: the renderer mirrors `PETAL_SHED_AGE`, `POLLEN_RESERVE` and `COLD_CHAR_ENERGY` so a seed head is drawn under exactly the condition that makes it one, and ash is full exactly when the sim calls an ember out — but parity only compares Rust with `engine.ts`, and neither knew a third copy existed. The probe parses all three sources and fails when they disagree.
 
-  Twelve checks are gated as of this writing: cold char against the empty tray and against
+  Thirteen checks are gated as of this writing: cold char against the empty tray and against
   its hearth surround, wet against dry char, a bud against the seed head it becomes, a seed
   head against its own flower's hue, the wellspring's three rune states against each other at
   four brush sizes, all 28 bloom-species pairs, **BLOOM_SHAPES agreeing across sim, engine
-  and showcase**, and **a meteor in flight against fire, its own sparks and stardust**.
+  and showcase**, **a meteor in flight against fire, its own sparks and stardust**, and **soil and wood
+  wearing different fabrics**.
+
+  That last one gates TEXTURE rather than colour, which is a first here and is the point:
+  soil and wood sit at p10 29 redmean, under the palette floor, so pattern is the only thing
+  that can separate them — and for a long time the pattern was identical too, both striped
+  3.06x and 2.69x along the same diagonal. Two materials can each be beautifully textured and
+  still be one material on screen, so the check scores the weaker of the two anisotropies and
+  scores ZERO outright when they share an axis.
+
+  Two traps if you extend it. Measure the DIAGONALS: an h-versus-v test is blind to diagonal
+  banding, because a diagonal steps equally both ways — it reported both of these as
+  isotropic while a render showed the stripes plainly. And mirror the sim's own
+  `variant_for` in the fixture: a fixture that assigns its own variant pattern invents
+  texture the game never draws, and the first version of this measurement did exactly that,
+  flipping Sand's reading when it was corrected.
 
   That last one covers a gap with a shape worth remembering, because the audit's own numbers
   hid it. `interaction:audit` scores each outcome's contrast against WHAT IT REPLACED, so a

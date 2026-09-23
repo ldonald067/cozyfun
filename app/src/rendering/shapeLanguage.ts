@@ -299,7 +299,42 @@ function sandColor({ color, variant, energy, flags, cells, width, height, x, y }
   return out;
 }
 
-function soilColor({ color, variant, energy, flags, cells, width, height, x, y }: ShapeContext) {
+// Soil is SEDIMENT, and sediment lies in BEDS. It used to lie on the DIAGONAL, which was
+// nobody's design decision — it is an artefact of how the simulation picks a variant.
+//
+// `variant_for` is `(x*73856093 + y*19349663 + kind*83492791 + rng) % 8`, which reads like a
+// hash and is a LINEAR FORM. Taken mod 8 a linear form is constant along a diagonal, and
+// `materialColor` picks the palette entry with `palette[variant % length]` — so every
+// material with a multi-entry palette gets diagonal stripes for free, whether or not anyone
+// wanted them. Measured through the renderer, the step across soil's stripes was 98 redmean
+// and the step along them 32: a 3.06x anisotropy, stronger structure than Wall's actual
+// brickwork at 1.63x. Proved by substituting the variant source — with a genuinely random
+// variant the same field measures 1.03, i.e. flat.
+//
+// That is a problem because WOOD gets the identical treatment (2.69x, same axis) out of a
+// palette of four browns that overlaps soil's four browns. The two softest substrates were
+// the same fabric in two shades, and they are the pair the game puts together most often: a
+// wooden trough holding a soil bed reads as one brown mass at play zoom, with the bottom
+// rail invisible against the bed. They are also the closest pair in the group by colour
+// (p10 29 redmean, under the 45 floor), so nothing was separating them at all.
+//
+// The fix is deliberately NOT to make `variant_for` a real hash. That is a simulation change
+// the parity harness would have to carry, it would change every material at once, and it
+// would leave soil and wood BOTH as flat per-cell noise — separating them by removing the
+// only texture either one has. Instead soil stops keying its body colour on the variant and
+// beds horizontally, which is what soil actually does, and leaves wood its diagonal, which
+// reads as grain running along the plank. Two materials, two fabrics, one renderer change.
+//
+// The bed index is jittered by one bit of the cell hash so the seams wander a little rather
+// than ruling perfect lines across the tray.
+const SOIL_BEDS: Rgb[] = [
+  [91, 59, 42],
+  [112, 77, 53],
+  [136, 99, 70],
+  [76, 48, 36]
+];
+
+function soilColor({ variant, energy, flags, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
   const surface = !sameKind(cells, width, height, x, y - 1, MATERIAL.Soil);
   const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Soil);
@@ -312,7 +347,8 @@ function soilColor({ color, variant, energy, flags, cells, width, height, x, y }
   const scorched = Boolean(flags & CELL_FLAG.Scorched);
   const localX = (x + hash) & 3;
   const localY = (y + (hash >> 2)) & 3;
-  let out = adjustRgb(color, (hash % 7) * 4 - 14);
+  const bed = SOIL_BEDS[((y >> 1) + (hash & 1)) % SOIL_BEDS.length];
+  let out = adjustRgb(bed, (hash % 7) * 4 - 14);
 
   if (surface) out = mixRgb(out, [141, 96, 61], 0.32);
   if (looseEdge || hash % 11 === 0) out = mixRgb(out, [43, 27, 21], 0.34);

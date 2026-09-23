@@ -23,7 +23,43 @@ Each frame, `renderer.ts` asks `materialColor.ts` for a color per cell. That col
 Shape language is intentionally procedural:
 
 - Sand: grain speckles, warmer exposed surfaces, and damp/heat contact tint.
-- Soil: darker clumps, roots, organic pockets, damp contact, and occasional moss/moonwater-adjacent green.
+- Soil: horizontal **beds**, plus roots, organic pockets, damp contact, and occasional
+  moss/moonwater-adjacent green. The bedding is a measured correction, and the bug it fixes
+  was never in this file at all.
+
+  Soil used to lie on the DIAGONAL, and nobody chose that. `variant_for` in the sim reads
+  like a hash and is a **linear form** — `(x*73856093 + y*19349663 + kind*83492791 + rng) % 8`
+  — and a linear form taken mod 8 is constant along a diagonal. `materialColor` picks
+  `palette[variant % length]`, so **every material with a multi-entry palette gets diagonal
+  stripes for free**, wanted or not. Measured through the renderer, the step across soil's
+  stripes was 98 redmean and along them 32: a **3.06x** anisotropy, stronger structure than
+  Wall's actual brickwork at 1.63x. Substituting the variant source proves the cause — with a
+  genuinely random variant the same field measures 1.03, flat.
+
+  That mattered because WOOD got the identical treatment, **2.69x on the same axis**, out of
+  four browns overlapping soil's four browns. The two softest substrates were one fabric in
+  two shades, and they are the pair the game puts together most often: a wooden trough
+  holding a soil bed read as a single brown mass at play zoom, its bottom rail invisible
+  against the bed. They are also the closest pair in the group by colour — **p10 29 redmean,
+  under the 45 floor** — so nothing separated them at all.
+
+  **The fix is deliberately not to make `variant_for` a real hash.** That is a simulation
+  change parity would have to carry, it moves every material at once, and it would leave soil
+  and wood BOTH as flat per-cell noise — separating them by deleting the only texture either
+  one has. Soil beds horizontally instead, which is what sediment does, and wood keeps its
+  diagonal, which reads as grain along the plank. Soil now measures 1.21x along the
+  horizontal; `npm run renderer:probe` gates the pair.
+
+  The trade is real and mixed rather than free: `soil.breathes` rises 282 -> **342** and
+  `soil.reborn` 151 -> **183**, while `soil.falls` drops 142 -> **122** and `soil.feeds`
+  207 -> 192. Everything stays 5-14x clear of the audit's 24 floor.
+
+  **Stone is the one substrate with no structure at all** and that is a known, unfixed gap
+  rather than an oversight: it measures 1.08x, isotropic per-cell noise, while this file
+  claims "chunky block shading, facet shifts, dark crack marks". It causes no confusion —
+  stone is far from everything in colour and Wall's horizontal courses separate that pair —
+  so it is an identity problem, not a legibility one. If it is ever taken on, start at the
+  palette lookup rather than the mark layer, for the reason recorded under Moss/Fungus/Wood.
 - Seed: chestnut body, darker edges, oval silhouette, grounded lower edge, sprout flecks, and moonwater-fed highlights.
 - Ice: cube facets, bright top-left edges, darker bottom-right edges, and crack pixels.
 - Wall: brick-like tile structure with mortar lines, lit exposed edges, chips, and heat/wet/plant staining.

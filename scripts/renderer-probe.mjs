@@ -514,6 +514,62 @@ function assertFloor(label, floor, worst, detail) {
     `it — not a hue. If this fails, something re-warmed or re-brightened the rock.`);
 }
 
+// 9. SOIL AND WOOD MUST NOT WEAR THE SAME FABRIC. This gate is about texture rather than
+//    colour, which is a first here and is the point: the two softest substrates are the
+//    closest pair in the group by colour (p10 29 redmean, under the 45 floor), so the only
+//    thing that can separate them is the pattern — and for a long time the pattern was
+//    identical too.
+//
+//    The cause was upstream of the renderer. `variant_for` in the sim reads like a hash and
+//    is a LINEAR FORM — (x*73856093 + y*19349663 + ...) % 8 — and a linear form mod 8 is
+//    constant along a diagonal. `materialColor` picks `palette[variant % length]`, so every
+//    material with a multi-entry palette got free diagonal stripes. Soil measured 3.06x
+//    anisotropic along NW-SE and wood 2.69x along the SAME axis, out of two four-entry
+//    palettes of overlapping browns. A wooden trough holding a soil bed read as one mass.
+//
+//    Soil now beds horizontally (sediment does) and wood keeps its diagonal (grain does).
+//    The gate asks two things: that each still HAS structure, so neither collapses into the
+//    per-cell noise that Stone is, and that their smoothest axes DIFFER. Note the measure
+//    has to consider diagonals: an h-versus-v test is blind to diagonal banding, because a
+//    diagonal steps equally both ways, and it reported both of these as isotropic.
+{
+  const AXES = { horizontal: [1, 0], vertical: [0, 1], "diagonal NW-SE": [1, 1], "diagonal NE-SW": [1, -1] };
+  const fabric = (kind, energy, age) => {
+    const cells = board((put) => {
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        // Mirror the sim's own variant assignment: a fixture that invents its own variant
+        // pattern invents texture the game never draws. This one produced a fake diagonal
+        // and flipped Sand's reading when it was corrected.
+        const mix = (Math.imul(x, 73856093) + Math.imul(y, 19349663) + Math.imul(kind, 83492791)) >>> 0;
+        put(x, y, kind, energy, age, 0, mix % 8);
+      }
+    });
+    const step = {};
+    for (const [name, [dx, dy]] of Object.entries(AXES)) {
+      const ds = [];
+      for (const t of TIMES) for (let y = 2; y < H - 2; y++) for (let x = 2; x < W - 2; x++) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+        ds.push(redmean(colourAt(cells, x, y, t), colourAt(cells, nx, ny, t)));
+      }
+      step[name] = ds.reduce((a, b) => a + b, 0) / ds.length;
+    }
+    const ranked = Object.entries(step).sort((a, b) => a[1] - b[1]);
+    return { along: ranked[0][0], ratio: ranked[ranked.length - 1][1] / ranked[0][1] };
+  };
+  const soil = fabric(MATERIAL.Soil, 0, 40);
+  const wood = fabric(MATERIAL.Wood, 0, 40);
+  const differ = soil.along !== wood.along;
+  // Scored as the weaker of the two structures, and zero outright if they share an axis --
+  // two materials can each be beautifully textured and still be one material on screen.
+  const worst = differ ? Math.round(Math.min(soil.ratio, wood.ratio) * 100) : 0;
+  assertFloor("soil and wood wear different fabrics", 115, worst,
+    `soil runs along ${soil.along} (${soil.ratio.toFixed(2)}x), wood along ${wood.along} ` +
+    `(${wood.ratio.toFixed(2)}x)${differ ? "" : " -- SAME AXIS, scored 0"}. Score is the weaker ` +
+    `of the two anisotropies x100, or 0 when they share an axis. Colour cannot save this pair: ` +
+    `they sit at p10 29 redmean, under the palette floor.`);
+}
+
 if (!quiet) {
   console.log("\nRendered state pairs, worst case over a full energy/age/species/time sweep:");
   for (const c of checks) {
