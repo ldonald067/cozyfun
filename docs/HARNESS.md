@@ -129,6 +129,24 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   the ungated one is the one that regressed. When adding a state here, ask what that state
   sits NEXT TO in play and gate that too.
 
+  **The meteor check is the worked example of a gate that was itself the bug.** Its first
+  version pinned the rock at one position and one variant, so a hash-gated glint branch never
+  fired, and swept spark energies from 120 up while `leave_meteor_trail` spawns its sparks at
+  **90**. It reported 148; sweeping position and variant gave 55, and adding the trail's own
+  energies gave 34. What those exposed was a real regression in the renderer, confirmed
+  against the live engine at 29. Three lessons, all paid for:
+
+  - **Sweep the shape on BOTH sides of a pair.** Not just the state of the thing under test,
+    but the state of what it is being compared against — the spark a meteor is guaranteed to
+    be beside is the one the gate could not see.
+  - **A hash-gated branch needs a fixture that makes the hash fire.** Pinning x, y and
+    variant silently excludes every branch keyed on `hashCell`.
+  - **Vacuity-test every regression the check claims to cover, not just one.** Three
+    sabotages were run here and the first pass caught only two: restoring the hot nose still
+    PASSED, because no fixture placed rock above the sampled cell, which is the only geometry
+    where a leading-face treatment fires. The fixture grew a mass-interior case and now all
+    three fail by name (29 / 34 / 16).
+
   Adding a check here means committing to a number in public. That is the point: the floors are the design claims, so a regression fails the gate instead of being rediscovered by eye two phases later.
 
 - `npm run material:contrast`: fails when any two material palettes fall below the averaged-colour distance floor. It cannot see per-variant, interaction-state, glow, shape or animation differences, so it is a floor and not a verdict.

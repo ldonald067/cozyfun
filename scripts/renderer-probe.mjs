@@ -459,59 +459,92 @@ function assertFloor(label, floor, worst, detail) {
 
 // 8. A METEOR IN FLIGHT must not read as the fire it creates, as the sparks it sheds, or as
 //    the stardust it bursts into. This is the pair set nothing was checking, and the gap had
-//    a shape worth remembering: the audit's contrast column scores each outcome against WHAT
-//    IT REPLACED, so a meteor measured 537 against the night sky and passed everything, while
-//    sitting a median of 53 from FIRE across its whole state range — p10 48, p90 61, never
-//    far apart rather than occasionally close.
+//    a shape worth remembering: `interaction:audit` scores each outcome's contrast against
+//    WHAT IT REPLACED, so a meteor measured 537 against the night sky and passed everything,
+//    while sitting a median of 53 from FIRE across its whole state range.
 //
-//    That matters because `meteor.impacts` rings the landing with fire and `meteor.trail`
-//    sheds sparks as it falls, so the one event that puts a meteor on screen also puts the
-//    two things it looked like directly beside it. Three of the ten shortest-lived
-//    interactions in the game were rendering in one colour.
+//    **The first version of this check was itself the problem, and an adversarial review
+//    found it three ways at once.** It pinned the rock at ONE position and ONE variant, and
+//    swept spark energies starting at 120. All three of those were wrong:
 //
-//    Sparks are swept at age 0 as well, because a spark is WHITE-HOT at birth — an ice-white
-//    meteor core scored 22 here, worse than the collision it was meant to fix, and only this
-//    check's spark arm caught it.
+//      - `hash % 11` gates a glint, and at the pinned cell it never fired. Sweeping position
+//        and variant so it does dropped the score from 183 to 55.
+//      - `leave_meteor_trail` spawns its sparks at ENERGY 90, below the lowest energy swept —
+//        so the gate could not see the one spark state a meteor is guaranteed to be beside.
+//        Adding it, and the decay below it, took the score to 34.
+//      - and the treatment those two exposed was a real REGRESSION, not a fixture artefact:
+//        driving the engine for real (220x140, seed 1107, paint(110,10,4,Meteor,55), four
+//        ticks) the worst meteor/spark pair in an ordinary shower measured 29, against 79
+//        for the warm rock that preceded it.
+//
+//    So sweep the shape AND the state on both sides of a pair. A floor measured through a
+//    pinned fixture is a floor on the fixture, not on the design. This one is 70, set from
+//    the swept worst case of 78 rather than from the 148 the pinned one reported.
 {
-  const meteorInFlight = (age) => board((put) => {
-    for (let x = 0; x < W; x++) put(x, 12, MATERIAL.Wall);   // a floor well clear of the rock
-    put(12, 4, MATERIAL.Meteor, 255, age, 0, 2);             // nothing below it: in flight
+  // `under` is what the rock is falling THROUGH. Empty is the obvious case; Smoke and Steam
+  // are the ones a plain `=== Empty` test got wrong, because `update_meteor` moves with
+  // `try_move(..., can_sink_through_gas = true)` and sinks through both — a rock descending
+  // through its own impact smoke is airborne and used to render the hot crust. Meteor is the
+  // interior of a painted mass, which is 82% of a default-brush stamp.
+  const rock = (x, y, variant, age, under = MATERIAL.Empty, capped = false) => board((put) => {
+    for (let i = 0; i < W; i++) put(i, H - 1, MATERIAL.Wall);   // a floor well clear of the rock
+    put(x, y, MATERIAL.Meteor, 255, age, 0, variant);
+    if (under !== MATERIAL.Empty) put(x, y + 1, under, 80, 20, 0, variant);
+    // `capped` puts more rock ABOVE the sampled cell, which is the interior of a painted
+    // mass and the ONLY geometry where a leading-face treatment keyed on "meteor above"
+    // fires. Without it this gate passed with the regressing hot nose restored -- the
+    // vacuity test caught that, which is the entire reason to run one.
+    if (capped) put(x, y - 1, MATERIAL.Meteor, 255, age, 0, variant);
   });
   const fireOnFuel = (energy, age) => board((put) => {
-    for (let x = 0; x < W; x++) put(x, 8, MATERIAL.Wall);
-    for (let x = 10; x <= 14; x++) { put(x, 7, MATERIAL.Wood, 0, 40); put(x, 6, MATERIAL.Fire, energy, age, 0, x); }
+    for (let i = 0; i < W; i++) put(i, 8, MATERIAL.Wall);
+    for (let i = 10; i <= 14; i++) { put(i, 7, MATERIAL.Wood, 0, 40); put(i, 6, MATERIAL.Fire, energy, age, 0, i); }
   });
-  const loneSpark = (energy, age, variant) => board((put) => {
-    for (let x = 0; x < W; x++) put(x, 12, MATERIAL.Wall);
-    put(12, 4, MATERIAL.Spark, energy, age, 0, variant);
-  });
-  const stardustDrift = (energy, age, variant) => board((put) => {
-    for (let x = 0; x < W; x++) put(x, 12, MATERIAL.Wall);
-    put(12, 4, MATERIAL.Stardust, energy, age, 0, variant);
-    put(14, 2, MATERIAL.Stardust, energy, age, 0, variant);
+  const lone = (kind, x, y, energy, age, variant) => board((put) => {
+    for (let i = 0; i < W; i++) put(i, H - 1, MATERIAL.Wall);
+    put(x, y, kind, energy, age, 0, variant);
+    if (kind === MATERIAL.Stardust) put(x + 2, y - 2, kind, energy, age, 0, variant);
   });
 
+  // Sample the rock across POSITION and VARIANT, so the hash-gated branches actually fire.
+  const CELLS = [[12, 4], [5, 7], [2, 11], [19, 3], [8, 9]];
+  const SHAPES = [
+    [MATERIAL.Empty, false, "air"],
+    [MATERIAL.Smoke, false, "smoke"],
+    [MATERIAL.Steam, false, "steam"],
+    [MATERIAL.Meteor, true, "the interior of its own mass"],
+    [MATERIAL.Empty, true, "the leading face of a mass"],
+  ];
   const rocks = [];
-  for (const age of [0, 4, 8, 12]) for (const t of TIMES) rocks.push(colourAt(meteorInFlight(age), 12, 4, t));
+  for (const [x, y] of CELLS) for (const v of [0, 1, 2, 3, 4, 5, 6, 7])
+    for (const age of [0, 4, 8, 12]) for (const [u, cap, un] of SHAPES) for (const t of TIMES)
+      rocks.push({ c: colourAt(rock(x, y, v, age, u, cap), x, y, t), tag: `rock (${x},${y}) v${v} a${age} at ${un} t${t}` });
 
   const rivals = [];
   for (const e of [180, 210, 230, 255]) for (const a of [0, 6, 20, 45]) for (const t of TIMES)
     rivals.push({ name: "fire", c: colourAt(fireOnFuel(e, a), 12, 6, t) });
-  for (const e of [120, 190, 255]) for (const a of [0, 8, 16]) for (const v of [0, 1, 2, 3]) for (const t of TIMES)
-    rivals.push({ name: `spark v${v}`, c: colourAt(loneSpark(e, a, v), 12, 4, t) });
-  for (const e of [0, 60, 120]) for (const a of [0, 40, 200]) for (const v of [0, 1, 2, 3]) for (const t of TIMES)
-    rivals.push({ name: "stardust", c: colourAt(stardustDrift(e, a, v), 12, 4, t) });
+  // Spark energies include the 90 a meteor TRAIL spawns at and the decay below it, not only
+  // the bright burst range -- the trail is the spark a meteor is always next to.
+  for (const [x, y] of CELLS) for (const e of [40, 60, 90, 120, 190, 255]) for (const a of [0, 4, 8, 15, 20])
+    for (const v of [0, 1, 2, 3]) for (const t of TIMES)
+      rivals.push({ name: `spark v${v} e${e}`, c: colourAt(lone(MATERIAL.Spark, x, y, e, a, v), x, y, t) });
+  for (const [x, y] of CELLS) for (const e of [0, 60, 120]) for (const a of [0, 40, 200])
+    for (const v of [0, 1, 2, 3]) for (const t of TIMES)
+      rivals.push({ name: "stardust", c: colourAt(lone(MATERIAL.Stardust, x, y, e, a, v), x, y, t) });
   rivals.push({ name: "the night sky", c: NIGHT });
 
   let worst = Infinity, at = null;
-  for (const rock of rocks) for (const r of rivals) {
-    const d = redmean(rock, r.c);
-    if (d < worst) { worst = d; at = r.name; }
+  for (const r of rocks) for (const v of rivals) {
+    const d = redmean(r.c, v.c);
+    if (d < worst) { worst = d; at = `${r.tag} vs ${v.name}`; }
   }
-  assertFloor("meteor in flight vs fire, its own sparks and stardust", 120, worst,
-    `worst against ${at}. A meteor is the only dark-and-cold thing in a roster where every ` +
-    `other hot or cosmic material is a light source, and that luminance gap is what carries ` +
-    `it — not a hue. If this fails, something re-warmed or re-brightened the rock.`);
+  assertFloor("meteor in flight vs fire, its own sparks and stardust", 70, worst,
+    `worst at ${at}. A meteor is the only dark-and-cold thing in a roster where every other ` +
+    `hot or cosmic material is a light source, and that luminance gap is what carries it. ` +
+    `It therefore cannot afford a bright glint of ANY hue: a spark can be gold, rose, mint, ` +
+    `sky or white-hot at birth, so a gold twinkle scored 55 here and recolouring it cold ` +
+    `scored 10 by walking into the sky spark. If this fails, something re-warmed, ` +
+    `re-brightened, or re-decorated the rock.`);
 }
 
 // 9. SOIL AND WOOD MUST NOT WEAR THE SAME FABRIC. This gate is about texture rather than

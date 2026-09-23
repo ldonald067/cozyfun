@@ -52,7 +52,7 @@ Shape language is intentionally procedural:
 
   The trade is real and mixed rather than free: `soil.breathes` rises 282 -> **342** and
   `soil.reborn` 151 -> **183**, while `soil.falls` drops 142 -> **122** and `soil.feeds`
-  207 -> 192. Everything stays 5-14x clear of the audit's 24 floor.
+  207 -> 192. Everything stays 4-14x clear of the audit's 24 floor (`soil.roots` is the lowest at 93).
 
   **Stone is the one substrate with no structure at all** and that is a known, unfixed gap
   rather than an oversight: it measures 1.08x, isotropic per-cell noise, while this file
@@ -83,28 +83,59 @@ Shape language is intentionally procedural:
   white-hot at birth. Fixing a pair by walking into its neighbour is not a fix. Sweeping
   candidate cores through the renderer against the whole neighbourhood found the free space:
   every other hot or cosmic material here is a light SOURCE and therefore bright, and nothing
-  in the roster is dark and cold. `#3c4377` measures **404 from fire, 184 from stardust, 160
-  from spark, 196 from the night sky**, worst pair 98 against stone — where the warm rock
-  cleared the floor by 8. The heat stays on the GLOW layer (`#ff7a30`, untouched), so the
+  in the roster is dark and cold. `#3c4377` measures **404 from fire, 184 from stardust and
+  196 from the night sky** where the warm rock cleared the 45 floor by 8. Treat the spark
+  figure with care: an isolated cell against bright sparks reported 160, and the honest
+  swept number — every position, variant, flight medium and mass geometry, against spark
+  energies down to 40 — is **78**. The first of those two is the kind of number that hid a
+  regression here; the gate uses the second. The heat stays on the GLOW layer (`#ff7a30`, untouched), so the
   pair reads cool-body/hot-light, which nothing else does: fire is a warm body under a warm
   glow, stardust a violet body under a violet one. It is also the honest reading — a meteor
   is a rock, and the fire belongs to the air around it.
 
-  The burn on the leading face is keyed on having meteor body ABOVE it, not on edge exposure.
-  A meteor in flight is usually ONE cell, where every face is exposed, so an edge test would
-  hand a lone rock both the cold core and the hot nose and average them into mud — the same
-  failure that flattened the wellspring rim to a mid grey.
+  **There is no burn on the leading face, and the attempt at one is the cautionary tale.**
+  A 50% orange mix on any cell with meteor above it, as a hot nose on a falling mass, looked
+  right and REGRESSED the pair this whole treatment exists to protect. Measured by driving
+  the real engine — 220x140, seed 1107, `paint(110,10,4,Meteor,55)`, four ticks — the worst
+  meteor/spark pair in an ordinary painted shower went from **79 redmean before the cold core
+  to 29 with the nose**, under the 45 floor: the warm brown it produced landed on the
+  meteor's own decayed trail sparks. With the nose gone that pair measures **91**, better
+  than the warm rock it replaced. The rock is uniformly cold and the heat is the glow
+  layer's job, which was the design anyway.
 
-  **A meteor has no resting state, which is why the showcase could never gate this.**
-  `update_meteor` falls, and the tick it cannot, it converts to stone or stardust and rings
-  itself with fire. A live scene can hold neither look still: give it air and it drops out of
-  frame, give it a pedestal and it detonates in the middle of the exhibit. The review board's
-  "heat family lineup" claimed four materials side by side and delivered three for exactly
-  this reason, with the meteor caught nine rows below where it was painted. `npm run
-  renderer:probe` gates the pair instead, where a falling cell holds still because the
-  renderer is a pure function and nothing has to tick. One consequence worth knowing: the
-  `falling === false` branch of `meteorColor` is reachable only during a single-tick diagonal
-  slide, so it is very nearly dead code.
+  **It also carries no glint in flight, and that is a harder rule than it sounds.** The
+  original gold twinkle (`hash % 11`) was left over from the warm rock; recolouring it to a
+  cold blue-white was WORSE, because it walked straight into the sky spark (`#7fb0ff`). A
+  spark can be gold, rose, mint, sky **or white-hot at birth**, so a bright glint of any hue
+  collides with one of them. The one dark, cold thing in a roster of light sources cannot
+  afford a twinkle — and does not need one, since its halo is on the glow layer.
+
+  **`airborne` mirrors the simulation's own movement test rather than guessing at it.**
+  `update_meteor` moves with `try_move(..., can_sink_through_gas = true)`, which accepts an
+  empty target **or Smoke or Steam** — so a rock descending through its own impact smoke is
+  still falling, while a plain `=== Empty` test called it landed and painted it with the hot
+  crust. A fourth term, meteor-below, is a deliberate addition rather than part of
+  `try_move`: such a cell cannot move, but it is part of a falling mass, and at the default
+  brush **only 18% of a painted meteor has empty space below it**. Without it the cold core
+  covered less than a fifth of what a player actually makes, and a default-brush stamp sat
+  **15 redmean from fire**. It now measures 392 at every radius.
+
+  **Every one of those three was found by adversarial review, not by the gate**, and the
+  gate is the part that had to change most. Its first version pinned the rock at ONE position
+  and ONE variant — so the hash-gated glint never fired — and swept spark energies starting
+  at 120, while `leave_meteor_trail` spawns at **energy 90**. It reported 148 while the swept
+  truth was 34. It now sweeps position, variant, what the rock is falling through, and
+  whether it is the interior or the leading face of a mass, against spark energies down to
+  40. The floor is **70, set from the swept worst case of 78** rather than from the number a
+  pinned fixture reported. A floor measured through a pinned fixture is a floor on the
+  fixture, not on the design.
+
+  One consequence of `airborne` covering gas and mass: the `else` branch of `meteorColor` is
+  now genuinely rare — a rock resting on something solid, which `update_meteor` converts to
+  stone or stardust on that same tick. An earlier version of this file called that branch
+  "very nearly dead code" while a plain `=== Empty` test was sending **82% of every painted
+  meteor** through it. That claim was wrong then and is only approximately right now.
+
 - Moss/Fungus/Wood: leafy clusters, fungus cap/gill/spore role colors clustered on a half-resolution hash so the mat reads lumpier than a grain — moss and fungus were measurably the same fabric (luminance 176 +/- 31 against 169 +/- 31, cell-to-cell step 33 apiece) and with colour removed had no boundary between them at all. **The clustering is a nudge, not a solution, and the honest numbers are small**: on the current showcase the two mats sit at 17% against 14% of adjacent cell pairs repeating their neighbour, and mean steps of 27 against 32. Colour still carries this distinction (155 redmean apart) and the texture is a faint second channel. Pushing it further has been tried and made things worse — moving the cap/gill LATTICE to half resolution as well, so a 2x2 patch shares its role outright, dropped fungus to 13% against moss's 15%, because hard 2-cell bands step harder at their boundaries than speckle does and the per-cell palette pick underneath is the real grain. If this is ever worth another attempt, it starts at the palette lookup, not at the role marks. Also: oil/heat/cosmic contact cues, damp moonwater tint, char/damp contact cues, end-grain, and woodgrain lines.
 - Ember: pulsing heat cores that dim into cold char, with spark flecks above hot beds. **A bed that goes out wears ash.** Cold char measured **52 redmean from the EMPTY TRAY** — under the 45 palette floor's neighbourhood, while every other element in the roster sits 185-578 from the night — so a burnt-out hearth read as erased rather than as spent, and `ember.cools` promised relightable fuel a player could not find. Ash builds continuously as the bed cools, reaching full at the sim's own `COLD_CHAR_ENERGY`, and forms only where the bed meets air, so a deep pile keeps a dark mass under a powdered crust instead of turning into a grey slab. Measured through the renderer itself on the one-cell-deep bed a burnt log leaves, worst case over the whole cooling range and a full time sweep, char went from **52 to 213** from the night, and wet char from **30 to 127** from dry char. Ash is suppressed entirely on a soaked bed — wet ash is a slurry, not a powder — which is what keeps `ember.quenched` visible; laying the ash under the wet wash instead pulled the pair to 23, under the interaction audit's own 24 floor. The trade is deliberate and shows in the gate: `ember.cools` drops from 183 to 132 contrast, because ash is a smaller step down from a hot ember than black was. Being findable in the scene is worth more than being maximally different from the state before it. **Two earlier numbers here were wrong and are worth knowing why**: a capture-based measurement reported 54 → 150 and 6 → 30, because the showcase's wet-char row is not reliably wet by the time the shutter opens. `npm run renderer:probe` asks the renderer instead of a photograph. Ash is matte and lands on the base layer only — an ember at zero energy still emits no glow, so a dead hearth never reads as lit. **The first ash colour fixed one pair and broke another, and only a re-review caught it**: a mid warm grey put a spent bed 213 from the night and **29 from STONE**, under the palette floor — and a hearth is char against a stone firebox, which is the commoner adjacency of the two. Nobody burns a log in mid-air. Pale grey ash, which is what wood ash actually is, clears the whole neighbourhood: night 296, stone 93, wall 231, wood 71, soil 159, sand 225, smoke 166, steam 70, ice 185, wet char 204. `renderer:probe` now gates char against its hearth surround as well as against the tray, because nothing checked the pair that broke.
 - Glass: a mostly see-through pane — the interior starts from the night sky and takes only a whisper of mint (0.085 of the palette colour, which puts it ~42 redmean from the night behind it; at 0.18 it sat at ~90, twice the distance the contrast gate demands between two different materials, and a sealed dome went murky), so the rims and a drifting diagonal sheen band carry the identity rather than the fill. Fresh panes flash warm as they vitrify. Condensation (steam nearby, or the wet flag) is a thin haze plus scattered beads streaked by vertical clear runs, which read *darker* than the fog because the drop has wiped the pane behind it — not a flat grey wash.

@@ -464,25 +464,45 @@ const METEOR_CORE: Rgb = [48, 68, 124];
 function meteorColor({ color, variant, time, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
   const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Meteor);
-  const falling = kindAt(cells, width, height, x, y + 1) === MATERIAL.Empty;
-  // In flight the gold pre-mix below is deliberately skipped: leaving it in is what tinted
-  // the cosmic core mauve and cost the Stardust pair its margin.
-  let out = falling ? color : mixRgb(color, [255, 214, 120], 0.35);
-  if (falling) {
+  // AIRBORNE MIRRORS THE SIM'S OWN MOVEMENT TEST rather than guessing at it. `update_meteor`
+  // moves with `try_move(..., can_sink_through_gas = true)`, which accepts an empty target
+  // OR Smoke OR Steam — so a rock descending through its own impact smoke is still falling
+  // while a plain `=== Empty` test called it landed and painted it with the hot crust. The
+  // fourth term is a deliberate ADDITION, not part of try_move: a cell with meteor beneath
+  // it cannot move, but it is part of a falling mass, and a mass that renders a cold nose on
+  // a warm body is two objects. At the default brush only 18% of a painted meteor has empty
+  // space below it, so without this the fix covered less than a fifth of what a player makes.
+  const below = kindAt(cells, width, height, x, y + 1);
+  const airborne = below === MATERIAL.Empty || below === MATERIAL.Smoke
+    || below === MATERIAL.Steam || below === MATERIAL.Meteor;
+  let out = airborne ? color : mixRgb(color, [255, 214, 120], 0.35);
+  if (airborne) {
+    // No hot nose. One was tried — a 50% orange mix on any cell with meteor above it, as a
+    // leading-face burn — and it REGRESSED the pair this whole treatment exists to protect.
+    // Measured by driving the real engine (220x140, seed 1107, paint(110,10,4,Meteor,55),
+    // four ticks), the worst meteor/spark pair in an ordinary painted shower went from 79
+    // redmean BEFORE the cold core to 29 WITH the nose, under the 45 floor: the warm brown
+    // it produced landed on the meteor's own decayed trail sparks. The rock is uniformly
+    // cold now and the heat is the glow layer's job, which is the design anyway.
     out = mixRgb(out, METEOR_CORE, 0.94);
-    // The leading face burns — but only on a meteor with body ABOVE it. A cell exposed on
-    // opposite sides taking both treatments is what flattened the wellspring rim to a mid
-    // grey, and a meteor in flight is usually ONE cell, where every face is exposed. Keying
-    // the burn on the body above means the common case takes the core outright and only a
-    // real multi-cell meteor wears a hot nose.
-    if (kindAt(cells, width, height, x, y - 1) === MATERIAL.Meteor) {
-      out = mixRgb(out, [255, 150, 60], 0.5);
-    }
   } else {
     if (edge.bottom || edge.right || hash % 7 === 0) out = mixRgb(out, [45, 38, 43], 0.58);
     if (edge.top || edge.left) out = mixRgb(out, [255, 238, 158], 0.4);
   }
-  if (hash % 11 === 0) out = mixRgb(out, [255, 229, 124], 0.36 + (Math.sin(time * 0.02 + x) + 1) * 0.1);
+  // NO GLINT IN FLIGHT, and the two failed attempts are the argument. This was a GOLD wash
+  // on both branches, left over from the warm rock, and it was the single biggest hole in
+  // the gate: sweeping position and variant so `hash % 11 === 0` actually fires dropped the
+  // meteor/spark score from 183 to 55. Recolouring it to a cold blue-white was worse, 10,
+  // because it walked straight into the SKY spark (`#7fb0ff`).
+  //
+  // The lesson generalises: a spark can be gold, rose, mint, sky OR white-hot at birth, so a
+  // BRIGHT glint of any hue collides with one of them. A meteor's whole identity here is that
+  // it is the one dark, cold thing in a roster of light sources — a twinkle is the one
+  // decoration it cannot afford. It keeps its halo on the glow layer, which is brighter than
+  // any glint would have been and costs the base layer nothing.
+  if (hash % 11 === 0 && !airborne) {
+    out = mixRgb(out, [255, 229, 124], 0.36 + (Math.sin(time * 0.02 + x) + 1) * 0.1);
+  }
   return out;
 }
 
