@@ -81,51 +81,64 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   and showcase**, **a meteor in flight against fire, its own sparks and stardust**, and **soil and wood
   wearing different fabrics**.
 
-  That last one gates TEXTURE rather than colour, which is a first here and is the point:
-  soil and wood sit at p10 29 redmean, under the palette floor, so pattern is the only thing
-  that can separate them — and for a long time the pattern was identical too, both striped
-  3.06x and 2.69x along the same diagonal. Two materials can each be beautifully textured and
-  still be one material on screen, so the check scores the weaker of the two anisotropies and
-  scores ZERO outright when they share an axis.
+  **The fabric check** gates TEXTURE rather than colour, which is a first here and is the
+  point: soil and wood sit at p10 29 redmean, under the palette floor, so pattern is the only
+  thing that can separate them — and for a long time the pattern was identical too, both
+  striped 3.06x and 2.69x along the same diagonal. Two materials can each be beautifully
+  textured and still be one material on screen, so it scores the weaker of the two
+  anisotropies and scores ZERO outright when they share an axis. Measure the DIAGONALS if you
+  extend it: an h-versus-v test is blind to diagonal banding, because a diagonal steps equally
+  both ways, and it reported both of these as isotropic while a render showed the stripes
+  plainly. And mirror the sim's own `variant_for` in the fixture — one that assigns its own
+  variant pattern invents texture the game never draws, which the first version did, flipping
+  Sand's reading when it was corrected.
 
-  Three traps if you extend it. Measure the DIAGONALS: an h-versus-v test is blind to
-  diagonal banding, because a diagonal steps equally both ways — it reported both of these as
-  isotropic while a render showed the stripes plainly. Mirror the sim's own `variant_for` in
-  the fixture: one that assigns its own variant pattern invents texture the game never draws,
-  and the first version of this measurement did exactly that, flipping Sand's reading when it
-  was corrected. And **size the board to the thing being measured** — this check has its own
-  72x40 fixture rather than the shared 26x14 one, because soil's bedding repeats every eight
-  rows and a 14-row board sees under two cycles. It scored 134 there against a floor of 115
-  while the real 220x140 grid scored **114, under that floor**. 72x40 is the smallest size
-  where the number converges to what the play grid reports, and the floor is set from it.
+  **The meteor check** covers a gap whose shape is worth remembering, because the audit's own
+  numbers hid it. `interaction:audit` scores each outcome's contrast against WHAT IT REPLACED,
+  so a meteor measured 537 against the night sky and passed everything — while sitting a
+  median of 53 from FIRE, the material its own impact creates. A gate can be green on the pair
+  it measures and blind to the pair that matters. When adding a check here, ask what the state
+  sits next to IN PLAY, and remember that for an effect the thing it sits next to is often the
+  thing it spawns.
 
-  That last one covers a gap with a shape worth remembering, because the audit's own numbers
-  hid it. `interaction:audit` scores each outcome's contrast against WHAT IT REPLACED, so a
-  meteor measured 537 against the night sky and passed everything — while sitting a median of
-  53 from FIRE, the material its own impact creates. A gate can be green on the pair it
-  measures and blind to the pair that matters. When adding a check here, ask what the state
-  sits next to IN PLAY, and remember that for an effect the thing it sits next to is often
-  the thing it spawns.
+  **The BLOOM_SHAPES check** is a mirrored-table check rather than a colour pair, and it
+  exists for the same reason the constants check does. `BLOOM_SHAPES` lives in THREE files and
+  parity compares only two of them; the showcase carried a hand-copied third with a comment
+  asking for it to be kept in step. That comment is not a check, and it went stale the first
+  time the shapes changed — the review board quietly exhibited heads the sim could no longer
+  grow. A single moved petal now fails the probe by name.
 
-  That last one is a mirrored-table check rather than a colour pair, and it exists for the
-  same reason the constants check does. `BLOOM_SHAPES` lives in THREE files and parity
-  compares only two of them; the showcase carried a hand-copied third with a comment asking
-  for it to be kept in step. That comment is not a check, and it went stale the first time
-  the shapes changed — the review board quietly exhibited heads the sim could no longer grow.
-  A single moved petal now fails the probe by name.
+  ### Size the fixture to the thing being measured
 
-  **Measure the state at the SIZE a player makes it, not the size that is convenient.** The
-  wellspring check built a five-cell plus and sampled two of its arms, and reported 66. That
-  reading was accurate — a whole-block sample at radius 1 measures 68 — it was simply the
-  only size ever measured, and the app's brush runs 1 to 12 and defaults to 4. The
-  wellspring's identity is an edge treatment, so edge cells fall from 80% of a five-cell
-  stamp to 41% of the default disc and 13% at radius 12: the design gets harder to read the
-  more of it you paint. Whole-block, the worst of its three pairs is 68 / 10 / 8 / 4 at radius
-  1 / 4 / 8 / 12. Every fix that element has had was real, correctly measured, and measured at
-  the one size where the problem does not exist — including by this gate, which is why it kept
-  coming back. When a cue's strength depends on the shape it is drawn in, sweep the shape. The last two were claims the docs stated and nothing enforced —
-  and neither is visible to `material:contrast`, because attunement borrows every material's
-  colour and the eight species live inside one "Flower" palette.
+  **This is the single most expensive lesson in this file, and three separate checks have now
+  taught it.** A floor measured through a convenient fixture is a floor on the fixture, not on
+  the design — and it reads as headroom while the real thing sits under the bar.
+
+  - **Wellspring.** The check built a five-cell plus and sampled two arms, reporting 66. That
+    reading was accurate — a whole-block sample at radius 1 measures 68 — it was simply the
+    only size ever measured, while the app's brush runs 1 to 12 and defaults to 4. Its
+    identity is an EDGE treatment, so edge cells fall from 80% of a five-cell stamp to 41% of
+    the default disc and 13% at radius 12: the design gets harder to read the more of it you
+    paint. Whole-block, the worst of its three pairs was 68 / 10 / 8 / 4 at radius 1 / 4 / 8 /
+    12. Every fix that element ever had was real, correctly measured, and measured at the one
+    size where the problem does not exist — including by this gate, which is why it kept
+    coming back.
+  - **Meteor.** The first version pinned the rock at ONE position and ONE variant, so a
+    hash-gated glint branch never fired, and swept spark energies from 120 while
+    `leave_meteor_trail` spawns at 90. It reported 148; sweeping position and variant gave 55,
+    and adding the trail's own energies gave 34. What those exposed was a real regression,
+    confirmed against the live engine at 29.
+  - **Soil and wood.** The fabric check ran on the shared 26x14 board and scored 134 against a
+    floor of 115 — apparent headroom of 17% over a play-grid value of **114, under its own
+    floor**. Soil's bedding repeats every eight rows, so a 14-row fixture sees under two
+    cycles. It has its own 72x40 board now, the smallest size where the number converges to
+    what the real 220x140 grid reports.
+
+  So: sweep the shape AND the state, on BOTH sides of a pair. Give a check its own board when
+  the thing it measures has a period. And **vacuity-test every regression the check claims to
+  cover, not just one** — the rebuilt meteor gate still PASSED with its regression restored,
+  because no fixture placed rock above the sampled cell, which is the only geometry where a
+  leading-face treatment fires.
 
   **A pair that nothing checks is a pair that will break.** The ash treatment was measured
   against the night sky, passed, shipped — and put a spent bed 29 redmean from Stone, which
@@ -252,6 +265,30 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   failed commit reaching the host at all; this gate still asks, of whatever IS live, whether
   anybody ever checked it — which also covers manual redeploys and rollbacks, neither of
   which the toggle gates.
+
+- `npm run config:drift`: asks whether the Railway configuration in this repo is the one
+  Railway is actually running. It exists because the migration off `railway.json` changed
+  something that looks like nothing: **the authoring file no longer applies itself.**
+
+  Railway's docs are explicit. Config as Code "is still read from your service repository
+  during deploy"; Infrastructure as Code "is evaluated by the Railway CLI ... and applies
+  those changes only after confirmation". So the old habit is now a silent no-op — editing
+  `.railway/railway.ts`, committing, pushing and watching a green deploy used to mean the
+  config changed, and now means only the FILE changed. `npm run deploy:verify` cannot see it
+  either: that gate asks whether the running build is the commit you expect, which it is.
+
+  `railway config plan --detailed-exit-code` is the oracle (0 agree, 2 pending), verified
+  both ways here. The check also fails if a `railway.json` reappears beside the IaC file,
+  since Railway refuses to let both manage one service and reads Config as Code for the last
+  time on **2026-12-01**.
+
+  One trap worth knowing if you touch it: the `railway/iac` SDK works out which CLI is
+  driving it from **`process.env._`**, the shell's "last command" variable. Typed at a prompt
+  that is `railway` and everything works by hand; spawned from a script it is the node binary,
+  and the SDK throws "requires Railway CLI 5.42.1 or newer" while a perfectly new CLI sits on
+  PATH. The script sets `_` to the resolved binary so it behaves the same from a terminal, an
+  npm script and CI. It needs the CLI, a login and a linked project, and says so loudly rather
+  than skipping — a config check that quietly excuses itself is worse than none.
 
 - `npm run qa:live`: `deploy:verify`, then browser and visual QA against `COZY_QA_URL`. This
   is the whole "does production work" question in one command; the local gate structurally

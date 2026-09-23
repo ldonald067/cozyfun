@@ -20,6 +20,7 @@
     "test:field-notes": "node scripts/smoke-field-notes.mjs",
     "test:browser": "node scripts/smoke-browser.mjs",
     "deploy:verify": "node scripts/deploy-verify.mjs",
+    "config:drift": "node scripts/config-drift.mjs",
     "qa:live": "node scripts/deploy-verify.mjs && npm run test:browser && npm run visual:qa",
     "test:chrome": "powershell -ExecutionPolicy Bypass -File scripts/test-chrome.ps1",
     "test:firefox": "powershell -ExecutionPolicy Bypass -File scripts/test-firefox.ps1",

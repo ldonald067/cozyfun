@@ -83,6 +83,12 @@ check fail when it stops witnessing it.
 Pushing to `main` redeploys the game by itself. The site repo is never involved; it holds one
 iframe pointing at `pixelfun.littlealbumclub.net/embed.html`.
 
+**That is true of CODE and not of deploy CONFIG.** `.railway/railway.ts` replaced the
+deprecated `railway.json`, and it does not apply itself — Railway evaluates it through the
+CLI on an explicit `railway config apply`, where `railway.json` was read on every deploy.
+Editing it, committing and watching a green deploy changes nothing. `npm run config:drift`
+is what says so.
+
 `COZY_BASE` must stay unset for that deploy — it serves from its own root. Set it only when
 handing the build to another server to mount under a path.
 

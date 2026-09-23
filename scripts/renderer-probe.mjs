@@ -87,6 +87,36 @@ for (const { name, renderer } of MIRRORED) {
   }
 }
 
+// The fabric check's fixture mirrors `variant_for` so it assigns variants the way paint()
+// does — and a fixture that invents its own variant pattern invents texture the game never
+// draws, which is exactly what the first version did. That makes this a FOURTH copy of a
+// simulation rule, and the section above exists because a mirror with nothing checking it is
+// a promise rather than a fact. So check it: if the sim's hash coefficients ever change, the
+// fabric fixture stops reflecting reality and would go on reporting comfortable numbers.
+const VARIANT_COEFFS = [73856093, 19349663, 83492791];
+const VARIANT_MODULUS = 8;
+{
+  const fn = rust.match(/fn variant_for[\s\S]*?\n    \}/)?.[0];
+  if (!fn) {
+    failures.push("variant_for: not found in sim/src/lib.rs — has it been renamed? " +
+      "scripts/renderer-probe.mjs mirrors its coefficients for the soil/wood fabric fixture.");
+  } else {
+    const coeffs = [...fn.matchAll(/wrapping_mul\((\d+)\)/g)].map((m) => Number(m[1]));
+    const modulus = Number(fn.match(/%\s*(\d+)\)?\s*as u8/)?.[1]);
+    const agree = coeffs.length === VARIANT_COEFFS.length
+      && coeffs.every((c, i) => c === VARIANT_COEFFS[i])
+      && modulus === VARIANT_MODULUS;
+    note(`  ${"variant_for".padEnd(18)} rust [${coeffs.join(", ")}] % ${modulus}   probe [${VARIANT_COEFFS.join(", ")}] % ${VARIANT_MODULUS}   ${agree ? "agree" : "DISAGREE"}`);
+    if (!agree) {
+      failures.push(
+        `variant_for disagrees: sim has [${coeffs.join(", ")}] % ${modulus}, this probe ` +
+        `mirrors [${VARIANT_COEFFS.join(", ")}] % ${VARIANT_MODULUS}. The soil/wood fabric ` +
+        `fixture would be measuring a texture the game does not draw. Update VARIANT_COEFFS.`,
+      );
+    }
+  }
+}
+
 // ------------------------------------------------------------------------ rendered distance
 const NIGHT = [9, 14, 20]; // the tray's own background, #091018
 const redmean = ([r1, g1, b1], [r2, g2, b2]) => {
@@ -95,29 +125,38 @@ const redmean = ([r1, g1, b1], [r2, g2, b2]) => {
 };
 
 const W = 26, H = 14, STRIDE = 8;
-function board(paint) {
-  const cells = new Uint8Array(W * H * STRIDE);
-  const put = (x, y, kind, energy = 0, age = 0, flags = 0, variant = 0) => {
-    if (x < 0 || y < 0 || x >= W || y >= H) return;
-    const o = (y * W + x) * STRIDE;
-    cells[o] = kind; cells[o + 1] = variant & 7;
-    cells[o + 2] = age & 255; cells[o + 3] = (age >> 8) & 255;
-    cells[o + 4] = energy & 255; cells[o + 5] = (energy >> 8) & 255;
-    cells[o + 6] = flags & 255; cells[o + 7] = (flags >> 8) & 255;
+// ONE board factory, because three separate checks have now needed their own size and each
+// hand-rolled this same twenty lines first. "Size the fixture to the thing being measured"
+// is the most expensive lesson in docs/HARNESS.md — a factory is what stops the next check
+// paying for it in copy-paste as well.
+function grid(w, h) {
+  const board = (paint) => {
+    const cells = new Uint8Array(w * h * STRIDE);
+    const put = (x, y, kind, energy = 0, age = 0, flags = 0, variant = 0) => {
+      if (x < 0 || y < 0 || x >= w || y >= h) return;
+      const o = (y * w + x) * STRIDE;
+      cells[o] = kind; cells[o + 1] = variant & 7;
+      cells[o + 2] = age & 255; cells[o + 3] = (age >> 8) & 255;
+      cells[o + 4] = energy & 255; cells[o + 5] = (energy >> 8) & 255;
+      cells[o + 6] = flags & 255; cells[o + 7] = (flags >> 8) & 255;
+    };
+    paint(put);
+    return cells;
   };
-  paint(put);
-  return cells;
+  const colourAt = (cells, x, y, time) => {
+    const o = (y * w + x) * STRIDE;
+    return colorForCell({
+      kind: cells[o], variant: cells[o + 1],
+      age: cells[o + 2] | (cells[o + 3] << 8),
+      energy: cells[o + 4] | (cells[o + 5] << 8),
+      flags: cells[o + 6] | (cells[o + 7] << 8),
+      time, cells, width: w, height: h, x, y,
+    });
+  };
+  return { width: w, height: h, board, colourAt };
 }
-const colourAt = (cells, x, y, time) => {
-  const o = (y * W + x) * STRIDE;
-  return colorForCell({
-    kind: cells[o], variant: cells[o + 1],
-    age: cells[o + 2] | (cells[o + 3] << 8),
-    energy: cells[o + 4] | (cells[o + 5] << 8),
-    flags: cells[o + 6] | (cells[o + 7] << 8),
-    time, cells, width: W, height: H, x, y,
-  });
-};
+const { board, colourAt } = grid(W, H);
+
 // Sweep time across a full slow-pulse period. Several of these states animate, and the worst
 // phase is the one that decides whether a cue reads — not the phase that happened to be 0.
 const TIMES = [0, 700, 1400, 2100, 2800, 3500, 4200, 4900];
@@ -314,29 +353,7 @@ function assertFloor(label, floor, worst, detail) {
 {
   // Its own board: a radius-12 disc is 25 cells across, which does not fit the shared one.
   const SW = 34, SH = 34;
-  const springBoard = (paint) => {
-    const cells = new Uint8Array(SW * SH * STRIDE);
-    const put = (x, y, kind, energy = 0, age = 0, flags = 0, variant = 0) => {
-      if (x < 0 || y < 0 || x >= SW || y >= SH) return;
-      const o = (y * SW + x) * STRIDE;
-      cells[o] = kind; cells[o + 1] = variant & 7;
-      cells[o + 2] = age & 255; cells[o + 3] = (age >> 8) & 255;
-      cells[o + 4] = energy & 255; cells[o + 5] = (energy >> 8) & 255;
-      cells[o + 6] = flags & 255; cells[o + 7] = (flags >> 8) & 255;
-    };
-    paint(put);
-    return cells;
-  };
-  const springColourAt = (cells, x, y, time) => {
-    const o = (y * SW + x) * STRIDE;
-    return colorForCell({
-      kind: cells[o], variant: cells[o + 1],
-      age: cells[o + 2] | (cells[o + 3] << 8),
-      energy: cells[o + 4] | (cells[o + 5] << 8),
-      flags: cells[o + 6] | (cells[o + 7] << 8),
-      time, cells, width: SW, height: SH, x, y,
-    });
-  };
+  const { board: springBoard, colourAt: springColourAt } = grid(SW, SH);
   // The sim's brush is a Euclidean disc: dx^2 + dy^2 <= r^2, which is the 5 / 13 / 49 / 197
   // cell counts the harness doc records for radius 1 / 2 / 4 / 8.
   const disc = (r) => {
@@ -580,26 +597,20 @@ function assertFloor(label, floor, worst, detail) {
 //    while a render showed the stripes plainly.
 {
   const FW = 72, FH = 40;
+  const { board: fabricBoard, colourAt: fabricColourAt } = grid(FW, FH);
   const AXES = { horizontal: [1, 0], vertical: [0, 1], "diagonal NW-SE": [1, 1], "diagonal NE-SW": [1, -1] };
   const fabric = (kind, energy, age) => {
-    const cells = new Uint8Array(FW * FH * STRIDE);
-    for (let y = 0; y < FH; y++) for (let x = 0; x < FW; x++) {
-      // Mirror the sim's own variant assignment: a fixture that invents its own variant
-      // pattern invents texture the game never draws. The first version of this measurement
-      // did exactly that and flipped Sand's reading when it was corrected.
-      const variant = (Math.imul(x, 73856093) + Math.imul(y, 19349663) + Math.imul(kind, 83492791)) >>> 0;
-      const o = (y * FW + x) * STRIDE;
-      cells[o] = kind; cells[o + 1] = variant % 8;
-      cells[o + 2] = age & 255; cells[o + 3] = (age >> 8) & 255;
-      cells[o + 4] = energy & 255; cells[o + 5] = (energy >> 8) & 255;
-    }
-    const sample = (x, y, time) => {
-      const o = (y * FW + x) * STRIDE;
-      return colorForCell({
-        kind, variant: cells[o + 1], age, energy, flags: 0,
-        time, cells, width: FW, height: FH, x, y,
-      });
-    };
+    const cells = fabricBoard((put) => {
+      for (let y = 0; y < FH; y++) for (let x = 0; x < FW; x++) {
+        // Mirror the sim's own variant assignment: a fixture that invents its own variant
+        // pattern invents texture the game never draws. The first version of this
+        // measurement did exactly that and flipped Sand's reading when it was corrected.
+        const variant = (Math.imul(x, VARIANT_COEFFS[0]) + Math.imul(y, VARIANT_COEFFS[1])
+          + Math.imul(kind, VARIANT_COEFFS[2])) >>> 0;
+        put(x, y, kind, energy, age, 0, variant % VARIANT_MODULUS);
+      }
+    });
+    const sample = (x, y, time) => fabricColourAt(cells, x, y, time);
     const step = {};
     for (const [name, [dx, dy]] of Object.entries(AXES)) {
       let total = 0, n = 0;
@@ -641,4 +652,4 @@ if (failures.length) {
   for (const f of failures) console.error(`  - ${f}`);
   process.exit(1);
 }
-console.log(`\nRenderer probe passed: ${MIRRORED.length} mirrored constants agree across sim, engine and renderer, and ${checks.length} rendered state pairs clear their floors.`);
+console.log(`\nRenderer probe passed: ${MIRRORED.length + 1} simulation rules are mirrored faithfully (${MIRRORED.length} constants plus variant_for), and ${checks.length} rendered state pairs clear their floors.`);
