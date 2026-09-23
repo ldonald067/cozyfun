@@ -18,7 +18,29 @@ plus a `_railway-verify.<sub>` TXT record, and the domain stays inactive until b
 
 The pieces: `Dockerfile` builds both toolchains (cargo compiles the sim to wasm32, then Vite
 bundles the app around it) and `scripts/serve-static.mjs` serves the result.
-`railway.json` pins the Dockerfile builder so Railway does not try to guess.
+`.railway/railway.ts` pins the Dockerfile builder so Railway does not try to guess, along
+with the start command, healthcheck and restart policy. It replaced `railway.json`, which
+Railway deprecated with a 2026-12-01 cutoff.
+
+That migration is worth reading before touching the file, because `railway config migrate`
+does **not** produce a working translation. It emitted the builder and the dockerfile path
+as *comments* and dropped the restart policy — and the service's own builder field still
+said `RAILPACK`, because the old `railway.json` had been overriding it at deploy time rather
+than changing it. Applying the generated file as-is would have handed this image to a
+buildpack, which cannot infer a build that needs cargo, the wasm32 target and Node in one
+stage. **Always `railway config plan` and read every line before `railway config apply`.**
+
+The second trap is worse and the plan is what caught it: omitting a top-level block does not
+leave it alone, it writes the block's fields to null. A file faithful to the old
+`railway.json` — which never carried source settings — planned
+`source.repo -> null, source.type -> null, source.checkSuites -> null`, i.e. disconnecting
+the GitHub repo and ending push-to-deploy. The source is therefore declared explicitly. Note
+this applies to the BLOCK and not to every field: `build.buildEnvironment` is `V3` live, is
+not named in the file, and plans clean, because undeclared keys inside a block that *is*
+declared are preserved.
+
+One field is a real gain over `railway.json`: `checkSuites: true` is the Settings -> Source
+**Wait for CI** toggle, which the old format could not express at all. It is code now.
 
 That server is hand-written for one reason: `.wasm` must be served as `application/wasm` or
 `instantiateStreaming` refuses it, and the app does not report that — it quietly falls back

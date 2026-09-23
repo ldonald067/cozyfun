@@ -31,5 +31,8 @@
     "slow-world:audit": "node scripts/slow-world-audit.mjs",
     "icons": "node scripts/make-favicon.mjs",
     "icons:check": "node scripts/make-favicon.mjs --check"
+  },
+  "devDependencies": {
+    "railway": "^3.11.0"
   }
 }

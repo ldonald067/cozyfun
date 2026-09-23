@@ -190,8 +190,8 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
 
   Detection is the half this repo can own. The other half is not deploying in the first
   place: Railway's service **Settings → Source** has a *Wait for CI* toggle that holds the
-  build until checks pass. It is a dashboard setting, not something `railway.json` carries,
-  so it cannot be turned on from here. With it on, a push parks the deployment in `WAITING`
+  build until checks pass. It WAS a dashboard setting that `railway.json` could not carry —
+  it is now `checkSuites: true` in `.railway/railway.ts`, so the repo finally states it. With it on, a push parks the deployment in `WAITING`
   while Actions runs, builds only if every workflow succeeds, and marks the deployment
   `SKIPPED` if any fails. CI here runs 2-3 minutes, so that is roughly what a deploy waits
   before it starts building.
@@ -199,8 +199,11 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   **Verify it by behaviour, not by the switch.** Push, then read the deployment state: it has
   to pass through `WAITING`. The first attempt at this looked enabled and was not — the
   deployment went to `BUILDING` one second after the push and two seconds BEFORE the CI run
-  started, which is as clear a negative as exists. `railway.json` cannot carry the flag, so
-  nothing in the repo can tell you whether it is on; the timeline is the only evidence.
+  started, which is as clear a negative as exists. That paragraph used to end "nothing in the
+  repo can tell you whether it is on; the timeline is the only evidence", and the move to
+  `.railway/railway.ts` is what changed it: `checkSuites` is declared there, and
+  `railway config plan` reports drift without deploying anything. The timeline is still the
+  better evidence, because it observes the behaviour rather than the intent.
 
   Confirmed working on 2026-08-26, and this is what a good one looks like: push at 14:32:13,
   deployment `WAITING` at 14:32:14, the CI run starting a second later, CI green at 14:34:32,
