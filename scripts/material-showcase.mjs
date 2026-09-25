@@ -7,7 +7,7 @@ export function materialShowcaseScript() {
     const height = 140;
     const stride = 8;
     const material = { Wall: 1, Sand: 2, Water: 3, Smoke: 4, Soil: 5, Fire: 6, Wood: 7, Lava: 8, Stone: 9, Moss: 10, Seed: 11, Fungus: 12, Oil: 13, Ice: 14, Steam: 15, Stardust: 16, Meteor: 17, Moonwater: 18, Flower: 19, Glass: 20, Ember: 21, Pollen: 22, Stem: 23, Rocket: 24, Wellspring: 25, Spark: 26 };
-    const flag = { Wet: 1, Rooted: 2, Cosmic: 4, Frozen: 8, Scorched: 16 };
+    const flag = { Wet: 1, Rooted: 2, Cosmic: 4, Frozen: 8, Scorched: 16, Bedded: 32 };
     const cells = new Uint8Array(width * height * stride);
     const writeU16 = (offset, value) => {
       cells[offset] = value & 255;
@@ -216,6 +216,16 @@ export function materialShowcaseScript() {
     // floor of 45 and hold — measured on a real garden, a head runs its budget to zero
     // by ~1200 ticks but almost always keeps a stubborn petal or two hanging on.
     bloom(68, 134, 7, 5, [[1, 2], [-1, 4]], 20, 1300, 2);    // cosmos, spent and shedding
+
+    // The two rocks, side by side on one shelf: sandstone on the left, the stone lava cools
+    // into on the right. Sandstone is what the slow world makes when a flooded sand bed
+    // compacts while the player is away, and the only thing that tells it from lava rock is
+    // how it was laid down, so this pair is the whole identity claim. Nine rows tall because
+    // the strata repeat every eight, and a shorter block would not show one full cycle.
+    // Wall shelf, because stone falls; open sky above, clear of the sand pile's columns.
+    line(180, 205, 34, material.Wall);
+    rect(182, 192, 25, 33, material.Stone, 0, 90, flag.Bedded);
+    rect(195, 203, 25, 33, material.Stone, 0, 90);
 
     // Geology: a larger stone mass with mineral veins and an old patinated wall.
     rect(24, 44, 44, 56, material.Stone, 0, 60);

@@ -5,11 +5,16 @@ export const CELL_FLAG = {
   Rooted: 1 << 1,
   Cosmic: 1 << 2,
   Frozen: 1 << 3,
-  Scorched: 1 << 4
+  Scorched: 1 << 4,
+  // Stone laid down as sediment rather than cooled from lava. It is in the mask below for
+  // the same reason FLAG_BEDDED is in the sim's: whatever the mask drops is stripped on
+  // every load, and a reload is exactly when the slow world runs.
+  Bedded: 1 << 5
 } as const;
 
 export const CELL_FLAG_MASK =
-  CELL_FLAG.Wet | CELL_FLAG.Rooted | CELL_FLAG.Cosmic | CELL_FLAG.Frozen | CELL_FLAG.Scorched;
+  CELL_FLAG.Wet | CELL_FLAG.Rooted | CELL_FLAG.Cosmic | CELL_FLAG.Frozen | CELL_FLAG.Scorched
+  | CELL_FLAG.Bedded;
 
 export const MATERIAL = {
   Empty: 0,

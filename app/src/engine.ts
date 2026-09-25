@@ -248,6 +248,25 @@ class JsSandboxEngine implements SandboxEngine {
         continue;
       }
 
+      // Sediment turns to rock: sand under its own deposit at the bottom of standing
+      // water compacts into bedded sandstone. See the sim for why the test is the
+      // deposit's position under the water rather than the sand's own wet flag — water
+      // does not soak down through a bed, so a wetness test was either dead or wrong.
+      if (kind === MATERIAL.Sand) {
+        if (this.underStandingWater(cellIndex, old) && this.chance(SLOW_SAND_COMPACTS)) {
+          writeCellBytes(
+            next,
+            idx,
+            MATERIAL.Stone,
+            old[idx + 1],
+            readU16(old, idx + 4),
+            0,
+            (flags & CELL_FLAG.Wet) | CELL_FLAG.Bedded
+          );
+        }
+        continue;
+      }
+
       // A spent seed head sows itself clear of its own shadow. "Spent" is age plus an
       // empty budget, not the absence of petals — see the sim for the measurement
       // that ruled out a bare-crown check.
@@ -301,6 +320,25 @@ class JsSandboxEngine implements SandboxEngine {
   }
 
   /** Open air resting on soil or moss, searched outward past PLANT_SPACING. */
+  // Mirrors Universe::under_standing_water: sand covered by at least one layer of its own
+  // deposit (Sand, or Stone already compacted above it), in a deposit whose top is under
+  // standing water. Reads `old` only.
+  private underStandingWater(cellIndex: number, old: Uint8Array) {
+    const x = cellIndex % this.w;
+    let y = Math.floor(cellIndex / this.w) - 1;
+    let cover = 0;
+    while (y >= 0) {
+      const kind = old[(y * this.w + x) * CELL_STRIDE];
+      if (kind === MATERIAL.Sand || kind === MATERIAL.Stone) {
+        cover++;
+        y--;
+        continue;
+      }
+      return cover > 0 && (kind === MATERIAL.Water || kind === MATERIAL.Moonwater);
+    }
+    return false;
+  }
+
   private scatterSite(x: number, y: number, variant: number, old: Uint8Array, next: Uint8Array) {
     const start = variant % SCATTER_OFFSETS.length;
     for (let step = 0; step < SCATTER_OFFSETS.length; step++) {
@@ -1524,6 +1562,7 @@ const SOIL_DAMP_ENERGY = 60;
 // See `Universe::slow_step` in sim/src/lib.rs for the reasoning behind the tuning.
 const SLOW_CHAR_SETTLES = 6;
 const SLOW_SEED_SCATTERS = 3;
+const SLOW_SAND_COMPACTS = 8;
 const SCATTER_OFFSETS: readonly number[] = [6, -6, 9, -9, 12, -12, 15, -15];
 const SCATTER_REACH = 14;
 

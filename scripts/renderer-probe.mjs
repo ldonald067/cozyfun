@@ -638,6 +638,78 @@ function assertFloor(label, floor, worst, detail) {
     `which is where this number converges to what the 220x140 play grid reports.`);
 }
 
+// 10. SANDSTONE. Stone laid down as sediment, which the slow world makes when a flooded sand
+//     bed compacts. Two claims, gated separately because they fail in different ways.
+//
+//     COLOUR. Sandstone forms directly under the lake's loose sand floor — and that floor is
+//     always WET, because it touches the water. The first palette was tuned against DRY sand,
+//     measured a comfortable p10 70, and put the real boundary at p10 33 and min 27: the
+//     neighbour was measured in a state it never has in play. So the wet floor is the first
+//     pair here. Every warm brown that cleared sand then landed on SOIL (p10 24-31), which is
+//     also horizontally bedded, so no texture could rescue it — the settled palette is a pale
+//     grey-buff that clears all five on colour alone.
+//
+//     TEXTURE. The rock's whole identity is being LAYERED, which is the one thing that tells
+//     it from the granular stone lava cools into (1.08x, isotropic). A first version jittered
+//     each cell's stratum independently and came out LESS stratified than the loose sand it
+//     formed from — v/h 1.26 against sand's 1.59. The seam now drifts by 8-column runs.
+{
+  const { board: ssBoard, colourAt: ssColourAt } = grid(72, 40);
+  const field = (kind, flags, energy, age) => ssBoard((put) => {
+    for (let y = 0; y < 40; y++) for (let x = 0; x < 72; x++) {
+      const v = (Math.imul(x, VARIANT_COEFFS[0]) + Math.imul(y, VARIANT_COEFFS[1])
+        + Math.imul(kind, VARIANT_COEFFS[2])) >>> 0;
+      put(x, y, kind, energy, age, flags, v % VARIANT_MODULUS);
+    }
+  });
+  const meanOf = (cells, time) => {
+    let r = 0, g = 0, b = 0, n = 0;
+    for (let y = 4; y < 36; y++) for (let x = 4; x < 68; x++) {
+      const c = ssColourAt(cells, x, y, time); r += c[0]; g += c[1]; b += c[2]; n++;
+    }
+    return [r / n, g / n, b / n];
+  };
+  const sandstone = field(MATERIAL.Stone, CELL_FLAG.Bedded, 0, 90);   // (kind, flags, energy, age)
+  const NEIGHBOURS = [
+    ["the wet sand floor it forms under", MATERIAL.Sand, CELL_FLAG.Wet, 80, 42],
+    ["dry sand", MATERIAL.Sand, 0, 0, 42],
+    ["the stone lava cools into", MATERIAL.Stone, 0, 0, 90],
+    ["soil", MATERIAL.Soil, 0, 0, 40],
+    ["the wall a basin is built from", MATERIAL.Wall, 0, 0, 20000],
+  ];
+  let worst = Infinity, at = null;
+  for (const [name, kind, flags, energy, age] of NEIGHBOURS) {
+    const other = field(kind, flags, energy, age);
+    for (const t of TIMES) {
+      const d = redmean(meanOf(sandstone, t), meanOf(other, t));
+      if (d < worst) { worst = d; at = name; }
+    }
+  }
+  assertFloor("sandstone vs the ground it forms beside", 70, worst,
+    `worst against ${at}. Sandstone is striped, but so are sand, soil and wall — only lava ` +
+    `rock is not — so against those four COLOUR is all that separates it. Measure the sand ` +
+    `floor WET: it always touches the lake, and a dry-sand reading hid a real p10 of 33.`);
+
+  const AX = { horizontal: [1, 0], vertical: [0, 1], "diagonal NW-SE": [1, 1], "diagonal NE-SW": [1, -1] };
+  const step = {};
+  for (const [name, [dx, dy]] of Object.entries(AX)) {
+    let total = 0, n = 0;
+    for (const t of TIMES) for (let y = 2; y < 38; y++) for (let x = 2; x < 70; x++) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= 72 || ny >= 40) continue;
+      total += redmean(ssColourAt(sandstone, x, y, t), ssColourAt(sandstone, nx, ny, t)); n++;
+    }
+    step[name] = total / n;
+  }
+  const ranked = Object.entries(step).sort((a, b) => a[1] - b[1]);
+  const along = ranked[0][0], ratio = ranked[ranked.length - 1][1] / ranked[0][1];
+  assertFloor("sandstone is laid in beds", 300, along === "horizontal" ? Math.round(ratio * 100) : 0,
+    `sandstone runs along ${along} at ${ratio.toFixed(2)}x. Its identity is being LAYERED — the ` +
+    `stone lava cools into is isotropic at about 1.08x — so strata must run horizontally and ` +
+    `strongly. Scored x100, and 0 if they stop being horizontal. If this fails, check the seam ` +
+    `still drifts by column runs: per-cell jitter made the rock less layered than sand.`);
+}
+
 if (!quiet) {
   console.log("\nRendered state pairs, worst case over a full energy/age/species/time sweep:");
   for (const c of checks) {

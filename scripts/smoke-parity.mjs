@@ -34,6 +34,9 @@ if (compile.status !== 0) throw new Error("parity harness TypeScript compile fai
 await writeFile(resolve(outDir, "package.json"), JSON.stringify({ type: "commonjs" }));
 const require = createRequire(import.meta.url);
 const { createFallbackEngine } = require(resolve(outDir, "engine.js"));
+// Flags come from the compiled source rather than a hand-typed copy: a mirrored constant
+// with nothing checking it is a promise, and this file already owns one of those in `M`.
+const { CELL_FLAG } = require(resolve(outDir, "materials.js"));
 
 const wasmBytes = await readFile(resolve(root, "app/public/sim/cozy_sandbox_sim.wasm"));
 const { instance } = await WebAssembly.instantiate(wasmBytes, {});
@@ -619,6 +622,52 @@ const scenarios = [
       if ((seen.soilAfterNight ?? 0) < 3) {
         return `a night away turned only ${seen.soilAfterNight ?? 0} char cells into soil`;
       }
+      return null;
+    },
+  },
+  {
+    // Sediment turns to rock between sessions, and this is the only scenario that reaches
+    // that code — before it, parity passed with the rule present in one engine and absent
+    // from the other, because no scene had a flooded sand bed. Every slow step below is
+    // compared byte for byte, which is what catches an RNG roll taken on one side only.
+    name: "a lake left long enough to turn its bed to stone",
+    w: 32, h: 24, seed: 4102, ticks: 260,
+    slowSteps: [{ at: 200, count: 24 }],
+    paint(p) {
+      // Target first, masonry last: the brush spills a cell and the walls must win.
+      // Sand cannot sink through water, so it is painted BELOW it rather than poured in.
+      for (let y = 16; y <= 21; y++) for (let x = 3; x <= 28; x++) p(x, y, 1, M.Sand);
+      for (let y = 11; y <= 15; y++) for (let x = 3; x <= 28; x++) p(x, y, 1, M.Water);
+      for (let x = 0; x < 32; x++) p(x, 22, 1, M.Wall);
+      for (let y = 8; y < 22; y++) { p(1, y, 1, M.Wall); p(30, y, 1, M.Wall); }
+    },
+    observe(seen, cells, w, h, tick) {
+      let sand = 0, bedded = 0, water = 0, looseFloor = 0;
+      for (let i = 0; i < w * h; i++) {
+        const kind = cells[i * STRIDE];
+        const flags = cells[i * STRIDE + 6] | (cells[i * STRIDE + 7] << 8);
+        if (kind === M.Sand) {
+          sand++;
+          const above = i >= w ? cells[(i - w) * STRIDE] : 0;
+          if (above === M.Water) looseFloor++;
+        } else if (kind === M.Stone && flags & CELL_FLAG.Bedded) bedded++;
+        else if (kind === M.Water) water++;
+      }
+      // observe runs BEFORE the slow steps taken at the end of the same tick.
+      if (tick === 200 && seen.beddedBefore === undefined) {
+        seen.beddedBefore = bedded;
+        seen.sandBefore = sand;
+        seen.waterBefore = water;
+      }
+      seen.beddedAfter = bedded;
+      seen.looseFloorAfter = looseFloor;
+    },
+    expect(seen) {
+      if ((seen.sandBefore ?? 0) < 60) return `only ${seen.sandBefore ?? 0} sand cells settled — there is no bed to compact`;
+      if ((seen.waterBefore ?? 0) < 60) return `only ${seen.waterBefore ?? 0} water cells — the bed is not under a lake`;
+      if ((seen.beddedBefore ?? 0) !== 0) return "bedded stone existed before any slow step ran";
+      if ((seen.beddedAfter ?? 0) < 40) return `a long absence compacted only ${seen.beddedAfter ?? 0} cells into sandstone`;
+      if ((seen.looseFloorAfter ?? 0) < 10) return `the lake floor should stay loose sand, found ${seen.looseFloorAfter ?? 0}`;
       return null;
     },
   },

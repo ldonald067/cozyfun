@@ -60,6 +60,18 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
 
   Its baseline is honest rather than perfect: a slow step consumes engine RNG, so the two branches enter catch-up with slightly different trajectories. That noise floor is measured, not assumed — deleting both slow-world writes while keeping every `chance()` roll leaves 5 changed cells and 0 new plant columns, against floors of 20 and 1.
 
+  It also runs a **lake of its own** for the sandstone rule — a separate scene rather than a
+  corner of the main one, because that board is fully claimed and its inert zone promises
+  nothing at x >= 76 changes, and because every roll the new rule takes would have shifted
+  the RNG stream under every threshold here. The lake asserts that a day compacts more of a
+  flooded bed than an hour (72 cells against 31), that the rock is visible against the sand
+  it replaced, that the layer the water rests on stays loose, and that **the bedded flag
+  survives a save and reload**. That last one is the check nothing else could make: the slow
+  steps create the flag AFTER the load, so a flag missing from a load mask would pass every
+  other assertion and be stripped the next time the game opened. It drives the JS engine;
+  `bedded_sandstone_survives_a_save_and_reload` is the same claim for the wasm one, whose
+  mask is a separate constant.
+
   It also asserts you arrive **in flower** — a crown ringed by petals, using the app's own
   `aHeadIsOpen` rather than a restatement of it. Every other assertion here passed happily
   while a player arrived after the bloom: the scene had changed, in new columns, by plenty
@@ -74,12 +86,24 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
 
   It also closes a gap **four independent reviewers found**: the renderer mirrors `PETAL_SHED_AGE`, `POLLEN_RESERVE` and `COLD_CHAR_ENERGY` so a seed head is drawn under exactly the condition that makes it one, and ash is full exactly when the sim calls an ember out — but parity only compares Rust with `engine.ts`, and neither knew a third copy existed. The probe parses all three sources and fails when they disagree.
 
-  Thirteen checks are gated as of this writing: cold char against the empty tray and against
+  Fifteen checks are gated as of this writing: cold char against the empty tray and against
   its hearth surround, wet against dry char, a bud against the seed head it becomes, a seed
   head against its own flower's hue, the wellspring's three rune states against each other at
   four brush sizes, all 28 bloom-species pairs, **BLOOM_SHAPES agreeing across sim, engine
-  and showcase**, **a meteor in flight against fire, its own sparks and stardust**, and **soil and wood
-  wearing different fabrics**.
+  and showcase**, **a meteor in flight against fire, its own sparks and stardust**, **soil and wood
+  wearing different fabrics**, and two for **sandstone** — against the ground it forms beside,
+  and whether it is actually laid in beds.
+
+  **The sandstone checks are a second worked example of measuring a neighbour in the wrong
+  state.** Its palette was first tuned against DRY sand and scored a comfortable p10 70 — but
+  sandstone forms directly under a lake's loose sand floor, and that floor always touches the
+  water, so it is always WET. On a real lake the boundary measured p10 33 and min 27. The
+  colour check lists the wet floor first for that reason. The texture check exists because
+  the rock's first version, jittered cell by cell like soil, came out LESS layered than the
+  loose sand it formed from (v/h 1.26 against 1.59); stepping the seam by 8-column runs took
+  it to 5.65. Both were vacuity-tested three ways, and each regression fails exactly the
+  check it should: a palette drifting toward sand fails colour only, per-cell jitter fails
+  texture only, and dropping the bedded branch fails both.
 
   **The fabric check** gates TEXTURE rather than colour, which is a first here and is the
   point: soil and wood sit at p10 29 redmean, under the palette floor, so pattern is the only
@@ -182,7 +206,7 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   **Mean cell-to-cell step cannot tell a clump from a grain.** It is a mean of absolute differences, so a blocky mat with strong contrast between blocks scores about the same as per-cell confetti — which is how a fungus lattice change that made the mat measurably *less* clumpy first read as an improvement. The instrument that sees it is the share of adjacent cell pairs that repeat their neighbour's value: fine speckle almost never repeats, a genuinely clumped mat repeats about half. Quote that alongside the step, never the step alone.
 - `npm run test:audio-reactions`: asserts the post-tick reaction detector emits the right cues for each material transition.
 - `npm run test:subpath`: builds at a non-root base and asserts no root-absolute asset path survives, so embedding the sandbox under a path on another site cannot silently regress into the JS fallback engine.
-- `npm run material:audit`: validates that every material definition has two concrete identity traits and the right number of documented interaction roles — **4-6 for toolbar materials, 1-3 for generated-only outcomes and the Eraser** — before a new element can pass review. It also asserts the visual review board renders every material and every cell-state flag.
+- `npm run material:audit`: validates that every material definition has two concrete identity traits and the right number of documented interaction roles — **4-6 for toolbar materials, 1-3 for generated-only outcomes and the Eraser** — before a new element can pass review. It also asserts the visual review board renders every material and every cell-state flag — and, since the sandstone flag, that the board's hand-typed `flag` map carries the same VALUES as `CELL_FLAG`. The showcase runs inside the page as a template literal and cannot import, so it keeps its own copy; the name check alone would let `Bedded: 64` through, setting a bit that means nothing and reviewing every sandstone exhibit as plain lava rock.
 - `npm run test:sim`: validates Rust simulation behavior.
 - `npm run test:wasm`: validates the WASM bridge and key sim outcomes from JavaScript.
 - `npm run test:js-fallback`: validates JS fallback parity for user-visible sim behavior.

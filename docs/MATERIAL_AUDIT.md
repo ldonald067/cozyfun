@@ -249,9 +249,11 @@ the fire fountain as producing literally nothing, which was the fixture, not the
 
 ## Why the slow world is not in the matrix
 
-Two rules run only between sessions: cold char settles into soil, and a spent seed head
-sows a seed into the bed beside it. Both change materials, so they look like matrix
-candidates, and they are deliberately not.
+Three rules run only between sessions: cold char settles into soil, a spent seed head
+sows a seed into the bed beside it, and a flooded sand bed compacts into sandstone. All
+three change materials, so they look like matrix candidates, and they are deliberately not.
+Sandstone in particular would have landed on Stone, Sand and Water — every one of them at
+its cap — which is the practical tell repeated below.
 
 The matrix documents what a player can **do** — reactions they can set up, watch, and
 learn from. The slow world is the opposite by construction: it never runs while anyone

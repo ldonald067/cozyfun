@@ -78,10 +78,15 @@ Shape language is intentionally procedural:
   stone is far from everything in colour and Wall's horizontal courses separate that pair —
   so it is an identity problem, not a legibility one. If it is ever taken on, start at the
   palette lookup rather than the mark layer, for the reason recorded under Moss/Fungus/Wood.
+
+  That gap now has half an answer with a reason behind it. Stone has two ORIGINS — cooled
+  from lava, or compacted from a flooded sand bed between sessions — and the second carries
+  `CELL_FLAG.Bedded` and is drawn in strata at 5.65x. So a granular rock and a layered rock
+  now tell you how each one was made. Lava rock itself is unchanged, and still 1.08x.
 - Seed: chestnut body, darker edges, oval silhouette, grounded lower edge, sprout flecks, and moonwater-fed highlights.
 - Ice: cube facets, bright top-left edges, darker bottom-right edges, and crack pixels.
 - Wall: brick-like tile structure with mortar lines, lit exposed edges, chips, and heat/wet/plant staining.
-- Stone: chunky block shading, facet shifts, dark crack marks, damp edge staining, lichen flecks, and warm heat contact.
+- Stone: chunky block shading, facet shifts, dark crack marks, damp edge staining, lichen flecks, and warm heat contact. **Sandstone** — stone carrying `CELL_FLAG.Bedded`, laid down as sediment rather than cooled from lava — is drawn in two-row strata with a dark bedding plane between layers, a pale grey-buff, and none of the igneous block and crack structure. See the slow world below for where it comes from and `SANDSTONE_BEDS` in `shapeLanguage.ts` for why every colour in it is where it is.
 - Smoke/Steam: edge-softened puff clusters with age fade, plus distinct dry soot cues for smoke and wet condensation/frost cues for steam. **Steam does not actually form clusters, and no renderer change can fix that — this was tried and reverted.** Steam is emitted ONE CELL AT A TIME (a vent here, a vent there) and rises immediately, so it never gathers into a body the way smoke off a burning log does: measured on the same `update_gas` code, **26% of steam cells touch another steam cell against smoke's 75%**, and the neighbour histogram is blunter still — **74% of steam cells have ZERO cardinal neighbours**, 9% have two or more. Pouring water on lava therefore reads as a one-cell-wide vertical dotted thread rather than as vapour. The attempted fix was to thin a cell by how gathered it is, so a stray speck became a wisp while a real plume stayed solid. It worked as designed and still did not earn its place: an isolated cell went from 285 redmean off the night to 198, the airborne cells in a real pour dropped 38%, and at native resolution the before and after are all but indistinguishable — while six documented interactions lost 25-30% of their contrast (`water.boils` 395 → 275, `soil.breathes` 282 → 158). **A one-cell-wide dotted line stays a dotted line however it is shaded**; you cannot paint a plume out of cells that are not there. If this is ever worth another attempt it belongs in the SIM — emitting steam in small clusters rather than single cells — which is a deliberate design choice about vapour volume, not a rendering tweak, and it would undo the bound measured at the vent-widening change (peak steam 0.8% of the board).
 - Water/Moonwater: connected surface highlights, lower shadow, heat-contact brightness, ordinary water earth/oil/life contact ripples, and moonwater hard-surface/oil/life shimmer.
 - Stardust: bright twinkles, nearby star glints, and a brighter violet treatment near moonwater.
@@ -296,20 +301,47 @@ Current cosmic rules:
 
 The slow world (between sessions only):
 
-- Two rules run on their own clock at wake, never during play: cold char that is not
-  under water
-  settles into fresh soil, and a spent seed head sows a seed clear of its own shadow.
-  Both live in `Universe::slow_step`, are mirrored in `engine.ts`, and consume the same
-  RNG stream as `tick()`, so parity applies to them exactly as it does to movement.
+- Three rules run on their own clock at wake, never during play: cold char that is not
+  under water settles into fresh soil, a spent seed head sows a seed clear of its own
+  shadow, and **a flooded sand bed compacts into sandstone**. All three live in
+  `Universe::slow_step`, are mirrored in `engine.ts`, and consume the same RNG stream as
+  `tick()`, so parity applies to them exactly as it does to movement.
+- **Sediment turns to rock, which closes the one loop the roster was missing.** Lava cools
+  to stone, running water wears stone to sand, heat fuses sand to glass and a meteor
+  shatters glass back to sand — but nothing turned sand into stone. Sand lying under its own
+  deposit at the bottom of standing water now compacts into **bedded** stone while you are
+  away (`CELL_FLAG.Bedded`), and when running water later wears that stone away it becomes
+  plain sand again, flag and all. The loop closes on its own.
+
+  **The test is the deposit's position under the water, not the sand's own wetness**, and
+  that was measured rather than assumed. Water does not soak down through a sand bed here:
+  on a real painted pond only the top two to five rows ever carried the wet flag, and the
+  deep bed stayed bone dry. So "wet and covered" fired on about nine cells in a whole lake,
+  and "wet at all" compacted only the surface, capping loose sand with a lid of rock. What
+  compacts now is sand covered by at least one layer of its own deposit, in a column whose
+  deposit is topped by water — a lake bed, not a beach. The layer the water rests on stays
+  loose, so a finished lake keeps a sand floor over its rock.
+
+  It is the slowest odds in the slow world, 1 in 8 per step: an hour away (4 steps) sets
+  about 40% of a flooded bed, a day (18) about 90%, measured at 31 and 72 cells on the
+  audit's lake. `npm run slow-world:audit` asserts that a day beats an hour, that the rock is
+  visible (224 redmean from the sand it replaced), that the floor stays loose, and that the
+  flag survives a save — `load_cells` keeps only the bits the mask names, and a reload is
+  exactly when the slow world runs.
 - **Absence needs its own unit because ticks cannot express it** — the argument is
   written out once, in `app/src/slowWorld.ts`, which owns the whole absence policy.
   The curve: 1h earns 4 steps, a day 18, capped at 24 so a week away does not erase what
   you built. Under an hour earns none — that is a reload, not an absence.
-- **Only what you left living changes.** The slow world leaves a scene of walls, sand
-  and glass byte-identical — a cargo test and the audit's raw-byte inert check both say
-  so. (The ordinary catch-up ticks that follow are a separate thing and will still
-  settle anything mid-fall, as they would during play.) Char under water is spared too:
-  a quenched hearth is a look somebody chose.
+- **Nothing the player built changes.** This used to read "only what you left living
+  changes", and sandstone is what showed that living was a proxy: a lake bed is not alive,
+  but nobody built it either. The real promise is that a week away does not edit your
+  construction. So a flooded deposit may set into rock, while a dry dune — buried or not —
+  comes back byte-identical, because a dune on a shelf is a thing somebody made. A scene of
+  walls, dry sand and glass still returns byte-identical, a cargo test and the audit's
+  raw-byte inert check both say so, and `a_dry_dune_is_never_turned_to_stone` covers the
+  buried case the older test could not see. (The ordinary catch-up ticks that follow are a
+  separate thing and will still settle anything mid-fall, as they would during play.) Char
+  under water is spared too: a quenched hearth is a look somebody chose.
 - A sown seed **displaces the one patch of moss it lands on back to soil**. A watered bed
   is a solid moss carpet within about twenty seconds of play and moss does not root a
   seed, so without that the whole arm produced inert grains — measured, not reasoned.
@@ -382,7 +414,7 @@ npm run test:browser
 
 `npm run visual:qa` saves a controlled current-material capture to `.tmp/visual-qa/current-materials.png`, a deterministic material identity showcase to `.tmp/visual-qa/material-identity-showcase.png`, responsive layout metrics to `.tmp/visual-qa/current-layout.json`, and room backdrop captures for every scene environment.
 
-The material showcase is shared by visual, Chrome, and Firefox QA through `scripts/material-showcase.mjs`. It should cover oil-over-water, wet/dry/scorched/frozen sand, damp/frozen/scorched hard materials, wet wood steam, ordinary water/lava and water/meteor shock, water/moonwater contact contrast, oil-smothered plants, distinct fungus life/cosmic/heat clusters, freeze-thaw wall stress up to a near-crumble frost-stressed wall, a grown stalked plant, a spent seed head standing next to an unopened bud of the same species (the arc's two ends, whose only difference is the tip) plus a spent crown still holding its last petals, veined stone and patinated wall, constellation etching, a pouring wellspring basin beside a dormant block, a one-cell attuned/dormant wellspring pair, **the three rune states at the DEFAULT brush** (radius 4, sealed by a one-cell ring so the attuned one cannot flood the board) — without which every wellspring exhibit here is one to three cells, and the body wash that carries state above radius 2 would have no picture at all, the glass set (an age-0 vitrify flash clear of the lava pool, a cooled see-through pane, a deeper pane with real interior, and a dewed pane), and a rocket charge with a lit grain in flight.
+The material showcase is shared by visual, Chrome, and Firefox QA through `scripts/material-showcase.mjs`. It should cover oil-over-water, wet/dry/scorched/frozen sand, damp/frozen/scorched hard materials, wet wood steam, ordinary water/lava and water/meteor shock, water/moonwater contact contrast, oil-smothered plants, distinct fungus life/cosmic/heat clusters, freeze-thaw wall stress up to a near-crumble frost-stressed wall, a grown stalked plant, a spent seed head standing next to an unopened bud of the same species (the arc's two ends, whose only difference is the tip) plus a spent crown still holding its last petals, veined stone and patinated wall, constellation etching, a pouring wellspring basin beside a dormant block, a one-cell attuned/dormant wellspring pair, **the three rune states at the DEFAULT brush** (radius 4, sealed by a one-cell ring so the attuned one cannot flood the board) — without which every wellspring exhibit here is one to three cells, and the body wash that carries state above radius 2 would have no picture at all, the glass set (an age-0 vitrify flash clear of the lava pool, a cooled see-through pane, a deeper pane with real interior, and a dewed pane), a rocket charge with a lit grain in flight, and **the two rocks side by side** — sandstone beside the stone lava cools into, on one wall shelf, nine rows tall because the strata repeat every eight.
 
 Four traps in this scene, all learned the hard way. Display stands must be **Wall**, since stone now falls — and that includes planters: soil is a powder, so a garden bed with nothing under it drops the instant the capture's sim starts and takes the whole plant with it. The garden row also has to sit clear of any column that loose material falls down: its first home in the bottom band was directly under the sand pile, and the capture showed two exhibits buried. A glass bloom placed beside the lava pool cannot evidence anything — it sits inside lava's own halo — so the vitrify exhibit is deliberately somewhere else. And the showcase is a *live* scene: it is loaded into the running app and captured a beat later, so an exhibit painted in a state the sim will immediately leave does not survive to the picture. The garden row's crown energies sit below `CROWN_RESERVE` and above the shed floor for exactly this reason — otherwise the bud exhibit opens into a head before the shutter. The two spent exhibits are the deliberate exception: their crowns sit *under* `POLLEN_RESERVE` because that is what makes them seed heads, and only the crown does. Their petals stay pinned at the shed floor of 45, so the head cannot start dropping petals mid-capture.
 

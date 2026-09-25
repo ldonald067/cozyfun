@@ -47,9 +47,10 @@ const { createFallbackEngine } = require(resolve(outDir, "engine.js"));
 // certify a return path that production does not perform.
 const { aHeadIsOpen, catchUpRemaining, nextCatchUpChunk, openCrowns, planAbsence, wakeTerrarium } = require(resolve(outDir, "slowWorld.js"));
 const { colorForCell } = require(resolve(outDir, "rendering/materialColor.js"));
+const { CELL_FLAG } = require(resolve(outDir, "materials.js"));
 
 const STRIDE = 8;
-const M = { Wall: 1, Sand: 2, Water: 3, Soil: 5, Fire: 6, Wood: 7, Seed: 11, Glass: 20 };
+const M = { Wall: 1, Sand: 2, Water: 3, Soil: 5, Fire: 6, Wood: 7, Stone: 9, Seed: 11, Glass: 20 };
 const KIND_NAME = ["empty", "wall", "sand", "water", "smoke", "soil", "fire", "wood", "lava",
   "stone", "moss", "seed", "fungus", "oil", "ice", "steam", "stardust", "meteor", "moonwater",
   "flower", "glass", "ember", "pollen", "stem", "rocket", "wellspring", "spark"];
@@ -336,6 +337,98 @@ for (const [key, count] of [...transitions].sort((a, b) => b[1] - a[1])) {
   console.log(`    ${String(count).padStart(3)}  ${key}`);
 }
 
+// 5. SEDIMENT TURNS TO ROCK, and that has to be worth coming back to.
+//
+//    A scene of its own rather than a corner of the one above, for two reasons. That board
+//    is fully claimed — garden, hearth, and an inert zone checked as "everything at x >= 76"
+//    — and a lake there would have to live inside the zone that promises nothing changes.
+//    And every chance() roll the new rule takes shifts the shared RNG stream, so bolting a
+//    lake onto that scene would have moved every threshold above for reasons unrelated to
+//    sediment. Separate scene, same `wakeTerrarium`, same real renderer.
+const LW = 32, LH = 24;
+function paintLake(p) {
+  // Target first, masonry last: the brush spills a cell and the walls must win. Sand is
+  // painted BELOW the water because it cannot sink through it (try_move only sinks
+  // through gas), so pouring it in would leave it floating.
+  for (let y = 16; y <= 21; y++) for (let x = 3; x <= 28; x++) p(x, y, 1, M.Sand);
+  for (let y = 11; y <= 15; y++) for (let x = 3; x <= 28; x++) p(x, y, 1, M.Water);
+  for (let x = 0; x < LW; x++) p(x, 22, 1, M.Wall);
+  for (let y = 8; y < 22; y++) { p(1, y, 1, M.Wall); p(30, y, 1, M.Wall); }
+}
+const isBedded = (cells, i) =>
+  cells[i * STRIDE] === M.Stone && (cells[i * STRIDE + 6] | (cells[i * STRIDE + 7] << 8)) & CELL_FLAG.Bedded;
+
+function lakeAfter(secondsAway) {
+  const engine = createFallbackEngine(LW, LH, SEED);
+  paintLake((x, y, r, mat, d = 100) => engine.paint(x, y, r, mat, d));
+  for (let t = 0; t < 300; t++) engine.tick();
+  const before = engine.getCellBytes();
+  const plan = wakeTerrarium(engine, secondsAway);
+  let owed = plan.catchUpTicks;
+  while (owed > 0) {
+    const chunk = nextCatchUpChunk(owed);
+    for (let t = 0; t < chunk; t++) engine.tick();
+    owed = catchUpRemaining(engine.getCellBytes(), owed - chunk, LW, plan.crownsAtWake);
+  }
+  const after = engine.getCellBytes();
+  engine.dispose();
+
+  let bedded = 0, looseFloor = 0;
+  const distances = [];
+  for (let i = 0; i < LW * LH; i++) {
+    const x = i % LW, y = Math.floor(i / LW);
+    if (after[i * STRIDE] === M.Sand && y > 0 && after[(i - LW) * STRIDE] === M.Water) looseFloor++;
+    if (!isBedded(after, i)) continue;
+    bedded++;
+    const a = cellAt(before, i), b = cellAt(after, i);
+    const was = colorForCell({ ...a, time: 0, cells: before, width: LW, height: LH, x, y });
+    const now = colorForCell({ ...b, time: 0, cells: after, width: LW, height: LH, x, y });
+    distances.push(redmeanDistance(was, now));
+  }
+  distances.sort((p, q) => p - q);
+  return { steps: plan.slowSteps, bedded, looseFloor, after,
+    median: distances.length ? distances[Math.floor(distances.length / 2)] : 0 };
+}
+
+const lakeHour = lakeAfter(3600);
+const lakeDay = lakeAfter(24 * 3600);
+console.log(`\n  a flooded sand bed:   an hour -> ${lakeHour.bedded} cells of sandstone (${lakeHour.steps} steps)` +
+  `   a day -> ${lakeDay.bedded} (${lakeDay.steps} steps), median contrast ${lakeDay.median.toFixed(1)}`);
+
+if (lakeDay.bedded < 60) {
+  failures.push(`a day away turned only ${lakeDay.bedded} cells of a flooded sand bed into sandstone.`);
+}
+if (lakeDay.bedded <= lakeHour.bedded) {
+  failures.push(`a day compacted ${lakeDay.bedded} cells of sediment and an hour ${lakeHour.bedded}. ` +
+    `Rock is supposed to be the slow thing — if a day is no further along than an hour, ` +
+    `"come back tomorrow" means nothing.`);
+}
+if (lakeDay.median < MIN_CONTRAST) {
+  failures.push(`sandstone renders ${lakeDay.median} redmean from the sand it replaced, under ` +
+    `the ${MIN_CONTRAST} floor — the lake bed turned to rock and nobody can see it.`);
+}
+if (lakeDay.looseFloor < 10) {
+  failures.push(`only ${lakeDay.looseFloor} cells of loose sand left under the water: the layer ` +
+    `the lake rests on should stay sand, so the bed keeps a floor on top of the rock.`);
+}
+// The flag has to survive a save. `load_cells` keeps only what FLAG_MASK names, and a reload
+// is exactly when the slow world runs — so a flag missing from the mask would be stripped the
+// next time the game opened, and every sandstone in the terrarium would quietly turn back into
+// plain lava rock. Nothing else in this file would notice: the steps above create the flag
+// AFTER the load, not before it.
+{
+  const reloaded = createFallbackEngine(LW, LH, SEED);
+  if (!reloaded.loadCellBytes(lakeDay.after)) failures.push("a compacted lake could not be reloaded at all.");
+  const cells = reloaded.getCellBytes();
+  reloaded.dispose();
+  let survived = 0;
+  for (let i = 0; i < LW * LH; i++) if (isBedded(cells, i)) survived++;
+  if (survived !== lakeDay.bedded) {
+    failures.push(`a save and reload kept ${survived} of ${lakeDay.bedded} sandstone cells bedded — ` +
+      `the flag is missing from a load mask, so rock forgets it was ever sediment.`);
+  }
+}
+
 if (failures.length) {
   console.error("\nSlow-world audit FAILED:\n");
   for (const failure of failures) console.error(`  - ${failure}\n`);
@@ -345,5 +438,6 @@ if (failures.length) {
 console.log(
   `\nSlow-world audit passed: a day away visibly changes ${day.visible} cells at median ` +
     `contrast ${day.median.toFixed(1)} (against ${hour.visible} for an hour), grows the garden into ` +
-    `${grown.length} new column${grown.length === 1 ? "" : "s"}, and leaves the inert zone alone.`,
+    `${grown.length} new column${grown.length === 1 ? "" : "s"}, leaves the inert zone alone, ` +
+    `and turns a flooded sand bed to rock (${lakeDay.bedded} cells in a day, ${lakeHour.bedded} in an hour).`,
 );

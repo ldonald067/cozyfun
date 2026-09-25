@@ -91,6 +91,32 @@ function auditShowcaseCoverage(materialsSource, showcaseSource, materialIds, fai
       );
     }
   }
+
+  // ...and the VALUE has to match, not just the name. The showcase runs inside the page as a
+  // template literal, so it cannot import CELL_FLAG and carries its own hand-typed copy. The
+  // check above only proves each flag is USED — a showcase that wrote Bedded: 64 would pass
+  // it, set a bit that means nothing, and review every sandstone exhibit as plain lava rock.
+  const bit = (expr) => {
+    const shift = expr.match(/^\s*1\s*<<\s*(\d+)\s*$/);
+    return shift ? 1 << Number(shift[1]) : Number(expr);
+  };
+  const realFlags = flagBlock
+    ? Object.fromEntries([...flagBlock[1].matchAll(/^\s+([A-Za-z]+):\s*([^,\n]+)/gm)].map((m) => [m[1], bit(m[2])]))
+    : {};
+  const shownBlock = showcaseSource.match(/const flag = \{([^}]*)\}/);
+  if (!shownBlock) {
+    failures.push("the visual review board has no `const flag = { ... }` map to check against CELL_FLAG");
+  } else {
+    const shownFlags = Object.fromEntries([...shownBlock[1].matchAll(/([A-Za-z]+):\s*(\d+)/g)].map((m) => [m[1], Number(m[2])]));
+    for (const [name, value] of Object.entries(realFlags)) {
+      if (shownFlags[name] !== value) {
+        failures.push(
+          `the visual review board's flag.${name} is ${shownFlags[name] ?? "missing"} but CELL_FLAG.${name} is ${value}; ` +
+            `its exhibit would carry the wrong bit and be reviewed as something else`,
+        );
+      }
+    }
+  }
 }
 
 function auditInteractionMatrix(markdown, materialLabels, failures) {

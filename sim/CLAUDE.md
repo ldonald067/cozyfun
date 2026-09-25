@@ -34,8 +34,14 @@ they were away. It is a separate entry point on purpose; the argument for why ti
 express an absence lives in `app/src/slowWorld.ts`, which owns that policy for both the app
 and the harness.
 
-Rules belong there only if they are too consequential to fire while watched, and only if
-they touch something the player left living — a scene of walls and sand must come back
-byte-identical, and `slow_steps_leave_an_unliving_scene_byte_identical` enforces that.
+Rules belong there only if they are too slow or too consequential to fire while watched,
+and only if they **never rearrange something the player built**. That used to read "only if
+they touch something the player left living", and living was always a proxy for the real
+promise: a week away does not edit your construction. Sediment turning to rock is the case
+that separated the two — a lake bed is not alive, and nobody built it either. So submerged
+sand may change; a dry dune on a shelf may not, because a dune is a thing somebody made.
+`slow_steps_leave_an_unliving_scene_byte_identical` still holds a dry scene of walls and sand
+to byte-identical, and `a_dry_dune_is_never_turned_to_stone` guards the burial case, which
+that older test could not see: its sand was never covered.
 Everything else about it is ordinary: same RNG stream, same parity obligation, same
 mirroring in `engine.ts`.

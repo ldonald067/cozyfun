@@ -53,7 +53,13 @@ const FLAG_ROOTED: u16 = 1 << 1;
 const FLAG_COSMIC: u16 = 1 << 2;
 const FLAG_FROZEN: u16 = 1 << 3;
 const FLAG_SCORCHED: u16 = 1 << 4;
-const FLAG_MASK: u16 = FLAG_WET | FLAG_ROOTED | FLAG_COSMIC | FLAG_FROZEN | FLAG_SCORCHED;
+/// Stone that was laid down as sediment rather than cooled from lava. It is the only way the
+/// renderer can tell the two rocks apart, so it has to survive a save: `FLAG_MASK` is what
+/// `load_cells` keeps, and a flag missing from it is silently stripped on every reload —
+/// which is exactly when the slow world runs.
+const FLAG_BEDDED: u16 = 1 << 5;
+const FLAG_MASK: u16 =
+    FLAG_WET | FLAG_ROOTED | FLAG_COSMIC | FLAG_FROZEN | FLAG_SCORCHED | FLAG_BEDDED;
 
 /// Canonical face order around a cell, walked identically by petal opening and
 /// pollen release in both engines. **Cardinals first, then diagonals**: a head that
@@ -164,6 +170,9 @@ const SOIL_DAMP_ENERGY: u16 = 60;
 // being large enough to feel like the scene was edited.
 const SLOW_CHAR_SETTLES: u32 = 6;
 const SLOW_SEED_SCATTERS: u32 = 3;
+/// Deliberately the slowest odds in the slow world: rock should feel like the one thing here
+/// that takes days, not a night.
+const SLOW_SAND_COMPACTS: u32 = 8;
 /// Every offset clears PLANT_SPACING, so a scattered seed lands where it can grow.
 const SCATTER_OFFSETS: [i32; 8] = [6, -6, 9, -9, 12, -12, 15, -15];
 const SCATTER_REACH: i32 = 14;
@@ -400,6 +409,30 @@ impl Universe {
                 continue;
             }
 
+            // Sediment turns to rock, which closes the one loop the roster was missing.
+            // Lava cools to stone, running water wears stone to sand, heat fuses sand to
+            // glass and a meteor shatters glass back to sand — but nothing ever turned sand
+            // into stone, so the cycle had a hole in it. Sand lying under its own deposit
+            // at the bottom of standing water compacts into sandstone while you are away.
+            //
+            // "At the bottom of standing water", not "wet", and that is a measured choice:
+            // water does not soak down through a sand bed in this sim. On a real pond only
+            // the top two to five rows ever carry the wet flag and the deep bed stays dry,
+            // so a wetness test either fired on about nine cells (wet AND covered) or capped
+            // loose sand with a stone lid (wet at all). The deposit's position under the
+            // water is what matters, which is also the true geology: a lake bed, not a beach.
+            //
+            // The cover requirement leaves the topmost layer loose, so a compacted bed keeps
+            // a sand floor on top of it. And a dry dune can never qualify — the sand castle
+            // you left on the shelf comes back as sand. Only a flooded deposit changes.
+            if cell.kind == Material::Sand as u8 {
+                if self.under_standing_water(idx, &old) && self.chance(SLOW_SAND_COMPACTS) {
+                    next[idx] = Cell::new(Material::Stone as u8, cell.variant, cell.energy);
+                    next[idx].flags = (cell.flags & FLAG_WET) | FLAG_BEDDED;
+                }
+                continue;
+            }
+
             // A spent seed head sows. The crown drops a seed clear of its own shadow,
             // so a garden walks across the tray over successive visits instead of
             // standing exactly where it was planted forever. The seed inherits the
@@ -442,6 +475,26 @@ impl Universe {
         }
 
         self.cells = next;
+    }
+
+    /// Sand covered by at least one layer of its own deposit, in a deposit whose top is
+    /// under standing water. Scans straight up through Sand and Stone — sandstone already
+    /// formed above still counts as overburden — and asks what it meets first. Reads `old`
+    /// only, so a cell compacting this step cannot change what its neighbours see.
+    fn under_standing_water(&self, idx: usize, old: &[Cell]) -> bool {
+        let (x, y) = self.xy(idx);
+        let mut cover = 0;
+        let mut ny = y - 1;
+        while ny >= 0 {
+            let kind = old[self.idx(x as u32, ny as u32)].kind;
+            if kind == Material::Sand as u8 || kind == Material::Stone as u8 {
+                cover += 1;
+                ny -= 1;
+                continue;
+            }
+            return cover > 0 && is_water_like(kind);
+        }
+        false
     }
 
     /// Somewhere a scattered seed could actually come up: open air resting on soil
@@ -3635,6 +3688,43 @@ mod tests {
         );
     }
 
+    /// The rock cycle closes on its own. Sandstone is still stone, so running water wears it
+    /// exactly as it wears lava rock — and what comes off is PLAIN sand, not bedded sand,
+    /// because erosion builds a fresh grain rather than carrying the stone's flags across. A
+    /// lake that set into rock can be cut back to sand by a stream, and that sand could settle
+    /// under water and set again. The docs claim the loop closes; this is what makes it true.
+    #[test]
+    fn eroded_sandstone_comes_off_as_plain_sand() {
+        let mut u = Universe::new(16, 16, 7);
+        for y in 3..=10 {
+            for x in [6, 7, 9, 10] {
+                set_cell(&mut u, x, y, Material::Wall);
+            }
+        }
+        set_cell(&mut u, 8, 10, Material::Wall);
+        set_cell(&mut u, 8, 9, Material::Stone);
+        let rock = u.idx(8, 9);
+        u.cells[rock].flags |= FLAG_BEDDED;
+        set_cell(&mut u, 8, 8, Material::Water);
+
+        let mut grain = None;
+        'wear: for _ in 0..30000 {
+            u.tick();
+            for y in 4..=9 {
+                if kind_at(&u, 8, y) == Material::Sand as u8 && flags_at(&u, 8, y) & FLAG_WET != 0 {
+                    grain = Some(y);
+                    break 'wear;
+                }
+            }
+        }
+        let y = grain.expect("running water should wear a grain off sandstone, as it does off lava rock");
+        assert_eq!(
+            flags_at(&u, 8, y) & FLAG_BEDDED,
+            0,
+            "an eroded grain must come off as plain sand — bedded is a property of the rock, not the grain"
+        );
+    }
+
     /// The other half of the rule, and the half that protects what a player built: still water
     /// carves nothing. Water with nowhere to go is a pond, not a stream. Without this the rule
     /// ate the build — measured on a stone bowl holding standing water, eroding on contact
@@ -4431,6 +4521,123 @@ mod tests {
             u.slow_step();
         }
         assert_eq!(before, u.cells, "a scene with nothing alive in it must come back unchanged");
+    }
+
+    /// A flooded sand bed compacts into sandstone from the inside while you are away,
+    /// born bedded so the renderer can tell it from lava rock — and the layer the water
+    /// actually rests on stays loose, so the lake keeps a sand floor.
+    #[test]
+    fn a_flooded_sand_bed_compacts_into_bedded_sandstone() {
+        let mut u = Universe::new(24, 24, 7);
+        for x in 2..22 {
+            set_cell(&mut u, x, 20, Material::Wall);
+        }
+        for y in 10..20 {
+            set_cell(&mut u, 2, y, Material::Wall);
+            set_cell(&mut u, 21, y, Material::Wall);
+        }
+        for x in 3..21 {
+            for y in 15..20 {
+                set_cell(&mut u, x, y, Material::Sand);
+            }
+            for y in 11..15 {
+                set_cell(&mut u, x, y, Material::Water);
+            }
+        }
+        for _ in 0..24 {
+            u.slow_step();
+        }
+        let at = |u: &Universe, x: u32, y: u32| u.cells[u.idx(x, y)];
+
+        let floor_loose = (3..21).filter(|&x| at(&u, x, 15).kind == Material::Sand as u8).count();
+        assert_eq!(floor_loose, 18, "the layer the water rests on must stay loose sand");
+
+        let (mut buried, mut bedded) = (0, 0);
+        for x in 3..21 {
+            for y in 16..20 {
+                buried += 1;
+                let c = at(&u, x, y);
+                if c.kind == Material::Stone as u8 && c.flags & FLAG_BEDDED != 0 {
+                    bedded += 1;
+                }
+            }
+        }
+        assert!(
+            bedded * 10 >= buried * 8,
+            "a day's worth of slow steps should turn most of a flooded bed to sandstone \
+             (at 1-in-{SLOW_SAND_COMPACTS} odds, 24 steps leave about 4% loose); got {bedded}/{buried}"
+        );
+    }
+
+    /// Sandstone has to survive a save. `load_cells` keeps only the bits `FLAG_MASK` names,
+    /// and a reload is exactly when the slow world runs — so a flag left out of the mask is
+    /// stripped the next time the game opens, and every sandstone quietly becomes lava rock.
+    /// This is the PRODUCTION engine's mask; the slow-world audit checks the JS one, and the
+    /// two are separate constants that nothing else compares.
+    #[test]
+    fn bedded_sandstone_survives_a_save_and_reload() {
+        let mut u = Universe::new(8, 8, 7);
+        set_cell_state(&mut u, 3, 3, Material::Stone, 0, 0, FLAG_BEDDED | FLAG_WET);
+        let bytes: Vec<u8> = u
+            .cells
+            .iter()
+            .flat_map(|c| {
+                let mut b = vec![c.kind, c.variant];
+                b.extend_from_slice(&c.age.to_le_bytes());
+                b.extend_from_slice(&c.energy.to_le_bytes());
+                b.extend_from_slice(&c.flags.to_le_bytes());
+                b
+            })
+            .collect();
+        let mut reloaded = Universe::new(8, 8, 7);
+        assert!(reloaded.load_cells(&bytes), "the saved board should load");
+        let flags = reloaded.cells[reloaded.idx(3, 3)].flags;
+        assert_ne!(flags & FLAG_BEDDED, 0, "a reload stripped the bedded flag — it is missing from FLAG_MASK");
+        assert_ne!(flags & FLAG_WET, 0, "and it must not take the other flags with it");
+    }
+
+    /// The build-protection half. A deep DRY dune is buried but not flooded, so it comes
+    /// back exactly as it was left — a sand castle is a thing somebody made.
+    #[test]
+    fn a_dry_dune_is_never_turned_to_stone() {
+        let mut u = Universe::new(24, 24, 7);
+        for x in 2..22 {
+            set_cell(&mut u, x, 20, Material::Wall);
+        }
+        for x in 3..21 {
+            for y in 10..20 {
+                set_cell(&mut u, x, y, Material::Sand);
+            }
+        }
+        let before = u.cells.clone();
+        for _ in 0..24 {
+            u.slow_step();
+        }
+        assert_eq!(before, u.cells, "a dry dune must come back byte-identical");
+    }
+
+    /// Water that is NOT on top of the deposit does not count. A pond sitting beside a dune
+    /// leaves the dune alone: the test is what lies above the sand, not what lies near it.
+    #[test]
+    fn water_beside_a_dune_does_not_petrify_it() {
+        let mut u = Universe::new(30, 24, 7);
+        for x in 1..29 {
+            set_cell(&mut u, x, 20, Material::Wall);
+        }
+        for y in 12..20 {
+            set_cell(&mut u, 14, y, Material::Wall);
+            for x in 3..14 {
+                set_cell(&mut u, x, y, Material::Sand);
+            }
+            for x in 15..27 {
+                set_cell(&mut u, x, y, Material::Water);
+            }
+        }
+        for _ in 0..24 {
+            u.slow_step();
+        }
+        let stone = u.cells.iter().filter(|c| c.kind == Material::Stone as u8).count();
+        assert_eq!(stone, 0, "a dune next to a pond is not under it");
     }
 
     /// A finished plant sows itself onto the next patch of ground, clear of its own

@@ -1078,6 +1078,26 @@ function glassColor({ color, variant, age, energy, flags, time, cells, width, he
   return out;
 }
 
+// Sandstone: stone that was laid down as sediment rather than cooled from lava, carried by
+// `CELL_FLAG.Bedded`, which the slow world sets when a flooded sand bed compacts.
+//
+// A light warm buff, and the colour was the hard part, because texture could only do half
+// the job. Sandstone is striped — but so are SAND (1.60x), SOIL (1.14x) and WALL (1.63x), all
+// horizontal, so strata separate it only from the igneous stone it is not, which is
+// isotropic (1.08x). Against everything else colour has to carry it alone, and the loose sand
+// floor sits DIRECTLY on this rock. Eleven palettes were swept through this renderer on a
+// 72x40 board, and they split along exactly that line. Every warm brown landed on soil (p10
+// 24-31, under the 45 floor) where no texture could rescue it; the first buff-grey landed on
+// plain stone (36) where texture could. Lifting that grey lighter and warmer cleared both.
+// These four measure p10 70 from sand, 58 from stone, 60 from soil, 71 from wall and 169
+// from water — every neighbour clear on colour alone — at 1.26x along the horizontal.
+const SANDSTONE_BEDS: Rgb[] = [
+  [192, 184, 166],
+  [164, 158, 142],
+  [208, 200, 182],
+  [146, 142, 136]
+];
+
 function stoneColor({ color, variant, energy, flags, cells, width, height, x, y }: ShapeContext) {
   const blockHash = hashCell(x >> 1, y >> 1, variant);
   const facet = hashCell(x >> 2, y >> 2, variant);
@@ -1091,20 +1111,44 @@ function stoneColor({ color, variant, energy, flags, cells, width, height, x, y 
   const cosmic = Boolean(flags & CELL_FLAG.Cosmic);
   const localX = (x + (facet & 1)) & 3;
   const localY = (y + ((facet >> 2) & 1)) & 3;
-  let out = mixRgb(adjustRgb(color, (blockHash % 7) * 5 - 15), [82, 81, 76], 0.16);
-  if (localX === 0 || localY === 0 || edge.top || edge.left) out = mixRgb(out, [171, 172, 168], 0.3);
-  if (localX === 3 || localY === 3 || edge.right || edge.bottom) out = mixRgb(out, [28, 31, 37], 0.38);
-  if ((localX === 1 && localY === 2 && facet % 3 === 0) || (x + y + blockHash) % 13 === 0) {
-    out = mixRgb(out, [24, 26, 31], 0.62);
-  }
-  if (localX + localY === 2 && facet % 5 === 0) out = mixRgb(out, [121, 118, 104], 0.22);
-  if (((x ^ y ^ blockHash) & 31) === 3) out = mixRgb(out, [192, 187, 169], 0.22);
-  if (edge.count === 0) {
-    // Mineral veins: rare clustered strata glint inside larger stone masses only.
-    const veinSeed = hashCell(x >> 3, y >> 3, 1);
-    if ((veinSeed & 15) === 3 && (x * 2 + y * 3 + (veinSeed & 7)) % 19 < 2) {
-      out = mixRgb(out, (veinSeed & 16) !== 0 ? [212, 190, 140] : [176, 196, 214], 0.4);
-      if (((x ^ y) & 7) === 2) out = mixRgb(out, [236, 226, 190], 0.35);
+  let out: Rgb;
+  if (flags & CELL_FLAG.Bedded) {
+    // Laid down in beds, so it is drawn in beds: two-row strata with a dark bedding plane
+    // every fourth row, and NONE of the igneous block/crack/vein structure below, which is
+    // isotropic and would drown the one thing that says this rock was sediment.
+    //
+    // The seam wanders by RUNS OF COLUMNS, not per cell, and that one decision is most of
+    // the look. The first version jittered each cell's band independently — the same shape
+    // soil uses — and it made speckle rather than layers: measured, only 31% of adjacent
+    // cells along a row held the same stratum, and the rock came out LESS stratified than the
+    // loose sand it formed from (v/h 1.26 against sand's 1.59). The rock whose whole identity
+    // is layers was the mottled one. Stepping the seam once per 8-column block keeps each
+    // layer continuous for a run and lets it drift like a real bed: 58% of pairs hold their
+    // stratum and v/h is 5.0. Quieting the grain further pushed runs to 94%, which is the
+    // ruled-line look the soil bedding was written to avoid.
+    const grain = hashCell(x, y, variant);
+    const seam = hashCell(x >> 3, y >> 3, 7) & 1;
+    out = adjustRgb(SANDSTONE_BEDS[((y >> 1) + seam) % SANDSTONE_BEDS.length], (grain % 5) * 2 - 4);
+    // A bedding plane lies BETWEEN layers, so it is never drawn on the bed's exposed top.
+    // There it also sat right under the lake's wet sand floor and dragged the rock toward it:
+    // measured on a real lake, the worst floor/rock pair was 44, one under the 45 floor.
+    if (((y + seam) & 3) === 0 && !edge.top) out = mixRgb(out, [72, 60, 48], 0.35);
+  } else {
+    out = mixRgb(adjustRgb(color, (blockHash % 7) * 5 - 15), [82, 81, 76], 0.16);
+    if (localX === 0 || localY === 0 || edge.top || edge.left) out = mixRgb(out, [171, 172, 168], 0.3);
+    if (localX === 3 || localY === 3 || edge.right || edge.bottom) out = mixRgb(out, [28, 31, 37], 0.38);
+    if ((localX === 1 && localY === 2 && facet % 3 === 0) || (x + y + blockHash) % 13 === 0) {
+      out = mixRgb(out, [24, 26, 31], 0.62);
+    }
+    if (localX + localY === 2 && facet % 5 === 0) out = mixRgb(out, [121, 118, 104], 0.22);
+    if (((x ^ y ^ blockHash) & 31) === 3) out = mixRgb(out, [192, 187, 169], 0.22);
+    if (edge.count === 0) {
+      // Mineral veins: rare clustered strata glint inside larger stone masses only.
+      const veinSeed = hashCell(x >> 3, y >> 3, 1);
+      if ((veinSeed & 15) === 3 && (x * 2 + y * 3 + (veinSeed & 7)) % 19 < 2) {
+        out = mixRgb(out, (veinSeed & 16) !== 0 ? [212, 190, 140] : [176, 196, 214], 0.4);
+        if (((x ^ y) & 7) === 2) out = mixRgb(out, [236, 226, 190], 0.35);
+      }
     }
   }
   if (dampContact.count > 0 || flags & CELL_FLAG.Wet || energy > 30) {
