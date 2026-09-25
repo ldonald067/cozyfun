@@ -1089,8 +1089,14 @@ function glassColor({ color, variant, age, energy, flags, time, cells, width, he
 // 72x40 board, and they split along exactly that line. Every warm brown landed on soil (p10
 // 24-31, under the 45 floor) where no texture could rescue it; the first buff-grey landed on
 // plain stone (36) where texture could. Lifting that grey lighter and warmer cleared both.
-// These four measure p10 70 from sand, 58 from stone, 60 from soil, 71 from wall and 169
-// from water — every neighbour clear on colour alone — at 1.26x along the horizontal.
+//
+// Measured on cells that actually TOUCH, in the geometry each neighbour has in play, these
+// four sit at p10 73 from the lake's wet sand floor and 89-94 from dry sand, which is the
+// pair colour has to carry. They do NOT clear lava rock (44) or wall (47) on colour alone:
+// both have pale lit edges that land on this buff, and strata — 5.65x against lava rock's
+// 1.08x — are what separate those two. An earlier version of this note said "every
+// neighbour clear on colour alone"; that was true of field MEANS, which is not what anyone
+// sees. `npm run renderer:probe` gates both halves.
 const SANDSTONE_BEDS: Rgb[] = [
   [192, 184, 166],
   [164, 158, 142],

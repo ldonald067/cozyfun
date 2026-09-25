@@ -639,57 +639,106 @@ function assertFloor(label, floor, worst, detail) {
 }
 
 // 10. SANDSTONE. Stone laid down as sediment, which the slow world makes when a flooded sand
-//     bed compacts. Two claims, gated separately because they fail in different ways.
+//     bed compacts. Three claims, gated separately because they fail in different ways.
 //
-//     COLOUR. Sandstone forms directly under the lake's loose sand floor — and that floor is
-//     always WET, because it touches the water. The first palette was tuned against DRY sand,
-//     measured a comfortable p10 70, and put the real boundary at p10 33 and min 27: the
-//     neighbour was measured in a state it never has in play. So the wet floor is the first
-//     pair here. Every warm brown that cleared sand then landed on SOIL (p10 24-31), which is
-//     also horizontally bedded, so no texture could rescue it — the settled palette is a pale
-//     grey-buff that clears all five on colour alone.
+//     COLOUR is measured on cells that TOUCH, in the geometry each neighbour has in play, and
+//     scored as the p10 of those pairs. This check used to compare the MEAN colour of two
+//     separate fields and called the result p10: it reported 86 while the pairs a player can
+//     actually see were never measured at all. Adversarial review caught it. A mean hides
+//     exactly the thing a bedded rock is made of — its darkest and palest strata — and a pair
+//     of cells that never touch says nothing about a boundary.
+//
+//     Against the SAND it forms from, colour is all that separates it: sand is stratified
+//     too (1.59x) and the lake's loose floor sits directly on the rock. That floor always
+//     touches the water, so it is WET — the first palette was tuned against dry sand and put
+//     the real boundary at p10 33. Measured through the engine on the audit's lake over 100
+//     seeds, that boundary is now p10 76; this fixture reproduces it at 73.
+//
+//     Against LAVA ROCK and WALL, colour alone does not carry it, and that is measured rather
+//     than assumed: touching pairs sit at p10 44 and 47. Their means are far apart, but lava
+//     rock's pale block lines and wall's lit courses both land on sandstone's buff. What
+//     separates those pairs is TEXTURE — strata against isotropic blocks — which the check
+//     after this one gates. So this floor only holds the line where it stands today.
 //
 //     TEXTURE. The rock's whole identity is being LAYERED, which is the one thing that tells
 //     it from the granular stone lava cools into (1.08x, isotropic). A first version jittered
 //     each cell's stratum independently and came out LESS stratified than the loose sand it
 //     formed from — v/h 1.26 against sand's 1.59. The seam now drifts by 8-column runs.
 {
-  const { board: ssBoard, colourAt: ssColourAt } = grid(72, 40);
-  const field = (kind, flags, energy, age) => ssBoard((put) => {
-    for (let y = 0; y < 40; y++) for (let x = 0; x < 72; x++) {
-      const v = (Math.imul(x, VARIANT_COEFFS[0]) + Math.imul(y, VARIANT_COEFFS[1])
-        + Math.imul(kind, VARIANT_COEFFS[2])) >>> 0;
-      put(x, y, kind, energy, age, flags, v % VARIANT_MODULUS);
+  const { board: ssBoard, colourAt: ssColourAt, width: SW, height: SH } = grid(72, 40);
+  const variantAt = (x, y, kind) => ((Math.imul(x, VARIANT_COEFFS[0]) + Math.imul(y, VARIANT_COEFFS[1])
+    + Math.imul(kind, VARIANT_COEFFS[2])) >>> 0) % VARIANT_MODULUS;
+  // `put` with the sim's own variant, so the fixture draws the palette pattern the game does.
+  const scene = (paint) => ssBoard((put) => paint((x, y, kind, energy, age, flags) =>
+    put(x, y, kind, energy, age, flags, variantAt(x, y, kind))));
+  const ROCK = [MATERIAL.Stone, 0, 90, CELL_FLAG.Bedded];
+  const isRock = (cells, i) => cells[i * STRIDE] === MATERIAL.Stone && cells[i * STRIDE + 6] & CELL_FLAG.Bedded;
+  // p10 over every sandstone/neighbour pair that shares an edge, across the whole time sweep.
+  const touchingP10 = (cells, isOther) => {
+    const d = [];
+    for (const t of TIMES) for (let y = 1; y < SH - 1; y++) for (let x = 1; x < SW - 1; x++) {
+      if (!isRock(cells, y * SW + x)) continue;
+      for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+        if (!isOther(cells, (y + dy) * SW + x + dx)) continue;
+        d.push(redmean(ssColourAt(cells, x, y, t), ssColourAt(cells, x + dx, y + dy, t)));
+      }
+    }
+    d.sort((a, b) => a - b);
+    return d[Math.floor(d.length * 0.1)];
+  };
+  const kindIs = (kind) => (cells, i) => cells[i * STRIDE] === kind && !isRock(cells, i);
+  // Beside it: the neighbour fills the left third and a band across the top, so the rock
+  // meets it on both a vertical and a horizontal face.
+  const beside = (kind, energy, age) => scene((put) => {
+    for (let y = 0; y < SH; y++) for (let x = 0; x < SW; x++) {
+      if (x < 24 || y < 12) put(x, y, kind, energy, age, 0);
+      else put(x, y, ...ROCK);
     }
   });
-  const meanOf = (cells, time) => {
-    let r = 0, g = 0, b = 0, n = 0;
-    for (let y = 4; y < 36; y++) for (let x = 4; x < 68; x++) {
-      const c = ssColourAt(cells, x, y, time); r += c[0]; g += c[1]; b += c[2]; n++;
-    }
-    return [r / n, g / n, b / n];
-  };
-  const sandstone = field(MATERIAL.Stone, CELL_FLAG.Bedded, 0, 90);   // (kind, flags, energy, age)
-  const NEIGHBOURS = [
-    ["the wet sand floor it forms under", MATERIAL.Sand, CELL_FLAG.Wet, 80, 42],
-    ["dry sand", MATERIAL.Sand, 0, 0, 42],
-    ["the stone lava cools into", MATERIAL.Stone, 0, 0, 90],
-    ["soil", MATERIAL.Soil, 0, 0, 40],
-    ["the wall a basin is built from", MATERIAL.Wall, 0, 0, 20000],
-  ];
-  let worst = Infinity, at = null;
-  for (const [name, kind, flags, energy, age] of NEIGHBOURS) {
-    const other = field(kind, flags, energy, age);
-    for (const t of TIMES) {
-      const d = redmean(meanOf(sandstone, t), meanOf(other, t));
-      if (d < worst) { worst = d; at = name; }
-    }
-  }
-  assertFloor("sandstone vs the ground it forms beside", 70, worst,
-    `worst against ${at}. Sandstone is striped, but so are sand, soil and wall — only lava ` +
-    `rock is not — so against those four COLOUR is all that separates it. Measure the sand ` +
-    `floor WET: it always touches the lake, and a dry-sand reading hid a real p10 of 33.`);
+  const worstOf = (pairs) => pairs
+    .map(([name, cells, isOther]) => [name, touchingP10(cells, isOther)])
+    .reduce((a, b) => (b[1] < a[1] ? b : a));
 
+  const [sandAt, sandWorst] = worstOf([
+    // The lake: water over a wet sand floor one to three cells deep (ragged by column run),
+    // sandstone under it. On the real lake the rock at that boundary is dry, so it is here.
+    ["the wet sand floor of a lake", scene((put) => {
+      for (let x = 0; x < SW; x++) {
+        const floor = 12 + (((x >> 3) * 5) % 3);
+        for (let y = 0; y < SH; y++) {
+          if (y < 10) put(x, y, MATERIAL.Water, 0, 0, 0);
+          else if (y <= floor) put(x, y, MATERIAL.Sand, 0, 40, CELL_FLAG.Wet);
+          else put(x, y, ...ROCK);
+        }
+      }
+    }), kindIs(MATERIAL.Sand)],
+    // At 1-in-8 odds a day leaves about one grain in eight loose inside the rock.
+    ["dry grains left loose inside the bed", scene((put) => {
+      for (let y = 0; y < SH; y++) for (let x = 0; x < SW; x++) {
+        if (((Math.imul(x, 2654435761) ^ Math.imul(y, 40503)) >>> 0) % 8 === 0) put(x, y, MATERIAL.Sand, 0, 40, 0);
+        else put(x, y, ...ROCK);
+      }
+    }), kindIs(MATERIAL.Sand)],
+    ["a dry dune beside it", beside(MATERIAL.Sand, 0, 40), kindIs(MATERIAL.Sand)],
+  ]);
+  assertFloor("sandstone vs the sand it forms from (touching p10)", 65, sandWorst,
+    `worst against ${sandAt}. Sand is stratified too, so COLOUR is all that separates the two, ` +
+    `and the lake's loose floor sits directly on the rock. Measure the floor WET: it always ` +
+    `touches the water, and a dry-sand reading once hid a real p10 of 33.`);
+
+  const [groundAt, groundWorst] = worstOf([
+    ["soil", beside(MATERIAL.Soil, 0, 40), kindIs(MATERIAL.Soil)],
+    ["the stone lava cools into", beside(MATERIAL.Stone, 0, 90), kindIs(MATERIAL.Stone)],
+    ["the wall a basin is built from", beside(MATERIAL.Wall, 0, 20000), kindIs(MATERIAL.Wall)],
+  ]);
+  assertFloor("sandstone vs the ground around it (touching p10)", 40, groundWorst,
+    `worst against ${groundAt}. Lava rock and wall share sandstone's pale tones at their lit ` +
+    `edges, so strata — gated next — carry those two pairs. This floor holds today's p10; ` +
+    `do not lower it to make a palette change pass.`);
+
+  const sandstone = scene((put) => {
+    for (let y = 0; y < SH; y++) for (let x = 0; x < SW; x++) put(x, y, ...ROCK);
+  });
   const AX = { horizontal: [1, 0], vertical: [0, 1], "diagonal NW-SE": [1, 1], "diagonal NE-SW": [1, -1] };
   const step = {};
   for (const [name, [dx, dy]] of Object.entries(AX)) {

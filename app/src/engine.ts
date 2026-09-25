@@ -328,8 +328,14 @@ class JsSandboxEngine implements SandboxEngine {
     let y = Math.floor(cellIndex / this.w) - 1;
     let cover = 0;
     while (y >= 0) {
-      const kind = old[(y * this.w + x) * CELL_STRIDE];
-      if (kind === MATERIAL.Sand || kind === MATERIAL.Stone) {
+      // Plain stone ends the scan: a painted lid is construction, not the lake's deposit.
+      // See the sim for the review that found water on a stone lid petrifying dry sand.
+      const above = (y * this.w + x) * CELL_STRIDE;
+      const kind = old[above];
+      if (
+        kind === MATERIAL.Sand ||
+        (kind === MATERIAL.Stone && readU16(old, above + 6) & CELL_FLAG.Bedded)
+      ) {
         cover++;
         y--;
         continue;

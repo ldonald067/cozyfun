@@ -671,6 +671,58 @@ const scenarios = [
       return null;
     },
   },
+  {
+    // The construction guard, as a matched pair. Left of the divider, an open lake; right
+    // of it, the same sand bed sealed under a painted stone LID with water on the lid. Review
+    // found the lidded bed compacting (88-124 cells) because the scan counted any stone as
+    // deposit. The lake half is what keeps this non-vacuous: if it stops compacting, the
+    // rule is not running at all and a clean lid proves nothing.
+    name: "a stone lid keeps the lake off the sand sealed under it",
+    w: 40, h: 26, seed: 4117, ticks: 260,
+    slowSteps: [{ at: 200, count: 24 }],
+    paint(p) {
+      // Target first, masonry last. The lid is painted after the sand and the water after
+      // the lid, so each spill lands on the layer below and the walls win at the end.
+      for (let y = 18; y <= 23; y++) for (let x = 3; x <= 36; x++) p(x, y, 1, M.Sand);
+      for (let y = 15; y <= 17; y++) for (let x = 21; x <= 36; x++) p(x, y, 1, M.Stone);
+      for (let y = 13; y <= 17; y++) for (let x = 3; x <= 18; x++) p(x, y, 1, M.Water);
+      for (let y = 11; y <= 13; y++) for (let x = 21; x <= 36; x++) p(x, y, 1, M.Water);
+      for (let x = 0; x < 40; x++) p(x, 24, 1, M.Wall);
+      for (let y = 8; y < 24; y++) { p(1, y, 1, M.Wall); p(38, y, 1, M.Wall); p(20, y, 1, M.Wall); }
+    },
+    observe(seen, cells, w, h, tick) {
+      let lakeBedded = 0, lidBedded = 0, lidSand = 0, lidStone = 0, lidWater = 0;
+      for (let i = 0; i < w * h; i++) {
+        const x = i % w;
+        const kind = cells[i * STRIDE];
+        const flags = cells[i * STRIDE + 6] | (cells[i * STRIDE + 7] << 8);
+        const bedded = kind === M.Stone && flags & CELL_FLAG.Bedded;
+        if (x < 20) { if (bedded) lakeBedded++; continue; }
+        if (bedded) lidBedded++;
+        else if (kind === M.Sand) lidSand++;
+        else if (kind === M.Stone) lidStone++;
+        else if (kind === M.Water) lidWater++;
+      }
+      // observe runs BEFORE the slow steps taken at the end of the same tick.
+      if (tick === 200 && seen.lidSandBefore === undefined) {
+        seen.lidSandBefore = lidSand;
+        seen.lidStoneBefore = lidStone;
+        seen.lidWaterBefore = lidWater;
+      }
+      seen.lakeBedded = lakeBedded;
+      seen.lidBedded = lidBedded;
+      seen.lidSandAfter = lidSand;
+    },
+    expect(seen) {
+      if ((seen.lidSandBefore ?? 0) < 40) return `only ${seen.lidSandBefore ?? 0} sand cells under the lid — nothing to protect`;
+      if ((seen.lidStoneBefore ?? 0) < 20) return `only ${seen.lidStoneBefore ?? 0} lid cells — the sand is not sealed`;
+      if ((seen.lidWaterBefore ?? 0) < 20) return `only ${seen.lidWaterBefore ?? 0} water cells on the lid — nothing is testing it`;
+      if ((seen.lakeBedded ?? 0) < 30) return `the open lake compacted only ${seen.lakeBedded ?? 0} cells — the rule is not running, so a clean lid proves nothing`;
+      if ((seen.lidBedded ?? 0) !== 0) return `${seen.lidBedded} cells of sand sealed under a stone lid turned to sandstone`;
+      if (seen.lidSandAfter !== seen.lidSandBefore) return `the lidded bed changed: ${seen.lidSandBefore} sand before, ${seen.lidSandAfter} after`;
+      return null;
+    },
+  },
 ];
 
 for (const s of scenarios) runScenario(s);

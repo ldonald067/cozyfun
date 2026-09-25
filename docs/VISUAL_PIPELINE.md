@@ -322,6 +322,15 @@ The slow world (between sessions only):
   deposit is topped by water — a lake bed, not a beach. The layer the water rests on stays
   loose, so a finished lake keeps a sand floor over its rock.
 
+  **"Its own deposit" means sand and sandstone, never plain stone.** The first version let
+  any stone count as cover, so water standing on a painted stone LID petrified the dry sand
+  sealed beneath it — adversarial review built that three separate ways and turned 88 to 124
+  cells of sand that never touched water into rock in a day. Plain stone now ends the scan:
+  a lid is something somebody built, and only rock the lake itself laid down is part of its
+  bed. `water_on_a_stone_lid_does_not_petrify_the_sand_under_it` and a matched lake/lid
+  parity scenario pin it, the latter failing as vacuous if the open lake beside the lid
+  stops compacting.
+
   It is the slowest odds in the slow world, 1 in 8 per step: an hour away (4 steps) sets
   about 40% of a flooded bed, a day (18) about 90%, measured at 31 and 72 cells on the
   audit's lake. `npm run slow-world:audit` asserts that a day beats an hour, that the rock is
@@ -339,7 +348,12 @@ The slow world (between sessions only):
   comes back byte-identical, because a dune on a shelf is a thing somebody made. A scene of
   walls, dry sand and glass still returns byte-identical, a cargo test and the audit's
   raw-byte inert check both say so, and `a_dry_dune_is_never_turned_to_stone` covers the
-  buried case the older test could not see. (The ordinary catch-up ticks that follow are a
+  buried case the older test could not see. **One case is open rather than settled**: rain
+  from an open window can fill a sand-floored basin the player built, and that IS a flooded
+  bed — review measured 81 cells compacting after a day. Whether a planter left out in the
+  rain should come back as rock is a design call nobody has made yet; a puddle that happens
+  to be standing at save time counts, because the slow steps run before the catch-up could
+  drain it. (The ordinary catch-up ticks that follow are a
   separate thing and will still settle anything mid-fall, as they would during play.) Char
   under water is spared too: a quenched hearth is a look somebody chose.
 - A sown seed **displaces the one patch of moss it lands on back to soil**. A watered bed

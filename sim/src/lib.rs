@@ -478,16 +478,26 @@ impl Universe {
     }
 
     /// Sand covered by at least one layer of its own deposit, in a deposit whose top is
-    /// under standing water. Scans straight up through Sand and Stone — sandstone already
-    /// formed above still counts as overburden — and asks what it meets first. Reads `old`
-    /// only, so a cell compacting this step cannot change what its neighbours see.
+    /// under standing water. Scans straight up through sand and BEDDED stone — sandstone
+    /// already formed above still counts as overburden — and asks what it meets first.
+    /// Reads `old` only, so a cell compacting this step cannot change what its neighbours
+    /// see.
+    ///
+    /// Plain stone ends the scan, and that is the construction guard rather than a detail.
+    /// Counting every stone as deposit let water resting on a painted stone lid petrify the
+    /// dry sand sealed under it — reproduced three separate ways by review, 88-124 cells of
+    /// sand that never touched water turned to rock in a day. A lid is something somebody
+    /// built; only rock the lake itself laid down is part of the lake bed.
     fn under_standing_water(&self, idx: usize, old: &[Cell]) -> bool {
         let (x, y) = self.xy(idx);
         let mut cover = 0;
         let mut ny = y - 1;
         while ny >= 0 {
-            let kind = old[self.idx(x as u32, ny as u32)].kind;
-            if kind == Material::Sand as u8 || kind == Material::Stone as u8 {
+            let above = old[self.idx(x as u32, ny as u32)];
+            let kind = above.kind;
+            if kind == Material::Sand as u8
+                || (kind == Material::Stone as u8 && above.flags & FLAG_BEDDED != 0)
+            {
                 cover += 1;
                 ny -= 1;
                 continue;
@@ -4638,6 +4648,40 @@ mod tests {
         }
         let stone = u.cells.iter().filter(|c| c.kind == Material::Stone as u8).count();
         assert_eq!(stone, 0, "a dune next to a pond is not under it");
+    }
+
+    /// A painted stone LID is construction, not deposit. Water resting on top of it must
+    /// not petrify the dry sand sealed underneath — the case adversarial review built three
+    /// ways (88, 100 and 124 cells turned to rock) while the dune test passed, because that
+    /// test only ever buried sand under sand.
+    #[test]
+    fn water_on_a_stone_lid_does_not_petrify_the_sand_under_it() {
+        let mut u = Universe::new(24, 24, 7);
+        for x in 2..22 {
+            set_cell(&mut u, x, 20, Material::Wall);
+        }
+        for y in 6..20 {
+            set_cell(&mut u, 2, y, Material::Wall);
+            set_cell(&mut u, 21, y, Material::Wall);
+        }
+        for x in 3..21 {
+            for y in 14..20 {
+                set_cell(&mut u, x, y, Material::Sand);
+            }
+            for y in 11..14 {
+                set_cell(&mut u, x, y, Material::Stone);
+            }
+            for y in 7..11 {
+                set_cell(&mut u, x, y, Material::Water);
+            }
+        }
+        let before = u.cells.clone();
+        for _ in 0..24 {
+            u.slow_step();
+        }
+        let bedded = u.cells.iter().filter(|c| c.flags & FLAG_BEDDED != 0).count();
+        assert_eq!(bedded, 0, "sand sealed under a stone lid is not a lake bed");
+        assert_eq!(before, u.cells, "the whole reservoir must come back byte-identical");
     }
 
     /// A finished plant sows itself onto the next patch of ground, clear of its own

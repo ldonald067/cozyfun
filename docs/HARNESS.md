@@ -86,24 +86,44 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
 
   It also closes a gap **four independent reviewers found**: the renderer mirrors `PETAL_SHED_AGE`, `POLLEN_RESERVE` and `COLD_CHAR_ENERGY` so a seed head is drawn under exactly the condition that makes it one, and ash is full exactly when the sim calls an ember out — but parity only compares Rust with `engine.ts`, and neither knew a third copy existed. The probe parses all three sources and fails when they disagree.
 
-  Fifteen checks are gated as of this writing: cold char against the empty tray and against
+  Sixteen checks are gated as of this writing: cold char against the empty tray and against
   its hearth surround, wet against dry char, a bud against the seed head it becomes, a seed
   head against its own flower's hue, the wellspring's three rune states against each other at
   four brush sizes, all 28 bloom-species pairs, **BLOOM_SHAPES agreeing across sim, engine
   and showcase**, **a meteor in flight against fire, its own sparks and stardust**, **soil and wood
-  wearing different fabrics**, and two for **sandstone** — against the ground it forms beside,
-  and whether it is actually laid in beds.
+  wearing different fabrics**, and three for **sandstone** — against the sand it forms from,
+  against the ground around it, and whether it is actually laid in beds.
 
   **The sandstone checks are a second worked example of measuring a neighbour in the wrong
   state.** Its palette was first tuned against DRY sand and scored a comfortable p10 70 — but
   sandstone forms directly under a lake's loose sand floor, and that floor always touches the
   water, so it is always WET. On a real lake the boundary measured p10 33 and min 27. The
-  colour check lists the wet floor first for that reason. The texture check exists because
+  colour check lists the wet floor first for that reason.
+
+  **And then the colour check turned out not to measure what it said.** It compared the MEAN
+  colour of two separate fields and reported the result as a p10 — 86, comfortably over its
+  70 floor, while no pair of cells a player could see had been measured. Adversarial review
+  found it. It now scores the p10 of cells that actually TOUCH, in each neighbour's in-play
+  geometry: the lake's wet floor, grains left loose in the bed, a dune beside it. That reads
+  73 against a floor of 65, and the engine-driven number on the audit's real lake is 76, so
+  the fixture is honest. Measuring properly also showed what the mean hid: against lava rock
+  and wall, touching pairs sit at p10 44 and 47 — their pale lit edges land on sandstone's
+  buff — so colour does not separate those two on its own, and the strata do. That became a
+  second check, floored where it stands.
+
+  **A reviewer reported 54 for that boundary, and the number was a stale compile.** Rerunning
+  the reviewer's own script unchanged, after the probe had rebuilt `.tmp/`, gave 76. The
+  compiled renderers under `.tmp/` are only as fresh as the last gate that wrote them, which
+  is the same trap that produced stale readings earlier in this work. Rebuild before you
+  trust a number read out of `.tmp/`, including someone else's.
+
+  The texture check exists because
   the rock's first version, jittered cell by cell like soil, came out LESS layered than the
   loose sand it formed from (v/h 1.26 against 1.59); stepping the seam by 8-column runs took
-  it to 5.65. Both were vacuity-tested three ways, and each regression fails exactly the
-  check it should: a palette drifting toward sand fails colour only, per-cell jitter fails
-  texture only, and dropping the bedded branch fails both.
+  it to 5.65. All three were vacuity-tested, and each regression fails exactly the check it
+  should: a palette drifting toward sand fails the sand check only (16), per-cell jitter
+  fails texture only (144), and dropping the bedded branch fails the ground check (16) and
+  texture (0) — lava rock against itself.
 
   **The fabric check** gates TEXTURE rather than colour, which is a first here and is the
   point: soil and wood sit at p10 29 redmean, under the palette floor, so pattern is the only
