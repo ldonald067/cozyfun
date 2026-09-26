@@ -348,12 +348,14 @@ The slow world (between sessions only):
   comes back byte-identical, because a dune on a shelf is a thing somebody made. A scene of
   walls, dry sand and glass still returns byte-identical, a cargo test and the audit's
   raw-byte inert check both say so, and `a_dry_dune_is_never_turned_to_stone` covers the
-  buried case the older test could not see. **One case is open rather than settled**: rain
-  from an open window can fill a sand-floored basin the player built, and that IS a flooded
-  bed — review measured 81 cells compacting after a day. Whether a planter left out in the
-  rain should come back as rock is a design call nobody has made yet; a puddle that happens
-  to be standing at save time counts, because the slow steps run before the catch-up could
-  drain it. (The ordinary catch-up ticks that follow are a
+  buried case the older test could not see. **Rain filling a basin is geology, by
+  decision.** An open window can fill a sand-floored basin the player built, and that IS a
+  flooded bed — review measured 81 cells compacting after a day. It was weighed and kept on
+  2026-09-26: the player built the basin, but the weather made the lake, and a lake bed turns
+  to rock. What stays protected is sand the water never stood on — a dry dune, or sand sealed
+  under a stone lid. Note that a puddle standing at save time counts even if it would have
+  drained, because the slow steps run before the catch-up; that is part of the same decision,
+  not a loophole in it. (The ordinary catch-up ticks that follow are a
   separate thing and will still settle anything mid-fall, as they would during play.) Char
   under water is spared too: a quenched hearth is a look somebody chose.
 - A sown seed **displaces the one patch of moss it lands on back to soil**. A watered bed
