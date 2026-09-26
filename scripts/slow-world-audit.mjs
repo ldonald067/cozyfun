@@ -346,21 +346,31 @@ for (const [key, count] of [...transitions].sort((a, b) => b[1] - a[1])) {
 //    lake onto that scene would have moved every threshold above for reasons unrelated to
 //    sediment. Separate scene, same `wakeTerrarium`, same real renderer.
 const LW = 32, LH = 24;
-function paintLake(p) {
-  // Target first, masonry last: the brush spills a cell and the walls must win. Sand is
-  // painted BELOW the water because it cannot sink through it (try_move only sinks
-  // through gas), so pouring it in would leave it floating.
-  for (let y = 16; y <= 21; y++) for (let x = 3; x <= 28; x++) p(x, y, 1, M.Sand);
-  for (let y = 11; y <= 15; y++) for (let x = 3; x <= 28; x++) p(x, y, 1, M.Water);
+// The lake is made the way a player makes one: a walled pond, then sand POURED onto the
+// water at the app's default brush (radius 4) and powder density (55), stroke by stroke.
+// Until sinking existed the sand had to be painted underneath the water, because a poured
+// grain sat on the surface forever — which meant this audit certified a lake bed no player
+// could build. The basin is deep enough to hold the water the sand displaces; a shallower
+// one overflowed its rim in the prototype.
+function pourLake(engine) {
+  const p = (x, y, r, mat, d = 100) => engine.paint(x, y, r, mat, d);
+  // Water first, masonry last: the brush spills a cell and the walls must win.
+  for (let y = 14; y <= 21; y++) for (let x = 3; x <= 28; x++) p(x, y, 1, M.Water);
   for (let x = 0; x < LW; x++) p(x, 22, 1, M.Wall);
-  for (let y = 8; y < 22; y++) { p(1, y, 1, M.Wall); p(30, y, 1, M.Wall); }
+  for (let y = 3; y < 22; y++) { p(1, y, 1, M.Wall); p(30, y, 1, M.Wall); }
+  for (let t = 0; t < 30; t++) engine.tick();
+  // Two sweeps across the pond. x stays within 7..24 so a radius-4 stamp never paints
+  // over the walls at 1 and 30.
+  for (let pass = 0; pass < 2; pass++) {
+    for (let x = 7; x <= 24; x += 2) { p(x, 6, 4, M.Sand, 55); engine.tick(); }
+  }
 }
 const isBedded = (cells, i) =>
   cells[i * STRIDE] === M.Stone && (cells[i * STRIDE + 6] | (cells[i * STRIDE + 7] << 8)) & CELL_FLAG.Bedded;
 
 function lakeAfter(secondsAway) {
   const engine = createFallbackEngine(LW, LH, SEED);
-  paintLake((x, y, r, mat, d = 100) => engine.paint(x, y, r, mat, d));
+  pourLake(engine);
   for (let t = 0; t < 300; t++) engine.tick();
   const before = engine.getCellBytes();
   const plan = wakeTerrarium(engine, secondsAway);

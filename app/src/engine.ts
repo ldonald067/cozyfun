@@ -319,9 +319,8 @@ class JsSandboxEngine implements SandboxEngine {
     this.cells.set(next);
   }
 
-  /** Open air resting on soil or moss, searched outward past PLANT_SPACING. */
   // Mirrors Universe::under_standing_water: sand covered by at least one layer of its own
-  // deposit (Sand, or Stone already compacted above it), in a deposit whose top is under
+  // deposit (sand, or sandstone already compacted above it), in a deposit whose top is under
   // standing water. Reads `old` only.
   private underStandingWater(cellIndex: number, old: Uint8Array) {
     const x = cellIndex % this.w;
@@ -345,6 +344,7 @@ class JsSandboxEngine implements SandboxEngine {
     return false;
   }
 
+  /** Open air resting on soil or moss, searched outward past PLANT_SPACING. */
   private scatterSite(x: number, y: number, variant: number, old: Uint8Array, next: Uint8Array) {
     const start = variant % SCATTER_OFFSETS.length;
     for (let step = 0; step < SCATTER_OFFSETS.length; step++) {
@@ -752,11 +752,15 @@ class JsSandboxEngine implements SandboxEngine {
     // reapplication below still runs every tick, matching Rust's update_sand.
     if (wet) {
       if (this.ticks % 2 === 0) this.powder(idx, x, y, cell, old, next);
-    } else if (this.move(idx, x, y + 1, cell, old, next)) {
-      this.move(this.index(x, y + 1), x, y + 2, cell, old, next);
     } else {
-      for (const [dx, dy] of this.ticks % 2 === 0 ? [[-1, 1], [1, 1]] : [[1, 1], [-1, 1]]) {
-        if (this.move(idx, x + dx, y + dy, cell, old, next)) break;
+      // Two cells a tick through air, but a grain settles through liquid like anything else.
+      const sinking = this.inBounds(x, y + 1) && freeLiquid(next[this.index(x, y + 1)]);
+      if (this.fall(idx, x, y + 1, cell, old, next)) {
+        if (!sinking) this.fall(this.index(x, y + 1), x, y + 2, cell, old, next);
+      } else {
+        for (const [dx, dy] of this.ticks % 2 === 0 ? [[-1, 1], [1, 1]] : [[1, 1], [-1, 1]]) {
+          if (this.fall(idx, x + dx, y + dy, cell, old, next)) break;
+        }
       }
     }
     const energy = readU16(next, idx + 4);
@@ -766,14 +770,15 @@ class JsSandboxEngine implements SandboxEngine {
 
   private powder(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
     for (const [dx, dy] of this.ticks % 2 === 0 ? [[0, 1], [-1, 1], [1, 1]] : [[0, 1], [1, 1], [-1, 1]]) {
-      if (this.move(idx, x + dx, y + dy, cell, old, next)) return;
+      if (this.fall(idx, x + dx, y + dy, cell, old, next)) return;
     }
   }
 
   // Unsupported stone drops straight down one cell per tick — no diagonal slip, so
-  // pillars, floors, and shelves hold and only true overhangs fall. Wall never moves.
+  // pillars, floors, and shelves hold and only true overhangs fall. Liquid is not support:
+  // stone settles through it like any other grain. Wall never moves.
   private stone(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
-    this.move(idx, x, y + 1, cell, old, next);
+    this.fall(idx, x, y + 1, cell, old, next);
   }
 
   private soil(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
@@ -785,7 +790,9 @@ class JsSandboxEngine implements SandboxEngine {
     // beneath it, and moss was reliably winning that race, which is why a watered garden
     // used to end as a moss carpet and never as a flower.
     const claimed = this.soilIsClaimed(x, y, old);
-    if (!claimed && next[idx] === MATERIAL.Soil && readU16(next, idx + 4) > 140 && readU16(cell, 2) > 10 && this.chance(flags & CELL_FLAG.Cosmic ? 7 : 12)) {
+    // Only soil at rest greens — see Universe::update_soil.
+    const atRest = !this.inBounds(x, y + 1) || (old[this.index(x, y + 1)] !== MATERIAL.Empty && !freeLiquid(old[this.index(x, y + 1)]));
+    if (!claimed && atRest && next[idx] === MATERIAL.Soil && readU16(next, idx + 4) > 140 && readU16(cell, 2) > 10 && this.chance(flags & CELL_FLAG.Cosmic ? 7 : 12)) {
       writeCellBytes(next, idx, MATERIAL.Moss, cell[1], 90, 0, CELL_FLAG.Wet);
     }
   }
@@ -1199,7 +1206,8 @@ class JsSandboxEngine implements SandboxEngine {
   private seed(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
     if (!this.inBounds(x, y + 1)) return;
     const below = old[this.index(x, y + 1)];
-    if (below === MATERIAL.Empty) {
+    // Over open air or a liquid a seed is still falling, and does nothing else until it lands.
+    if (below === MATERIAL.Empty || freeLiquid(below)) {
       this.powder(idx, x, y, cell, old, next);
       return;
     }
@@ -1496,6 +1504,29 @@ class JsSandboxEngine implements SandboxEngine {
     return true;
   }
 
+  // Mirrors Universe::try_fall: how every grain moves. Into air it falls, into a liquid it
+  // sinks, and it never overwrites a liquid — see the sim for the 213 cells that cost.
+  private fall(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
+    if (!this.inBounds(x, y)) return false;
+    if (freeLiquid(next[this.index(x, y)])) return this.sink(idx, x, y, cell, old, next);
+    return this.move(idx, x, y, cell, old, next);
+  }
+
+  // Mirrors Universe::try_sink: a grain trades places with the liquid below it, which keeps
+  // its own temperature and flags.
+  private sink(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
+    if (this.ticks % SINK_EVERY !== 0 || !this.inBounds(x, y)) return false;
+    if (next[idx] !== cell[0]) return false;
+    const target = this.index(x, y);
+    const liquid = next[target];
+    if (!freeLiquid(liquid) || (old[target] !== liquid && old[target] !== MATERIAL.Empty)) return false;
+    const grain = next.slice(idx, idx + CELL_STRIDE);
+    const displaced = next.slice(target, target + CELL_STRIDE);
+    next.set(grain, target);
+    next.set(displaced, idx);
+    return true;
+  }
+
   private neighbors(x: number, y: number) {
     const out: number[] = [];
     for (let dy = -1; dy <= 1; dy++) {
@@ -1569,6 +1600,8 @@ const SOIL_DAMP_ENERGY = 60;
 const SLOW_CHAR_SETTLES = 6;
 const SLOW_SEED_SCATTERS = 3;
 const SLOW_SAND_COMPACTS = 8;
+// Settling through a liquid runs on one tick in this many; a parity gate, never a roll.
+const SINK_EVERY = 3;
 const SCATTER_OFFSETS: readonly number[] = [6, -6, 9, -9, 12, -12, 15, -15];
 const SCATTER_REACH = 14;
 
@@ -1699,6 +1732,12 @@ function wellspringSource(kind: number) {
 
 function waterLike(kind: number) {
   return kind === MATERIAL.Water || kind === MATERIAL.Moonwater;
+}
+
+// Mirrors is_free_liquid: water, moonwater and oil, the liquids a grain sinks through and
+// never overwrites. Never lava, which reacts.
+function freeLiquid(kind: number) {
+  return waterLike(kind) || kind === MATERIAL.Oil;
 }
 
 function absorbent(kind: number) {

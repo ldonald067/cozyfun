@@ -30,12 +30,17 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   shape a player actually paints is a 49-cell disc, not a plus. At radius 1 nothing can be
   placed one cell at a time and paint ORDER is what gives a layout its shape (paint the
   target first, let the masonry overwrite it). **Nothing stays where you put it, either** — liquids side-hop up to two
-  cells, gases rise, powders and stone fall, so a scenario that leaves cells floating
+  cells (so they jump a one-cell wall), gases rise, powders and stone fall and sink through
+  liquid, so a scenario that leaves cells floating
   diverges for a reason that has nothing to do with the rule under test. Seal enclosures
   with Wall. Print the board rather than reasoning about it — the chimney-breast scenario
   needed a firebox floor, because lava drains out of an open box inside 30 ticks, and a wall
   between the pour and the fire, because water quenches it just as fast. Neither was visible
   from the code.
+
+  `PARITY_ONLY=<text> npm run test:parity` runs only the scenarios whose name contains the
+  text. It exists for vacuity testing: the harness stops at the first failing scenario, so
+  sabotaging a rule that several scenarios reach only ever proves that the FIRST one notices.
 
   A scenario may also declare `slowSteps: [{ at, count }]` to take between-session slow steps at the end of a given tick. The slow world draws on the same RNG stream as `tick()`, so an unmirrored roll in it desynchronises the engines exactly as one in a movement rule would, and it has to be gated here for the same reason.
 
@@ -63,8 +68,11 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   It also runs a **lake of its own** for the sandstone rule — a separate scene rather than a
   corner of the main one, because that board is fully claimed and its inert zone promises
   nothing at x >= 76 changes, and because every roll the new rule takes would have shifted
-  the RNG stream under every threshold here. The lake asserts that a day compacts more of a
-  flooded bed than an hour (72 cells against 31), that the rock is visible against the sand
+  the RNG stream under every threshold here. The lake is made the way a player makes one:
+  a walled pond, then sand **poured** onto it at the default brush. Until grains could sink
+  it had to be painted underneath the water, so the audit certified a lake bed no player
+  could build. It asserts that a day compacts more of a flooded bed than an hour (168 cells
+  against 79), that the rock is visible against the sand
   it replaced, that the layer the water rests on stays loose, and that **the bedded flag
   survives a save and reload**. That last one is the check nothing else could make: the slow
   steps create the flag AFTER the load, so a flag missing from a load mask would pass every
@@ -387,6 +395,29 @@ runs about 4,000 ticks end to end, so staging a two-day absence spends the ENTIR
 inside the catch-up — whose first 3,400 ticks run 250 to a frame, a quarter-second of wall
 clock nobody can sample. If a check needs to watch something the wake produces, stage an
 absence that lands BEFORE it, not after.
+
+### The move clobber, and the one place it is closed
+
+`try_move` counts a target as free if it was empty at the START of the tick, so a mover can
+overwrite a cell that something else filled earlier in the same tick — a cell a reaction
+created, or water that has just flowed there. Roughly 97% of reaction-created cells were
+lost this way when it was measured, and the game's whole balance (moss spread, water
+emission, germination odds) was tuned in that world. **It is load-bearing, and fixing it is
+a rebalancing project, not a bug fix.** Closing it outright left `slow-world:audit` growing
+no garden at all and moved 96 of 115 interaction checks.
+
+It is closed in exactly one place: **a grain never overwrites a liquid** (`try_fall`). That
+was not optional. Once grains could sink, every sinking grain pushed water up into the path
+of the next one, and sand poured into a pond deleted 213 of its 392 water cells.
+
+The next step was tried and backed out, and the numbers are here so nobody repeats it
+blind. Stopping a liquid from overwriting a liquid conserves water perfectly — a water pour
+keeps 708 of 708 cells instead of 600 of 716 — and it moves the balance: the lidded-hearth
+parity scenario's steam fell from 60 to 26 (more water quenched the fire), a fed stream wore
+7 cells of rock where its test needs 12 (the trough filled faster and switched erosion
+off), and a day's garden grew into 11 new columns instead of 18. Every one of those is a
+tuning question, which is the point: it belongs with the rest of the rebalancing, not
+inside a feature.
 
 ## Golden Principles
 

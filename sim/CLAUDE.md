@@ -13,6 +13,17 @@ mirrored in `app/src/engine.ts` and behave byte-for-byte identically — see the
 - **Powders need a floor wide enough to hold them.** Soil, sand and seeds slide off a
   one-cell pedestal diagonally, so a planter built on a single Wall cell collapses and takes
   the plant with it. Several tests were debugged twice over this.
+- **Liquid is not support.** Everything that falls as a grain — sand, soil, seed, stone,
+  unlit rocket powder, a cut stalk — moves with `try_fall`, which sinks it through water,
+  moonwater and oil. A stone shelf or a seed bed laid over a pond goes to the bottom.
+- **A one-cell wall does not hold water.** Liquids side-hop two cells and jump it, and a
+  one-cell floor lets them drain out diagonally. Seal a liquid fixture with walls two thick
+  and a floor that runs under them — the `shaft` test helper does both.
+- **`try_move` can overwrite a cell another mover filled this tick**, because it counts a
+  target as free if it was empty in `old`. That clobber is load-bearing for the game's
+  balance and is left alone on purpose, with one exception: `try_fall` never overwrites a
+  liquid. Water flowing into water still loses cells (about 16% of a pour). Measured
+  attempts to close that gap, and why they were backed out, are in `docs/HARNESS.md`.
 - **Order matters inside a tick.** `age_and_decay` runs, then `apply_reactions`, then the
   bottom-up pass, then the top-down pass. Rules read `old` and write `next`; reading `next`
   means you see whatever earlier cells in the same tick already did.

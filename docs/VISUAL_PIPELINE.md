@@ -251,6 +251,23 @@ Current temperature rules:
 
 Current substrate rules:
 
+- **Things sink.** Everything that falls as a grain — sand, soil, seed, stone, unlit rocket
+  powder, a cut stalk — settles through water, moonwater and oil, trading places with the
+  liquid so the liquid comes up on top. It settles on one tick in three, so a grain dropped
+  into a pond visibly drifts down rather than vanishing to the bed, and the gate is tick
+  parity rather than a roll, so it costs no RNG in either engine. Pollen and stardust stay
+  light on purpose: motes floating on a pond is the right picture, and stardust charges the
+  water it touches. Lava is not a liquid anything sinks into — what touches lava reacts.
+
+  Until this existed, nothing sank at all. `try_move` only enters empty cells or gas, so a
+  measured pour left a mountain of sand standing on a pond's surface with every water cell
+  intact underneath it — and a lake bed, the thing sandstone needs, could only be made by
+  painting sand UNDER the water first. It is now what happens when you pour sand in.
+
+  Two things came with it. **A grain never overwrites a liquid** (`try_fall`): sinking
+  pushes water up into the path of the next grain, and the old move rule then deleted
+  213 of a 392-cell pond. And **only soil at rest greens into moss**: soaked soil used to
+  green on the way down and hang in the water as a floating clump.
 - Sand, wall, stone, and wood can hold short-lived dampness from water or moonwater.
 - Damp sand reads darker and moves more slowly, making it clump instead of behaving like dry loose grains.
 - Wet sand drains back to loose sand when its stored moisture is gone.
@@ -265,7 +282,7 @@ Current substrate rules:
   time. `wall.hearth` scores 4 cells in the interaction audit because that scene is a
   deliberately minimal column, not because the rule is that small. Modest and local is the
   intent: a damp rim quietly going away beside a fire is ambience, not an event.
-- Stone and wall split their roles along two axes. Stone is the natural hard substrate: it weathers, takes condensation more strongly, and **falls straight down when nothing supports it**. Wall is sealed construction that stains but resists casual moss, and never moves under any circumstance. Wall is therefore the only material that can hold a scaffold, frame, basin, or ceiling in place — build test fixtures and showcase stands out of it.
+- Stone and wall split their roles along two axes. Stone is the natural hard substrate: it weathers, takes condensation more strongly, and **falls straight down when nothing supports it** — and water is not support, so it settles through a pond like any other grain. Wall is sealed construction that stains but resists casual moss, and never moves under any circumstance. Wall is therefore the only material that can hold a scaffold, frame, basin, or ceiling in place — build test fixtures and showcase stands out of it.
 - Damp stone can be colonized by moss more readily than wall, while wood remains the faster soft substrate.
 - Oil strips nearby wet flags and blocks plain water hydration, creating a smothering boundary around life.
 - Smoke leaves soot/scorch flags on wall, stone, and wood. Steam condenses into wet flags on hard surfaces and still frosts near ice.
@@ -332,8 +349,8 @@ The slow world (between sessions only):
   stops compacting.
 
   It is the slowest odds in the slow world, 1 in 8 per step: an hour away (4 steps) sets
-  about 40% of a flooded bed, a day (18) about 90%, measured at 31 and 72 cells on the
-  audit's lake. `npm run slow-world:audit` asserts that a day beats an hour, that the rock is
+  about 40% of a flooded bed, a day (18) about 90%, measured at 79 and 168 cells on the
+  audit's lake — which is poured, sand onto water, now that sand sinks. `npm run slow-world:audit` asserts that a day beats an hour, that the rock is
   visible (224 redmean from the sand it replaced), that the floor stays loose, and that the
   flag survives a save — `load_cells` keeps only the bits the mask names, and a reload is
   exactly when the slow world runs.

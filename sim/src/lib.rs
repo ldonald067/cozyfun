@@ -173,6 +173,10 @@ const SLOW_SEED_SCATTERS: u32 = 3;
 /// Deliberately the slowest odds in the slow world: rock should feel like the one thing here
 /// that takes days, not a night.
 const SLOW_SAND_COMPACTS: u32 = 8;
+/// Settling through a liquid happens on one tick in this many. Slower than falling through
+/// air, so a grain dropped into a pond visibly drifts down rather than vanishing to the bed.
+/// A tick-parity gate rather than a roll: sinking consumes no RNG in either engine.
+const SINK_EVERY: u32 = 3;
 /// Every offset clears PLANT_SPACING, so a scattered seed lands where it can grow.
 const SCATTER_OFFSETS: [i32; 8] = [6, -6, 9, -9, 12, -12, 15, -15];
 const SCATTER_REACH: i32 = 14;
@@ -379,8 +383,9 @@ impl Universe {
     /// Runs only when the player returns, on a clock derived from how long they were
     /// away, and **never during play**. A slow step is deliberately not a slow tick:
     /// it is a small set of transformations each too consequential to fire while
-    /// watched, and each touches only something the player left living — a scene of
-    /// bare walls and sand comes back byte-identical.
+    /// watched, and none of them edits something the player BUILT — a scene of bare
+    /// walls, dry sand and glass comes back byte-identical. (This used to say "only what
+    /// the player left living"; a flooded lake bed is not alive, and nobody built it.)
     ///
     /// Why absence needs a unit of its own, and the curve that converts hours into
     /// steps, both live in `app/src/slowWorld.ts`, which owns the absence policy for
@@ -1362,12 +1367,18 @@ impl Universe {
             self.update_powder(idx, cell, old, next, 2);
         } else {
             let (x, y) = self.xy(idx);
-            if self.try_move(idx, x, y + 1, cell, old, next, true) {
-                let dropped = self.idx(x as u32, (y + 1) as u32);
-                self.try_move(dropped, x, y + 2, cell, old, next, true);
+            // A dry grain drops two cells a tick through air, but settles through a liquid
+            // like anything else — so the second cell is only taken after a real fall.
+            let sinking = y + 1 < self.height as i32
+                && is_free_liquid(next[self.idx(x as u32, (y + 1) as u32)].kind);
+            if self.try_fall(idx, x, y + 1, cell, old, next) {
+                if !sinking {
+                    let dropped = self.idx(x as u32, (y + 1) as u32);
+                    self.try_fall(dropped, x, y + 2, cell, old, next);
+                }
             } else {
                 for (dx, dy) in self.fall_dirs() {
-                    if dx != 0 && self.try_move(idx, x + dx, y + dy, cell, old, next, true) {
+                    if dx != 0 && self.try_fall(idx, x + dx, y + dy, cell, old, next) {
                         break;
                     }
                 }
@@ -1394,18 +1405,19 @@ impl Universe {
         let (x, y) = self.xy(idx);
         let dirs = self.fall_dirs();
         for (dx, dy) in dirs {
-            if self.try_move(idx, x + dx, y + dy, cell, old, next, true) {
+            if self.try_fall(idx, x + dx, y + dy, cell, old, next) {
                 return;
             }
         }
     }
 
     /// Unsupported stone drops straight down one cell per tick — no diagonal slip, so
-    /// pillars, floors, and shelves hold and only true overhangs fall. Motion halts the
-    /// instant anything (stone, wall, liquid, growth) sits directly below. Wall never moves.
+    /// pillars, floors, and shelves hold and only true overhangs fall. Liquid is not
+    /// support: stone settles through it like any other grain. Motion halts the instant
+    /// anything solid (stone, wall, growth) sits directly below. Wall never moves.
     fn update_stone(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
         let (x, y) = self.xy(idx);
-        self.try_move(idx, x, y + 1, cell, old, next, true);
+        self.try_fall(idx, x, y + 1, cell, old, next);
     }
 
     fn update_soil(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
@@ -1419,7 +1431,14 @@ impl Universe {
         // a watered garden used to end as a moss carpet and never as a flower.
         let (x, y) = self.xy(idx);
         let claimed = self.soil_is_claimed(x, y, old);
+        // Moss is a carpet on GROUND, so only soil that has come to rest greens. Once soil
+        // could sink, soaked grains greened on the way down and hung in the water as moss.
+        let at_rest = y + 1 >= self.height as i32 || {
+            let below = old[self.idx(x as u32, (y + 1) as u32)].kind;
+            below != Material::Empty as u8 && !is_free_liquid(below)
+        };
         if !claimed
+            && at_rest
             && next[idx].kind == Material::Soil as u8
             && next[idx].energy > 140
             && cell.age > 10
@@ -1544,7 +1563,9 @@ impl Universe {
         let (x, y) = self.xy(idx);
         if y + 1 < self.height as i32 {
             let below = old[self.idx(x as u32, (y + 1) as u32)];
-            if below.is_empty() {
+            // A seed over open air or a liquid is still falling, and does nothing else until
+            // it lands — which is how a seed dropped into a pond reaches the bed to root.
+            if below.is_empty() || is_free_liquid(below.kind) {
                 self.update_powder(idx, cell, old, next, 1);
                 return;
             }
@@ -2200,6 +2221,51 @@ impl Universe {
         true
     }
 
+    /// How every GRAIN moves one cell: sand, soil, seed, stone, unlit rocket powder and a
+    /// cut stalk. Into air it falls; into a liquid it sinks, trading places with it. And it
+    /// never destroys a liquid — the one promise this adds over `try_move`.
+    ///
+    /// That promise is needed because `try_move` counts a cell as free if it was empty at the
+    /// START of the tick, even when water has since moved into it, and overwrites it. That
+    /// clobber is load-bearing for reaction output and is deliberately left alone there (see
+    /// the note in docs/HARNESS.md). But sinking pushes water up into the path of whatever is
+    /// still falling, and measured on a sand pour into a pond, the clobber then deleted 213 of
+    /// 392 water cells. So for grains, a liquid in the target means sink or wait — never
+    /// overwrite. Pollen and stardust are not grains here: pollen floating on a pond is the
+    /// right picture, and stardust charges the water it touches rather than sinking in it.
+    fn try_fall(&self, idx: usize, nx: i32, ny: i32, cell: Cell, old: &[Cell], next: &mut [Cell]) -> bool {
+        if !self.in_bounds(nx, ny) {
+            return false;
+        }
+        if is_free_liquid(next[self.idx(nx as u32, ny as u32)].kind) {
+            return self.try_sink(idx, nx, ny, cell, old, next);
+        }
+        self.try_move(idx, nx, ny, cell, old, next, true)
+    }
+
+    /// Settle a grain through a liquid by trading places with it: the grain goes down and the
+    /// liquid comes up into the space it left, carrying its own temperature and flags. This is
+    /// oil rising through water run the other way. The liquid must be one that sat there all
+    /// tick, or one that flowed into an empty cell this tick — never a cell something else has
+    /// already turned into a different liquid, or two movers would claim it.
+    fn try_sink(&self, idx: usize, nx: i32, ny: i32, cell: Cell, old: &[Cell], next: &mut [Cell]) -> bool {
+        if self.tick_count % SINK_EVERY != 0 || !self.in_bounds(nx, ny) {
+            return false;
+        }
+        if next[idx].kind != cell.kind {
+            return false;
+        }
+        let target = self.idx(nx as u32, ny as u32);
+        let liquid = next[target].kind;
+        if !is_free_liquid(liquid) || (old[target].kind != liquid && !old[target].is_empty()) {
+            return false;
+        }
+        let liquid = next[target];
+        next[target] = next[idx];
+        next[idx] = liquid;
+        true
+    }
+
     /// Emits a vapor cell above the source when that cell is open, returning the
     /// emitted index so callers can stamp extra state (e.g. cosmic pollen).
     fn emit_vapor_from(
@@ -2288,6 +2354,13 @@ fn is_wellspring_source(kind: u8) -> bool {
 
 fn is_water_like(kind: u8) -> bool {
     kind == Material::Water as u8 || kind == Material::Moonwater as u8
+}
+
+/// Water, moonwater and oil: the liquids a grain sinks through, and never overwrites. Lava
+/// is left out on purpose — everything that touches lava reacts with it, and nothing should
+/// quietly sink into a pool that is meant to burn it.
+fn is_free_liquid(kind: u8) -> bool {
+    is_water_like(kind) || kind == Material::Oil as u8
 }
 
 fn is_absorbent(kind: u8) -> bool {
@@ -2456,6 +2529,109 @@ mod tests {
         u.paint(8, 2, 1, Material::Sand as u8, 100);
         u.tick();
         assert_eq!(kind_at(&u, 8, 3), Material::Sand as u8);
+    }
+
+    /// A sealed one-cell shaft, so every cell stays accounted for and a test can assert
+    /// exact conservation rather than "roughly the same". Both halves of the seal were
+    /// learned by watching water leave: the walls are TWO thick because a liquid side-hops
+    /// two cells and jumps a single wall, and the floor runs under them because a one-cell
+    /// floor lets water drain out diagonally.
+    fn shaft(u: &mut Universe, x: u32, top: u32, bottom: u32) {
+        for y in top..=bottom + 1 {
+            for wx in [x - 2, x - 1, x + 1, x + 2] {
+                set_cell(u, wx, y, Material::Wall);
+            }
+        }
+        set_cell(u, x, bottom + 1, Material::Wall);
+    }
+
+    /// Everything that falls as a grain settles through a pond to the bed, and the water it
+    /// displaces comes up on top — none of it lost on the way.
+    #[test]
+    fn every_grain_sinks_through_a_pond_and_lifts_it() {
+        for grain in [Material::Sand, Material::Soil, Material::Stone, Material::Seed, Material::Rocket] {
+            let mut u = Universe::new(12, 26, 7);
+            shaft(&mut u, 5, 2, 22);
+            for y in 12..=22 {
+                set_cell(&mut u, 5, y, Material::Water);
+            }
+            set_cell(&mut u, 5, 6, grain);
+            for _ in 0..600 {
+                u.tick();
+            }
+            // At least, not exactly: soil soaked this long greens into moss, and moss sheds
+            // dew. The promise under test is that sinking never LOSES water.
+            let water = count_kind(&u, Material::Water);
+            assert!(water >= 11, "{grain:?} lost water sinking through it: {water} of 11 left");
+            assert_ne!(kind_at(&u, 5, 22), Material::Water as u8, "{grain:?} never reached the bed");
+            assert_eq!(kind_at(&u, 5, 12), Material::Water as u8, "the displaced water should sit on top");
+        }
+    }
+
+    /// Density is an ORDER, not a flag: sand goes through an oil slick and then the water under
+    /// it, and the oil still ends up floating on the water.
+    #[test]
+    fn sand_sinks_through_an_oil_film_and_the_water_under_it() {
+        let mut u = Universe::new(12, 26, 7);
+        shaft(&mut u, 5, 2, 22);
+        for y in 16..=22 {
+            set_cell(&mut u, 5, y, Material::Water);
+        }
+        for y in 13..=15 {
+            set_cell(&mut u, 5, y, Material::Oil);
+        }
+        set_cell(&mut u, 5, 8, Material::Sand);
+        for _ in 0..900 {
+            u.tick();
+        }
+        assert_eq!(kind_at(&u, 5, 22), Material::Sand as u8, "sand should rest on the bed");
+        assert_eq!((count_kind(&u, Material::Water), count_kind(&u, Material::Oil)), (7, 3));
+        let top_of = |m: Material| (0..26).find(|&y| kind_at(&u, 5, y) == m as u8).unwrap();
+        assert!(top_of(Material::Oil) < top_of(Material::Water), "oil must still float on the water");
+    }
+
+    /// Pollen is light on purpose — motes floating on a pond is the right picture.
+    #[test]
+    fn pollen_stays_on_the_surface_of_a_pond() {
+        let mut u = Universe::new(12, 26, 7);
+        shaft(&mut u, 5, 2, 22);
+        for y in 12..=22 {
+            set_cell(&mut u, 5, y, Material::Water);
+        }
+        set_cell(&mut u, 5, 10, Material::Pollen);
+        for _ in 0..60 {
+            u.tick();
+            for y in 13..=22 {
+                assert_ne!(kind_at(&u, 5, y), Material::Pollen as u8, "pollen sank into the pond");
+            }
+        }
+    }
+
+    /// The one promise `try_fall` adds over `try_move`: a grain never overwrites a liquid.
+    /// `try_move` counts a cell as free if it was empty at the START of the tick, so water
+    /// that flows into it first used to be deleted by a grain landing on the same cell —
+    /// which sinking made common, because every grain that sinks pushes water up into the
+    /// path of the next one. Here the only place the water can go is the cell the grain is
+    /// about to fall into.
+    #[test]
+    fn a_falling_grain_never_deletes_water_that_just_flowed_under_it() {
+        for start in 0..6 {
+            let mut u = Universe::new(12, 12, 7);
+            for x in 0..12 {
+                set_cell(&mut u, x, 7, Material::Wall);
+            }
+            set_cell(&mut u, 4, 6, Material::Wall);
+            set_cell(&mut u, 7, 6, Material::Wall);
+            set_cell(&mut u, 6, 6, Material::Water);
+            set_cell(&mut u, 5, 5, Material::Sand);
+            // Vary which tick the two meet on, so the tick-parity gates all get exercised.
+            u.tick_count = start;
+            for _ in 0..12 {
+                u.tick();
+                assert_eq!(count_kind(&u, Material::Water), 1, "the water was deleted (start {start})");
+                assert_eq!(count_kind(&u, Material::Sand), 1, "the sand was deleted (start {start})");
+            }
+        }
     }
 
     #[test]

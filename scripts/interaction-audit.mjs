@@ -220,6 +220,25 @@ const CHECKS = [
   { m: "Sand", covers: "sand.vitrifies", role: "fuses into glass under lava", w: 30, h: 26, seed: 8, ticks: 900,
     paint: (p) => { p(15, 20, 3, M.Sand); p(15, 15, 2, M.Lava); },
     outcome: (g, before) => g.appeared(M.Glass, before) },
+  { m: "Sand", covers: "sand.settles", role: "sinks through a pond to the bed", w: 30, h: 28, seed: 132, ticks: 600,
+    // Poured onto a walled pond from above, the way a player makes a lake bed. The outcome is
+    // sand with water above it in its own column — sand that got UNDER the surface, which a
+    // grain resting on top of the pond can never satisfy.
+    paint: (p) => {
+      for (let y = 18; y <= 25; y++) for (let x = 9; x <= 21; x++) p(x, y, 1, M.Water);
+      p(15, 8, 3, M.Sand);
+      for (let x = 6; x <= 24; x++) p(x, 26, 1, M.Wall);
+      for (let y = 12; y <= 26; y++) { p(7, y, 1, M.Wall); p(23, y, 1, M.Wall); }
+    },
+    outcome: (g) => g.all(M.Sand).filter((i) => {
+      const [x, y] = g.xyOf(i);
+      for (let ay = y - 1; ay >= 0; ay--) {
+        const above = g.kindAt(x, ay);
+        if (above === M.Water) return true;
+        if (above !== M.Sand) return false;
+      }
+      return false;
+    }) },
   { m: "Water", covers: "water.boils", role: "boils away to steam over sustained flame", w: 30, h: 26, seed: 9, ticks: 2000,
     paint: (p) => { p(15, 20, 3, M.Wall); p(15, 16, 3, M.Water); p(15, 21, 2, M.Lava); },
     outcome: (g, before) => g.appeared(M.Steam, before) },

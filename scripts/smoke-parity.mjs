@@ -123,6 +123,9 @@ function runScenario({ name, w, h, seed, ticks, paint, observe, expect, slowStep
   console.log(`  ok  ${name} (${ticks} ticks)${expect ? ` ${JSON.stringify(seen)}` : ""}`);
 }
 
+// What the density scenario drops through its pond, by the name it reports.
+const DROPPED = { sand: M.Sand, soil: M.Soil, stone: M.Stone, seed: M.Seed, rocket: M.Rocket, pollen: M.Pollen };
+
 const scenarios = [
   {
     name: "busy mixed scene",
@@ -634,12 +637,13 @@ const scenarios = [
     w: 32, h: 24, seed: 4102, ticks: 260,
     slowSteps: [{ at: 200, count: 24 }],
     paint(p) {
-      // Target first, masonry last: the brush spills a cell and the walls must win.
-      // Sand cannot sink through water, so it is painted BELOW it rather than poured in.
-      for (let y = 16; y <= 21; y++) for (let x = 3; x <= 28; x++) p(x, y, 1, M.Sand);
-      for (let y = 11; y <= 15; y++) for (let x = 3; x <= 28; x++) p(x, y, 1, M.Water);
+      // Target first, masonry last: the brush spills a cell and the walls must win. The sand
+      // is dropped ONTO the pond from above and settles through it, which is how a player
+      // makes a lake bed — so this scenario carries sinking through both engines as well.
+      for (let y = 14; y <= 21; y++) for (let x = 3; x <= 28; x++) p(x, y, 1, M.Water);
+      for (let y = 5; y <= 9; y++) for (let x = 4; x <= 27; x++) p(x, y, 1, M.Sand);
       for (let x = 0; x < 32; x++) p(x, 22, 1, M.Wall);
-      for (let y = 8; y < 22; y++) { p(1, y, 1, M.Wall); p(30, y, 1, M.Wall); }
+      for (let y = 3; y < 22; y++) { p(1, y, 1, M.Wall); p(30, y, 1, M.Wall); }
     },
     observe(seen, cells, w, h, tick) {
       let sand = 0, bedded = 0, water = 0, looseFloor = 0;
@@ -668,6 +672,44 @@ const scenarios = [
       if ((seen.beddedBefore ?? 0) !== 0) return "bedded stone existed before any slow step ran";
       if ((seen.beddedAfter ?? 0) < 40) return `a long absence compacted only ${seen.beddedAfter ?? 0} cells into sandstone`;
       if ((seen.looseFloorAfter ?? 0) < 10) return `the lake floor should stay loose sand, found ${seen.looseFloorAfter ?? 0}`;
+      return null;
+    },
+  },
+  {
+    // Sinking is a density ORDER, so this drops one of everything onto a pond under an oil
+    // film: sand, soil, stone, seed and unlit rocket powder should all reach the bed, and
+    // pollen — light on purpose — should not. Every swap is compared byte for byte, and the
+    // expectations below fail the scenario if the grains stop reaching the bottom.
+    name: "a handful of everything dropped through an oil-slicked pond",
+    w: 40, h: 28, seed: 4121, ticks: 500,
+    paint(p) {
+      for (let y = 15; y <= 24; y++) for (let x = 4; x <= 35; x++) p(x, y, 1, M.Water);
+      for (let x = 4; x <= 35; x++) p(x, 13, 1, M.Oil);
+      Object.values(DROPPED).forEach((kind, i) => p(7 + i * 5, 6, 1, kind));
+      for (let x = 0; x < 40; x++) p(x, 25, 1, M.Wall);
+      for (let y = 4; y < 25; y++) { p(1, y, 1, M.Wall); p(38, y, 1, M.Wall); }
+    },
+    observe(seen, cells, w, h) {
+      // A grain has SUNK once any liquid sits above it in its own column.
+      const sunk = {};
+      for (let i = 0; i < w * h; i++) {
+        const kind = cells[i * STRIDE];
+        const x = i % w;
+        for (let y = Math.floor(i / w) - 1; y >= 0; y--) {
+          const above = cells[(y * w + x) * STRIDE];
+          if (above === M.Water || above === M.Oil) { sunk[kind] = (sunk[kind] ?? 0) + 1; break; }
+          if (above === M.Wall) break;
+        }
+      }
+      for (const [name, kind] of Object.entries(DROPPED)) {
+        seen[name] = Math.max(seen[name] ?? 0, sunk[kind] ?? 0);
+      }
+    },
+    expect(seen) {
+      for (const name of ["sand", "soil", "stone", "seed", "rocket"]) {
+        if ((seen[name] ?? 0) < 3) return `${name} never sank below the pond's surface (${seen[name] ?? 0} cells)`;
+      }
+      if ((seen.pollen ?? 0) > 0) return `pollen sank into the pond (${seen.pollen} cells) — it is meant to float`;
       return null;
     },
   },
@@ -725,5 +767,12 @@ const scenarios = [
   },
 ];
 
-for (const s of scenarios) runScenario(s);
-console.log(`Parity harness passed: JS and WASM byte-identical across ${scenarios.length} scenarios`);
+// PARITY_ONLY=<text> runs just the scenarios whose name contains it. It exists for
+// vacuity-testing: the harness stops at the first failing scenario, so sabotaging a rule that
+// several scenarios reach only ever proves the FIRST one notices.
+const only = process.env.PARITY_ONLY;
+const selected = only ? scenarios.filter((s) => s.name.includes(only)) : scenarios;
+if (only && selected.length === 0) throw new Error(`PARITY_ONLY="${only}" matches no scenario`);
+for (const s of selected) runScenario(s);
+console.log(`Parity harness passed: JS and WASM byte-identical across ${selected.length} scenarios` +
+  (only ? ` (filtered by PARITY_ONLY="${only}")` : ""));
