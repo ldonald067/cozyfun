@@ -813,7 +813,13 @@ class JsSandboxEngine implements SandboxEngine {
     if (this.ticks % slow !== 0) return;
     const side = this.ticks % 2 === 0 ? 1 : -1;
     for (const [dx, dy] of [[0, 1], [side, 1], [-side, 1], [side, 0], [-side, 0], [side * 2, 0], [-side * 2, 0]]) {
-      if (this.move(idx, x + dx, y + dy, cell, old, next)) return;
+      if (this.move(idx, x + dx, y + dy, cell, old, next)) {
+        // Moving water throws spray — mirrors update_liquid, roll after the move.
+        if (waterLike(cell[0]) && this.chance(MIST_ODDS)) {
+          writeCellBytes(next, this.index(x + dx, y + dy), MATERIAL.Steam, cell[1], MIST_ENERGY);
+        }
+        return;
+      }
     }
   }
 
@@ -1494,6 +1500,8 @@ class JsSandboxEngine implements SandboxEngine {
     const movingCell = next.slice(idx, idx + CELL_STRIDE);
     if (movingCell[0] !== cell[0]) return false;
     const target = this.index(x, y);
+    // A liquid never deletes a liquid — see Universe::try_move.
+    if (freeLiquid(movingCell[0]) && freeLiquid(next[target])) return false;
     const canMove =
       old[target] === MATERIAL.Empty ||
       next[target] === MATERIAL.Empty ||
@@ -1602,6 +1610,8 @@ const SLOW_SEED_SCATTERS = 3;
 const SLOW_SAND_COMPACTS = 8;
 // Settling through a liquid runs on one tick in this many; a parity gate, never a roll.
 const SINK_EVERY = 3;
+const MIST_ODDS = 450;
+const MIST_ENERGY = 30;
 const SCATTER_OFFSETS: readonly number[] = [6, -6, 9, -9, 12, -12, 15, -15];
 const SCATTER_REACH = 14;
 

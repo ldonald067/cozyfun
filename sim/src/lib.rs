@@ -178,6 +178,14 @@ const SLOW_SAND_COMPACTS: u32 = 8;
 /// air, so a grain dropped into a pond visibly drifts down rather than vanishing to the bed.
 /// A tick-parity gate rather than a roll: sinking consumes no RNG in either engine.
 const SINK_EVERY: u32 = 3;
+/// Moving water throws spray: each time a water or moonwater cell actually moves, it turns to
+/// mist at 1 in this many. Water with nowhere to go never moves, so a settled pond or a lake
+/// bed keeps every cell — while a pour, a fountain and a thin film that keeps shifting lose
+/// some. This is the deliberate water sink; see `try_move` for the accidental one it replaced.
+const MIST_ODDS: u32 = 450;
+/// Mist is cool vapour — steam at the bottom of its energy range, so it reads as a faint
+/// sheen rather than as a kettle.
+const MIST_ENERGY: u16 = 30;
 /// Every offset clears PLANT_SPACING, so a scattered seed lands where it can grow.
 const SCATTER_OFFSETS: [i32; 8] = [6, -6, 9, -9, 12, -12, 15, -15];
 const SCATTER_REACH: i32 = 14;
@@ -1492,6 +1500,12 @@ impl Universe {
         ];
         for (dx, dy) in dirs {
             if self.try_move(idx, x + dx, y + dy, cell, old, next, true) {
+                // Moving water throws spray (MIST_ODDS). The roll comes after the move, so
+                // water that cannot move — a settled pond — never draws on the RNG at all.
+                if is_water_like(cell.kind) && self.chance(MIST_ODDS) {
+                    let landed = self.idx((x + dx) as u32, (y + dy) as u32);
+                    next[landed] = Cell::new(Material::Steam as u8, cell.variant, MIST_ENERGY);
+                }
                 return;
             }
         }
@@ -2214,6 +2228,12 @@ impl Universe {
         let target = self.idx(nx as u32, ny as u32);
         let target_old = old[target];
         let target_next = next[target];
+        // A liquid never deletes a liquid. Two cells flowing into the same just-emptied cell
+        // used to overwrite each other, and that loss was the game's only water sink — the one
+        // thing bounding a spring. Mist (MIST_ODDS) is the deliberate sink that replaced it.
+        if is_free_liquid(moving_cell.kind) && is_free_liquid(target_next.kind) {
+            return false;
+        }
         let can_move = target_old.is_empty()
             || target_next.is_empty()
             || (can_sink_through_gas
@@ -4273,12 +4293,22 @@ mod tests {
         assert_eq!(kind_at(&u, 8, 8), Material::Moonwater as u8);
     }
 
+    /// The two cells are sealed in a pocket so they stay in contact. The first version left
+    /// the moonwater with nothing under it: it fell away from the oil within a tick, and the
+    /// test passed only if the 1-in-4 cleaning roll landed in that instant — 35 seeds in 50.
+    /// Any change to the RNG stream could flip it, and one did. Sealed, it is 50 of 50.
     #[test]
     fn moonwater_cleans_oil_into_stardust() {
         let mut u = Universe::new(16, 16, 17);
         set_cell(&mut u, 7, 8, Material::Moonwater);
         set_cell(&mut u, 8, 8, Material::Oil);
-        set_cell(&mut u, 8, 9, Material::Wall);
+        // Two thick on each side: a liquid side-hops two cells and would jump a single wall.
+        for x in [5, 6, 9, 10] {
+            set_cell(&mut u, x, 8, Material::Wall);
+        }
+        for x in 5..=10 {
+            set_cell(&mut u, x, 9, Material::Wall);
+        }
         for _ in 0..24 {
             u.tick();
         }
