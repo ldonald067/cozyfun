@@ -57,6 +57,12 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
 
   Two lessons are baked into the metrics. Size is the union over the outcome's whole life, not the peak at one instant, or a gradual rule like a fungus mat reverting to soil scores as invisible while being perfectly obvious. And an outcome that is a *transition* ("was glass, is sand now") must be made sticky, or it scores 2 ticks no matter how permanent its result is.
 
+  The scenes and the runner that plays them live in `scripts/interaction-scenes.mjs`, shared
+  with `audit:drift` and `clobber:census` so all three measure the same 124 scenes. Material
+  ids and flags there are read from `materials.ts`, not typed out. **The audit measures each
+  check on ONE seed**, which is right for "does it happen" and wrong for "did my change move
+  it" — use `audit:drift` for that.
+
 - `npm run slow-world:audit`: plays a scene in — a watered garden, a hearth burned to char, and a sand pile that must not move — then leaves for an hour, half a day, a day, two days and a week, and measures what came back. It is the only gate that asks whether **absence is worth anything**, which cargo tests and parity cannot: both pass happily while the slow world changes four cells nobody would see.
 
   It asserts four things, each a way the feature could be a lie. A day away must visibly change the scene (cell count and colour distance, judged by compiling the real renderer rather than restating its rules). A day must change **more than an hour**, or the curve has flattened and "come back tomorrow" means nothing. The garden must stand in **new columns** — a scattered seed that never comes up is clutter, not spread. And the inert zone must be untouched, compared **byte for byte** against the board that went in, since a rendered-difference check could never see age, energy or flag changes.
@@ -86,6 +92,40 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   of cells; it had just changed into stalks.
 
   Two measurements shaped the rule itself and are worth not rediscovering. Seeds sown onto a mature bed landed on **moss**, which does not root them, so the scatter arm read as inert specks until the landing displaced that one patch of carpet back to soil. And the scene must be watered before the absence: a dry bed cannot sprout anything, which is the intended shape of the rule but understates it to the point of looking broken if the fixture forgets.
+
+- `npm run audit:drift`: did a change move the interaction audit, or did the dice? It replays
+  every audit scene over N seeds (default 8) on the working tree and on a git ref (default
+  `HEAD`; `--base origin/main`, `--seeds 12`, `--only id,id`), and lists a metric only when
+  the two builds' middle halves do not overlap. The base is built in a worktree under
+  `.tmp/drift/` and cached by commit, seed count and scene file, so a second comparison
+  costs one side. It reports and exits 0 — it is a measurement, not a gate.
+
+  It exists because a single-seed table reads dice as effects. Adding sinking appeared to
+  cut a spark hissing over water from contrast 423 to 201, a lava quench from 893 ticks on
+  screen to 199, and to delay a fairy ring from tick 353 to 1113; over ten seeds the spark
+  was 394 both ways, the quench 407 against 500, the ring 1001 against 744. Against the
+  commit before sinking, `audit:drift` finds **5 of 124 checks moved**, where the
+  single-seed table listed 26. Run it on any change that could move the balance, which is
+  any change to a sim rule.
+
+- `npm run clobber:census`: what the move clobber deletes, and where. It plays every audit
+  scene on the JS mirror with a counter on the mover and reports each overwrite by mover,
+  victim, and the victim's origin (moved in, or created by a reaction). About 36,000 of 4
+  million moves overwrite something; water deleting water that just flowed in is 75% of
+  them, and liquid-on-liquid 82%. It hooks the engine's private `move` and `react` by name,
+  and fails loudly if either is renamed or if it counts no moves at all — a census that
+  quietly counted nothing would report the problem solved.
+
+- `npm run water:budget`: how much water the game keeps, on the shipped wasm build — a
+  water spring on the real board, a pour into a basin, and sand poured into a pond. The
+  numbers when it was written: a spring holds ~280 cells (0.9% of the board), a pour keeps
+  600 of 716, a pond keeps 207 of 392 once sand sinks through it. Nothing in the sim sets
+  those; the clobber does. ROADMAP Phase 20 replaces it, judged against this.
+
+- `scripts/compile-app.mjs`: the one way a harness loads the app's TypeScript. Eight scripts
+  carried identical copies of the compile; now each names its files and gets a loader back.
+  Every call wipes its `.tmp/` folder and compiles fresh, and `root` compiles another
+  checkout, which is how `audit:drift` builds its base.
 
 - `npm run icons:check`: fails when the committed site icons no longer match `scripts/make-favicon.mjs`. The generator colours the cornflower from `SPECIES[0]` and the Stem entry — **imported, not copied** — so a renderer or materials palette edit changes the icon, and this is what says so. Regenerate with `npm run icons`. Without it the generator and its committed output are simply two sources of truth wearing one coat.
 - `npm run renderer:probe`: calls the **shipped renderer as a pure function** and asserts the state pairs the design depends on, over the whole range the sim can produce rather than at one sample. `colorForCell` needs no browser, no capture and no sim, so this asks it directly and reports the WORST case over energy, age, species and a full time sweep.
@@ -388,24 +428,34 @@ absence that lands BEFORE it, not after.
 
 `try_move` counts a target as free if it was empty at the START of the tick, so a mover can
 overwrite a cell that something else filled earlier in the same tick — a cell a reaction
-created, or water that has just flowed there. Roughly 97% of reaction-created cells were
-lost this way when it was measured, and the game's whole balance (moss spread, water
-emission, germination odds) was tuned in that world. **It is load-bearing, and fixing it is
-a rebalancing project, not a bug fix.** Closing it outright left `slow-world:audit` growing
-no garden at all and moved 96 of 115 interaction checks.
+created, or water that has just flowed there. The game's whole balance (moss spread, water
+emission, germination odds) was tuned in that world, so **it is load-bearing, and replacing
+it is a rebalancing project, not a bug fix.** ROADMAP Phase 20 is that project.
+
+What it does, measured (`npm run clobber:census`, `npm run water:budget`):
+
+- **It is the game's hidden evaporation.** 82% of all overwrites are a liquid deleting a
+  liquid, and only MOVING water is ever deleted — so ponds keep their water, a pour loses
+  16%, and a fountain loses nearly everything.
+- **It is the only thing bounding a water wellspring.** Nothing in the game drinks standing
+  water (water on soil, sand, wall or stone keeps every cell for 3,000 ticks). A spring holds
+  about 280 cells with the clobber and floods 8,837, 29% of the board, without it.
+- **It is why closing it "killed the garden".** Closed outright, a day away still turns 43 of
+  45 cold char cells to soil — and the extra surviving water greens every one of them into
+  moss during the catch-up, where seeds do not root. The before/after table read that as
+  `ember -> soil` falling to zero. The levers are the water budget and moss greening, not
+  the char rule.
 
 It is closed in exactly one place: **a grain never overwrites a liquid** (`try_fall`). That
 was not optional. Once grains could sink, every sinking grain pushed water up into the path
 of the next one, and sand poured into a pond deleted 213 of its 392 water cells.
 
-The next step was tried and backed out, and the numbers are here so nobody repeats it
-blind. Stopping a liquid from overwriting a liquid conserves water perfectly — a water pour
-keeps 708 of 708 cells instead of 600 of 716 — and it moves the balance: the lidded-hearth
-parity scenario's steam fell from 60 to 26 (more water quenched the fire), a fed stream wore
-7 cells of rock where its test needs 12 (the trough filled faster and switched erosion
-off), and a day's garden grew into 11 new columns instead of 18. Every one of those is a
-tuning question, which is the point: it belongs with the rest of the rebalancing, not
-inside a feature.
+The next step was tried and backed out. Stopping a liquid from overwriting a liquid conserves
+water perfectly — a pour keeps 708 of 708 instead of 600 of 716 — and with no sink to replace
+the clobber it moves the balance: the lidded-hearth parity scenario's steam fell from 60 to
+26, a fed stream wore 7 cells of rock where its test needs 12, and a day's garden grew into
+11 new columns instead of 18. Those are single-seed readings, taken before `audit:drift`
+existed; re-measure them before tuning against them.
 
 ## Golden Principles
 

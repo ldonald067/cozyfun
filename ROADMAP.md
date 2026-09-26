@@ -4,8 +4,9 @@ This roadmap keeps the project focused: make the toy feel good, keep the codebas
 
 ## Status Snapshot
 
-Every phase through 19 is complete except two open items: Phase 8's remaining subjective
-listening pass, and the shelved `fix/reaction-cell-clobber` branch described in Phase 19.
+Every phase through 19 is complete except Phase 8's remaining subjective listening pass.
+Phase 20 — replacing the move clobber's hidden water sink with a deliberate one — is under
+way: its instruments (20A) are built and 20B is next.
 
 The sandbox is a playable, deployed browser toy: React/Vite UI, Rust/WASM sim with a byte-identical JS fallback, 18 paintable materials plus the Eraser on the toolbar and 8 generated-only outcomes, six credited room backdrops with room-linked native ambience, optional YouTube Desk Radio, local save/share/postcard/clip export, a click-to-load embed poster, deterministic sim/parity/browser/visual/audio QA wired into local scripts and CI, and a deploy gate that proves which commit the running host is serving. It runs at `pixelfun.littlealbumclub.net` and is iframed into `littlealbumclub.net`. Details live in the phase sections below.
 
@@ -603,13 +604,52 @@ running a scenario through it, because the app carried no build identity at all.
   as the reviewer this project spawns. One copy, backed up by the same push that ships the
   game.
 
-### Open: the reaction-cell clobber
+### The reaction-cell clobber moved to Phase 20
 
-`fix/reaction-cell-clobber` is pushed and deliberately **not merged**. Both engines treat a
-move target as free if it is empty in `old` *or* in `next`, so a mover can overwrite a cell
-`apply_reactions` created in the same tick — measured, about 97% of reaction-created cells.
-Correcting it is a rebalancing project, not a bug fix: with it applied, a day away produces
-zero `ember -> soil` and zero new stems against 41 and 24 on `main`, the scene drowns in
-moss, and `slow-world:audit` fails outright. The whole material balance was tuned inside
-that behaviour. Landing it means re-tuning moss spread and water emission until the garden
-grows again, then re-checking all 123 interaction checks.
+This section used to describe `fix/reaction-cell-clobber` as a pushed, unmerged branch. The
+branch was deleted on 2026-08-26 — its only unique content was a two-line change — and the
+problem it tried to fix is now Phase 20, where it turned out to be about water rather than
+reactions.
+
+## Phase 20: The Water Budget
+
+Status: in progress — 20A done, 20B next.
+
+**No rule in the sim decides how much water a scene holds.** The move clobber does: a mover
+may overwrite a cell another mover filled earlier the same tick, and when water flows into
+water that deletes it. Measured across all 124 interaction-audit scenes, liquid deleting
+liquid is 82% of every overwrite. So ponds keep their water, a pour loses 16%, and a
+fountain loses nearly everything — which is also the ONLY thing bounding a water wellspring
+(about 280 cells on the 220x140 board, against 8,837 once water stops deleting itself;
+nothing in the game drinks standing water). And it explains the old "garden dies" result:
+with the clobber closed, cold char still turns to soil, and the surviving water greens all
+of it into moss, where nothing roots.
+
+The goal is to replace that accident with a deliberate, visible water cycle, then let water
+be conserved in movement. Two decisions from the owner shape it: **the sink is VISIBLE mist**,
+not a silent delete; and **no cheap fixes** — every change has to be meaningful on its own
+and must not create problems later, so nothing opportunistic rides along with a step.
+
+- **20A — instruments. Done.** `npm run audit:drift` replays every audit scene over N seeds
+  on two builds and reports only moves the seed spread cannot explain (against the commit
+  before sinking: 5 of 124, where the one-seed table said 26). `npm run clobber:census`
+  counts every overwrite by mover, victim and origin. `npm run water:budget` measures a
+  spring, a pour, and sand poured into a pond on the shipped build. The eight harnesses that
+  compiled the app's TypeScript share `scripts/compile-app.mjs`, and the audit's scenes are
+  a shared module so all three tools measure the same scenes. Starting numbers: spring 0.9%
+  of the board, pour 600 of 716 kept, pond 207 of 392 kept after sand sinks through it.
+- **20B — spray evaporates into mist.** Water falling through open air turns to visible mist
+  at 1-in-K odds; still water never evaporates, so ponds and lake beds keep their water.
+  Tune K so a spring holds 1-3% of the board. Judged by `water:budget` and `audit:drift`.
+- **20C — liquids stop deleting liquids.** With the sink carrying the budget, turn on
+  conservation and tune — in order — K, how fast wet soil greens into moss, and how fast
+  soil dries, until a day's garden grows into at least 12 new columns and nothing moves
+  outside its seed spread without an explanation. Known pressure points, single-seed and to
+  be re-measured: the lidded-hearth steam scenario, the fed-stream erosion test, the garden.
+- **20D — gases (optional).** Smoke and steam deleting each other (about 14% of overwrites)
+  also acts as extra fading. Conserving it means more smoke, compensated by faster fading.
+- **20E — the rest of the clobber**, if the census shows what remains is small; otherwise it
+  is documented as intended.
+
+Each step is one commit, closed with the full gate, a live deploy check, and an adversarial
+review.

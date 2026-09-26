@@ -152,8 +152,9 @@ const POLLEN_COST: u16 = 15;
 const PETAL_SHED_AGE: u16 = 1200;
 
 /// One open face in this many pours per tick. Tuned against a measurement, not taste:
-/// at 26 an attuned spring held a permanent 3-4 cells of standing water because soil
-/// absorbed it as fast as it arrived.
+/// at 26 an attuned spring held a permanent 3-4 cells of standing water, because the water
+/// vanished about as fast as it arrived. That was read at the time as soil absorbing it; it
+/// was the move clobber — nothing in the game absorbs standing water (see ROADMAP Phase 20).
 const WELLSPRING_POUR: u32 = 7;
 /// How far a spring will push through its own material to reach open space.
 const WELLSPRING_REACH: i32 = 4;
@@ -830,12 +831,16 @@ impl Universe {
                         // were the limit, not the odds — walking past its own material to
                         // the edge of the pool is what lets it actually pump.
                         //
-                        // No output cap here on purpose. One was tried — resting once a 5x5
-                        // held enough of its own material — and no scene could be built in
-                        // which it changed the outcome, because the pour is already bounded
-                        // twice over: it only fills empty cells, and every substrate in the
-                        // game (wall, soil, sand, stone) drinks standing water. An unproven
-                        // guard plus a test that cannot fail is worse than neither.
+                        // No output cap here. One was tried — resting once a 5x5 held enough
+                        // of its own material — and no scene could be built in which it
+                        // changed the outcome. The reason recorded for that was wrong, though:
+                        // nothing in the game drinks standing water (water resting on soil,
+                        // sand, wall or stone keeps every cell for 3,000 ticks, measured).
+                        // What bounds a water spring is the move clobber — flowing water
+                        // deleting water — at about 280 cells on the 220x140 board, against
+                        // 8,837 once moving water stops deleting itself. ROADMAP Phase 20
+                        // replaces that accident with a deliberate sink; until it does, the
+                        // clobber cannot be closed on its own. `npm run water:budget` measures it.
                         let (cx, cy) = self.xy(idx);
                         let source = cell.energy as u8;
                         for (dx, dy) in [(0, -1), (-1, 0), (1, 0), (0, 1)] {
@@ -4465,9 +4470,9 @@ mod tests {
 
     /// A spring attuned to a POWDER entombs itself: the grain piles up, nothing drinks it,
     /// and once no empty cell lies within WELLSPRING_REACH of any face the pour stops. That is
-    /// the real bound on a powder spring, and it is worth pinning both halves of, because the
-    /// matrix's stated reason for having no output cap -- "every substrate in the game drinks
-    /// standing water" -- is a WATER argument and does not hold here.
+    /// the real bound on a powder spring, and it is worth pinning both halves of. (A water
+    /// spring is bounded by something else entirely — the move clobber, not absorption; the
+    /// old claim that "every substrate drinks standing water" was never true. ROADMAP Phase 20.)
     ///
     /// Measured on the shipped 220x140 grid at the default brush, a sand spring fills 23% of
     /// the terrarium in about a minute and then halts for good. It is not dead, though, and

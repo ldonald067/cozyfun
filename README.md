@@ -172,11 +172,20 @@ rule is REACHABLE and whether an absence is worth anything. A count in prose is 
 source of truth that nothing checks. `docs/HARNESS.md` describes what each stage proves and
 why it exists; the order and the list come from the script.
 
-Two gates sit outside `check`, because they need a deployment rather than a build:
+Three gates sit outside `check`, because they need the live service rather than a build:
 
 ```txt
 deploy:verify   is the running deployment the commit you think it is, on the wasm engine
 qa:live         that, then browser and visual QA against COZY_QA_URL
+config:drift    is the Railway config in .railway/railway.ts the one Railway is running
+```
+
+And three measurement tools, which report rather than pass or fail:
+
+```txt
+audit:drift     did a change move the interactions, or the dice (N seeds, vs a git ref)
+clobber:census  what the move clobber deletes, by mover, victim and origin
+water:budget    how much water a spring, a pour and a pond keep on the shipped build
 ```
 
 Any of those can be run on its own — `npm run test:parity`, `npm run visual:qa`, and so on. `npm run test:wasm` builds the sim and runs just the WASM smoke.

@@ -298,17 +298,25 @@ Current cosmic rules:
 - Wellspring blocks drink the first touching source material and pour it back out, feeding
   *through* their own pool rather than only into bare faces. A spring submerges itself within
   seconds, and an adjacent-empty rule then blocks every face and stops the source dead —
-  measured at a permanent 3-4 cells of standing water. There is deliberately no output cap:
-  one was tried and no scene could be built where it changed the outcome, because the pour is
-  already bounded by filling only empty cells and by every substrate drinking standing water.
-  **That second bound is a WATER argument and does not hold for a powder** — nothing drinks
-  sand — so it is worth saying what actually stops one. A powder spring ENTOMBS itself: the
-  grain piles up until no empty cell lies within `WELLSPRING_REACH` of any face, and the pour
-  halts. Measured on the shipped grid at the default brush, sand and rocket reach **23% of the
-  terrarium in about a minute** and then never grow again; soil takes three minutes to the same
-  ceiling, seed stops at 4%. Water sits at 1% and lava keeps creeping to 8% because both flow
-  away. The conclusion — no cap needed — survives, but for a different reason than the one
-  written down.
+  measured at a permanent 3-4 cells of standing water. There is no output cap: one was
+  tried and no scene could be built where it changed the outcome.
+
+  **What bounds a water spring is not what this section used to say.** It credited "every
+  substrate drinking standing water", and nothing in the game does: water resting on soil,
+  sand, wall or stone keeps every cell for 3,000 ticks, measured. The real bound is the move
+  clobber — flowing water deleting water that flowed into the same cell a moment earlier —
+  which holds a spring at about **280 cells, 1% of the 220x140 board**, steady from tick 1,000
+  to 16,000. Stop moving water deleting itself and the same spring floods **8,837 cells, 29%
+  of the board**. So a spring is bounded by accident, and closing the clobber without a
+  deliberate sink in its place would drown the tray; ROADMAP Phase 20 is that replacement,
+  and `npm run water:budget` is its measure.
+
+  **A powder spring is bounded a third way**, since nothing deletes sand either. It ENTOMBS
+  itself: the grain piles up until no empty cell lies within `WELLSPRING_REACH` of any face,
+  and the pour halts. Measured on the shipped grid at the default brush, sand and rocket reach
+  **23% of the terrarium in about a minute** and then never grow again; soil takes three
+  minutes to the same ceiling, seed stops at 4%. Lava keeps creeping to 8% because it flows
+  away.
 
   **It is blocked, not dead, and that is what makes it fair.** Carve a sealed cavity beside a
   buried spring and it pours again within a few hundred ticks with its attunement intact (+299

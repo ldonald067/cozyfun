@@ -12,6 +12,7 @@ npm run check               # the full gate; read the stage list from package.js
 npm run test:parity         # strictest single gate: both engines must agree byte-for-byte
 npm run interaction:audit   # does each documented interaction actually HAPPEN in play
 npm run slow-world:audit    # is an absence visible when you come back to it
+npm run audit:drift         # did a change move the interactions, or did the dice (N seeds, vs a git ref)
 npm run deploy:verify       # is the DEPLOYMENT the commit you think it is
 npm run build               # cargo -> wasm32, then Vite
 ```

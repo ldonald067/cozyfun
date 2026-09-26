@@ -58,7 +58,8 @@ Prefer evidence over opinion throughout. Run the command, read the file, compute
 Use the smallest honest gate for the change:
 
 - Docs only: `git diff --check`.
-- Sim behavior: `npm run test:sim`, `npm run test:wasm`, `npm run test:js-fallback`, and **`npm run test:parity`** — the first three each drive one engine and can all pass while the two have drifted apart; only parity compares them.
+- Sim behavior: `npm run test:sim`, `npm run test:wasm`, `npm run test:js-fallback`, and **`npm run test:parity`** — the first three each drive one engine and can all pass while the two have drifted apart; only parity compares them. Then **`npm run audit:drift`** to see which interactions the change moved: the audit's own before/after table is one seed per check and reads dice as effects.
+- Anything that changes how much water survives (movement, the clobber, evaporation, springs): `npm run water:budget` and `npm run clobber:census`, compared against the numbers in ROADMAP Phase 20.
 - Between-sessions behavior: add `npm run slow-world:audit`. Every other sim gate can pass while an absence changes nothing a player would see.
 - Native audio direction: `npm run audio:qa`.
 - UI, browser, visual, audio, export, or cross-boundary work: `npm run check`.

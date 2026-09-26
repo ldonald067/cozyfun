@@ -22,8 +22,10 @@ mirrored in `app/src/engine.ts` and behave byte-for-byte identically — see the
 - **`try_move` can overwrite a cell another mover filled this tick**, because it counts a
   target as free if it was empty in `old`. That clobber is load-bearing for the game's
   balance and is left alone on purpose, with one exception: `try_fall` never overwrites a
-  liquid. Water flowing into water still loses cells (about 16% of a pour). Measured
-  attempts to close that gap, and why they were backed out, are in `docs/HARNESS.md`.
+  liquid. Water flowing into water still loses cells (about 16% of a pour) — and that loss
+  is the ONLY thing bounding a water wellspring (280 cells with it, 8,837 without). Never
+  close it without the deliberate sink ROADMAP Phase 20 is building; the measurements are in
+  `docs/HARNESS.md`, and `npm run clobber:census` / `npm run water:budget` take them.
 - **Order matters inside a tick.** `age_and_decay` runs, then `apply_reactions`, then the
   bottom-up pass, then the top-down pass. Rules read `old` and write `next`; reading `next`
   means you see whatever earlier cells in the same tick already did.

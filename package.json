@@ -30,6 +30,9 @@
     "test:subpath": "node scripts/smoke-subpath.mjs",
     "interaction:audit": "node scripts/interaction-audit.mjs",
     "slow-world:audit": "node scripts/slow-world-audit.mjs",
+    "audit:drift": "node scripts/audit-drift.mjs",
+    "clobber:census": "node scripts/clobber-census.mjs",
+    "water:budget": "node scripts/water-budget.mjs",
     "icons": "node scripts/make-favicon.mjs",
     "icons:check": "node scripts/make-favicon.mjs --check"
   },
