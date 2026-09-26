@@ -1,44 +1,8 @@
-import { rm, writeFile } from "node:fs/promises";
-import { createRequire } from "node:module";
-import { resolve } from "node:path";
-import { spawnSync } from "node:child_process";
+import { compileApp } from "./compile-app.mjs";
 
-const root = resolve(import.meta.dirname, "..");
-const outDir = resolve(root, ".tmp/js-fallback-cjs");
-const tsc = resolve(root, "app/node_modules/typescript/bin/tsc");
+const app = compileApp("js-fallback-cjs", ["engine.ts", "materials.ts"]);
 
-await rm(outDir, { recursive: true, force: true });
-
-const compile = spawnSync(process.execPath, [
-  tsc,
-  "--target",
-  "ES2022",
-  "--module",
-  "CommonJS",
-  "--moduleResolution",
-  "Node",
-  "--lib",
-  "ES2022,DOM",
-  "--strict",
-  "true",
-  "--skipLibCheck",
-  "true",
-  "--esModuleInterop",
-  "true",
-  "--outDir",
-  outDir,
-  "app/src/engine.ts",
-  "app/src/materials.ts"
-], { cwd: root, stdio: "inherit" });
-
-if (compile.status !== 0) {
-  throw new Error("JS fallback TypeScript compile failed");
-}
-
-await writeFile(resolve(outDir, "package.json"), JSON.stringify({ type: "commonjs" }));
-
-const require = createRequire(import.meta.url);
-const { createFallbackEngine } = require(resolve(outDir, "engine.js"));
+const { createFallbackEngine } = app.load("engine");
 
 const MATERIAL = {
   Empty: 0,

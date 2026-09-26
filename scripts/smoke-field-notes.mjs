@@ -3,24 +3,13 @@
 // trying it. This drives the REAL sim into that state from painted materials only -- the same
 // bar the interaction audit holds -- and asserts the note fires. A note that cannot fire is
 // worse than no note, because the rule it was meant to teach then has no channel at all.
-import { readFile, rm, writeFile } from "node:fs/promises";
-import { createRequire } from "node:module";
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { spawnSync } from "node:child_process";
+import { compileApp } from "./compile-app.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const outDir = resolve(root, ".tmp/field-notes-cjs");
-const tsc = resolve(root, "app/node_modules/typescript/bin/tsc");
-await rm(outDir, { recursive: true, force: true });
-const compile = spawnSync(process.execPath, [
-  tsc, "--target", "ES2022", "--module", "CommonJS", "--moduleResolution", "Node",
-  "--lib", "ES2022,DOM", "--strict", "true", "--skipLibCheck", "true", "--esModuleInterop", "true",
-  "--outDir", outDir, "app/src/fieldNotes.ts", "app/src/materials.ts",
-], { cwd: root, stdio: "inherit" });
-if (compile.status !== 0) throw new Error("field note TypeScript compile failed");
-await writeFile(resolve(outDir, "package.json"), JSON.stringify({ type: "commonjs" }));
-const require_ = createRequire(import.meta.url);
-const { FieldNoteJournal } = require_(resolve(outDir, "fieldNotes.js"));
+const app = compileApp("field-notes-cjs", ["fieldNotes.ts", "materials.ts"]);
+const { FieldNoteJournal } = app.load("fieldNotes");
 
 // localStorage does not exist in node; the journal already tolerates it throwing, but the
 // ledger has to stay empty or every note would read as already witnessed.

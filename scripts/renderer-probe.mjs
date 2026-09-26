@@ -25,9 +25,8 @@
 
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { rm, writeFile, readFile, mkdir } from "node:fs/promises";
-import { spawnSync } from "node:child_process";
-import { createRequire } from "node:module";
+import { rm, readFile } from "node:fs/promises";
+import { compileApp } from "./compile-app.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const quiet = process.argv.includes("--quiet");
@@ -37,23 +36,10 @@ const note = (line) => { if (!quiet) console.log(line); };
 // ---------------------------------------------------------------- compile the real renderer
 // Same invocation the interaction audit uses, for the same reason: reimplementing the colour
 // rules here would only prove the harness agrees with itself.
-const rendererDir = resolve(root, ".tmp/probe-renderer");
-await rm(rendererDir, { recursive: true, force: true });
-await mkdir(rendererDir, { recursive: true });
-const tsc = resolve(root, "app/node_modules/typescript/bin/tsc");
-const compiled = spawnSync(
-  process.execPath,
-  [tsc, "--target", "ES2022", "--module", "CommonJS", "--moduleResolution", "Node", "--lib",
-   "ES2022,DOM", "--strict", "true", "--skipLibCheck", "true", "--esModuleInterop", "true",
-   "--outDir", rendererDir, "app/src/rendering/materialColor.ts", "app/src/materials.ts"],
-  { cwd: root, stdio: "inherit" },
-);
-if (compiled.status !== 0) throw new Error("renderer probe: renderer TypeScript compile failed");
-await writeFile(resolve(rendererDir, "package.json"), JSON.stringify({ type: "commonjs" }));
-const require_ = createRequire(import.meta.url);
-const { colorForCell } = require_(resolve(rendererDir, "rendering/materialColor.js"));
-const shape = require_(resolve(rendererDir, "rendering/shapeLanguage.js"));
-const { MATERIAL, CELL_FLAG } = require_(resolve(rendererDir, "materials.js"));
+const app = compileApp("probe-renderer", ["rendering/materialColor.ts", "materials.ts"]);
+const { colorForCell } = app.load("rendering/materialColor");
+const shape = app.load("rendering/shapeLanguage");
+const { MATERIAL, CELL_FLAG } = app.load("materials");
 
 // ------------------------------------------------------------------ the mirrored constants
 // The renderer reads three numbers that BELONG to the simulation, so that a seed head is
@@ -225,7 +211,6 @@ const checks = [];
     checks.push({ label: "BLOOM_SHAPES agree across sim, engine and showcase", floor: 8, worst: 8, detail: "" });
   }
 }
-
 
 function assertFloor(label, floor, worst, detail) {
   checks.push({ label, floor, worst, detail });

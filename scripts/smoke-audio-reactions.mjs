@@ -1,49 +1,8 @@
-import { rm, writeFile } from "node:fs/promises";
-import { createRequire } from "node:module";
-import { resolve } from "node:path";
-import { spawnSync } from "node:child_process";
+import { compileApp } from "./compile-app.mjs";
 
-const root = resolve(import.meta.dirname, "..");
-const outDir = resolve(root, ".tmp/audio-reactions-cjs");
-const tsc = resolve(root, "app/node_modules/typescript/bin/tsc");
+const app = compileApp("audio-reactions-cjs", ["audio/reactions.ts", "materials.ts", "engine.ts"]);
 
-await rm(outDir, { recursive: true, force: true });
-
-const compile = spawnSync(
-  process.execPath,
-  [
-    tsc,
-    "--target",
-    "ES2022",
-    "--module",
-    "CommonJS",
-    "--moduleResolution",
-    "Node",
-    "--lib",
-    "ES2022,DOM",
-    "--strict",
-    "true",
-    "--skipLibCheck",
-    "true",
-    "--esModuleInterop",
-    "true",
-    "--outDir",
-    outDir,
-    "app/src/audio/reactions.ts",
-    "app/src/materials.ts",
-    "app/src/engine.ts"
-  ],
-  { cwd: root, stdio: "inherit" }
-);
-
-if (compile.status !== 0) {
-  throw new Error("Audio reaction TypeScript compile failed");
-}
-
-await writeFile(resolve(outDir, "package.json"), JSON.stringify({ type: "commonjs" }));
-
-const require = createRequire(import.meta.url);
-const { detectReactionCues } = require(resolve(outDir, "audio/reactions.js"));
+const { detectReactionCues } = app.load("audio/reactions");
 
 const MATERIAL = {
   Empty: 0,
@@ -239,7 +198,7 @@ expectCues("priority order and uniqueness", (before, after) => {
 // green. This one drives the REAL sim and feeds it consecutive frames, so the cue is bound
 // to what the simulation actually emits.
 {
-  const { createFallbackEngine } = require(resolve(outDir, "engine.js"));
+  const { createFallbackEngine } = app.load("engine");
   const W = 16, H = 16;
   const engine = createFallbackEngine(W, H, 7);
   const bytes = engine.getCellBytes();

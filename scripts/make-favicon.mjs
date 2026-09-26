@@ -25,11 +25,10 @@
 //   apple-touch-icon.png - iOS home screen; opaque, because Apple masks transparency
 
 import { deflateSync } from "node:zlib";
-import { writeFile, mkdir, readFile, rm } from "node:fs/promises";
-import { createRequire } from "node:module";
-import { spawnSync } from "node:child_process";
+import { writeFile, mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { compileApp } from "./compile-app.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outDir = path.join(root, "app", "public");
@@ -38,21 +37,9 @@ const check = process.argv.includes("--check");
 // Pull the real palettes out of the app, compiled to CommonJS exactly as the parity
 // and audit harnesses do. Neither module may use `import.meta`, which is already an
 // invariant for materials.ts and holds for the renderer.
-const cjsDir = path.join(root, ".tmp/favicon-cjs");
-await rm(cjsDir, { recursive: true, force: true });
-const compiled = spawnSync(
-  process.execPath,
-  [path.join(root, "app/node_modules/typescript/bin/tsc"),
-   "--target", "ES2022", "--module", "CommonJS", "--moduleResolution", "Node", "--lib",
-   "ES2022,DOM", "--strict", "true", "--skipLibCheck", "true", "--esModuleInterop", "true",
-   "--outDir", cjsDir, "app/src/rendering/shapeLanguage.ts", "app/src/materials.ts"],
-  { cwd: root, stdio: "inherit" }
-);
-if (compiled.status !== 0) throw new Error("make-favicon: TypeScript compile failed");
-await writeFile(path.join(cjsDir, "package.json"), JSON.stringify({ type: "commonjs" }));
-const require = createRequire(import.meta.url);
-const { SPECIES } = require(path.join(cjsDir, "rendering/shapeLanguage.js"));
-const { MATERIAL, MATERIALS } = require(path.join(cjsDir, "materials.js"));
+const app = compileApp("favicon-cjs", ["rendering/shapeLanguage.ts", "materials.ts"]);
+const { SPECIES } = app.load("rendering/shapeLanguage");
+const { MATERIAL, MATERIALS } = app.load("materials");
 
 const rgb = ([r, g, b]) => `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
 const cornflower = SPECIES[0];

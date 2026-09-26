@@ -9,45 +9,32 @@
 //
 //   node scripts/slow-world-audit.mjs
 //
-// Three properties are asserted, and each one is a way the feature could be a lie:
+// Each assertion below is a way the feature could be a lie:
 //
-//   1. A day away visibly changes the scene: enough cells, in colours far enough
-//      apart to see, judged by compiling the REAL renderer rather than restating
-//      its colour rules here.
-//   2. Longer absences change MORE than shorter ones, up to the cap. Without this a
-//      curve that saturates after an hour would pass while "come back tomorrow"
-//      meant nothing.
-//   3. A scene with nothing alive in it comes back untouched. The slow world is
-//      only allowed to move what the player left growing; walls, sand and glass are
-//      not the game's to rearrange.
+//   1. A day away visibly changes the scene: enough cells, in colours far enough apart
+//      to see, judged by compiling the REAL renderer rather than restating its rules.
+//   2. A day changes MORE than an hour. Without this a curve that saturates after an
+//      hour would pass while "come back tomorrow" meant nothing.
+//   3. The garden stands in NEW columns: a sown seed that never comes up is clutter.
+//   4. You arrive while a head is OPEN, not after the flowering spent itself unseen —
+//      and a bloom already open when you left does not cancel the catch-up.
+//   5. Nothing the player built changes: the inert zone comes back byte-identical.
+//   6. A flooded sand bed turns to rock: a day compacts more than an hour, the rock is
+//      visible against the sand it replaced, the lake keeps a loose floor, and the
+//      bedded flag survives a save and reload.
 
-import { rm, writeFile } from "node:fs/promises";
-import { createRequire } from "node:module";
 import { resolve } from "node:path";
-import { spawnSync } from "node:child_process";
+import { compileApp } from "./compile-app.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const outDir = resolve(root, ".tmp/slow-world-cjs");
-await rm(outDir, { recursive: true, force: true });
-const tsc = resolve(root, "app/node_modules/typescript/bin/tsc");
-const compile = spawnSync(
-  process.execPath,
-  [tsc, "--target", "ES2022", "--module", "CommonJS", "--moduleResolution", "Node", "--lib",
-   "ES2022,DOM", "--strict", "true", "--skipLibCheck", "true", "--esModuleInterop", "true",
-   "--outDir", outDir, "app/src/engine.ts", "app/src/materials.ts", "app/src/slowWorld.ts",
-   "app/src/rendering/materialColor.ts"],
-  { cwd: root, stdio: "inherit" },
-);
-if (compile.status !== 0) throw new Error("slow-world audit: TypeScript compile failed");
-await writeFile(resolve(outDir, "package.json"), JSON.stringify({ type: "commonjs" }));
-const require = createRequire(import.meta.url);
-const { createFallbackEngine } = require(resolve(outDir, "engine.js"));
+const app = compileApp("slow-world-cjs", ["engine.ts", "materials.ts", "slowWorld.ts", "rendering/materialColor.ts"]);
+const { createFallbackEngine } = app.load("engine");
 // The SAME absence policy the app runs, not a copy of it. `wakeTerrarium` owns the
 // step count, the tick count, and the order they are applied in, so this gate cannot
 // certify a return path that production does not perform.
-const { aHeadIsOpen, catchUpRemaining, nextCatchUpChunk, openCrowns, planAbsence, wakeTerrarium } = require(resolve(outDir, "slowWorld.js"));
-const { colorForCell } = require(resolve(outDir, "rendering/materialColor.js"));
-const { CELL_FLAG } = require(resolve(outDir, "materials.js"));
+const { aHeadIsOpen, catchUpRemaining, nextCatchUpChunk, openCrowns, planAbsence, wakeTerrarium } = app.load("slowWorld");
+const { colorForCell } = app.load("rendering/materialColor");
+const { CELL_FLAG } = app.load("materials");
 
 const STRIDE = 8;
 const M = { Wall: 1, Sand: 2, Water: 3, Soil: 5, Fire: 6, Wood: 7, Stone: 9, Seed: 11, Glass: 20 };

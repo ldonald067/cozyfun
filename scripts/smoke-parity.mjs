@@ -10,33 +10,18 @@
 // each other can drift by a single flag bit after ~200 ticks. It affects only the
 // JS fallback (WASM is the default engine) and is not reproducible without that
 // continuous dual-fountain setup, so it is documented rather than gated on here.
-import { rm, writeFile, readFile } from "node:fs/promises";
-import { createRequire } from "node:module";
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { spawnSync } from "node:child_process";
+import { compileApp } from "./compile-app.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 
-// Compile the TS engine to CommonJS, mirroring scripts/smoke-js-fallback.mjs.
-const outDir = resolve(root, ".tmp/parity-cjs");
-await rm(outDir, { recursive: true, force: true });
-const tsc = resolve(root, "app/node_modules/typescript/bin/tsc");
-const compile = spawnSync(
-  process.execPath,
-  [
-    tsc, "--target", "ES2022", "--module", "CommonJS", "--moduleResolution", "Node",
-    "--lib", "ES2022,DOM", "--strict", "true", "--skipLibCheck", "true",
-    "--esModuleInterop", "true", "--outDir", outDir, "app/src/engine.ts", "app/src/materials.ts",
-  ],
-  { cwd: root, stdio: "inherit" },
-);
-if (compile.status !== 0) throw new Error("parity harness TypeScript compile failed");
-await writeFile(resolve(outDir, "package.json"), JSON.stringify({ type: "commonjs" }));
-const require = createRequire(import.meta.url);
-const { createFallbackEngine } = require(resolve(outDir, "engine.js"));
+// The TS engine as CommonJS, through the one compile every harness shares.
+const app = compileApp("parity-cjs", ["engine.ts", "materials.ts"]);
+const { createFallbackEngine } = app.load("engine");
 // Flags come from the compiled source rather than a hand-typed copy: a mirrored constant
 // with nothing checking it is a promise, and this file already owns one of those in `M`.
-const { CELL_FLAG } = require(resolve(outDir, "materials.js"));
+const { CELL_FLAG } = app.load("materials");
 
 const wasmBytes = await readFile(resolve(root, "app/public/sim/cozy_sandbox_sim.wasm"));
 const { instance } = await WebAssembly.instantiate(wasmBytes, {});
