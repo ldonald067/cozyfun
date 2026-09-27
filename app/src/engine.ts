@@ -1511,6 +1511,8 @@ class JsSandboxEngine implements SandboxEngine {
     if (waterLike(movingCell[0]) && waterLike(next[target])) return false;
     // A gas never deletes a gas — see Universe::try_move.
     if (isGas(movingCell[0]) && isGas(next[target])) return false;
+    // Nor water — see Universe::try_move.
+    if (isGas(movingCell[0]) && waterLike(next[target])) return false;
     const canMove =
       old[target] === MATERIAL.Empty ||
       next[target] === MATERIAL.Empty ||

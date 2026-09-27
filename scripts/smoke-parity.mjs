@@ -13,6 +13,9 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { compileApp } from "./compile-app.mjs";
+// Read from engine.ts by the audit's scene module, so the parity witness and the audit's
+// thermal-steam filter can never disagree about what mist is.
+import { MIST_ENERGY } from "./interaction-scenes.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 
@@ -750,6 +753,42 @@ const scenarios = [
       if (seen.chamberLowestBeforeExpiry !== seen.chamberFirst) return `sealed smoke fell from ${seen.chamberFirst} to ${seen.chamberLowestBeforeExpiry} cells before it could age out`;
       if (seen.chamberLast !== 0) return `sealed smoke never aged out (${seen.chamberLast} cells left)`;
       if ((seen.fireSmokeCellTicks ?? 0) < 500) return `the lidded fire made only ${seen.fireSmokeCellTicks ?? 0} cell-ticks of smoke`;
+      return null;
+    },
+  },
+  {
+    // A gas never deletes water (ROADMAP Phase 20E). Water falls from the top of a sealed
+    // Wall chamber while steam rises from the bottom, through each other. Liquids move before
+    // gases, so steam meets water that has just flowed by rising into it, which used to delete
+    // the water. Nothing here is hot or cold and Wall takes dew as a stain, so the only way
+    // water may leave is as mist born this tick (age 0, MIST_ENERGY). Steam is NOT conserved
+    // and is not meant to be: water sinking through a gas cell displaces it by design.
+    name: "rising steam never deletes falling water",
+    w: 40, h: 34, seed: 4211, ticks: 140,
+    paint(p) {
+      for (let x = 1; x <= 38; x++) { p(x, 1, 1, M.Wall); p(x, 32, 1, M.Wall); }
+      for (let y = 1; y <= 32; y++) { p(1, y, 1, M.Wall); p(38, y, 1, M.Wall); }
+      for (let y = 5; y <= 10; y++) for (let x = 8; x <= 31; x += 2) p(x + (y % 2), y, 1, M.Water);
+      for (let y = 22; y <= 28; y++) for (let x = 8; x <= 31; x += 2) p(x + ((y + 1) % 2), y, 1, M.Steam);
+    },
+    observe(seen, cells, w, h, tick) {
+      let water = 0, fresh = 0, met = 0;
+      for (let i = 0; i < w * h; i++) {
+        const o = i * STRIDE, kind = cells[o];
+        if (kind === M.Water) {
+          water++;
+          if (i >= w && cells[o - w * STRIDE] === M.Steam) met++;
+        } else if (kind === M.Steam && (cells[o + 2] | (cells[o + 3] << 8)) === 0 && (cells[o + 4] | (cells[o + 5] << 8)) === MIST_ENERGY) fresh++;
+      }
+      if (seen.water !== undefined && seen.water - water !== fresh) {
+        seen.unexplainedLoss = (seen.unexplainedLoss ?? 0) + (seen.water - water - fresh);
+      }
+      seen.water = water;
+      seen.steamMeetsWater = (seen.steamMeetsWater ?? 0) + met;
+    },
+    expect(seen) {
+      if ((seen.steamMeetsWater ?? 0) < 20) return `steam met the falling water on only ${seen.steamMeetsWater ?? 0} cell-ticks`;
+      if (seen.unexplainedLoss) return `${seen.unexplainedLoss} water cells vanished without throwing mist — rising steam deleted them`;
       return null;
     },
   },

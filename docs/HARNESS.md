@@ -475,11 +475,23 @@ gases crowd. It pools as a ceiling layer rather than fogging the box, and the ow
 as-is over shortening smoke's lifetime. The water budget is untouched: a spring's mist is too
 sparse to meet another gas.
 
-What remains open, from the census after 20D: water overwriting steam a reaction just made
-(2,323), and **steam overwriting water that just flowed in (1,343)** — the last small leak of
-the old water sink, mostly where a spring's mist rises through its own stream. That second one
-was 615 after 20B and **20D doubled it**: mist that used to be deleted by other gas now
-survives long enough to meet water. Both are 20E.
+**A gas never overwrites water** (20E). Steam rising into water that had just flowed into its
+path was the last leak of the old accidental sink — 615 overwrites after 20B, 1,343 after 20D,
+because mist that other gas used to delete then lived to meet water. It is 0 now, and the
+census fell from 4,970 overwrites to 3,058. The water budget holds the owner's ~7%: the spring
+reads 7.4% at 4,000 ticks and 6.8% at 16,000, one run each against 6.9% and 7.1%, with pour
+and pond unchanged; no audit check moves at 32 seeds. Oil stays out of the guard for the same
+reason it stays out of water's: it has no sink.
+
+Its witness had to be narrower than it first looked, and the reason is worth keeping. Water
+plus steam is NOT conserved in a heat-free chamber, even with every clobber closed: water
+sinking through a gas cell displaces it outright (`can_sink_through_gas`), which deletes the
+steam by design. So the test and the parity scenario assert the water side only — each tick,
+water lost must equal the mist born that tick (age 0, `MIST_ENERGY`) — and also that steam and
+water actually met, so a scene where they never touch cannot pass.
+
+What remains open: water overwriting steam a reaction just made (1,836 after the gas-on-water
+guard), the last class 20E means to decide.
 
 **The phase's adversarial review found five real problems** after every gate was green, and
 each is fixed with a test that fails on its sabotage: the oil flood above; two heat checks

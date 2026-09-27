@@ -9,7 +9,7 @@ Phase 20 replaces the game's accidental water sink with a deliberate one (ROADMA
 has the full story). **20A** built the instruments and **20B** shipped the water budget:
 moving water throws a faint visible mist (`MIST_ODDS`, 1 in 450 per move), water never
 deletes water, a settled pond keeps every drop, a puddle on open ground dries in 15-30 s, and
-a spring settles into a lake of ~7% of the board. Everything is green: 121 cargo tests, 28
+a spring settles into a lake of ~7% of the board. Everything is green: 122 cargo tests, 29
 parity scenarios, 125 interaction checks, the slow world, the full `npm run check`.
 
 **The triage of the 17 checks 20B moved is done, and none was a regression**: 10 were dice
@@ -67,14 +67,9 @@ All by the owner, recorded in the user's memory and ROADMAP Phase 20:
 
 ## 1. 20E — the rest of the clobber
 
-- **Steam overwriting water that just flowed in: 1,343** (615 before 20D, which doubled it:
-  mist that other gas used to delete now lives to meet water) — the last small leak of the old
-  water sink, mostly a spring's mist rising through its own stream (`stone.erodes` is 1,131 of
-  it). Closing it (a gas never deletes
-  a liquid) will grow a spring's lake a little: re-run `water:budget` and keep the spring near
-  the ~7% the owner accepted — if it grows past that, MIST_ODDS is the knob, and it also sets
-  how fast puddles dry.
-- **Water overwriting steam a reaction just made: 2,323** — quenching lava and boiling. Closing
+- **Done: a gas never deletes water** (steam-over-water 1,343 -> 0; spring still ~7%). Its
+  witness counts water only — see docs/HARNESS.md for why water plus steam is not conserved.
+- **Water overwriting steam a reaction just made: 1,836** — quenching lava and boiling. Closing
   it keeps more of that steam; check `lava.quenched`, `water.quenches` and the steam bound.
 - Everything else is under ~350 per class. Decide per class with the census; anything left
   open gets documented as intended in docs/HARNESS.md ("The move clobber, and what is left").

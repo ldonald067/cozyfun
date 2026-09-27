@@ -745,9 +745,13 @@ and must not create problems later, so nothing opportunistic rides along with a 
   not move. The water budget is identical to the last digit — a spring's mist is too sparse to
   meet another gas — but the census's steam-over-water class doubled (615 -> 1,343), since
   mist that other gas used to delete now lives to meet water. That is 20E's to close.
-- **20E — the rest of the clobber.** After 20B: water overwriting reaction-made steam (2,619)
-  and steam overwriting water that just flowed in (615) — the last small leak of the old
-  water sink. Close them if the census says it is cheap, otherwise document them as intended.
+- **20E — the rest of the clobber. In progress.**
+  - **A gas never deletes water. Done.** Steam rising into water that had just flowed into its
+    path — the last leak of the old water sink — was 615 overwrites after 20B and 1,343 after
+    20D, since mist that other gas used to delete then lived to meet water. It is 0 now, the
+    census falls from 4,970 to 3,058, and the spring holds the accepted ~7% (7.4% at 4,000
+    ticks, 6.8% at 16,000; pour and pond unchanged). No audit check moves at 32 seeds.
+  - Next: water overwriting steam a reaction just made (1,836) — quenching lava and boiling.
 
 Each step is one commit, closed with the full gate, a live deploy check, and an adversarial
 review.

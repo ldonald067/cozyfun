@@ -2289,6 +2289,12 @@ impl Universe {
         if is_gas(moving_cell.kind) && is_gas(target_next.kind) {
             return false;
         }
+        // Nor does a gas delete water (ROADMAP Phase 20E): mist rising through its own stream
+        // used to overwrite the water that had just flowed into its path — the last leak of the
+        // old accidental sink. Water only, as above: oil still has no sink of its own.
+        if is_gas(moving_cell.kind) && is_water_like(target_next.kind) {
+            return false;
+        }
         let can_move = target_old.is_empty()
             || target_next.is_empty()
             || (can_sink_through_gas
@@ -3161,6 +3167,60 @@ mod tests {
             u.tick();
         }
         assert_eq!(count_kind(&u, Material::Smoke), 0, "smoke past its lifetime should be gone");
+    }
+
+    #[test]
+    fn rising_steam_never_deletes_falling_water() {
+        // A sealed Wall chamber: water falling from the top, steam rising from the bottom,
+        // through each other. Liquids move before gases in a tick, so the only way steam can
+        // meet a cell water has just flowed into is by rising into it — which used to delete
+        // the water. Nothing here is hot or cold, nothing drinks water and Wall takes dew as a
+        // stain, so the ONLY way water may leave is as mist, born this tick at age 0 and
+        // MIST_ENERGY. Steam itself is not conserved here and is not meant to be: water
+        // sinking through a gas cell displaces it outright, which is a separate, designed rule.
+        let mut u = Universe::new(24, 30, 11);
+        for y in 1..=28 {
+            for x in 1..=22 {
+                if y == 1 || y == 28 || x == 1 || x == 22 {
+                    set_cell(&mut u, x, y, Material::Wall);
+                }
+            }
+        }
+        for y in 3..=8 {
+            for x in 6..=17 {
+                if (x + y) % 2 == 0 {
+                    set_cell(&mut u, x, y, Material::Water);
+                }
+            }
+        }
+        for y in 20..=26 {
+            for x in 6..=17 {
+                if (x + y) % 2 == 1 {
+                    set_cell(&mut u, x, y, Material::Steam);
+                }
+            }
+        }
+        let fresh_mist = |u: &Universe| {
+            u.cells
+                .iter()
+                .filter(|c| c.kind == Material::Steam as u8 && c.age == 0 && c.energy == MIST_ENERGY)
+                .count()
+        };
+        let mut water = count_kind(&u, Material::Water);
+        let mut met = false;
+        for tick in 1..=140 {
+            u.tick();
+            let now = count_kind(&u, Material::Water);
+            assert_eq!(water - now, fresh_mist(&u), "water lost at tick {tick} beyond the mist it threw: rising steam deleted it");
+            met |= u.cells.iter().any(|c| c.kind == Material::Steam as u8 && c.age > 0)
+                && (0..u.cells.len()).any(|i| {
+                    u.cells[i].kind == Material::Water as u8
+                        && i >= 24
+                        && u.cells[i - 24].kind == Material::Steam as u8
+                });
+            water = now;
+        }
+        assert!(met, "the steam never reached the falling water, so this proves nothing");
     }
 
     #[test]
