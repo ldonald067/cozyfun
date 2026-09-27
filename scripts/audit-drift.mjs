@@ -37,10 +37,12 @@ const baseRef = arg("base", "HEAD");
 const seeds = Number(arg("seeds", "8"));
 const only = arg("only", "").split(",").filter(Boolean);
 const checks = only.length ? CHECKS.filter((c) => only.includes(c.covers)) : CHECKS;
-if (only.length && checks.length !== only.length) {
-  const known = new Set(CHECKS.map((c) => c.covers));
-  throw new Error(`audit:drift: unknown check id(s): ${only.filter((id) => !known.has(id)).join(", ")}`);
-}
+const unknown = only.filter((id) => !CHECKS.some((c) => c.covers === id));
+if (unknown.length) throw new Error(`audit:drift: unknown check id(s): ${unknown.join(", ")}`);
+// Several interactions carry more than one check under the same id (stem.climbs, oil.floats,
+// fire.ignites, ...), so a check is keyed by id AND role. Keying by id alone let the second
+// check of a pair silently overwrite the first in both the results and the comparison.
+const keyOf = (check) => `${check.covers} | ${check.role}`;
 
 function run(cmd, args, opts = {}) {
   const r = spawnSync(cmd, args, { cwd: root, encoding: "utf8", ...opts });
@@ -56,7 +58,7 @@ function measure(engine, renderer, label) {
     const runs = [];
     // k = 0 is the audit's own seed, so the audit's single reading is always in the sample.
     for (let k = 0; k < seeds; k++) runs.push(runCheck({ ...check, seed: check.seed + k * 1000 }, { engine, colorForCell: renderer }));
-    out[check.covers] = runs.map((r) => ({
+    out[keyOf(check)] = runs.map((r) => ({
       // An `absent` check succeeds by never firing, so "reached" means what the check means.
       reached: r.absent ? r.firstTick < 0 : r.firstTick >= 0,
       firstTick: r.firstTick, cells: r.spreadCells ?? 0, shown: r.visibleTicks ?? 0, contrast: Math.round(r.contrast ?? 0),
@@ -70,7 +72,7 @@ function measure(engine, renderer, label) {
 const baseSha = run("git", ["rev-parse", baseRef]);
 const scenesHash = createHash("sha1").update(readFileSync(resolve(root, "scripts/interaction-scenes.mjs"))).digest("hex").slice(0, 10);
 const driftDir = resolve(root, ".tmp/drift");
-const cacheFile = resolve(driftDir, `${baseSha.slice(0, 12)}-${seeds}seeds-${scenesHash}${only.length ? "-" + only.join("+") : ""}.json`);
+const cacheFile = resolve(driftDir, `v2-${baseSha.slice(0, 12)}-${seeds}seeds-${scenesHash}${only.length ? "-" + only.join("+") : ""}.json`);
 mkdirSync(driftDir, { recursive: true });
 
 let base;
@@ -112,7 +114,7 @@ const METRICS = [["firstTick", "first tick"], ["cells", "cells"], ["shown", "sho
 
 const moved = [];
 for (const check of checks) {
-  const b = base[check.covers], h = head[check.covers];
+  const b = base[keyOf(check)], h = head[keyOf(check)];
   if (!b) { moved.push({ check, notes: ["no base measurement"] }); continue; }
   const notes = [];
   const bReach = b.filter((r) => r.reached).length, hReach = h.filter((r) => r.reached).length;
