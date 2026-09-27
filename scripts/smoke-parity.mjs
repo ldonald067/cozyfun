@@ -546,31 +546,48 @@ const scenarios = [
     w: 32, h: 24, seed: 4103, ticks: 240,
     paint(p) {
       for (let x = 0; x < 32; x++) p(x, 21, 1, M.Wall);
-      // A wet wood bed with a wall lid pressed straight down onto it, so the cell directly
-      // above every log is sealed and only the diagonals are open.
+      // A wood bed under a wall lid, fired at both ends, with water poured on the lid. Only the
+      // bed's EDGES can vent diagonally — if every log had a wall directly above it, each
+      // log's diagonal would be its neighbour's sealed cell — and the brush's discs cut the
+      // lid and the bed into a rougher shape than this reads. What the scene reliably does is
+      // make embers and drying logs vent past blocked cells, which is what `observe` counts.
       for (let x = 10; x <= 20; x++) p(x, 20, 1, M.Wood);
       for (let x = 12; x <= 18; x++) p(x, 19, 1, M.Wall);
       p(15, 18, 2, M.Water);
       p(11, 20, 1, M.Fire); p(19, 20, 1, M.Fire);
     },
+    // The witness is a wisp VENTED diagonally: fresh vapour with no vapour under it last
+    // tick (so it did not just rise there), beside a source one row down whose own cell
+    // overhead was blocked. This used to count total steam against a floor of 40, and that
+    // number was measuring water hitting the fire, not the vent: once water stopped deleting
+    // itself (ROADMAP Phase 20) the pour pooled in the notch it cuts in the lid, the fire was
+    // never doused, and the total fell to 12 with the vent working perfectly. The scene DOES
+    // exercise the fallback — a straight-up-only engine diverges from this one by tick 4 on
+    // every seed tried, first on an ember venting smoke past the lid — so the scene stays and
+    // the count now looks at the branch itself. Gas also drifts diagonally on its own, so the
+    // witness has false positives: measured on this seed, 57 with the fallback and 35 with the
+    // vent restricted to straight up. The floor sits between them.
     observe(seen, cells, w, h) {
-      let offColumn = 0, total = 0;
-      for (let i = 0; i < w * h; i++) {
-        if (cells[i * STRIDE] !== M.Steam) continue;
-        total++;
-        const x = i % w;
-        // Under the lid (x 12..18) the only way steam reaches these columns' edges is a
-        // diagonal hop; count steam sitting outside the lidded span.
-        if (x < 12 || x > 18) offColumn++;
+      const VAPOUR = new Set([M.Steam, M.Smoke]);
+      // The previous board rides along out of sight: `seen` is printed, and a board is noise.
+      const prev = seen.previousBoard;
+      Object.defineProperty(seen, "previousBoard", { value: cells.slice(), writable: true, enumerable: false, configurable: true });
+      if (!prev) return;
+      const k = (c, x, y) => (x < 0 || y < 0 || x >= w || y >= h ? -1 : c[(y * w + x) * STRIDE]);
+      let vents = 0;
+      for (let vy = 0; vy < h - 1; vy++) for (let vx = 0; vx < w; vx++) {
+        if (!VAPOUR.has(k(cells, vx, vy)) || VAPOUR.has(k(prev, vx, vy))) continue;
+        if ([-1, 0, 1].some((d) => VAPOUR.has(k(prev, vx + d, vy + 1)))) continue;
+        for (const dx of [-1, 1]) {
+          const source = k(prev, vx - dx, vy + 1), cap = k(prev, vx - dx, vy);
+          if (source > 0 && !VAPOUR.has(source) && cap > 0 && !VAPOUR.has(cap)) { vents++; break; }
+        }
       }
-      seen.maxSteam = Math.max(seen.maxSteam ?? 0, total);
-      seen.maxOffColumn = Math.max(seen.maxOffColumn ?? 0, offColumn);
+      seen.diagonalVents = (seen.diagonalVents ?? 0) + vents;
     },
     expect(seen) {
-      // 60 with the diagonal fallback, 18 without, both measured by deleting it. A floor of
-      // 40 sits clear of the no-fallback ceiling rather than merely above zero.
-      if ((seen.maxSteam ?? 0) < 40) {
-        return `a lidded bed should still vent freely, peaked at only ${seen.maxSteam ?? 0} steam cells (a straight-up-only vent manages 18 here)`;
+      if ((seen.diagonalVents ?? 0) < 46) {
+        return `only ${seen.diagonalVents ?? 0} wisps vented diagonally past a blocked cell (57 with the fallback, 35 without it)`;
       }
       return null;
     }
@@ -687,14 +704,22 @@ const scenarios = [
         }
       }
       for (const [name, kind] of Object.entries(DROPPED)) {
+        if (kind === M.Pollen) continue;
         seen[name] = Math.max(seen[name] ?? 0, sunk[kind] ?? 0);
+      }
+      // Pollen is judged by how DEEP it gets, not by what lies above it: grains sinking push
+      // water up, and that water can slop over a mote floating on the surface without the
+      // mote moving at all. Sinking would carry it past the pond's first rows to the bed.
+      for (let i = 0; i < w * h; i++) {
+        if (cells[i * STRIDE] === M.Pollen) seen.pollenDeepestRow = Math.max(seen.pollenDeepestRow ?? 0, Math.floor(i / w));
       }
     },
     expect(seen) {
       for (const name of ["sand", "soil", "stone", "seed", "rocket"]) {
         if ((seen[name] ?? 0) < 3) return `${name} never sank below the pond's surface (${seen[name] ?? 0} cells)`;
       }
-      if ((seen.pollen ?? 0) > 0) return `pollen sank into the pond (${seen.pollen} cells) — it is meant to float`;
+      // The oil film sits on rows 12-14 and the water starts at row 15.
+      if ((seen.pollenDeepestRow ?? 0) > 15) return `pollen reached row ${seen.pollenDeepestRow} of the pond — it is meant to float, not sink`;
       return null;
     },
   },
