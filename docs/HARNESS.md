@@ -108,6 +108,22 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   single-seed table listed 26. Run it on any change that could move the balance, which is
   any change to a sim rule.
 
+  **Eight seeds is a screen, not a verdict — confirm a regression at `--seeds 32` before
+  diagnosing it.** Triaging what 20B moved, 10 of the 17 checks flagged as worse at eight
+  seeds stopped moving at 32. The worst offender is a first tick on a geometric wait: a
+  fungus's first bite on wood read 17 -> 30, from per-seed samples {2,4,10,14,17,25,34,78}
+  against {6,16,27,29,30,32,47,77}. Eight seeds do not pin down the quartiles of a
+  distribution that wide, so their middle halves can separate by chance. The reverse
+  happens too: at 32 seeds `ember.quenched` showed a large real gain (on screen 18 ticks ->
+  the whole scene) that the eight-seed table did not list. `--only` keeps a 32-seed run to a
+  couple of minutes.
+
+  **When a moved metric survives, ask what its cells WERE before asking why they changed.**
+  Five 20B "regressions" were the audit's own Wall floor: plain moss used to eat it, so
+  checks counted wall cells, then soil falling through the breach. Classifying every
+  outcome cell by what the scene painted there, and by whether it sits below the floor,
+  settled each one in a single run.
+
 - `npm run clobber:census`: what the move clobber deletes, and where. It plays every audit
   scene on the JS mirror with a counter on the mover and reports each overwrite by mover,
   victim, and the victim's origin (moved in, or created by a reaction). Before Phase 20B

@@ -1,7 +1,7 @@
 # Handoff — where the work is, and what to do next
 
-*Rewritten at each handoff, never appended to. Written 2026-09-27; `main` is `7b6c76c`, live
-at pixelfun.littlealbumclub.net and verified with `npm run qa:live`.*
+*Rewritten at each handoff, never appended to. Written 2026-09-27; `main` carries the triage
+of what 20B moved (docs only — the sim is unchanged since `7b6c76c`).*
 
 ## Where things stand
 
@@ -12,11 +12,18 @@ deletes water, a settled pond keeps every drop, a puddle on open ground dries in
 a spring settles into a lake of ~7% of the board. Everything is green: 120 cargo tests, 27
 parity scenarios, 125 interaction checks, the slow world, the full `npm run check`.
 
-Three pieces of work remain, in this order:
+**The triage of the 17 checks 20B moved is done, and none was a regression**: 10 were dice
+(they stop moving at 32 seeds), 5 were the audit's own Wall floor, one is a changed witness
+and one is a bigger pool. ROADMAP Phase 20 has the per-check reasoning; HARNESS.md's
+`audit:drift` section has the two lessons. Two items are still worth a look while doing the
+rest, neither measured yet: plants watered only once grow shorter now (a stalk's height is
+fixed by the seed's energy at germination), and the slow-world garden must keep growing its
+18 new columns.
 
-1. **Triage what 20B moved** — 17 interaction checks got measurably worse (all still pass).
-2. **20D — gases**: smoke and steam deleting each other.
-3. **20E — the rest of the move clobber**, including the last small water leak.
+Two pieces of work remain, in this order:
+
+1. **20D — gases**: smoke and steam deleting each other.
+2. **20E — the rest of the move clobber**, including the last small water leak.
 
 ## Decisions already made — do not relitigate
 
@@ -35,10 +42,12 @@ All by the owner, recorded in the user's memory and ROADMAP Phase 20:
 
 - **Branch until green.** A push to `main` deploys. 20B lived on `phase-20b-mist` (merged;
   the remote branch can be deleted) and only fast-forwarded once the full gate passed.
-- **Measure on eight seeds, never one.** The interaction audit is one seed per check and
+- **Screen on eight seeds, confirm on 32.** The interaction audit is one seed per check and
   reads dice as effects. `npm run audit:drift -- --base <ref> [--only id,id]` compares the
   working tree with any commit; a metric is listed only when the two builds' middle halves do
-  not overlap. **The baseline for "what 20B moved" is `8dc123b`** (20A, before any mist).
+  not overlap — and at eight seeds that still misfires on wide distributions (10 of 17 in the
+  triage). Re-run anything you would act on with `--seeds 32 --only ...`. The pre-mist
+  baseline is `8dc123b`; the baseline for 20D/20E is the current `main`.
 - **Water tools:** `npm run water:budget` (spring, oil spring, pour, sand into a pond) and
   `npm run clobber:census` (every overwrite by mover, victim and origin).
 - **Vacuity-test every gate you touch**: sabotage the rule in BOTH engines and watch the gate
@@ -47,46 +56,13 @@ All by the owner, recorded in the user's memory and ROADMAP Phase 20:
 - **Close each step with `/adversarial-review`** (Codex; check `codex login status`). In 20B
   it found five real problems after every gate was green — including an oil spring flooding
   a third of the board.
-- Scratch scorers from 20B are in `.tmp/` (untracked, may be gone): `candidates.mjs` scores
-  a candidate check on eight seeds, `mossfloor.mjs` counts moss that replaced audit scaffold
-  walls. **Consider promoting a per-seed pass/fail mode into `audit:drift`**: re-staging a
+- Scratch scorers are in `.tmp/` (untracked, may be gone): `candidates.mjs` scores a
+  candidate check on eight seeds, and `origin-split.mjs <id...>` classifies every cell a
+  check's outcome touched by what the scene painted there and whether it is below the Wall
+  floor, base against working tree — it settled five of the triage's seventeen in one run. **Consider promoting a per-seed pass/fail mode into `audit:drift`**: re-staging a
   scene needed it a dozen times, which is this repo's own rule for when a tool earns a place.
 
-## 1. Triage the 17 checks 20B moved
-
-Reproduce with `npm run audit:drift -- --base 8dc123b`. Every one still clears the audit's
-floors; the question is whether each is explained, and fixed at its cause if it is a real
-regression. End each as **explained and accepted (write down why)** or **fixed at the cause**.
-
-**Not regressions — the witness changed (confirm, then move on):**
-- `water.boils` (cells 92 -> 32, contrast 424 -> 115) and `fire.softens` (first tick 6 -> 7).
-  These now count only steam hotter than mist, because review showed they passed on mist
-  with every thermal source turned off. Their numbers describe different cells now.
-
-**Mostly scaffolding — moss used to eat the audit's own Wall floor** (plain moss may no
-longer take a wall). Measured, pre-20B against now, cells that replaced a wall / growth
-elsewhere:
-- `seed.settles` 35 / 41 -> 0 / 41 — pure artefact; growth unchanged.
-- `soil.feeds` 16 / 38 -> 0 / 34 — mostly artefact.
-- `fungus.cosmic` 13 / 23 -> 0 / 18 — partly real.
-- **`fungus.overtakes` 13 / 58 -> 0 / 39 and `moss.overtaken` 5 / 63 -> 0 / 41 — real drops
-  beyond the scaffolding.** Moss is overtaken by fungus "when old or wet"; the likely cause is
-  the drier world (puddles now dry), but that is a hypothesis. Find the cause first.
-
-**The drier world (puddles dry, meltwater mists):**
-- `ice.melts` shown 1200 -> 571 — the meltwater now evaporates as it runs. Probably honest;
-  decide whether a melt's water should read longer.
-- `fire.dries` contrast 133 -> 116, `stone.blocks` contrast 391 -> 337,
-  `moss.dries` contrast 134 -> 111 (its scene was re-staged in 20B; see its comment).
-- Later first ticks: `flower.wilts` 1311 -> 1403, `pollen.drifts` 138 -> 147,
-  `wood.feeds` 17 -> 30, `fungus.rots` 7 -> 11. `stem.burns` shown 732 -> 706,
-  `ember.quenched` cells 29 -> 27. Small; check whether any is a gameplay feel change.
-
-Things to watch while doing it: plants watered only once grow shorter now (a stalk's height
-is fixed by the seed's energy at germination), and the slow-world garden still grows 18 new
-columns — keep it there.
-
-## 2. 20D — gases
+## 1. 20D — gases
 
 The census after 20B: **smoke deleting smoke 3,190** (37% of remaining overwrites), steam
 over steam 347, smoke/steam over each other ~500. It works as extra fading today.
@@ -98,7 +74,7 @@ steam's documented bound (**0.8% of the board** with water poured on lava). If c
 fogs a scene, the lever is fade age, not the clobber. Owner decision needed if it changes
 how a fire looks.
 
-## 3. 20E — the rest of the clobber
+## 2. 20E — the rest of the clobber
 
 - **Steam overwriting water that just flowed in: 615** — the last small leak of the old water
   sink, mostly a spring's mist rising through its own stream. Closing it (a gas never deletes

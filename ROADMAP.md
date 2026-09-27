@@ -639,8 +639,8 @@ adversarial review whose findings were fixed before moving on.
 
 ## Phase 20: The Water Budget
 
-Status: in progress — 20A and 20B done (20B absorbed what the plan called 20C). Next: triage the
-checks 20B moved, then 20D and 20E. The working plan is `docs/HANDOFF.md`.
+Status: in progress — 20A, 20B and the triage of what 20B moved are done (20B absorbed what the
+plan called 20C). Next: 20D and 20E. The working plan is `docs/HANDOFF.md`.
 
 **No rule in the sim decides how much water a scene holds.** The move clobber does: a mover
 may overwrite a cell another mover filled earlier the same tick, and when water flows into
@@ -687,6 +687,36 @@ and must not create problems later, so nothing opportunistic rides along with a 
   `main`, the multi-seed drift before those retunes read 25 checks better, 15 worse, 15 mixed.
   Numbers now: spring 7.1%, oil spring 1.2% (unchanged), pour 82% kept, pond after sand 94% (was 53%), liquid-on-liquid
   overwrites 0 (was 29,424 across the audit scenes).
+- **Triage of what 20B moved. Done — no regressions.** `audit:drift` against `8dc123b` flagged
+  17 checks as worse. Each was taken to a cause by classifying every outcome cell by what the
+  scene painted there and where it sits against the audit's Wall floor, then re-run on 32
+  seeds. They fall into four groups, and none is a player-visible loss:
+  - **Dice (10).** At 32 seeds `fire.softens`, `ice.melts`, `fire.dries`, `moss.dries`,
+    `flower.wilts`, `pollen.drifts`, `wood.feeds`, `fungus.rots`, `stem.burns` and
+    `ember.quenched`'s cell count stop moving. `wood.feeds` is the clean example: its bite has
+    no wetness gate at all, and the per-seed first ticks were {2,4,10,14,17,25,34,78} against
+    {6,16,27,29,30,32,47,77} — two draws of one geometric wait. Eight seeds can separate the
+    middle halves of a distribution that wide by chance.
+  - **Scaffold (5).** `seed.settles`, `soil.feeds`, `fungus.cosmic`, `fungus.overtakes` and
+    `moss.overtaken` were counting the audit's own Wall floor, which plain moss ate before 20B.
+    On the cells each rule acts on they are flat: seeds 8 -> 8, soil 28 -> 28, cosmic fungus
+    15 -> 15, moss overtaken on the painted mat 284 -> 256 over eight seeds. The overtake
+    drop looked real beyond the walls and was not: 219 of its 269 extra cells lay BELOW the
+    floor, reached only once moss had breached it, and the ~4 mat cells per seed fungus no
+    longer takes are islands touching nothing but Wall and air — fungus used to reach them
+    across moss growing on the floor. Re-watering the scene does not restore the old
+    numbers, which rules out the drier-world hypothesis the handoff started from.
+  - **Witness changed (1).** `water.boils` now counts only steam hotter than mist, by design.
+  - **Better, measured as worse (1).** `stone.blocks` contrast 391 -> 337 because the basin
+    holds 12 cells instead of 8 — a deeper pool has more shadowed body than lit rim.
+
+  Two gains the 8-seed table hid: `ember.quenched` is on screen **18 ticks -> the whole
+  scene** at 32 seeds (a quenched hearth now stays under a still pond; 18 was under the
+  audit's own 30-tick floor, so the base had been passing on one lucky seed), and
+  `fungus.cosmic` contrast rose 87 -> 90. `ice.melts` deserves one sentence: that scene's
+  fire melts only 1-4 cells of the block in either build, so what moved was how long a
+  two-cell drip lingers, which is the owner's "puddles dry". The melt being that small
+  predates 20B.
 - **20D — gases (optional).** Smoke deleting smoke (3,190 in the census after 20B) also acts
   as extra fading. Conserving it means more smoke, compensated by faster fading.
 - **20E — the rest of the clobber.** After 20B: water overwriting reaction-made steam (2,619)
