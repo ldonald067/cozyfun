@@ -230,8 +230,9 @@ are mechanically the SAME machine — all three saturate at exactly 3,504 cells 
 else, because all three are powders that pile until the spring entombs itself. Water and
 moonwater are identical too, because they move identically. (Their row was 65 apiece when
 this table was first measured; on the 220x140 board a default-brush spring held ~263 under
-the old accidental water sink, and since ROADMAP Phase 20 it settles into a lake of ~2,200
-cells — the water-row numbers are that, remeasured.) The variety in this
+the old accidental water sink, and since moving water began throwing mist (the water
+budget, in docs/VISUAL_PIPELINE.md) it settles into a lake of ~2,200 cells — the water-row
+numbers are that, remeasured.) The variety in this
 element is real but it does not live in the pour: it lives in what the material does after it
 lands. A rocket dune is inert until a flame reaches it, a soil dune grows things, a sand dune
 vitrifies. That is worth knowing before anyone tries to make the eleven "feel more different"
