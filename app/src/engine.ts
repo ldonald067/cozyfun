@@ -616,7 +616,8 @@ class JsSandboxEngine implements SandboxEngine {
             writeCellBytes(next, nidx, MATERIAL.Stone, old[nidx + 1], 0, 0, CELL_FLAG.Scorched);
             continue;
           }
-          if (other === MATERIAL.Ember && readU16(old, nidx + 4) < 30 && this.chance(12)) {
+          // Only RUNNING water washes cold char away — see the sim.
+          if (other === MATERIAL.Ember && readU16(old, nidx + 4) < COLD_CHAR_ENERGY && waterCanMove && this.chance(12)) {
             next.fill(0, nidx, nidx + CELL_STRIDE);
             continue;
           }

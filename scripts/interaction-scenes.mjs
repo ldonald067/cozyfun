@@ -268,7 +268,13 @@ export const CHECKS = [
     paint: (p) => { p(15, 20, 3, M.Wall); p(15, 16, 3, M.Water); p(15, 21, 2, M.Lava); },
     outcome: (g, before) => g.appeared(M.Steam, before) },
   { m: "Water", covers: "water.rinses", role: "rinses soot from scorched stone", w: 30, h: 26, seed: 10, ticks: 2500,
-    paint: (p) => { p(15, 20, 3, M.Stone); p(15, 17, 1, M.Fire); p(15, 12, 4, M.Water); },
+    // Burn against the rock first, THEN wash it — the order a player uses. Soot comes from
+    // smoke touching the stone, and a fire on top of the rock sends its smoke straight up and
+    // away, so sooting used to be luck: the water painted at the start raced the smoke and
+    // won on one seed in eight, before and after ROADMAP Phase 20. A fire against the rock's
+    // side climbs its face, and the pour lands once it is black: 8 seeds of 8.
+    paint: (p) => { p(15, 19, 3, M.Stone); p(11, 21, 1, M.Fire); },
+    act: (p, t) => { if (t === 200) p(15, 11, 3, M.Water); },
     outcome: (g, before, memo) => {
       const sooty = g.all(M.Stone).filter((i) => g.hasFlag(i, F.Scorched));
       if (sooty.length) { memo.sooted = true; return []; }
@@ -330,7 +336,11 @@ export const CHECKS = [
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
     outcome: (g, before) => g.appeared(M.Pollen, before) },
   { m: "Stem", covers: "stem.climbs", role: "unfurls side leaves as it climbs", w: 40, h: 34, seed: 25, ticks: 3500,
-    paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
+    // A generous watering. A stalk's height is fixed by the seed's energy when it germinates,
+    // and since puddles on open ground dry as mist (ROADMAP Phase 20) a thin pour leaves the
+    // bed's top dry too soon: a short stalk and no leaves on 5 seeds of 8. Watering again
+    // later does not help — the height is already decided. A proper pour: 7 of 8, as before.
+    paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 17, 4, M.Water); },
     outcome: (g) => g.all(M.Stem).filter((i) => {
       const [x, y] = g.xyOf(i);
       return g.kindAt(x - 1, y) === M.Stem || g.kindAt(x + 1, y) === M.Stem;
@@ -647,11 +657,18 @@ export const CHECKS = [
   { m: "Moss", covers: "moss.overtaken", role: "is overtaken by fungus when old or wet", w: 30, h: 26, seed: 91, ticks: 3000,
     paint: (p) => { p(15, 20, 4, M.Moss); p(15, 16, 1, M.Fungus); p(15, 13, 2, M.Water); },
     outcome: (g, before) => g.appeared(M.Fungus, before) },
-  { m: "Moss", covers: "moss.dries", role: "dries and scorches before burning", w: 30, h: 26, seed: 92, ticks: 900,
+  { m: "Moss", covers: "moss.dries", role: "dries and scorches before burning", w: 40, h: 26, seed: 92, ticks: 900,
     // The moss has to be WET first: measured on a dry mat, fire skips straight to burning
     // and the scorch step the docs describe never happens at all.
-    paint: (p) => { p(15, 20, 4, M.Moss); p(15, 15, 2, M.Water); },
-    act: (p, t) => { if (t === 400) p(20, 20, 1, M.Fire); },
+    //
+    // A soaked carpet lit from one end, soon after watering. The scorch is a moving front —
+    // each cell holds it for only ~20 ticks before it burns — so it is seen on a strip the
+    // fire has to travel, not on a mound it eats in thirty ticks. The old scene waited 400
+    // ticks and lit into a puddle; it passed only because moss had eaten the audit's Wall
+    // floor beside a puddle that never dried, and that scorched floor was what it counted.
+    // With walls kept (ROADMAP Phase 20) and puddles drying, it saw nothing on 6 seeds of 8.
+    paint: (p) => { for (let x = 8; x <= 32; x += 2) p(x, 20, 2, M.Moss); for (let x = 8; x <= 32; x += 3) p(x, 14, 1, M.Water); },
+    act: (p, t) => { if (t === 150) p(6, 19, 1, M.Fire); },
     // Sticky, for the same reason as wood: scorch is a step on the way to burning.
     outcome: (g, before, memo) => {
       memo.charred ??= new Set();

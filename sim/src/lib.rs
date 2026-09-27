@@ -1115,8 +1115,18 @@ impl Universe {
                             next[nidx].flags = FLAG_SCORCHED;
                             continue;
                         }
-                        if other.kind == Material::Ember as u8 && other.energy < COLD_CHAR_ENERGY && self.chance(12) {
-                            // Charcoal wash: running water crumbles cold char away.
+                        if other.kind == Material::Ember as u8
+                            && other.energy < COLD_CHAR_ENERGY
+                            && water_can_move
+                            && self.chance(12)
+                        {
+                            // Charcoal wash: RUNNING water crumbles cold char away. The comment
+                            // always said running; the code took any touching water, so a hearth
+                            // doused under a still pond dissolved within ticks — contradicting the
+                            // slow world, which spares char under water because a quenched hearth
+                            // is a look somebody chose. Once ponds stopped draining (ROADMAP
+                            // Phase 20) that was every doused hearth. Same flow test as the rinse
+                            // and erosion; the roll comes after it.
                             next[nidx] = Cell::empty();
                             continue;
                         }
@@ -3762,6 +3772,28 @@ mod tests {
             }
         }
         assert!(seeded, "pollen resting on wet soil should take root as a seed");
+    }
+
+    /// The other half of the wash: a hearth doused under still water keeps its char. No water
+    /// cell here has anywhere to go, so none of it is running.
+    #[test]
+    fn still_water_keeps_a_quenched_hearth() {
+        let mut u = Universe::new(16, 16, 7);
+        for y in 4..=13 {
+            for x in 3..=12 {
+                set_cell(&mut u, x, y, Material::Wall);
+            }
+        }
+        for y in 6..=11 {
+            for x in 5..=10 {
+                set_cell(&mut u, x, y, Material::Water);
+            }
+        }
+        set_cell_state(&mut u, 7, 11, Material::Ember, 12, 0, FLAG_WET);
+        for _ in 0..400 {
+            u.tick();
+        }
+        assert_eq!(kind_at(&u, 7, 11), Material::Ember as u8, "still water must not wash the char away");
     }
 
     #[test]
