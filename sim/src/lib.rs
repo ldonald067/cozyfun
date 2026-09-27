@@ -2295,6 +2295,12 @@ impl Universe {
         if is_gas(moving_cell.kind) && is_water_like(target_next.kind) {
             return false;
         }
+        // And water never deletes a gas that ARRIVED this tick — steam a quench or a boil has
+        // just vented into an empty cell, or mist just thrown (ROADMAP Phase 20E). Water may
+        // still sink through gas that sat there all tick; only the clobber is closed.
+        if is_water_like(moving_cell.kind) && is_gas(target_next.kind) && target_old.is_empty() {
+            return false;
+        }
         let can_move = target_old.is_empty()
             || target_next.is_empty()
             || (can_sink_through_gas
@@ -3167,6 +3173,38 @@ mod tests {
             u.tick();
         }
         assert_eq!(count_kind(&u, Material::Smoke), 0, "smoke past its lifetime should be gone");
+    }
+
+    #[test]
+    fn water_never_deletes_steam_vented_this_tick_but_still_sinks_through_it() {
+        // Lava beside a wet log vents steam into the empty cell above the log, in the
+        // reaction pass, with no dice. Water directly above that cell falls into it in the
+        // movement pass that follows — and because it was empty at the START of the tick, the
+        // water used to land on the fresh steam and delete it.
+        let mut u = Universe::new(16, 16, 3);
+        for x in 0..16 {
+            set_cell(&mut u, x, 12, Material::Wall);
+        }
+        set_cell(&mut u, 6, 11, Material::Wall);
+        set_cell(&mut u, 7, 11, Material::Lava);
+        set_cell_state(&mut u, 8, 11, Material::Wood, 0, 120, FLAG_WET);
+        // A one-wide shaft, walled two thick because water side-hops two cells, so straight
+        // down onto the vent is the ONLY move the water has. Without it the water slid
+        // diagonally over the lava and this test passed without the rule ever being asked.
+        for y in 8..=10 {
+            for x in [5, 6, 7, 9, 10, 11] {
+                set_cell(&mut u, x, y, Material::Wall);
+            }
+        }
+        set_cell(&mut u, 8, 9, Material::Water);
+        u.tick();
+        assert_eq!(kind_at(&u, 8, 10), Material::Steam as u8, "the vent's steam should survive the water falling onto it");
+        assert_eq!(kind_at(&u, 8, 9), Material::Water as u8, "and the water should wait above it, not vanish");
+
+        // Only the clobber is closed. Steam that sat there all tick is gas the water may sink
+        // through, as before — so a vent is never a lid.
+        u.tick();
+        assert_eq!(kind_at(&u, 8, 10), Material::Water as u8, "a tick later the water should sink through the steam");
     }
 
     #[test]

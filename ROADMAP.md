@@ -706,7 +706,11 @@ and must not create problems later, so nothing opportunistic rides along with a 
     longer takes are islands touching nothing but Wall and air — fungus used to reach them
     across moss growing on the floor. Re-watering the scene does not restore the old
     numbers, which rules out the drier-world hypothesis the handoff started from.
-  - **Witness changed (1).** `water.boils` now counts only steam hotter than mist, by design.
+  - **Witness changed (1) — and this one was wrong, found later.** `water.boils` now counts
+    only steam hotter than mist, by design, and the drop was filed as that alone. It was half
+    of it: the water above the pan had been landing on the steam it boiled, and closing that
+    in 20E took the check back to its pre-20B contrast (115 -> 423). A witness change can hide
+    a real loss behind a legitimate one; measure what the new witness sees before accepting it.
   - **Better, measured as worse (1).** `stone.blocks` contrast 391 -> 337 because the basin
     holds 12 cells instead of 8 — a deeper pool has more shadowed body than lit rim.
 
@@ -751,7 +755,16 @@ and must not create problems later, so nothing opportunistic rides along with a 
     20D, since mist that other gas used to delete then lived to meet water. It is 0 now, the
     census falls from 4,970 to 3,058, and the spring holds the accepted ~7% (7.4% at 4,000
     ticks, 6.8% at 16,000; pour and pond unchanged). No audit check moves at 32 seeds.
-  - Next: water overwriting steam a reaction just made (1,836) — quenching lava and boiling.
+  - **Water never deletes a gas that arrived this tick. Done.** Steam a reaction had just
+    vented into an empty cell was overwritten by the water falling into it (1,836). Water may
+    still sink through gas that sat there all tick, so a vent never becomes a lid. The census
+    falls to 942 with nothing left between water and gas. Where steam is boiled off water it is
+    far more visible — `water.boils` contrast 115 -> 423 on 32 seeds, its pre-20B value, which
+    corrects the triage: that drop was only partly a changed witness. Where water is poured on
+    lava there is less steam (peak 144 -> 71), because falling water waits a tick above a fresh
+    vent and fewer cells boil away; rendered, the two pours are nearly indistinguishable. The
+    water budget is unchanged.
+  - Next: decide the classes still open (all under ~200, none between water and gas).
 
 Each step is one commit, closed with the full gate, a live deploy check, and an adversarial
 review.

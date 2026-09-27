@@ -42,6 +42,13 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   text. It exists for vacuity testing: the harness stops at the first failing scenario, so
   sabotaging a rule that several scenarios reach only ever proves that the FIRST one notices.
 
+  A scenario may start from exact bytes with `cells(w, h)`, loaded into both engines through
+  the same `load_cells` path a player's imported scene takes. It exists for states the brush
+  cannot place in one stroke — the first user is a wet log with water held one cell above its
+  steam vent, which no painted scene reached more than once in eight seeds. It is for
+  reaching a rule DETERMINISTICALLY, not for proving a player can: reachability from painted
+  materials is still the interaction audit's question.
+
   A scenario may also declare `slowSteps: [{ at, count }]` to take between-session slow steps at the end of a given tick. The slow world draws on the same RNG stream as `tick()`, so an unmirrored roll in it desynchronises the engines exactly as one in a movement rule would, and it has to be gated here for the same reason.
 
   **Byte-equality cannot tell coverage from vacuity.** Delete a rule from *both* engines and every scenario still passes. A scenario may therefore carry `observe`/`expect` callbacks that assert what it actually witnessed, and it fails with `scenario is VACUOUS` when it stops witnessing it. The "germinating garden" scenario is the cautionary tale: it passed for months while its soil bed greened into moss inside 100 ticks, so no seed in it ever germinated and it proved nothing about growth. Prose in a comment claiming a scenario is non-vacuous is not a check — if you verify a scenario by hand, encode what you counted.
@@ -490,8 +497,24 @@ steam by design. So the test and the parity scenario assert the water side only 
 water lost must equal the mist born that tick (age 0, `MIST_ENERGY`) — and also that steam and
 water actually met, so a scene where they never touch cannot pass.
 
-What remains open: water overwriting steam a reaction just made (1,836 after the gas-on-water
-guard), the last class 20E means to decide.
+**Water never overwrites a gas that arrived this tick** (20E): steam a reaction has just
+vented into an empty cell, or mist just thrown. Water may still sink through gas that sat there
+all tick, so a vent is never a lid — the cargo test and the parity scenario both assert that
+second half, because a guard that only blocked would have passed the first. The census falls
+to 942 overwrites with no class left between water and gas.
+
+Its effect is not the one the plan predicted, and both halves are measured. Where steam is
+BOILED off water, far more of it is seen: `water.boils` contrast 115 -> **423** on 32 seeds of
+32, which is its value before 20B (424). The triage recorded that drop as a changed witness
+by design; that was only half of it, because the water above the pan had been landing on the
+steam it made. Where water is POURED onto lava, less steam exists — peak 144 -> 71 on the
+220x140 board over eight seeds — because falling water now waits a tick above a fresh vent
+instead of dropping onto the lava, so fewer cells boil away (55 more water cells are left at
+the end). Rendered at play zoom the two pours are nearly indistinguishable, since quench steam
+is a one-cell-wide thread either way and most of the difference is steam already high above
+the pool. The water budget is unchanged (spring 7.2%, pour 82%, pond 94%).
+
+What remains after 20E is under ~200 per class and none of it involves water and gas.
 
 **The phase's adversarial review found five real problems** after every gate was green, and
 each is fixed with a test that fails on its sabotage: the oil flood above; two heat checks

@@ -9,12 +9,13 @@ Phase 20 replaces the game's accidental water sink with a deliberate one (ROADMA
 has the full story). **20A** built the instruments and **20B** shipped the water budget:
 moving water throws a faint visible mist (`MIST_ODDS`, 1 in 450 per move), water never
 deletes water, a settled pond keeps every drop, a puddle on open ground dries in 15-30 s, and
-a spring settles into a lake of ~7% of the board. Everything is green: 122 cargo tests, 29
+a spring settles into a lake of ~7% of the board. Everything is green: 123 cargo tests, 30
 parity scenarios, 125 interaction checks, the slow world, the full `npm run check`.
 
-**The triage of the 17 checks 20B moved is done, and none was a regression**: 10 were dice
-(they stop moving at 32 seeds), 5 were the audit's own Wall floor, one is a changed witness
-and one is a bigger pool. ROADMAP Phase 20 has the per-check reasoning; HARNESS.md's
+**The triage of the 17 checks 20B moved is done**: 10 were dice (they stop moving at 32
+seeds), 5 were the audit's own Wall floor and one is a bigger pool. The seventeenth,
+`water.boils`, was filed as a changed witness and was half wrong — water was also deleting the
+steam it boiled, which 20E fixed (contrast 115 -> 423). ROADMAP Phase 20 has the per-check reasoning; HARNESS.md's
 `audit:drift` section has the two lessons. The two watch items it raised are measured and hold (ROADMAP Phase 20): plants
 watered once are not shorter at player scale, and a day away still grows the slow-world
 garden 18 new columns — keep that number where it is through 20E.
@@ -69,9 +70,11 @@ All by the owner, recorded in the user's memory and ROADMAP Phase 20:
 
 - **Done: a gas never deletes water** (steam-over-water 1,343 -> 0; spring still ~7%). Its
   witness counts water only — see docs/HARNESS.md for why water plus steam is not conserved.
-- **Water overwriting steam a reaction just made: 1,836** — quenching lava and boiling. Closing
-  it keeps more of that steam; check `lava.quenched`, `water.quenches` and the steam bound.
-- Everything else is under ~350 per class. Decide per class with the census; anything left
+- **Done: water never deletes a gas that arrived this tick** (1,836 -> 0). It restored
+  `water.boils` to its pre-20B contrast and, less expectedly, halved the steam over a big lava
+  pour — both recorded in docs/HARNESS.md. Its parity scenario starts from exact cells
+  (`cells(w, h)`), because no painted scene reached the state reliably.
+- **What is left: 942 overwrites, every class under ~200.** Decide per class with the census; anything left
   open gets documented as intended in docs/HARNESS.md ("The move clobber, and what is left").
 
 ## Traps this work already paid for

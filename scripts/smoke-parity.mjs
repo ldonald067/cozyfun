@@ -44,9 +44,22 @@ function wasmCells(uni) {
   return new Uint8Array(wasm.memory.buffer, ptr, len).slice();
 }
 
-function runScenario({ name, w, h, seed, ticks, paint, observe, expect, slowSteps = [] }) {
+function runScenario({ name, w, h, seed, ticks, cells, paint, observe, expect, slowSteps = [] }) {
   const js = createFallbackEngine(w, h, seed);
   const uni = wasm.universe_new(w, h, seed);
+  // `cells` starts both engines from exact bytes, through the same load path a player's
+  // imported scene takes. For a state the brush cannot place in one stroke — a wet log with
+  // water held a precise distance above it — so a scenario can reach a rule deterministically.
+  // Reachability from painted materials is the interaction audit's question, not this one.
+  if (cells) {
+    const bytes = cells(w, h);
+    if (!js.loadCellBytes(bytes)) throw new Error(`[${name}] the JS engine refused the starting cells`);
+    const at = wasm.alloc(bytes.length);
+    new Uint8Array(wasm.memory.buffer, at, bytes.length).set(bytes);
+    const ok = wasm.universe_load_cells(uni, at, bytes.length);
+    wasm.dealloc(at, bytes.length);
+    if (!ok) throw new Error(`[${name}] the wasm engine refused the starting cells`);
+  }
   paint((x, y, r, mat, d = 100) => js.paint(x, y, r, mat, d));
   paint((x, y, r, mat, d = 100) => wasm.universe_paint(uni, x, y, r, mat, d));
 
@@ -115,6 +128,8 @@ function runScenario({ name, w, h, seed, ticks, paint, observe, expect, slowStep
 // The mist scenario's floor: 103 cell-ticks of mist with the rule, 0 with it switched off in
 // both engines, measured on its seed. The floor sits well between them.
 const MIST_FLOOR = 40;
+// The vent scenario's units, one per shaft; far enough apart that no two share a wall.
+const VENT_UNITS = [4, 12, 20, 28, 36, 44];
 const DROPPED = { sand: M.Sand, soil: M.Soil, stone: M.Stone, seed: M.Seed, rocket: M.Rocket, pollen: M.Pollen };
 
 const scenarios = [
@@ -753,6 +768,46 @@ const scenarios = [
       if (seen.chamberLowestBeforeExpiry !== seen.chamberFirst) return `sealed smoke fell from ${seen.chamberFirst} to ${seen.chamberLowestBeforeExpiry} cells before it could age out`;
       if (seen.chamberLast !== 0) return `sealed smoke never aged out (${seen.chamberLast} cells left)`;
       if ((seen.fireSmokeCellTicks ?? 0) < 500) return `the lidded fire made only ${seen.fireSmokeCellTicks ?? 0} cell-ticks of smoke`;
+      return null;
+    },
+  },
+  {
+    // Water never deletes a gas that ARRIVED this tick (ROADMAP Phase 20E). Six copies of one
+    // unit: lava beside a wet log, a one-wide shaft walled two thick above the log, and water in
+    // it one cell above the empty vent cell. On tick 1 the lava vents steam into that cell in the
+    // reaction pass and the water falls toward it in the movement pass — the water used to land
+    // on the steam and delete it. Now it must wait above it, and on tick 2 sink through it,
+    // because steam that sat there all tick is gas water may still displace. Painting cannot place
+    // a wet log with water held a precise distance above it, so this starts from exact cells.
+    name: "water never deletes steam vented this tick, and still sinks through it",
+    w: 48, h: 20, seed: 4261, ticks: 120,
+    cells(w, h) {
+      const bytes = new Uint8Array(w * h * STRIDE);
+      const put = (x, y, kind, energy = 0, flags = 0) => {
+        const o = (y * w + x) * STRIDE;
+        bytes[o] = kind; bytes[o + 4] = energy & 255; bytes[o + 5] = energy >> 8; bytes[o + 6] = flags & 255; bytes[o + 7] = flags >> 8;
+      };
+      for (let x = 0; x < w; x++) put(x, 16, M.Wall);
+      for (const cx of VENT_UNITS) {
+        put(cx - 2, 15, M.Wall); put(cx - 1, 15, M.Lava, 255); put(cx, 15, M.Wood, 120, CELL_FLAG.Wet); put(cx + 1, 15, M.Wall);
+        for (let y = 12; y <= 14; y++) for (const dx of [-3, -2, -1, 1, 2, 3]) put(cx + dx, y, M.Wall);
+        put(cx, 13, M.Water);
+      }
+      return bytes;
+    },
+    paint() {},
+    observe(seen, cells, w, h, tick) {
+      const at = (x, y) => cells[(y * w + x) * STRIDE];
+      const hotSteam = (x, y) => at(x, y) === M.Steam && (cells[(y * w + x) * STRIDE + 4] | (cells[(y * w + x) * STRIDE + 5] << 8)) > MIST_ENERGY;
+      if (tick === 1) seen.heldAboveFreshSteam = VENT_UNITS.filter((cx) => hotSteam(cx, 14) && at(cx, 13) === M.Water).length;
+      // Sank = the water left its shaft cell and the vented steam is gone from under it. The
+      // water may have thrown mist as it landed (MIST_ODDS), so what fills the vent cell now is
+      // water or fresh mist — on this seed one of the six does exactly that.
+      if (tick === 2) seen.sankThroughIt = VENT_UNITS.filter((cx) => at(cx, 13) !== M.Water && !hotSteam(cx, 14) && !hotSteam(cx, 13)).length;
+    },
+    expect(seen) {
+      if (seen.heldAboveFreshSteam !== VENT_UNITS.length) return `only ${seen.heldAboveFreshSteam ?? 0} of ${VENT_UNITS.length} vents kept their fresh steam under the falling water`;
+      if (seen.sankThroughIt !== VENT_UNITS.length) return `only ${seen.sankThroughIt ?? 0} of ${VENT_UNITS.length} waters sank through the steam a tick later — a vent became a lid`;
       return null;
     },
   },
