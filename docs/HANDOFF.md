@@ -15,10 +15,9 @@ parity scenarios, 125 interaction checks, the slow world, the full `npm run chec
 **The triage of the 17 checks 20B moved is done, and none was a regression**: 10 were dice
 (they stop moving at 32 seeds), 5 were the audit's own Wall floor, one is a changed witness
 and one is a bigger pool. ROADMAP Phase 20 has the per-check reasoning; HARNESS.md's
-`audit:drift` section has the two lessons. Two items are still worth a look while doing the
-rest, neither measured yet: plants watered only once grow shorter now (a stalk's height is
-fixed by the seed's energy at germination), and the slow-world garden must keep growing its
-18 new columns.
+`audit:drift` section has the two lessons. The two watch items it raised are measured and hold (ROADMAP Phase 20): plants
+watered once are not shorter at player scale, and a day away still grows the slow-world
+garden 18 new columns — keep that number where it is through 20D and 20E.
 
 Two pieces of work remain, in this order:
 

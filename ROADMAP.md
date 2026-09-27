@@ -717,6 +717,15 @@ and must not create problems later, so nothing opportunistic rides along with a 
   fire melts only 1-4 cells of the block in either build, so what moved was how long a
   two-cell drip lingers, which is the owner's "puddles dry". The melt being that small
   predates 20B.
+
+  Two things the handoff asked to watch were measured afterwards, and both hold. **Plants
+  watered once are not shorter** at player scale: a Wall planter on the 220x140 board at the
+  default brush, seeded in a row and given one pass of water, grows 12-16 plants with a
+  median stalk of 4 before and after 20B, tallest (7) on 8 of 107 before and 15 of 114 now,
+  and 98 peak flower cells against 83. The shortfall recorded at `stem.climbs` is a property
+  of that small scene's pour. What the planter does show predates 20B and is unchanged by
+  it: one watering leaves most plants at the minimum stalk and 58% of them leafless in both
+  builds. **The slow-world garden still grows 18 new columns** in a day.
 - **20D — gases (optional).** Smoke deleting smoke (3,190 in the census after 20B) also acts
   as extra fading. Conserving it means more smoke, compensated by faster fading.
 - **20E — the rest of the clobber.** After 20B: water overwriting reaction-made steam (2,619)
