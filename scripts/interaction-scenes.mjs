@@ -226,11 +226,15 @@ export const CHECKS = [
   // paints one: a wellspring above a stone mound, pouring over it. A finite blob of water
   // pools in the first hollow it wears and then stops flowing — which is the rule working,
   // not failing, but it makes a poor exhibit for a clause about SUSTAINED water.
-  { m: "Stone", covers: "stone.erodes", role: "erodes into sand under sustained water", w: 30, h: 26, seed: 6, ticks: 4000,
+  { m: "Stone", covers: "stone.erodes", role: "erodes into sand under sustained water", w: 220, h: 140, seed: 6, ticks: 4000,
+    // The real board, because a spring's pool scales with the board. Since water stopped
+    // deleting itself (ROADMAP Phase 20) a spring in a 30x26 box fills the box to its own
+    // height inside 400 ticks and the rock is under a lake before it can wear — the old
+    // board had only ever worked because the move clobber kept the stream thin. A
+    // default-brush boulder with a spring pouring onto it is the scene a player makes.
     paint: (p) => {
-      for (let x = 2; x < 28; x++) p(x, 23, 1, M.Wall);
-      p(15, 20, 3, M.Stone);
-      p(15, 10, 1, M.Wellspring); p(15, 8, 1, M.Water);
+      for (const [x, y] of [[110, 128], [104, 130], [116, 130], [110, 122]]) p(x, y, 4, M.Stone);
+      p(110, 100, 1, M.Wellspring); p(110, 97, 1, M.Water);
     },
     outcome: (g, before) => g.appeared(M.Sand, before) },
 

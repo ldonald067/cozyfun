@@ -4028,22 +4028,29 @@ mod tests {
         //
         // That equilibrium is the design — a stream should mark its bed, not eat the build —
         // so it is pinned here rather than left as prose nobody checks.
-        let mut u = Universe::new(60, 40, 7);
-        for x in 0..60 {
+        //
+        // Since water stopped deleting itself (ROADMAP Phase 20) the rock is protected a second
+        // way as well: the spring's own lake rises over it. So the board is 180 wide. On the
+        // old 60-wide board the lake drowned the boulder after 4 cells had worn; the stream
+        // only runs — and wears — while the floor it spills onto is still filling, which is
+        // what the real 220-wide tray gives it (measured there: 26 cells, then the lake).
+        let (w, cx) = (180, 90);
+        let mut u = Universe::new(w, 40, 7);
+        for x in 0..w {
             set_cell(&mut u, x, 39, Material::Wall);
         }
-        for x in 15..=44 {
+        for x in cx - 15..=cx + 14 {
             for y in 27..=38 {
                 set_cell(&mut u, x, y, Material::Stone);
             }
         }
         // A spring on top, taught water, pouring straight down onto the rock.
         for dy in 21..=23 {
-            for dx in 29..=31 {
+            for dx in cx - 1..=cx + 1 {
                 set_cell(&mut u, dx, dy, Material::Wellspring);
             }
         }
-        set_cell(&mut u, 30, 19, Material::Water);
+        set_cell(&mut u, cx, 19, Material::Water);
 
         let stone_at = |u: &Universe| {
             (0..u.cells.len())

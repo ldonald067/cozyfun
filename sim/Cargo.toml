@@ -13,3 +13,10 @@ opt-level = "s"
 lto = true
 codegen-units = 1
 panic = "abort"
+
+# The tests drive the whole sim for thousands of ticks, and a stream-erosion test needs a
+# 180-wide board to be honest (a spring's lake scales with the floor it spreads over). An
+# unoptimised build ran that one test in 35 s. Optimising changes speed only: overflow
+# checks and debug assertions stay on, so the tests still check exactly what they did.
+[profile.test]
+opt-level = 2
