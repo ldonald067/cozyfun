@@ -21,14 +21,17 @@ mirrored in `app/src/engine.ts` and behave byte-for-byte identically — see the
   and a floor that runs under them — the `shaft` test helper does both.
 - **`try_move` can overwrite a cell another mover filled this tick**, because it counts a
   target as free if it was empty in `old`. That clobber is load-bearing and mostly left alone,
-  with two exceptions: a grain never overwrites a liquid (`try_fall`), and a liquid never
-  overwrites a liquid. The second only works because **moving water throws mist**
-  (`MIST_ODDS`) — that is the water sink now, and without it a spring floods the tray. What
-  is still open, and why, is in `docs/HARNESS.md`; ROADMAP Phase 20 tracks it.
-- **"Running water" has to be written as running water.** Erosion, the soot rinse and the char
-  wash all gate on `water_can_move` (water with an empty neighbour). Two of them used to take
-  any touching water while their comments said "running" — harmless while ponds leaked, and
-  a still pond scrubbing everything under it once they stopped. If a rule says flow, test flow.
+  with two exceptions: a grain never overwrites a liquid (`try_fall`), and water never
+  overwrites water. The second only works because **moving water throws mist**
+  (`MIST_ODDS`) — that is the water sink now, and without it a spring floods the tray.
+  **Never conserve a liquid that has no sink**: oil was in that guard at first and an oil
+  spring flooded a third of the board. What is still open is in `docs/HARNESS.md`.
+- **"Running water" has to be written as running water.** The soot rinse and the char wash
+  gate on `liquid_can_flow` — somewhere the water could actually move. They used to take any
+  touching water while their comments said "running", and their first fix reused erosion's
+  `water_can_move` (any empty neighbour), which counts the open sky above a still pond as
+  flow. Erosion keeps that looser test on purpose, so a pond's waterline wears. If a rule
+  says flow, test flow — and a sealed test fixture will not tell you whether it does.
 - **Order matters inside a tick.** `age_and_decay` runs, then `apply_reactions`, then the
   bottom-up pass, then the top-down pass. Rules read `old` and write `next`; reading `next`
   means you see whatever earlier cells in the same tick already did.

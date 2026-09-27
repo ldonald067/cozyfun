@@ -29,6 +29,14 @@ export const colorForCell = current.colorForCell;
 // here — the kind of mirror this repo keeps having to add a check for — and the copy had
 // already fallen behind: it had no `Bedded`.
 export const M = current.materials.MATERIAL;
+// Mist is steam at this energy; steam made by HEAT is born at 120-230. A check about boiling or
+// quenching must count only the hot kind, or moving water alone satisfies it — review turned
+// off every thermal steam source and water.boils and fire.softens still passed on mist. Read
+// from the engine rather than copied, and loudly, so a rename cannot quietly zero the filter.
+const mistEnergy = readFileSync(resolve(repoRoot, "app/src/engine.ts"), "utf8").match(/^const MIST_ENERGY = (\d+);$/m);
+if (!mistEnergy) throw new Error("interaction-scenes: MIST_ENERGY not found in app/src/engine.ts; the thermal-steam checks need it");
+export const MIST_ENERGY = Number(mistEnergy[1]);
+const thermalSteam = (g, before) => g.appeared(M.Steam, before).filter((i) => g.energyAt(i) > MIST_ENERGY);
 export const F = current.materials.CELL_FLAG;
 export const STRIDE = 8;
 
@@ -266,7 +274,7 @@ export const CHECKS = [
     }) },
   { m: "Water", covers: "water.boils", role: "boils away to steam over sustained flame", w: 30, h: 26, seed: 9, ticks: 2000,
     paint: (p) => { p(15, 20, 3, M.Wall); p(15, 16, 3, M.Water); p(15, 21, 2, M.Lava); },
-    outcome: (g, before) => g.appeared(M.Steam, before) },
+    outcome: thermalSteam },
   { m: "Water", covers: "water.flows", role: "throws a faint mist where it moves", w: 40, h: 34, seed: 133, ticks: 600,
     // The owner's call for ROADMAP Phase 20 was that the water sink be VISIBLE: moving water
     // throws mist rather than silently vanishing. A pour into a walled basin with no heat
@@ -315,7 +323,7 @@ export const CHECKS = [
     // Water poured from above onto a flame, which is how a player puts a fire out. A blob
     // painted beside the fire just falls past it before anything can happen.
     paint: (p) => { p(15, 20, 1, M.Fire); p(15, 14, 2, M.Water); },
-    outcome: (g, before) => g.appeared(M.Steam, before) },
+    outcome: thermalSteam },
   { m: "Lava", covers: "lava.cools", role: "crusts into stone on its own", w: 26, h: 24, seed: 16, ticks: 3000,
     paint: (p) => { p(13, 18, 2, M.Lava); },
     outcome: (g, before) => g.appeared(M.Stone, before) },
@@ -679,7 +687,10 @@ export const CHECKS = [
     // ticks and lit into a puddle; it passed only because moss had eaten the audit's Wall
     // floor beside a puddle that never dried, and that scorched floor was what it counted.
     // With walls kept (ROADMAP Phase 20) and puddles drying, it saw nothing on 6 seeds of 8.
-    paint: (p) => { for (let x = 8; x <= 32; x += 2) p(x, 20, 2, M.Moss); for (let x = 8; x <= 32; x += 3) p(x, 14, 1, M.Water); },
+    // Watered every two columns rather than three: at three, a seed where the fire failed to
+    // catch left 2-3 scorched cells, and small RNG shifts elsewhere flipped which seeds those
+    // were. At two, 8 seeds of 8 with at least 19 cells — margin, not a lucky pass.
+    paint: (p) => { for (let x = 8; x <= 32; x += 2) p(x, 20, 2, M.Moss); for (let x = 8; x <= 32; x += 2) p(x, 14, 1, M.Water); },
     act: (p, t) => { if (t === 150) p(6, 19, 1, M.Fire); },
     // Sticky, for the same reason as wood: scorch is a step on the way to burning.
     outcome: (g, before, memo) => {

@@ -643,7 +643,7 @@ and must not create problems later, so nothing opportunistic rides along with a 
   decisions from the owner shaped it: **lakes are a feature** (a spring settles into a real
   pond, ~7% of the board, that stops growing), **puddles dry** (a puddle on open ground
   evaporates in 15-30 s while a pond that fills its basin keeps every drop — one knob sets
-  both, and 1-in-450 keeps a pour at today's 84%), and the mist stays visible, which an
+  both, and 1-in-450 keeps a pour close to today's 84% — 82%, once mist stopped raining back), and the mist stays visible, which an
   interaction-audit check now enforces.
 
   Two plan assumptions were wrong, and measurement caught both. Mist could not ship before
@@ -659,7 +659,7 @@ and must not create problems later, so nothing opportunistic rides along with a 
   char wash need running water, and condensation no longer scrubs soot; three audit scenes
   and two parity scenarios re-staged or re-witnessed; the steam field note needs heat. Against
   `main`, the multi-seed drift before those retunes read 25 checks better, 15 worse, 15 mixed.
-  Numbers now: spring 7.2%, pour 84% kept, pond after sand 94% (was 53%), liquid-on-liquid
+  Numbers now: spring 7.1%, oil spring 1.2% (unchanged), pour 82% kept, pond after sand 94% (was 53%), liquid-on-liquid
   overwrites 0 (was 29,424 across the audit scenes).
 - **20D — gases (optional).** Smoke deleting smoke (3,190 in the census after 20B) also acts
   as extra fading. Conserving it means more smoke, compensated by faster fading.

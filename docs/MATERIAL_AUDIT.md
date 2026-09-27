@@ -222,7 +222,7 @@ recorded in `docs/VISUAL_PIPELINE.md`):
 | Oil | 220 | nothing |
 | Seed | 108 | nothing |
 | Stardust | 86 | nothing |
-| Water / Moonwater | 2,156 / 2,192 | mist |
+| Water / Moonwater | 2,126 each | mist |
 | Meteor | **0** | 42 stone, 6 stardust |
 
 **As fountains they collapse into about four behaviours**, not eleven. Sand, soil and rocket

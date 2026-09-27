@@ -109,6 +109,9 @@ function runScenario({ name, w, h, seed, ticks, paint, observe, expect, slowStep
 }
 
 // What the density scenario drops through its pond, by the name it reports.
+// The mist scenario's floor: 103 cell-ticks of mist with the rule, 0 with it switched off in
+// both engines, measured on its seed. The floor sits well between them.
+const MIST_FLOOR = 40;
 const DROPPED = { sand: M.Sand, soil: M.Soil, stone: M.Stone, seed: M.Seed, rocket: M.Rocket, pollen: M.Pollen };
 
 const scenarios = [
@@ -674,6 +677,41 @@ const scenarios = [
       if ((seen.beddedBefore ?? 0) !== 0) return "bedded stone existed before any slow step ran";
       if ((seen.beddedAfter ?? 0) < 40) return `a long absence compacted only ${seen.beddedAfter ?? 0} cells into sandstone`;
       if ((seen.looseFloorAfter ?? 0) < 10) return `the lake floor should stay loose sand, found ${seen.looseFloorAfter ?? 0}`;
+      return null;
+    },
+  },
+  {
+    // The water budget (ROADMAP Phase 20): moving water throws mist, still water keeps every
+    // drop. Left of the divider a pour with no heat anywhere, so any steam is spray; right of
+    // it a sealed pond, walled two thick, whose water can go nowhere. Every mist roll is
+    // compared byte for byte, and the scenario fails if either half stops being witnessed —
+    // review showed that with mist removed from BOTH engines, all 26 earlier scenarios still
+    // passed, because nothing looked for it.
+    name: "a pour throws mist while a sealed pond keeps every drop",
+    w: 48, h: 30, seed: 4133, ticks: 400,
+    paint(p) {
+      for (let y = 8; y <= 25; y++) for (let x = 3; x <= 18; x += 4) p(x, 4 + (y % 3), 1, M.Water);
+      for (let y = 17; y <= 24; y++) for (let x = 30; x <= 42; x++) p(x, y, 1, M.Water);
+      for (let x = 0; x < 48; x++) { p(x, 27, 1, M.Wall); p(x, 26, 1, M.Wall); }
+      for (let y = 14; y <= 27; y++) { p(26, y, 1, M.Wall); p(27, y, 1, M.Wall); p(45, y, 1, M.Wall); p(46, y, 1, M.Wall); }
+      for (let x = 26; x <= 46; x++) { p(x, 14, 1, M.Wall); p(x, 15, 1, M.Wall); }
+    },
+    observe(seen, cells, w, h) {
+      let mist = 0, pond = 0;
+      for (let i = 0; i < w * h; i++) {
+        const x = i % w, kind = cells[i * STRIDE];
+        if (x < 24 && kind === M.Steam) mist++;
+        if (x > 27 && x < 45 && kind === M.Water) pond++;
+      }
+      // Cumulative, not a peak: mist is sparse at any instant (a few wisps) and plentiful over
+      // a pour, so a peak count is at the mercy of timing.
+      seen.mistCellTicks = (seen.mistCellTicks ?? 0) + mist;
+      seen.pondFirst ??= pond;
+      seen.pondLast = pond;
+    },
+    expect(seen) {
+      if ((seen.mistCellTicks ?? 0) < MIST_FLOOR) return `the heat-free pour made only ${seen.mistCellTicks ?? 0} cell-ticks of mist (floor ${MIST_FLOOR})`;
+      if (seen.pondLast !== seen.pondFirst) return `the sealed pond went from ${seen.pondFirst} water cells to ${seen.pondLast}`;
       return null;
     },
   },

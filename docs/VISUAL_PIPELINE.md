@@ -270,22 +270,30 @@ Current substrate rules:
   green on the way down and hang in the water as a floating clump.
 - **The water budget: moving water throws mist, still water keeps every drop.** Each time a
   water or moonwater cell actually moves it turns to low-energy steam at 1 in `MIST_ODDS`
-  (450), and no liquid ever deletes another. Until ROADMAP Phase 20 nothing in the sim
+  (450), and water never deletes water. Mist is given an odd variant so it always disperses:
+  expiring steam condenses back into a droplet when `variant & 3 == 0`, and mist that kept
+  its water's variant rained back forever, so a puddle never finished drying. **Oil is not
+  conserved**, deliberately: conserving a liquid needs a sink, oil has none, and review
+  measured an oil spring flooding 31.9% of the board when it was included (main: 1.2%). Until ROADMAP Phase 20 nothing in the sim
   decided how much water a scene held: the move clobber did, by letting flowing water
   overwrite water that had flowed into the same cell a moment earlier. Mist is that sink
   made deliberate and visible. The consequences, all measured and all chosen by the owner:
   - **A settled pond keeps every cell** (392 of 392 for 12,000 ticks), because water with
-    nowhere to go never moves. A pour still loses 16% on the way in, as it always did.
+    nowhere to go never moves. A pour loses 18% on the way in — it lost 16% to the old accidental sink.
   - **A puddle on open ground dries** in 15-30 seconds, as a faint mist. Its cells never
     settle — they hop sideways forever — so it evaporates, where a pond that fills its
     basin does not. That same surface motion is what bounds a spring, so the two are one
     knob: at 1-in-1000 puddles would last twice as long and a spring's lake reach ~11%.
-  - **Lakes are a feature.** A water spring settles at ~7% of the board (2,156 cells at
+  - **Lakes are a feature.** A water spring settles at ~7% of the board (2,126 cells at
     4,000 ticks), a real pond that stops growing. It used to hold ~260 cells, and only
     because the clobber was quietly deleting its water.
   - **The world is wetter, and five rules had to be told what "running water" means.**
-    Soot rinsing and the char wash both now need flowing water (erosion's flow test), so a
-    stone or a quenched hearth under a still pond keeps its look. Steam condensing on stone
+    Soot rinsing and the char wash both now need water that could actually MOVE — below, the
+    lower diagonals, or sideways — so a stone or a quenched hearth under a still pond keeps
+    its look. Their first version reused erosion's looser test (any empty neighbour), which
+    counts open air above a still pond as flow; review caught a shallow open pond rinsing a
+    sunken stone on tick 1 with zero water moves. Erosion keeps the looser test, which is what
+    lets a pond's waterline wear, as documented under erosion below. Steam condensing on stone
     wets it without scrubbing the soot. Only moonwater-charged moss takes a wall, because
     plain moss beside a permanent pond was always strongly fed and ate every wall it
     touched — wall to moss to fungus to soil. And the steam field note needs fire or lava on
@@ -329,7 +337,7 @@ Current cosmic rules:
   bound was the move clobber — flowing water deleting water — which held a spring at about
   260 cells. Since ROADMAP Phase 20 the bound is deliberate: the spring's pool surface keeps
   shifting, moving water throws mist, and the lake settles at **~7% of the 220x140 board**
-  (2,156 cells at 4,000 ticks, 2,216 at 16,000). `npm run water:budget` measures it.
+  (2,126 cells at 4,000 ticks, 2,190 at 16,000). `npm run water:budget` measures it.
 
   **A powder spring is bounded another way**, since nothing deletes sand either. It ENTOMBS
   itself: the grain piles up until no empty cell lies within `WELLSPRING_REACH` of any face,

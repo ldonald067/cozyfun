@@ -1084,6 +1084,12 @@ impl Universe {
                     // does. A wall basin is untouched either way; wall never erodes, and that is
                     // what makes Wall the material to build something permanent from.
                     let water_can_move = neighbors.iter().any(|&nidx| old[nidx].is_empty());
+                    // Stricter than `water_can_move`: somewhere this water could actually MOVE.
+                    // Rinsing soot and washing char claim RUNNING water, and open air above a
+                    // still pond's surface is not running — review measured a shallow open
+                    // pond rinsing a sunken stone on tick 1 with zero water moves.
+                    let (cx, cy) = self.xy(idx);
+                    let water_can_flow = self.liquid_can_flow(cx, cy, old);
                     if !is_moonwater && cell.energy > 150 && self.chance(20) {
                         // Simmering water vents a wisp and loses heat to evaporation.
                         self.emit_vapor_from(idx, old, next, Material::Steam as u8, cell.variant, 120);
@@ -1117,7 +1123,7 @@ impl Universe {
                         }
                         if other.kind == Material::Ember as u8
                             && other.energy < COLD_CHAR_ENERGY
-                            && water_can_move
+                            && water_can_flow
                             && self.chance(12)
                         {
                             // Charcoal wash: RUNNING water crumbles cold char away. The comment
@@ -1125,8 +1131,8 @@ impl Universe {
                             // doused under a still pond dissolved within ticks — contradicting the
                             // slow world, which spares char under water because a quenched hearth
                             // is a look somebody chose. Once ponds stopped draining (ROADMAP
-                            // Phase 20) that was every doused hearth. Same flow test as the rinse
-                            // and erosion; the roll comes after it.
+                            // Phase 20) that was every doused hearth. Same flow test as the rinse;
+                            // the roll comes after it.
                             next[nidx] = Cell::empty();
                             continue;
                         }
@@ -1192,14 +1198,14 @@ impl Universe {
                             if is_moonwater {
                                 next[nidx].flags |= FLAG_COSMIC;
                             }
-                            // Soot is rinsed off by RUNNING water, the same flow test erosion
-                            // uses. Unconditional, a stone at the bottom of a still pond was
+                            // Soot is rinsed off by RUNNING water — water that could actually move
+                            // (`liquid_can_flow`), not merely water with air above it. Unconditional, a stone at the bottom of a still pond was
                             // scrubbed by every water cell around it at once — and once water
                             // stopped vanishing (ROADMAP Phase 20) a meteor shocked into scorched
                             // stone sank into the pond and lost its scorch within a tick or two,
                             // so the shock was never seen. The roll comes after the flow test,
                             // so still water takes no roll at all.
-                            if next[nidx].flags & FLAG_SCORCHED != 0 && water_can_move && self.chance(5) {
+                            if next[nidx].flags & FLAG_SCORCHED != 0 && water_can_flow && self.chance(5) {
                                 next[nidx].flags &= !FLAG_SCORCHED;
                             }
                             // `next[idx].kind == cell.kind` is an OWNERSHIP check, not a
@@ -1252,7 +1258,7 @@ impl Universe {
                             if is_moonwater {
                                 next[nidx].flags |= FLAG_COSMIC;
                             }
-                            if next[nidx].flags & FLAG_SCORCHED != 0 && water_can_move && self.chance(5) {
+                            if next[nidx].flags & FLAG_SCORCHED != 0 && water_can_flow && self.chance(5) {
                                 next[nidx].flags &= !FLAG_SCORCHED;
                             }
                         }
@@ -1527,7 +1533,11 @@ impl Universe {
                 // water that cannot move — a settled pond — never draws on the RNG at all.
                 if is_water_like(cell.kind) && self.chance(MIST_ODDS) {
                     let landed = self.idx((x + dx) as u32, (y + dy) as u32);
-                    next[landed] = Cell::new(Material::Steam as u8, cell.variant, MIST_ENERGY);
+                    // An odd variant: expiring steam condenses back into a droplet when
+                    // `variant & 3 == 0`, and mist that kept the water's variant rained back
+                    // forever — review watched one droplet make 62 round trips, so a puddle
+                    // never quite dried. Mist disperses; steam from heat still condenses.
+                    next[landed] = Cell::new(Material::Steam as u8, cell.variant | 1, MIST_ENERGY);
                 }
                 return;
             }
@@ -2262,10 +2272,15 @@ impl Universe {
         let target = self.idx(nx as u32, ny as u32);
         let target_old = old[target];
         let target_next = next[target];
-        // A liquid never deletes a liquid. Two cells flowing into the same just-emptied cell
-        // used to overwrite each other, and that loss was the game's only water sink — the one
-        // thing bounding a spring. Mist (MIST_ODDS) is the deliberate sink that replaced it.
-        if is_free_liquid(moving_cell.kind) && is_free_liquid(target_next.kind) {
+        // Water never deletes water. Two cells flowing into the same just-emptied cell used to
+        // overwrite each other, and that loss was the game's only water sink — the one thing
+        // bounding a spring. Mist (MIST_ODDS) is the deliberate sink that replaced it.
+        //
+        // Water and moonwater only, because conserving a liquid needs a sink and only those
+        // two mist. Oil was in this guard at first and review measured the result: an oil
+        // spring flooded 31.9% of the board (main: 1.2%), because the clobber had been its
+        // only sink too. Oil keeps the old behaviour until it is given a sink of its own.
+        if is_water_like(moving_cell.kind) && is_water_like(target_next.kind) {
             return false;
         }
         let can_move = target_old.is_empty()
@@ -2278,6 +2293,20 @@ impl Universe {
         next[idx] = Cell::empty();
         next[target] = moving_cell;
         true
+    }
+
+    /// Whether a liquid at (x, y) has somewhere it could actually MOVE: the cells
+    /// `update_liquid` tries — below, the two lower diagonals, one and two cells to either
+    /// side. It reads `old` only, as the reaction pass must. Erosion keeps the looser
+    /// `water_can_move` (any empty neighbour), which deliberately lets a pond's waterline
+    /// wear; anything claiming to need RUNNING water uses this.
+    fn liquid_can_flow(&self, x: i32, y: i32, old: &[Cell]) -> bool {
+        [(0, 1), (-1, 1), (1, 1), (-1, 0), (1, 0), (-2, 0), (2, 0)]
+            .iter()
+            .any(|&(dx, dy)| {
+                let (nx, ny) = (x + dx, y + dy);
+                self.in_bounds(nx, ny) && old[self.idx(nx as u32, ny as u32)].is_empty()
+            })
     }
 
     /// How every GRAIN moves one cell: sand, soil, seed, stone, unlit rocket powder and a
@@ -3075,6 +3104,18 @@ mod tests {
             }
         }
         assert!(misted, "water that keeps moving should throw mist within 4,000 ticks at 1-in-{MIST_ODDS}");
+        // And it is GONE, not recycled. Mist that kept the water's variant condensed back into
+        // a droplet whenever `variant & 3 == 0` — review watched one make 62 round trips — so
+        // a puddle never finished drying. The floor is wall, which takes condensation as a
+        // stain rather than giving water back, so nothing here can return it.
+        for _ in 0..400 {
+            moving.tick();
+        }
+        assert_eq!(
+            (count_kind(&moving, Material::Water), count_kind(&moving, Material::Steam)),
+            (0, 0),
+            "a droplet that turned to mist should disperse completely, not rain back"
+        );
     }
 
     #[test]
@@ -3814,21 +3855,12 @@ mod tests {
         assert!(seeded, "pollen resting on wet soil should take root as a seed");
     }
 
-    /// The other half of the wash: a hearth doused under still water keeps its char. No water
-    /// cell here has anywhere to go, so none of it is running.
+    /// The other half of the wash: a hearth doused under still water keeps its char — in a
+    /// shallow open pond, where no water cell has anywhere to go, so none of it is running.
     #[test]
     fn still_water_keeps_a_quenched_hearth() {
         let mut u = Universe::new(16, 16, 7);
-        for y in 4..=13 {
-            for x in 3..=12 {
-                set_cell(&mut u, x, y, Material::Wall);
-            }
-        }
-        for y in 6..=11 {
-            for x in 5..=10 {
-                set_cell(&mut u, x, y, Material::Water);
-            }
-        }
+        open_shallow_pond(&mut u);
         set_cell_state(&mut u, 7, 11, Material::Ember, 12, 0, FLAG_WET);
         for _ in 0..400 {
             u.tick();
@@ -3836,18 +3868,29 @@ mod tests {
         assert_eq!(kind_at(&u, 7, 11), Material::Ember as u8, "still water must not wash the char away");
     }
 
+    /// A stream: a wellspring attuned to water pouring onto a long floor, running past the
+    /// cell at (8, 12) toward open ground. The rinse and the char wash need RUNNING water —
+    /// water that could actually move — and these tests used to wall a single water cell in on
+    /// every side it could go, which only counted as running because of the air above it:
+    /// the exact loophole review found in the flow test they were certifying.
+    fn stream_past_the_middle(u: &mut Universe) {
+        for x in 0..32 {
+            set_cell(u, x, 13, Material::Wall);
+        }
+        for (x, y) in [(3, 11), (3, 12), (4, 11), (4, 12)] {
+            set_cell_state(u, x, y, Material::Wellspring, 0, Material::Water as u16, 0);
+        }
+    }
+
     #[test]
     fn water_washes_cold_char_away() {
-        let mut u = Universe::new(16, 16, 7);
-        set_cell_state(&mut u, 8, 8, Material::Ember, 200, 10, 0);
-        set_cell(&mut u, 7, 8, Material::Water);
-        for (x, y) in [(6, 8), (5, 8), (9, 8), (6, 9), (7, 9), (8, 9), (9, 9)] {
-            set_cell(&mut u, x, y, Material::Wall);
-        }
+        let mut u = Universe::new(32, 16, 7);
+        stream_past_the_middle(&mut u);
+        set_cell_state(&mut u, 8, 12, Material::Ember, 200, 10, 0);
         let mut washed = false;
-        for _ in 0..80 {
+        for _ in 0..400 {
             u.tick();
-            if kind_at(&u, 8, 8) != Material::Ember as u8 {
+            if kind_at(&u, 8, 12) != Material::Ember as u8 {
                 washed = true;
                 break;
             }
@@ -4315,42 +4358,52 @@ mod tests {
 
     #[test]
     fn water_rinses_soot_from_hard_surfaces() {
-        let mut u = Universe::new(16, 16, 7);
-        set_cell(&mut u, 7, 8, Material::Water);
-        set_cell_state(&mut u, 8, 8, Material::Stone, 12, 40, FLAG_SCORCHED);
-        for (x, y) in [(6, 8), (5, 8), (9, 8), (6, 9), (7, 9), (8, 9)] {
-            set_cell(&mut u, x, y, Material::Wall);
-        }
+        let mut u = Universe::new(32, 16, 7);
+        stream_past_the_middle(&mut u);
+        set_cell_state(&mut u, 8, 12, Material::Stone, 12, 40, FLAG_SCORCHED);
         let mut rinsed = false;
-        for _ in 0..40 {
+        for _ in 0..400 {
             u.tick();
-            if flags_at(&u, 8, 8) & FLAG_SCORCHED == 0 {
+            if flags_at(&u, 8, 12) & FLAG_SCORCHED == 0 {
                 rinsed = true;
                 break;
             }
         }
         assert!(rinsed, "running water should rinse soot from scorched stone");
-        assert_eq!(kind_at(&u, 8, 8), Material::Stone as u8);
+        assert_eq!(kind_at(&u, 8, 12), Material::Stone as u8);
     }
 
-    /// The other half of the rinse: still water leaves soot alone. A scorched stone sealed at
-    /// the bottom of a pond, where no water cell has anywhere to go, keeps its scorch. Without
+    /// A shallow pond, two rows deep, OPEN to the air above, in a basin walled two thick. None
+    /// of its water can move — below is the floor or the stone, beside is more water or wall —
+    /// but its surface has air above it. That is the case review found the first flow test
+    /// getting wrong: it counted any empty neighbour, including the sky, as "running".
+    fn open_shallow_pond(u: &mut Universe) {
+        for y in 4..=13 {
+            for x in 3..=12 {
+                set_cell(u, x, y, Material::Wall);
+            }
+        }
+        for y in 4..=9 {
+            for x in 5..=10 {
+                let i = u.idx(x, y);
+                u.cells[i] = Cell::empty();
+            }
+        }
+        for y in 10..=11 {
+            for x in 5..=10 {
+                set_cell(u, x, y, Material::Water);
+            }
+        }
+    }
+
+    /// The other half of the rinse: still water leaves soot alone. A scorched stone at the
+    /// bottom of a shallow open pond, where no water cell has anywhere to go, keeps its scorch. Without
     /// the flow test every water cell around a sunken stone scrubbed it at once, and a meteor
     /// shocked into a pond lost its scorch within a tick or two of forming it.
     #[test]
     fn still_water_leaves_soot_on_a_sunken_stone() {
         let mut u = Universe::new(16, 16, 7);
-        // A sealed box two walls thick, full of water, with the scorched stone at its floor.
-        for y in 4..=13 {
-            for x in 3..=12 {
-                set_cell(&mut u, x, y, Material::Wall);
-            }
-        }
-        for y in 6..=11 {
-            for x in 5..=10 {
-                set_cell(&mut u, x, y, Material::Water);
-            }
-        }
+        open_shallow_pond(&mut u);
         set_cell_state(&mut u, 7, 11, Material::Stone, 12, 40, FLAG_SCORCHED);
         for _ in 0..400 {
             u.tick();

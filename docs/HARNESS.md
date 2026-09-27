@@ -120,7 +120,7 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   water spring on the real board, a pour into a basin, and sand poured into a pond. Under
   the old accidental sink (Phase 20A) a spring held ~280 cells (0.9%), a pour kept 600 of
   716, and a pond kept 207 of 392 once sand sank through it. With mist (Phase 20B): a spring
-  settles at 7.2%, a pour keeps 604 of 721 (the same 84%), and the pond keeps 367 of 392.
+  settles at 7.1%, a pour keeps 593 of 721 (82%, against 84% before), and the pond keeps 367 of 392.
 
 - `scripts/compile-app.mjs`: the one way a harness loads the app's TypeScript. Eight scripts
   carried identical copies of the compile; now each names its files and gets a loader back.
@@ -443,15 +443,23 @@ soil into moss, where seeds do not root.
 
 - **A grain never overwrites a liquid** (`try_fall`). Sinking pushes water up into the path of
   the next grain, and the old rule deleted 213 of a 392-cell pond.
-- **A liquid never overwrites a liquid** (`try_move`), with **mist** as the deliberate sink in
-  its place: moving water throws low-energy steam at 1 in `MIST_ODDS`. Closing this without
-  mist floods the tray (a spring reaches 29% of the board); with it, pours keep the same
-  84%, ponds keep every drop, and a spring settles into a ~7% lake.
+- **Water never overwrites water** (`try_move`), with **mist** as the deliberate sink in its
+  place: moving water throws low-energy steam at 1 in `MIST_ODDS`. Closing this without mist
+  floods the tray (a spring reaches 29% of the board); with it, pours keep 82% (84% before),
+  ponds keep every drop, and a spring settles into a ~7% lake. **Oil is left out on
+  purpose**: it has no sink, and conserving it flooded an oil spring to 31.9% of the board.
+  The general rule this taught is in `sim/CLAUDE.md`: never conserve a liquid without a sink.
 
 What remains open, from the census after 20B: smoke deleting smoke (3,190 — also working as
 extra fading), water overwriting steam a reaction just made (2,619), and **steam overwriting
 water that just flowed in (615)** — the last small leak of the old water sink, mostly where a
 spring's mist rises through its own stream. Those are 20D and 20E.
+
+**The phase's adversarial review found five real problems** after every gate was green, and
+each is fixed with a test that fails on its sabotage: the oil flood above; two heat checks
+(`water.boils`, `fire.softens`) that passed on mist alone with every thermal steam source
+turned off, so they now count only steam hotter than mist; a "running water" test that
+counted the sky; mist that rained back forever; and parity with no mist witness at all.
 
 **How the wetter world was retuned**, so the reasoning is not lost: every change was found by
 a gate, diagnosed to a cause, and measured on eight seeds with `audit:drift`. Fixtures sized

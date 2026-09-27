@@ -519,6 +519,9 @@ class JsSandboxEngine implements SandboxEngine {
       const waterCanMove =
         (kind === MATERIAL.Water || kind === MATERIAL.Moonwater) &&
         this.neighbors(x, y).some((nidx) => old[nidx] === MATERIAL.Empty);
+      // Mirrors `water_can_flow`: somewhere this water could actually move. Rinse and char
+      // wash need running water; erosion keeps the looser test above.
+      const waterCanFlow = (kind === MATERIAL.Water || kind === MATERIAL.Moonwater) && this.liquidCanFlow(x, y, old);
       for (const nidx of this.neighbors(x, y)) {
         const other = old[nidx];
         if (kind === MATERIAL.Fire) {
@@ -617,7 +620,7 @@ class JsSandboxEngine implements SandboxEngine {
             continue;
           }
           // Only RUNNING water washes cold char away — see the sim.
-          if (other === MATERIAL.Ember && readU16(old, nidx + 4) < COLD_CHAR_ENERGY && waterCanMove && this.chance(12)) {
+          if (other === MATERIAL.Ember && readU16(old, nidx + 4) < COLD_CHAR_ENERGY && waterCanFlow && this.chance(12)) {
             next.fill(0, nidx, nidx + CELL_STRIDE);
             continue;
           }
@@ -660,7 +663,7 @@ class JsSandboxEngine implements SandboxEngine {
           if (other === MATERIAL.Stone) {
             writeU16(next, nidx + 4, Math.min(255, readU16(next, nidx + 4) + Math.floor(vigor / 2)));
             writeU16(next, nidx + 6, readU16(next, nidx + 6) | CELL_FLAG.Wet | (kind === MATERIAL.Moonwater ? CELL_FLAG.Cosmic : 0));
-            if (readU16(next, nidx + 6) & CELL_FLAG.Scorched && waterCanMove && this.chance(5)) {
+            if (readU16(next, nidx + 6) & CELL_FLAG.Scorched && waterCanFlow && this.chance(5)) {
               writeU16(next, nidx + 6, readU16(next, nidx + 6) & ~CELL_FLAG.Scorched);
             }
             // `next[idx] === kind` is the ownership check mirrored from sim/src/lib.rs: an
@@ -683,7 +686,7 @@ class JsSandboxEngine implements SandboxEngine {
             const wallVigor = Math.max(8, Math.floor(vigor / (kind === MATERIAL.Moonwater ? 3 : 5)));
             writeU16(next, nidx + 4, Math.min(255, readU16(next, nidx + 4) + wallVigor));
             writeU16(next, nidx + 6, readU16(next, nidx + 6) | CELL_FLAG.Wet | (kind === MATERIAL.Moonwater ? CELL_FLAG.Cosmic : 0));
-            if (readU16(next, nidx + 6) & CELL_FLAG.Scorched && waterCanMove && this.chance(5)) {
+            if (readU16(next, nidx + 6) & CELL_FLAG.Scorched && waterCanFlow && this.chance(5)) {
               writeU16(next, nidx + 6, readU16(next, nidx + 6) & ~CELL_FLAG.Scorched);
             }
           }
@@ -817,7 +820,8 @@ class JsSandboxEngine implements SandboxEngine {
       if (this.move(idx, x + dx, y + dy, cell, old, next)) {
         // Moving water throws spray — mirrors update_liquid, roll after the move.
         if (waterLike(cell[0]) && this.chance(MIST_ODDS)) {
-          writeCellBytes(next, this.index(x + dx, y + dy), MATERIAL.Steam, cell[1], MIST_ENERGY);
+          // Odd variant: mist disperses and never condenses back — see the sim.
+          writeCellBytes(next, this.index(x + dx, y + dy), MATERIAL.Steam, cell[1] | 1, MIST_ENERGY);
         }
         return;
       }
@@ -1503,8 +1507,8 @@ class JsSandboxEngine implements SandboxEngine {
     const movingCell = next.slice(idx, idx + CELL_STRIDE);
     if (movingCell[0] !== cell[0]) return false;
     const target = this.index(x, y);
-    // A liquid never deletes a liquid — see Universe::try_move.
-    if (freeLiquid(movingCell[0]) && freeLiquid(next[target])) return false;
+    // Water never deletes water — see Universe::try_move for why oil is not included.
+    if (waterLike(movingCell[0]) && waterLike(next[target])) return false;
     const canMove =
       old[target] === MATERIAL.Empty ||
       next[target] === MATERIAL.Empty ||
@@ -1513,6 +1517,14 @@ class JsSandboxEngine implements SandboxEngine {
     next.fill(0, idx, idx + CELL_STRIDE);
     next.set(movingCell, target);
     return true;
+  }
+
+  // Mirrors Universe::liquid_can_flow: the cells update_liquid tries, read from `old`.
+  private liquidCanFlow(x: number, y: number, old: Uint8Array) {
+    for (const [dx, dy] of [[0, 1], [-1, 1], [1, 1], [-1, 0], [1, 0], [-2, 0], [2, 0]]) {
+      if (this.inBounds(x + dx, y + dy) && old[this.index(x + dx, y + dy)] === MATERIAL.Empty) return true;
+    }
+    return false;
   }
 
   // Mirrors Universe::try_fall: how every grain moves. Into air it falls, into a liquid it
