@@ -1447,7 +1447,8 @@ class JsSandboxEngine implements SandboxEngine {
       } else if (other === MATERIAL.Stone && dampSubstrate && (oldEnergy > 120 || this.chance(10))) {
         writeCellBytes(next, nidx, MATERIAL.Moss, old[nidx + 1], 58, 0, CELL_FLAG.Wet);
         spread = true;
-      } else if (other === MATERIAL.Wall && dampSubstrate && oldEnergy > 150) {
+      } else if (other === MATERIAL.Wall && dampSubstrate && oldEnergy > 150 && readU16(old, idx + 6) & CELL_FLAG.Cosmic) {
+        // Only moonwater-charged moss takes a wall — see Universe::update_moss.
         writeCellBytes(next, nidx, MATERIAL.Moss, old[nidx + 1], 48, 0, CELL_FLAG.Wet);
         spread = true;
       }

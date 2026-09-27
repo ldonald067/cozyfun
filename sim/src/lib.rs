@@ -1905,7 +1905,18 @@ impl Universe {
                 next[nidx] = Cell::new(Material::Moss as u8, other.variant, 58);
                 next[nidx].flags = FLAG_WET;
                 spread = true;
-            } else if wall_substrate && damp_substrate && cell.energy > 150 {
+            } else if wall_substrate
+                && damp_substrate
+                && cell.energy > 150
+                && cell.flags & FLAG_COSMIC != 0
+            {
+                // A wall is construction, and only moonwater's supercharged growth takes one.
+                // "Strongly fed" used to be enough, and it was rare while moving water deleted
+                // itself; once water was conserved (ROADMAP Phase 20) any moss beside a pond
+                // is fed past 150 every tick, and plain moss ate every wall a pond touched —
+                // wall to moss to fungus to soil, dissolving the one material the game
+                // promises is permanent. Ordinary growth stays grounded; the cosmic liquid
+                // keeps the special case.
                 next[nidx] = Cell::new(Material::Moss as u8, other.variant, 48);
                 next[nidx].flags = FLAG_WET;
                 spread = true;
@@ -4274,18 +4285,18 @@ mod tests {
     }
 
     #[test]
-    fn moss_needs_extra_energy_to_cross_wall() {
-        let mut weak = Universe::new(16, 16, 7);
-        set_cell_state(&mut weak, 7, 8, Material::Moss, 12, 130, FLAG_WET);
-        set_cell_state(&mut weak, 8, 8, Material::Wall, 12, 90, FLAG_WET);
-        weak.tick();
-        assert_eq!(kind_at(&weak, 8, 8), Material::Wall as u8);
-
-        let mut strong = Universe::new(16, 16, 7);
-        set_cell_state(&mut strong, 7, 8, Material::Moss, 12, 170, FLAG_WET);
-        set_cell_state(&mut strong, 8, 8, Material::Wall, 12, 90, FLAG_WET);
-        strong.tick();
-        assert_eq!(kind_at(&strong, 8, 8), Material::Moss as u8);
+    fn only_moonwater_charged_moss_takes_a_wall() {
+        let crosses = |energy: u16, flags: u16| {
+            let mut u = Universe::new(16, 16, 7);
+            set_cell_state(&mut u, 7, 8, Material::Moss, 12, energy, flags);
+            set_cell_state(&mut u, 8, 8, Material::Wall, 12, 90, FLAG_WET);
+            u.tick();
+            kind_at(&u, 8, 8) == Material::Moss as u8
+        };
+        assert!(!crosses(130, FLAG_WET), "weak moss must not take a wall");
+        // The case a pond produces every tick now that water is conserved.
+        assert!(!crosses(170, FLAG_WET), "strongly fed PLAIN moss must not take a wall");
+        assert!(crosses(170, FLAG_WET | FLAG_COSMIC), "moonwater-charged moss takes a soaked wall");
     }
 
     #[test]
