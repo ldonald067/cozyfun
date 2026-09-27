@@ -716,6 +716,44 @@ const scenarios = [
     },
   },
   {
+    // Gases never delete gases (ROADMAP Phase 20D). Left of the divider a live fire in a
+    // lidded firebox, so smoke is made, crowds under the lid and is compared byte for byte
+    // through every roll. Right of it a sealed chamber of painted smoke, narrower than the
+    // chamber so it fans out under the ceiling — the only geometry where one gas reaches for
+    // a cell another has just filled. Smoke is never consumed by a reaction, so its count
+    // must hold until it ages out past 180; with the guard removed from both engines it
+    // falls well before that.
+    name: "smoke crowding under a lid keeps every cell until it ages out",
+    w: 56, h: 30, seed: 4201, ticks: 260,
+    paint(p) {
+      for (let x = 0; x < 56; x++) { p(x, 27, 1, M.Wall); p(x, 26, 1, M.Wall); }
+      for (let x = 2; x <= 24; x++) p(x, 8, 1, M.Wall);
+      for (let y = 8; y <= 26; y++) { p(2, y, 1, M.Wall); p(24, y, 1, M.Wall); }
+      p(13, 22, 3, M.Wood); p(13, 18, 1, M.Fire);
+      for (let x = 30; x <= 52; x++) { p(x, 4, 1, M.Wall); }
+      for (let y = 4; y <= 26; y++) { p(30, y, 1, M.Wall); p(52, y, 1, M.Wall); }
+      for (let y = 17; y <= 23; y++) for (let x = 38; x <= 44; x++) p(x, y, 1, M.Smoke);
+    },
+    observe(seen, cells, w, h, tick) {
+      let fire = 0, chamber = 0;
+      for (let i = 0; i < w * h; i++) {
+        if (cells[i * STRIDE] !== M.Smoke) continue;
+        if (i % w < 26) fire++; else chamber++;
+      }
+      seen.fireSmokeCellTicks = (seen.fireSmokeCellTicks ?? 0) + fire;
+      seen.chamberFirst ??= chamber;
+      if (tick <= 170) seen.chamberLowestBeforeExpiry = Math.min(seen.chamberLowestBeforeExpiry ?? chamber, chamber);
+      seen.chamberLast = chamber;
+    },
+    expect(seen) {
+      if (!seen.chamberFirst) return "the sealed chamber started with no smoke in it";
+      if (seen.chamberLowestBeforeExpiry !== seen.chamberFirst) return `sealed smoke fell from ${seen.chamberFirst} to ${seen.chamberLowestBeforeExpiry} cells before it could age out`;
+      if (seen.chamberLast !== 0) return `sealed smoke never aged out (${seen.chamberLast} cells left)`;
+      if ((seen.fireSmokeCellTicks ?? 0) < 500) return `the lidded fire made only ${seen.fireSmokeCellTicks ?? 0} cell-ticks of smoke`;
+      return null;
+    },
+  },
+  {
     // Sinking is a density ORDER, so this drops one of everything onto a pond under an oil
     // film: sand, soil, stone, seed and unlit rocket powder should all reach the bed, and
     // pollen — light on purpose — should not. Every swap is compared byte for byte, and the

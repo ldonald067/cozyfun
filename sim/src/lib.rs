@@ -2283,6 +2283,12 @@ impl Universe {
         if is_water_like(moving_cell.kind) && is_water_like(target_next.kind) {
             return false;
         }
+        // A gas never deletes a gas (ROADMAP Phase 20D). Unlike water, smoke and steam already
+        // have a sink of their own — they expire by age — so no new rule is needed to keep
+        // this from filling the tray.
+        if is_gas(moving_cell.kind) && is_gas(target_next.kind) {
+            return false;
+        }
         let can_move = target_old.is_empty()
             || target_next.is_empty()
             || (can_sink_through_gas
@@ -2442,6 +2448,10 @@ fn is_wellspring_source(kind: u8) -> bool {
 
 fn is_water_like(kind: u8) -> bool {
     kind == Material::Water as u8 || kind == Material::Moonwater as u8
+}
+
+fn is_gas(kind: u8) -> bool {
+    kind == Material::Smoke as u8 || kind == Material::Steam as u8
 }
 
 /// Water, moonwater and oil: the liquids a grain sinks through, and never overwrites. Lava
@@ -3116,6 +3126,41 @@ mod tests {
             (0, 0),
             "a droplet that turned to mist should disperse completely, not rain back"
         );
+    }
+
+    #[test]
+    fn a_gas_never_deletes_a_gas_and_still_fades_by_age() {
+        // A sealed chamber with a column of smoke on its floor: the smoke rises and spreads
+        // under the ceiling, which is exactly where one gas used to move into a cell another
+        // had just filled and delete it. Smoke is never consumed by a reaction (it only
+        // soots), so until it ages out every cell must still be there.
+        let mut u = Universe::new(20, 24, 7);
+        for y in 2..=21 {
+            for x in 2..=17 {
+                let edge = y == 2 || y == 21 || x == 2 || x == 17;
+                if edge {
+                    set_cell(&mut u, x, y, Material::Wall);
+                }
+            }
+        }
+        // Narrower than the chamber, so it fans out sideways under the ceiling: a column
+        // rising in a full-width block never collides with anything and proves nothing.
+        for y in 12..=20 {
+            for x in 7..=12 {
+                set_cell(&mut u, x, y, Material::Smoke);
+            }
+        }
+        let painted = count_kind(&u, Material::Smoke);
+        for _ in 0..170 {
+            u.tick();
+        }
+        assert_eq!(count_kind(&u, Material::Smoke), painted, "crowded smoke should keep every cell until it ages out");
+
+        // And it still has its sink: conserving a gas is only safe because it expires.
+        for _ in 0..30 {
+            u.tick();
+        }
+        assert_eq!(count_kind(&u, Material::Smoke), 0, "smoke past its lifetime should be gone");
     }
 
     #[test]

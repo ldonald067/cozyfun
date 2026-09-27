@@ -466,10 +466,20 @@ soil into moss, where seeds do not root.
   purpose**: it has no sink, and conserving it flooded an oil spring to 31.9% of the board.
   The general rule this taught is in `sim/CLAUDE.md`: never conserve a liquid without a sink.
 
-What remains open, from the census after 20B: smoke deleting smoke (3,190 — also working as
-extra fading), water overwriting steam a reaction just made (2,619), and **steam overwriting
-water that just flowed in (615)** — the last small leak of the old water sink, mostly where a
-spring's mist rises through its own stream. Those are 20D and 20E.
+**A gas never overwrites a gas** (20D). Gases were the one class that could be conserved
+without a new rule, because smoke and steam already expire by age. The census went from
+8,544 overwrites to 4,970 with every gas-on-gas class at zero. Measured on the 220x140 board
+over eight seeds, an open log pile's smoke peak rises 6% and steam over a lava quench 5%, but
+**a fire under a lid roughly doubles its smoke** (peak 146 -> 264), because that is where
+gases crowd. It pools as a ceiling layer rather than fogging the box, and the owner kept it
+as-is over shortening smoke's lifetime. The water budget is untouched: a spring's mist is too
+sparse to meet another gas.
+
+What remains open, from the census after 20D: water overwriting steam a reaction just made
+(2,323), and **steam overwriting water that just flowed in (1,343)** — the last small leak of
+the old water sink, mostly where a spring's mist rises through its own stream. That second one
+was 615 after 20B and **20D doubled it**: mist that used to be deleted by other gas now
+survives long enough to meet water. Both are 20E.
 
 **The phase's adversarial review found five real problems** after every gate was green, and
 each is fixed with a test that fails on its sabotage: the oil flood above; two heat checks

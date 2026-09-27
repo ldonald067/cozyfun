@@ -1509,6 +1509,8 @@ class JsSandboxEngine implements SandboxEngine {
     const target = this.index(x, y);
     // Water never deletes water — see Universe::try_move for why oil is not included.
     if (waterLike(movingCell[0]) && waterLike(next[target])) return false;
+    // A gas never deletes a gas — see Universe::try_move.
+    if (isGas(movingCell[0]) && isGas(next[target])) return false;
     const canMove =
       old[target] === MATERIAL.Empty ||
       next[target] === MATERIAL.Empty ||
@@ -1757,6 +1759,10 @@ function wellspringSource(kind: number) {
 
 function waterLike(kind: number) {
   return kind === MATERIAL.Water || kind === MATERIAL.Moonwater;
+}
+
+function isGas(kind: number) {
+  return kind === MATERIAL.Smoke || kind === MATERIAL.Steam;
 }
 
 // Mirrors is_free_liquid: water, moonwater and oil, the liquids a grain sinks through and

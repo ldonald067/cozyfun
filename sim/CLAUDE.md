@@ -21,8 +21,9 @@ mirrored in `app/src/engine.ts` and behave byte-for-byte identically — see the
   and a floor that runs under them — the `shaft` test helper does both.
 - **`try_move` can overwrite a cell another mover filled this tick**, because it counts a
   target as free if it was empty in `old`. That clobber is load-bearing and mostly left alone,
-  with two exceptions: a grain never overwrites a liquid (`try_fall`), and water never
-  overwrites water. The second only works because **moving water throws mist**
+  with three exceptions: a grain never overwrites a liquid (`try_fall`), water never
+  overwrites water, and a gas never overwrites a gas — safe without a new rule, because smoke
+  and steam already expire by age. The second only works because **moving water throws mist**
   (`MIST_ODDS`) — that is the water sink now, and without it a spring floods the tray.
   **Never conserve a liquid that has no sink**: oil was in that guard at first and an oil
   spring flooded a third of the board. What is still open is in `docs/HARNESS.md`.

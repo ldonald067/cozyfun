@@ -6,9 +6,9 @@ This roadmap keeps the project focused: make the toy feel good, keep the codebas
 
 Every phase through 19 is complete except Phase 8's remaining subjective listening pass, and
 the September design passes between 19 and 20 all shipped. Phase 20 — replacing the move
-clobber's hidden water sink with a deliberate one — has its instruments (20A) and the water
-budget itself (20B) done; gases (20D), the last of the clobber (20E), and triage of the checks
-20B moved are next. **Start at `docs/HANDOFF.md`.**
+clobber's hidden water sink with a deliberate one — has its instruments (20A), the water
+budget itself (20B), the triage of what 20B moved, and gas conservation (20D) done; the last
+of the clobber (20E) is next. **Start at `docs/HANDOFF.md`.**
 
 The sandbox is a playable, deployed browser toy: React/Vite UI, Rust/WASM sim with a byte-identical JS fallback, 18 paintable materials plus the Eraser on the toolbar and 8 generated-only outcomes, six credited room backdrops with room-linked native ambience, optional YouTube Desk Radio, local save/share/postcard/clip export, a click-to-load embed poster, deterministic sim/parity/browser/visual/audio QA wired into local scripts and CI, and a deploy gate that proves which commit the running host is serving. It runs at `pixelfun.littlealbumclub.net` and is iframed into `littlealbumclub.net`. Details live in the phase sections below.
 
@@ -639,8 +639,8 @@ adversarial review whose findings were fixed before moving on.
 
 ## Phase 20: The Water Budget
 
-Status: in progress — 20A, 20B and the triage of what 20B moved are done (20B absorbed what the
-plan called 20C). Next: 20D and 20E. The working plan is `docs/HANDOFF.md`.
+Status: in progress — 20A, 20B, the triage of what 20B moved, and 20D are done (20B absorbed what the
+plan called 20C), and 20D. Next: 20E. The working plan is `docs/HANDOFF.md`.
 
 **No rule in the sim decides how much water a scene holds.** The move clobber does: a mover
 may overwrite a cell another mover filled earlier the same tick, and when water flows into
@@ -726,8 +726,25 @@ and must not create problems later, so nothing opportunistic rides along with a 
   of that small scene's pour. What the planter does show predates 20B and is unchanged by
   it: one watering leaves most plants at the minimum stalk and 58% of them leafless in both
   builds. **The slow-world garden still grows 18 new columns** in a day.
-- **20D — gases (optional).** Smoke deleting smoke (3,190 in the census after 20B) also acts
-  as extra fading. Conserving it means more smoke, compensated by faster fading.
+- **20D — a gas never deletes a gas. Done.** Smoke deleting smoke was 37% of the overwrites
+  left after 20B, and gases were the one class that needed no new sink: smoke and steam
+  already expire by age. Measured on the 220x140 board over eight seeds, against the build
+  before it:
+
+  | scene | smoke peak | smoke mean | steam peak |
+  | --- | --- | --- | --- |
+  | an open log pile | 368 -> 391 | 23 -> 28 | — |
+  | a lidded hearth | **146 -> 264** | 10 -> 19 | — |
+  | a fire under a pan | 54 -> 108 | 4 -> 8 | 5 -> 5 |
+  | water poured on lava | — | — | 130 -> 137 |
+
+  Open fires barely change, because smoke disperses before it can collide; a confined fire
+  roughly doubles its smoke, which pools under the lid as a ceiling layer rather than fogging
+  the box. **The owner kept it as-is** over shortening smoke's lifetime or reverting, having
+  seen the two hearths side by side. How long smoke stays on screen is set by the fire and did
+  not move. The water budget is identical to the last digit — a spring's mist is too sparse to
+  meet another gas — but the census's steam-over-water class doubled (615 -> 1,343), since
+  mist that other gas used to delete now lives to meet water. That is 20E's to close.
 - **20E — the rest of the clobber.** After 20B: water overwriting reaction-made steam (2,619)
   and steam overwriting water that just flowed in (615) — the last small leak of the old
   water sink. Close them if the census says it is cheap, otherwise document them as intended.
