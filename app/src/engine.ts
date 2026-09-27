@@ -659,7 +659,7 @@ class JsSandboxEngine implements SandboxEngine {
           if (other === MATERIAL.Stone) {
             writeU16(next, nidx + 4, Math.min(255, readU16(next, nidx + 4) + Math.floor(vigor / 2)));
             writeU16(next, nidx + 6, readU16(next, nidx + 6) | CELL_FLAG.Wet | (kind === MATERIAL.Moonwater ? CELL_FLAG.Cosmic : 0));
-            if (readU16(next, nidx + 6) & CELL_FLAG.Scorched && this.chance(5)) {
+            if (readU16(next, nidx + 6) & CELL_FLAG.Scorched && waterCanMove && this.chance(5)) {
               writeU16(next, nidx + 6, readU16(next, nidx + 6) & ~CELL_FLAG.Scorched);
             }
             // `next[idx] === kind` is the ownership check mirrored from sim/src/lib.rs: an
@@ -682,7 +682,7 @@ class JsSandboxEngine implements SandboxEngine {
             const wallVigor = Math.max(8, Math.floor(vigor / (kind === MATERIAL.Moonwater ? 3 : 5)));
             writeU16(next, nidx + 4, Math.min(255, readU16(next, nidx + 4) + wallVigor));
             writeU16(next, nidx + 6, readU16(next, nidx + 6) | CELL_FLAG.Wet | (kind === MATERIAL.Moonwater ? CELL_FLAG.Cosmic : 0));
-            if (readU16(next, nidx + 6) & CELL_FLAG.Scorched && this.chance(5)) {
+            if (readU16(next, nidx + 6) & CELL_FLAG.Scorched && waterCanMove && this.chance(5)) {
               writeU16(next, nidx + 6, readU16(next, nidx + 6) & ~CELL_FLAG.Scorched);
             }
           }
@@ -1040,7 +1040,8 @@ class JsSandboxEngine implements SandboxEngine {
         if (other === MATERIAL.Stone || other === MATERIAL.Wall) {
           const condensation = other === MATERIAL.Stone ? 58 : 26;
           writeU16(next, nidx + 4, Math.min(255, readU16(next, nidx + 4) + condensation));
-          writeU16(next, nidx + 6, (readU16(next, nidx + 6) | CELL_FLAG.Wet) & ~CELL_FLAG.Scorched);
+          // Condensation wets; only running water rinses soot — see the sim.
+          writeU16(next, nidx + 6, readU16(next, nidx + 6) | CELL_FLAG.Wet);
           if (other === MATERIAL.Stone && this.chance(4)) {
             writeCellBytes(next, idx, MATERIAL.Water, old[idx + 1], 50);
           }

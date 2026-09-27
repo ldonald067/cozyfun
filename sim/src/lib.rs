@@ -1182,7 +1182,14 @@ impl Universe {
                             if is_moonwater {
                                 next[nidx].flags |= FLAG_COSMIC;
                             }
-                            if next[nidx].flags & FLAG_SCORCHED != 0 && self.chance(5) {
+                            // Soot is rinsed off by RUNNING water, the same flow test erosion
+                            // uses. Unconditional, a stone at the bottom of a still pond was
+                            // scrubbed by every water cell around it at once — and once water
+                            // stopped vanishing (ROADMAP Phase 20) a meteor shocked into scorched
+                            // stone sank into the pond and lost its scorch within a tick or two,
+                            // so the shock was never seen. The roll comes after the flow test,
+                            // so still water takes no roll at all.
+                            if next[nidx].flags & FLAG_SCORCHED != 0 && water_can_move && self.chance(5) {
                                 next[nidx].flags &= !FLAG_SCORCHED;
                             }
                             // `next[idx].kind == cell.kind` is an OWNERSHIP check, not a
@@ -1235,7 +1242,7 @@ impl Universe {
                             if is_moonwater {
                                 next[nidx].flags |= FLAG_COSMIC;
                             }
-                            if next[nidx].flags & FLAG_SCORCHED != 0 && self.chance(5) {
+                            if next[nidx].flags & FLAG_SCORCHED != 0 && water_can_move && self.chance(5) {
                                 next[nidx].flags &= !FLAG_SCORCHED;
                             }
                         }
@@ -1278,7 +1285,13 @@ impl Universe {
                             if other.kind == Material::Stone as u8 || other.kind == Material::Wall as u8 {
                                 let condensation = if other.kind == Material::Stone as u8 { 58 } else { 26 };
                                 next[nidx].energy = next[nidx].energy.saturating_add(condensation).min(255);
-                                next[nidx].flags = (next[nidx].flags | FLAG_WET) & !FLAG_SCORCHED;
+                                // Condensation wets a surface; it does not wash soot off it —
+                                // that is running water's job (the rinse, gated on flow). It used
+                                // to clear the scorch too, and once moving water began throwing
+                                // mist (ROADMAP Phase 20) that mist condensed on every stone near a
+                                // pond: a meteor shocked into scorched stone lost its scorch within
+                                // 5-11 ticks on 7 seeds of 8, so the shock was never seen.
+                                next[nidx].flags |= FLAG_WET;
                                 if other.kind == Material::Stone as u8 && self.chance(4) {
                                     next[idx] = Cell::new(Material::Water as u8, cell.variant, 50);
                                 }
@@ -4246,6 +4259,32 @@ mod tests {
         }
         assert!(rinsed, "running water should rinse soot from scorched stone");
         assert_eq!(kind_at(&u, 8, 8), Material::Stone as u8);
+    }
+
+    /// The other half of the rinse: still water leaves soot alone. A scorched stone sealed at
+    /// the bottom of a pond, where no water cell has anywhere to go, keeps its scorch. Without
+    /// the flow test every water cell around a sunken stone scrubbed it at once, and a meteor
+    /// shocked into a pond lost its scorch within a tick or two of forming it.
+    #[test]
+    fn still_water_leaves_soot_on_a_sunken_stone() {
+        let mut u = Universe::new(16, 16, 7);
+        // A sealed box two walls thick, full of water, with the scorched stone at its floor.
+        for y in 4..=13 {
+            for x in 3..=12 {
+                set_cell(&mut u, x, y, Material::Wall);
+            }
+        }
+        for y in 6..=11 {
+            for x in 5..=10 {
+                set_cell(&mut u, x, y, Material::Water);
+            }
+        }
+        set_cell_state(&mut u, 7, 11, Material::Stone, 12, 40, FLAG_SCORCHED);
+        for _ in 0..400 {
+            u.tick();
+        }
+        assert_eq!(kind_at(&u, 7, 11), Material::Stone as u8);
+        assert_ne!(flags_at(&u, 7, 11) & FLAG_SCORCHED, 0, "still water must not rinse the soot off");
     }
 
     #[test]
