@@ -7,7 +7,7 @@ Harness engineering means improving the feedback loops around the sandbox so goo
 The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `scripts/` that adds repo-local tool paths; the wrappers run the same underlying steps.
 
 - `npm run build`: builds Rust/WASM, copies the WASM into `app/public/sim`, and builds the Vite app.
-- `npm run check`: the full local gate, in order — material identity audit, material contrast floor, site-icon freshness, Rust sim tests, production build, WASM smoke, JS fallback smoke, cross-engine parity, interaction reachability, slow-world visibility, subpath build, audio reactions, browser smoke, audio QA, and visual QA. If you are listing the stages anywhere, take the list from `package.json` rather than from memory.
+- `npm run check`: the full local gate, in order — material identity audit, material contrast floor, renderer probe, site-icon freshness, Rust sim tests, production build, WASM smoke, JS fallback smoke, cross-engine parity, interaction reachability, slow-world visibility, subpath build, audio reactions, field notes, browser smoke, audio QA, and visual QA. (This list had silently lost the renderer probe and field notes, which is the argument for the next sentence.) If you are listing the stages anywhere, take the list from `package.json` rather than from memory.
 - **`cargo build` is not `npm run build:sim`.** Parity reads the wasm from
   `app/public/sim/`, which `scripts/copy-wasm.mjs` writes — and only `npm run build:sim`
   runs it. Building the crate directly leaves a stale binary there, so parity compares your

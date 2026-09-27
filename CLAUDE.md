@@ -95,6 +95,10 @@ handing the build to another server to mount under a path.
 
 ## Deeper references
 
+**Work in progress and the next steps live in `docs/HANDOFF.md`.** Read it first when picking
+the project up; it is rewritten at each handoff rather than accumulated, so it is never stale
+history.
+
 Directory rules load themselves: `sim/CLAUDE.md` and `app/src/rendering/CLAUDE.md` are
 pulled in when you read a file there. Read these when the task touches them, not by default:
 

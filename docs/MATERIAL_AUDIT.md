@@ -134,10 +134,13 @@ bed, not eat the build — unbounded erosion already dissolved a basin from 169 
 once. `a_fed_stream_wears_a_trough_and_then_holds` pins it now, at both ends: a trough must
 appear, and it must then settle.
 
-**Why no gate caught it is worth more than the fix.** `interaction:audit` certifies
+**Why no gate caught it is worth more than the fix.** `interaction:audit` certified
 `stone.erodes` on a 30x26 board with a radius-3 stone blob — about 29 cells — so 19 eroded
-cells is most of the rock and scores a dramatic 19 cells at contrast 178. The rule was being
-certified on a pebble. That is not a bug in the audit: its floors ask *is this visible*,
+cells was most of the rock and scored a dramatic 19 cells at contrast 178. The rule was being
+certified on a pebble. (That scene has since moved to the real 220x140 board with a
+default-brush boulder: once water stopped vanishing, a spring in a 30x26 box drowned the rock
+in its own lake before it could wear, so the small board stopped being able to show erosion
+at all. See `docs/VISUAL_PIPELINE.md`, the water budget.) That is not a bug in the audit: its floors ask *is this visible*,
 which is a genuinely different question from *does it do what the clause says*. Only the
 second one was false, and nothing was asking it.
 

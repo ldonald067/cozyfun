@@ -4,10 +4,11 @@ This roadmap keeps the project focused: make the toy feel good, keep the codebas
 
 ## Status Snapshot
 
-Every phase through 19 is complete except Phase 8's remaining subjective listening pass.
-Phase 20 — replacing the move clobber's hidden water sink with a deliberate one — has its
-instruments (20A) and the water budget itself (20B) done; gases (20D) and the last of the
-clobber (20E) remain.
+Every phase through 19 is complete except Phase 8's remaining subjective listening pass, and
+the September design passes between 19 and 20 all shipped. Phase 20 — replacing the move
+clobber's hidden water sink with a deliberate one — has its instruments (20A) and the water
+budget itself (20B) done; gases (20D), the last of the clobber (20E), and triage of the checks
+20B moved are next. **Start at `docs/HANDOFF.md`.**
 
 The sandbox is a playable, deployed browser toy: React/Vite UI, Rust/WASM sim with a byte-identical JS fallback, 18 paintable materials plus the Eraser on the toolbar and 8 generated-only outcomes, six credited room backdrops with room-linked native ambience, optional YouTube Desk Radio, local save/share/postcard/clip export, a click-to-load embed poster, deterministic sim/parity/browser/visual/audio QA wired into local scripts and CI, and a deploy gate that proves which commit the running host is serving. It runs at `pixelfun.littlealbumclub.net` and is iframed into `littlealbumclub.net`. Details live in the phase sections below.
 
@@ -526,8 +527,10 @@ session runs four times more ticks than any absence can buy — so absence got i
 Status: complete.
 
 A roster-wide design review (interaction depth, visual identity, uniqueness, combos)
-produced 12 owner-approved items, shipped in five gated commits. Full specs, measurements,
-and gotchas live in `docs/PHASE_18_HANDOFF.md`.
+produced 12 owner-approved items, shipped in five gated commits. The full batch record — specs,
+measurements, fixture fallout — was `docs/PHASE_18_HANDOFF.md`, retired on 2026-09-27 once
+everything still live in it had moved into `CLAUDE.md` and `docs/`; `git show 7b6c76c:docs/PHASE_18_HANDOFF.md`
+recovers it.
 
 - Batch 1 (garden lineage) — `fbaafae`: revived the dead pollen loop; cosmic flowers breed
   cosmic pollen into cosmic seeds so moonlit gardens breed true.
@@ -612,9 +615,32 @@ branch was deleted on 2026-08-26 — its only unique content was a two-line chan
 problem it tried to fix is now Phase 20, where it turned out to be about water rather than
 reactions.
 
+## Between 19 and 20: September design passes
+
+Status: complete. Each pass was measured through the real renderer or engine, gated in
+`npm run renderer:probe`, `interaction:audit` or `slow-world:audit`, and closed with an
+adversarial review whose findings were fixed before moving on.
+
+- **Meteor reads as a cold rock in a warm halo** (`c470970`, review fixes `4b7b963`). It had
+  rendered a median 53 redmean from the fire its own impact makes. A hot leading face added
+  in the same pass regressed the meteor/spark pair to 29 and was removed; the gate now sweeps
+  position, variant, flight medium and mass geometry. See VISUAL_PIPELINE, Meteor.
+- **Soil beds horizontally** so it stops sharing wood's diagonal fabric (`6d23702`), with the
+  fabric gate moved to a 72x40 board once the 26x14 one proved to overstate it (`63c0c96`).
+- **Railway config as code** (`3e7ca01`): `railway.json` replaced by `.railway/railway.ts`,
+  which does NOT apply itself — `npm run config:drift` says whether it is live. See EMBEDDING.
+- **The rock cycle closes: sandstone** (`c75b426`, review fixes `2647d51`). A flooded sand bed
+  compacts into bedded stone while you are away; a stone lid is construction and protects the
+  sand under it; the colour gate scores touching cells, not field means. A rain-filled
+  sand basin turning to rock is geology, by the owner's decision (`dbbbe44`).
+- **Things sink** (`ffd5227`): grains settle through water and oil, which is what made a
+  poured lake bed — and so sandstone — reachable at all. A grain never deletes a liquid.
+- A debt pass after the first four (`3885005`) and a docs dedupe (`6cb94ce`).
+
 ## Phase 20: The Water Budget
 
-Status: in progress — 20A and 20B done (20B absorbed what the plan called 20C); 20D and 20E open.
+Status: in progress — 20A and 20B done (20B absorbed what the plan called 20C). Next: triage the
+checks 20B moved, then 20D and 20E. The working plan is `docs/HANDOFF.md`.
 
 **No rule in the sim decides how much water a scene holds.** The move clobber does: a mover
 may overwrite a cell another mover filled earlier the same tick, and when water flows into

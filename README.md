@@ -130,7 +130,7 @@ The app is static after build. There is no account system, database, cloud save,
 
 The Rust sim and the JavaScript fallback must stay byte-for-byte identical. `npm run test:parity` drives every scenario in `scripts/smoke-parity.mjs` through both engines and compares every cell each tick. Changing a rule in one engine and not the other is the single easiest way to break this project.
 
-`CLAUDE.md` is the operating guide for coding agents (and a fast orientation for people). Beyond it: `docs/ARCHITECTURE.md` for module boundaries, `docs/CODE_REVIEW.md` for the review checklist, `docs/HARNESS.md` for build/test/visual feedback loops, `docs/VISUAL_PIPELINE.md` for renderer and shape-language notes, `docs/AUDIO.md` for the sound foundation, `docs/MATERIAL_AUDIT.md` for the per-material interaction matrix, `docs/EMBEDDING.md` for deploying and embedding, `docs/PHASE_18_HANDOFF.md` for the living-world batch record, and `ASSET_CREDITS.md` for third-party room and audio sources.
+`CLAUDE.md` is the operating guide for coding agents (and a fast orientation for people). Beyond it: `docs/ARCHITECTURE.md` for module boundaries, `docs/CODE_REVIEW.md` for the review checklist, `docs/HARNESS.md` for build/test/visual feedback loops, `docs/VISUAL_PIPELINE.md` for renderer and shape-language notes, `docs/AUDIO.md` for the sound foundation, `docs/MATERIAL_AUDIT.md` for the per-material interaction matrix, `docs/EMBEDDING.md` for deploying and embedding, `docs/HANDOFF.md` for the work in progress and what to do next, and `ASSET_CREDITS.md` for third-party room and audio sources.
 
 ## Scene format
 
