@@ -110,17 +110,17 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
 
 - `npm run clobber:census`: what the move clobber deletes, and where. It plays every audit
   scene on the JS mirror with a counter on the mover and reports each overwrite by mover,
-  victim, and the victim's origin (moved in, or created by a reaction). About 36,000 of 4
-  million moves overwrite something; water deleting water that just flowed in is 75% of
-  them, and liquid-on-liquid 82%. It hooks the engine's private `move` and `react` by name,
+  victim, and the victim's origin (moved in, or created by a reaction). Before Phase 20B
+  about 36,000 of 4 million moves overwrote something, liquid-on-liquid 82% of them; after
+  it, 8,544 of 3.2 million, and liquid-on-liquid **zero**. It hooks the engine's private `move` and `react` by name,
   and fails loudly if either is renamed or if it counts no moves at all — a census that
   quietly counted nothing would report the problem solved.
 
 - `npm run water:budget`: how much water the game keeps, on the shipped wasm build — a
-  water spring on the real board, a pour into a basin, and sand poured into a pond. The
-  numbers when it was written: a spring holds ~280 cells (0.9% of the board), a pour keeps
-  600 of 716, a pond keeps 207 of 392 once sand sinks through it. Nothing in the sim sets
-  those; the clobber does. ROADMAP Phase 20 replaces it, judged against this.
+  water spring on the real board, a pour into a basin, and sand poured into a pond. Under
+  the old accidental sink (Phase 20A) a spring held ~280 cells (0.9%), a pour kept 600 of
+  716, and a pond kept 207 of 392 once sand sank through it. With mist (Phase 20B): a spring
+  settles at 7.2%, a pour keeps 604 of 721 (the same 84%), and the pond keeps 367 of 392.
 
 - `scripts/compile-app.mjs`: the one way a harness loads the app's TypeScript. Eight scripts
   carried identical copies of the compile; now each names its files and gets a loader back.
@@ -424,38 +424,43 @@ inside the catch-up — whose first 3,400 ticks run 250 to a frame, a quarter-se
 clock nobody can sample. If a check needs to watch something the wake produces, stage an
 absence that lands BEFORE it, not after.
 
-### The move clobber, and the one place it is closed
+### The move clobber, and what is left of it
 
 `try_move` counts a target as free if it was empty at the START of the tick, so a mover can
 overwrite a cell that something else filled earlier in the same tick — a cell a reaction
-created, or water that has just flowed there. The game's whole balance (moss spread, water
-emission, germination odds) was tuned in that world, so **it is load-bearing, and replacing
-it is a rebalancing project, not a bug fix.** ROADMAP Phase 20 is that project.
+created, or water that has just flowed there. The game's whole balance was tuned in that
+world, and replacing it is a rebalancing project rather than a bug fix: ROADMAP Phase 20.
 
-What it does, measured (`npm run clobber:census`, `npm run water:budget`):
+What it was doing (`npm run clobber:census`, `npm run water:budget`): it was the game's only
+water sink. 82% of all overwrites were a liquid deleting a liquid, and only MOVING water was
+ever deleted — so ponds kept their water, a pour lost 16%, and a fountain lost nearly all of
+it. Nothing drinks standing water (water on soil, sand, wall or stone keeps every cell for
+3,000 ticks), so the clobber was also the only thing bounding a wellspring. And it explains
+the old "closing it kills the garden" result: without it the surviving water greened fresh
+soil into moss, where seeds do not root.
 
-- **It is the game's hidden evaporation.** 82% of all overwrites are a liquid deleting a
-  liquid, and only MOVING water is ever deleted — so ponds keep their water, a pour loses
-  16%, and a fountain loses nearly everything.
-- **It is the only thing bounding a water wellspring.** Nothing in the game drinks standing
-  water (water on soil, sand, wall or stone keeps every cell for 3,000 ticks). A spring holds
-  about 280 cells with the clobber and floods 8,837, 29% of the board, without it.
-- **It is why closing it "killed the garden".** Closed outright, a day away still turns 43 of
-  45 cold char cells to soil — and the extra surviving water greens every one of them into
-  moss during the catch-up, where seeds do not root. The before/after table read that as
-  `ember -> soil` falling to zero. The levers are the water budget and moss greening, not
-  the char rule.
+**Where it stands after Phase 20B.** Two cases are closed, and each had to be:
 
-It is closed in exactly one place: **a grain never overwrites a liquid** (`try_fall`). That
-was not optional. Once grains could sink, every sinking grain pushed water up into the path
-of the next one, and sand poured into a pond deleted 213 of its 392 water cells.
+- **A grain never overwrites a liquid** (`try_fall`). Sinking pushes water up into the path of
+  the next grain, and the old rule deleted 213 of a 392-cell pond.
+- **A liquid never overwrites a liquid** (`try_move`), with **mist** as the deliberate sink in
+  its place: moving water throws low-energy steam at 1 in `MIST_ODDS`. Closing this without
+  mist floods the tray (a spring reaches 29% of the board); with it, pours keep the same
+  84%, ponds keep every drop, and a spring settles into a ~7% lake.
 
-The next step was tried and backed out. Stopping a liquid from overwriting a liquid conserves
-water perfectly — a pour keeps 708 of 708 instead of 600 of 716 — and with no sink to replace
-the clobber it moves the balance: the lidded-hearth parity scenario's steam fell from 60 to
-26, a fed stream wore 7 cells of rock where its test needs 12, and a day's garden grew into
-11 new columns instead of 18. Those are single-seed readings, taken before `audit:drift`
-existed; re-measure them before tuning against them.
+What remains open, from the census after 20B: smoke deleting smoke (3,190 — also working as
+extra fading), water overwriting steam a reaction just made (2,619), and **steam overwriting
+water that just flowed in (615)** — the last small leak of the old water sink, mostly where a
+spring's mist rises through its own stream. Those are 20D and 20E.
+
+**How the wetter world was retuned**, so the reasoning is not lost: every change was found by
+a gate, diagnosed to a cause, and measured on eight seeds with `audit:drift`. Fixtures sized
+for vanishing water were resized (a spring's lake scales with the board, so the erosion
+scenes moved to the real board and a 180-wide one). Four rules learned what "running water"
+means (soot rinse, char wash, condensation no longer scrubs soot, moss on walls needs
+moonwater). Three audit scenes that leaned on a puddle sitting still forever were re-staged to
+what a player does, and accepted only at 7-8 seeds of 8. And two parity scenarios now witness
+the rule they are named for instead of a proxy that had been measuring something else.
 
 ## Golden Principles
 

@@ -15,8 +15,9 @@
 //   2. Water poured into a basin: how much of what the brush laid down is still there.
 //   3. Sand poured into a pond: how much of the pond survives the sand sinking through it.
 //
-// It reports, and exits 0. ROADMAP Phase 20 is replacing the clobber with a deliberate
-// sink, and each step of that is judged against these numbers.
+// Since ROADMAP Phase 20B the sink is deliberate — moving water throws mist, and no liquid
+// deletes another — and the same three read: spring 7.2%, pour 84% kept, pond 94% kept.
+// It reports, and exits 0; each later step of Phase 20 is judged against these numbers.
 import { M, loadWasmEngine } from "./interaction-scenes.mjs";
 
 const engine = await loadWasmEngine();

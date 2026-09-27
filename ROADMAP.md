@@ -5,8 +5,9 @@ This roadmap keeps the project focused: make the toy feel good, keep the codebas
 ## Status Snapshot
 
 Every phase through 19 is complete except Phase 8's remaining subjective listening pass.
-Phase 20 — replacing the move clobber's hidden water sink with a deliberate one — is under
-way: its instruments (20A) are built and 20B is next.
+Phase 20 — replacing the move clobber's hidden water sink with a deliberate one — has its
+instruments (20A) and the water budget itself (20B) done; gases (20D) and the last of the
+clobber (20E) remain.
 
 The sandbox is a playable, deployed browser toy: React/Vite UI, Rust/WASM sim with a byte-identical JS fallback, 18 paintable materials plus the Eraser on the toolbar and 8 generated-only outcomes, six credited room backdrops with room-linked native ambience, optional YouTube Desk Radio, local save/share/postcard/clip export, a click-to-load embed poster, deterministic sim/parity/browser/visual/audio QA wired into local scripts and CI, and a deploy gate that proves which commit the running host is serving. It runs at `pixelfun.littlealbumclub.net` and is iframed into `littlealbumclub.net`. Details live in the phase sections below.
 
@@ -613,7 +614,7 @@ reactions.
 
 ## Phase 20: The Water Budget
 
-Status: in progress — 20A done, 20B next.
+Status: in progress — 20A and 20B done (20B absorbed what the plan called 20C); 20D and 20E open.
 
 **No rule in the sim decides how much water a scene holds.** The move clobber does: a mover
 may overwrite a cell another mover filled earlier the same tick, and when water flows into
@@ -638,18 +639,33 @@ and must not create problems later, so nothing opportunistic rides along with a 
   compiled the app's TypeScript share `scripts/compile-app.mjs`, and the audit's scenes are
   a shared module so all three tools measure the same scenes. Starting numbers: spring 0.9%
   of the board, pour 600 of 716 kept, pond 207 of 392 kept after sand sinks through it.
-- **20B — spray evaporates into mist.** Water falling through open air turns to visible mist
-  at 1-in-K odds; still water never evaporates, so ponds and lake beds keep their water.
-  Tune K so a spring holds 1-3% of the board. Judged by `water:budget` and `audit:drift`.
-- **20C — liquids stop deleting liquids.** With the sink carrying the budget, turn on
-  conservation and tune — in order — K, how fast wet soil greens into moss, and how fast
-  soil dries, until a day's garden grows into at least 12 new columns and nothing moves
-  outside its seed spread without an explanation. Known pressure points, single-seed and to
-  be re-measured: the lidded-hearth steam scenario, the fed-stream erosion test, the garden.
-- **20D — gases (optional).** Smoke and steam deleting each other (about 14% of overwrites)
-  also acts as extra fading. Conserving it means more smoke, compensated by faster fading.
-- **20E — the rest of the clobber**, if the census shows what remains is small; otherwise it
-  is documented as intended.
+- **20B — moving water throws mist, and liquids stop deleting liquids. Done.** Three
+  decisions from the owner shaped it: **lakes are a feature** (a spring settles into a real
+  pond, ~7% of the board, that stops growing), **puddles dry** (a puddle on open ground
+  evaporates in 15-30 s while a pond that fills its basin keeps every drop — one knob sets
+  both, and 1-in-450 keeps a pour at today's 84%), and the mist stays visible, which an
+  interaction-audit check now enforces.
+
+  Two plan assumptions were wrong, and measurement caught both. Mist could not ship before
+  conservation: on its own it is a second drain (a spring fell from 0.9% to 0.4%), so 20B
+  took what the plan had filed as 20C. And spray from the air alone does not bound a spring,
+  which pours through its own pool; "moving water throws mist" does, and it is also the
+  faithful replacement, because the clobber only ever deleted moving water.
+
+  The wetter world broke what leaned on vanishing water, and each break was taken to a cause
+  and retuned in its own commit on eight seeds: erosion fixtures resized to the board a
+  spring's lake needs; only moonwater-charged moss takes a wall (plain moss beside a pond was
+  eating walls — and had been eating the audit's own scaffolding all along); soot rinse and
+  char wash need running water, and condensation no longer scrubs soot; three audit scenes
+  and two parity scenarios re-staged or re-witnessed; the steam field note needs heat. Against
+  `main`, the multi-seed drift before those retunes read 25 checks better, 15 worse, 15 mixed.
+  Numbers now: spring 7.2%, pour 84% kept, pond after sand 94% (was 53%), liquid-on-liquid
+  overwrites 0 (was 29,424 across the audit scenes).
+- **20D — gases (optional).** Smoke deleting smoke (3,190 in the census after 20B) also acts
+  as extra fading. Conserving it means more smoke, compensated by faster fading.
+- **20E — the rest of the clobber.** After 20B: water overwriting reaction-made steam (2,619)
+  and steam overwriting water that just flowed in (615) — the last small leak of the old
+  water sink. Close them if the census says it is cheap, otherwise document them as intended.
 
 Each step is one commit, closed with the full gate, a live deploy check, and an adversarial
 review.

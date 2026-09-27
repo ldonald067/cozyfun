@@ -267,6 +267,18 @@ export const CHECKS = [
   { m: "Water", covers: "water.boils", role: "boils away to steam over sustained flame", w: 30, h: 26, seed: 9, ticks: 2000,
     paint: (p) => { p(15, 20, 3, M.Wall); p(15, 16, 3, M.Water); p(15, 21, 2, M.Lava); },
     outcome: (g, before) => g.appeared(M.Steam, before) },
+  { m: "Water", covers: "water.flows", role: "throws a faint mist where it moves", w: 40, h: 34, seed: 133, ticks: 600,
+    // The owner's call for ROADMAP Phase 20 was that the water sink be VISIBLE: moving water
+    // throws mist rather than silently vanishing. A pour into a walled basin with no heat
+    // anywhere, so every wisp counted is spray — and it has to clear the same floors as any
+    // other interaction, or "visible" is a claim nobody checked.
+    paint: (p) => { for (let y = 16; y <= 29; y++) { p(6, y, 1, M.Wall); p(33, y, 1, M.Wall); } },
+    act: (p, t) => { if (t < 90 && t % 3 === 0) p(20, 6, 4, M.Water); },
+    outcome: (g, before, memo) => {
+      memo.wisps ??= new Set();
+      for (const i of g.appeared(M.Steam, before)) memo.wisps.add(i);
+      return [...memo.wisps].filter((i) => g.kindOf(i) === M.Steam);
+    } },
   { m: "Water", covers: "water.rinses", role: "rinses soot from scorched stone", w: 30, h: 26, seed: 10, ticks: 2500,
     // Burn against the rock first, THEN wash it — the order a player uses. Soot comes from
     // smoke touching the stone, and a fire on top of the rock sends its smoke straight up and

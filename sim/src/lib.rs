@@ -3037,6 +3037,46 @@ mod tests {
         );
     }
 
+    /// The deliberate water sink (ROADMAP Phase 20): water throws mist only when it MOVES.
+    /// A pond that fills its basin has nowhere to go, so it keeps every cell forever; a lone
+    /// cell hopping about on open ground keeps moving, and turns to mist.
+    #[test]
+    fn moving_water_throws_mist_and_still_water_keeps_every_drop() {
+        // Still: a basin filled to the brim, sealed two walls thick so nothing can move.
+        let mut still = Universe::new(16, 16, 7);
+        for y in 3..=13 {
+            for x in 2..=13 {
+                set_cell(&mut still, x, y, Material::Wall);
+            }
+        }
+        for y in 5..=11 {
+            for x in 4..=11 {
+                set_cell(&mut still, x, y, Material::Water);
+            }
+        }
+        for _ in 0..3000 {
+            still.tick();
+        }
+        assert_eq!(count_kind(&still, Material::Water), 56, "a full, sealed pond keeps every drop");
+        assert_eq!(count_kind(&still, Material::Steam), 0, "and throws no mist");
+
+        // Moving: one cell on an open floor never settles, and sooner or later becomes mist.
+        let mut moving = Universe::new(16, 16, 7);
+        for x in 0..16 {
+            set_cell(&mut moving, x, 15, Material::Wall);
+        }
+        set_cell(&mut moving, 8, 14, Material::Water);
+        let mut misted = false;
+        for _ in 0..4000 {
+            moving.tick();
+            if count_kind(&moving, Material::Steam) > 0 {
+                misted = true;
+                break;
+            }
+        }
+        assert!(misted, "water that keeps moving should throw mist within 4,000 ticks at 1-in-{MIST_ODDS}");
+    }
+
     #[test]
     fn water_spreads_when_blocked() {
         let mut u = Universe::new(16, 16, 7);

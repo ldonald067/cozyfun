@@ -20,12 +20,15 @@ mirrored in `app/src/engine.ts` and behave byte-for-byte identically — see the
   one-cell floor lets them drain out diagonally. Seal a liquid fixture with walls two thick
   and a floor that runs under them — the `shaft` test helper does both.
 - **`try_move` can overwrite a cell another mover filled this tick**, because it counts a
-  target as free if it was empty in `old`. That clobber is load-bearing for the game's
-  balance and is left alone on purpose, with one exception: `try_fall` never overwrites a
-  liquid. Water flowing into water still loses cells (about 16% of a pour) — and that loss
-  is the ONLY thing bounding a water wellspring (280 cells with it, 8,837 without). Never
-  close it without the deliberate sink ROADMAP Phase 20 is building; the measurements are in
-  `docs/HARNESS.md`, and `npm run clobber:census` / `npm run water:budget` take them.
+  target as free if it was empty in `old`. That clobber is load-bearing and mostly left alone,
+  with two exceptions: a grain never overwrites a liquid (`try_fall`), and a liquid never
+  overwrites a liquid. The second only works because **moving water throws mist**
+  (`MIST_ODDS`) — that is the water sink now, and without it a spring floods the tray. What
+  is still open, and why, is in `docs/HARNESS.md`; ROADMAP Phase 20 tracks it.
+- **"Running water" has to be written as running water.** Erosion, the soot rinse and the char
+  wash all gate on `water_can_move` (water with an empty neighbour). Two of them used to take
+  any touching water while their comments said "running" — harmless while ponds leaked, and
+  a still pond scrubbing everything under it once they stopped. If a rule says flow, test flow.
 - **Order matters inside a tick.** `age_and_decay` runs, then `apply_reactions`, then the
   bottom-up pass, then the top-down pass. Rules read `old` and write `next`; reading `next`
   means you see whatever earlier cells in the same tick already did.

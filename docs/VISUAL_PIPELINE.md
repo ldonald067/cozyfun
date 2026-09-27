@@ -268,6 +268,28 @@ Current substrate rules:
   pushes water up into the path of the next grain, and the old move rule then deleted
   213 of a 392-cell pond. And **only soil at rest greens into moss**: soaked soil used to
   green on the way down and hang in the water as a floating clump.
+- **The water budget: moving water throws mist, still water keeps every drop.** Each time a
+  water or moonwater cell actually moves it turns to low-energy steam at 1 in `MIST_ODDS`
+  (450), and no liquid ever deletes another. Until ROADMAP Phase 20 nothing in the sim
+  decided how much water a scene held: the move clobber did, by letting flowing water
+  overwrite water that had flowed into the same cell a moment earlier. Mist is that sink
+  made deliberate and visible. The consequences, all measured and all chosen by the owner:
+  - **A settled pond keeps every cell** (392 of 392 for 12,000 ticks), because water with
+    nowhere to go never moves. A pour still loses 16% on the way in, as it always did.
+  - **A puddle on open ground dries** in 15-30 seconds, as a faint mist. Its cells never
+    settle — they hop sideways forever — so it evaporates, where a pond that fills its
+    basin does not. That same surface motion is what bounds a spring, so the two are one
+    knob: at 1-in-1000 puddles would last twice as long and a spring's lake reach ~11%.
+  - **Lakes are a feature.** A water spring settles at ~7% of the board (2,156 cells at
+    4,000 ticks), a real pond that stops growing. It used to hold ~260 cells, and only
+    because the clobber was quietly deleting its water.
+  - **The world is wetter, and five rules had to be told what "running water" means.**
+    Soot rinsing and the char wash both now need flowing water (erosion's flow test), so a
+    stone or a quenched hearth under a still pond keeps its look. Steam condensing on stone
+    wets it without scrubbing the soot. Only moonwater-charged moss takes a wall, because
+    plain moss beside a permanent pond was always strongly fed and ate every wall it
+    touched — wall to moss to fungus to soil. And the steam field note needs fire or lava on
+    the board, since mist would otherwise spend "fire and water argue" on a fireless pour.
 - Sand, wall, stone, and wood can hold short-lived dampness from water or moonwater.
 - Damp sand reads darker and moves more slowly, making it clump instead of behaving like dry loose grains.
 - Wet sand drains back to loose sand when its stored moisture is gone.
@@ -301,17 +323,15 @@ Current cosmic rules:
   measured at a permanent 3-4 cells of standing water. There is no output cap: one was
   tried and no scene could be built where it changed the outcome.
 
-  **What bounds a water spring is not what this section used to say.** It credited "every
-  substrate drinking standing water", and nothing in the game does: water resting on soil,
-  sand, wall or stone keeps every cell for 3,000 ticks, measured. The real bound is the move
-  clobber — flowing water deleting water that flowed into the same cell a moment earlier —
-  which holds a spring at about **280 cells, 1% of the 220x140 board**, steady from tick 1,000
-  to 16,000. Stop moving water deleting itself and the same spring floods **8,837 cells, 29%
-  of the board**. So a spring is bounded by accident, and closing the clobber without a
-  deliberate sink in its place would drown the tray; ROADMAP Phase 20 is that replacement,
-  and `npm run water:budget` is its measure.
+  **What bounds a water spring is mist, and it used to be an accident.** This section once
+  credited "every substrate drinking standing water", and nothing in the game does: water
+  resting on soil, sand, wall or stone keeps every cell for 3,000 ticks, measured. The real
+  bound was the move clobber — flowing water deleting water — which held a spring at about
+  260 cells. Since ROADMAP Phase 20 the bound is deliberate: the spring's pool surface keeps
+  shifting, moving water throws mist, and the lake settles at **~7% of the 220x140 board**
+  (2,156 cells at 4,000 ticks, 2,216 at 16,000). `npm run water:budget` measures it.
 
-  **A powder spring is bounded a third way**, since nothing deletes sand either. It ENTOMBS
+  **A powder spring is bounded another way**, since nothing deletes sand either. It ENTOMBS
   itself: the grain piles up until no empty cell lies within `WELLSPRING_REACH` of any face,
   and the pour halts. Measured on the shipped grid at the default brush, sand and rocket reach
   **23% of the terrarium in about a minute** and then never grow again; soil takes three
