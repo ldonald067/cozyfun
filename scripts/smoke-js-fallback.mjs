@@ -3,42 +3,14 @@ import { compileApp } from "./compile-app.mjs";
 const app = compileApp("js-fallback-cjs", ["engine.ts", "materials.ts"]);
 
 const { createFallbackEngine } = app.load("engine");
+const materials = app.load("materials");
 
-const MATERIAL = {
-  Empty: 0,
-  Wall: 1,
-  Sand: 2,
-  Water: 3,
-  Smoke: 4,
-  Soil: 5,
-  Fire: 6,
-  Wood: 7,
-  Lava: 8,
-  Stone: 9,
-  Moss: 10,
-  Seed: 11,
-  Fungus: 12,
-  Oil: 13,
-  Ice: 14,
-  Steam: 15,
-  Stardust: 16,
-  Meteor: 17,
-  Moonwater: 18,
-  Flower: 19,
-  Glass: 20,
-  Ember: 21,
-  Stem: 23,
-  Rocket: 24,
-  Wellspring: 25,
-  Spark: 26
-};
-
-const CELL_FLAG = {
-  Wet: 1 << 0,
-  Frozen: 1 << 3,
-  Scorched: 1 << 4,
-  Unknown: 1 << 12
-};
+// Ids and flag bits come from materials.ts, not a hand-typed copy. Both tables used to be
+// typed out here and the flag one had fallen behind (no Cosmic, Rooted or Bedded): a test
+// that set CELL_FLAG.Cosmic silently set nothing. `Unknown` is deliberately NOT a game bit —
+// it is what the load tests use to prove bits the game does not name are masked off.
+const { MATERIAL, CELL_FLAG: APP_FLAGS } = materials;
+const CELL_FLAG = { ...APP_FLAGS, Unknown: 1 << 12 };
 
 const CELL_STRIDE = 8;
 
@@ -363,15 +335,21 @@ withEngine(7, (engine) => {
   assert(kindAt(weak, 16, 8, 8) === MATERIAL.Wall, "wall should resist ordinary moss spread");
 });
 
-withEngine(7, (engine) => {
-  const cells = new Uint8Array(16 * 16 * CELL_STRIDE);
-  setCell(cells, 16, 7, 8, MATERIAL.Moss, { age: 12, energy: 170, flags: CELL_FLAG.Wet });
-  setCell(cells, 16, 8, 8, MATERIAL.Wall, { age: 12, energy: 90, flags: CELL_FLAG.Wet });
-  loadCells(engine, cells, "strong wall moss cells should load");
-  engine.tick();
-  const strong = engine.getCellBytes();
-  assert(kindAt(strong, 16, 8, 8) === MATERIAL.Moss, "fed moss should still cross a soaked wall");
-});
+// Only moonwater-charged moss takes a wall — see the wasm smoke and ROADMAP Phase 20.
+for (const [flags, crosses, label] of [
+  [CELL_FLAG.Wet, false, "strongly fed plain moss should not take a soaked wall"],
+  [CELL_FLAG.Wet | CELL_FLAG.Cosmic, true, "moonwater-charged moss should take a soaked wall"],
+]) {
+  withEngine(7, (engine) => {
+    const cells = new Uint8Array(16 * 16 * CELL_STRIDE);
+    setCell(cells, 16, 7, 8, MATERIAL.Moss, { age: 12, energy: 170, flags });
+    setCell(cells, 16, 8, 8, MATERIAL.Wall, { age: 12, energy: 90, flags: CELL_FLAG.Wet });
+    loadCells(engine, cells, "strong wall moss cells should load");
+    engine.tick();
+    const strong = engine.getCellBytes();
+    assert((kindAt(strong, 16, 8, 8) === MATERIAL.Moss) === crosses, label);
+  });
+}
 
 withEngine(13, (engine) => {
   const cells = new Uint8Array(16 * 16 * CELL_STRIDE);

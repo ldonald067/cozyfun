@@ -86,7 +86,10 @@ const NOTE_RULES: readonly NoteRule[] = [
     text: "the blooms are dusting the air" },
   { id: "spark.flies", kind: MATERIAL.Spark,
     text: "fire, briefly, learns to fly" },
-  { id: "steam.rises", kind: MATERIAL.Steam,
+  // Heat must be on the board: moving water throws a faint mist of its own (ROADMAP Phase
+  // 20), and without this the first mist off a pour or a spring would spend this once-ever
+  // note on a scene with no fire in it — telling the player something that did not happen.
+  { id: "steam.rises", kind: MATERIAL.Steam, requires: [MATERIAL.Fire, MATERIAL.Lava],
     text: "fire and water argue in whispers of steam" },
   { id: "smoke.rises", kind: MATERIAL.Smoke,
     text: "the wood breathes out its years" },

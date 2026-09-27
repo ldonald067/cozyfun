@@ -1,5 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { compileApp } from "./compile-app.mjs";
+
+const materials = compileApp("wasm-smoke-cjs", ["materials.ts"]).load("materials");
 
 const root = resolve(import.meta.dirname, "..");
 const wasmPath = resolve(root, "app/public/sim/cozy_sandbox_sim.wasm");
@@ -7,41 +10,12 @@ const bytes = await readFile(wasmPath);
 const { instance } = await WebAssembly.instantiate(bytes, {});
 const wasm = instance.exports;
 
-const MATERIAL = {
-  Empty: 0,
-  Wall: 1,
-  Sand: 2,
-  Water: 3,
-  Smoke: 4,
-  Soil: 5,
-  Fire: 6,
-  Wood: 7,
-  Lava: 8,
-  Stone: 9,
-  Moss: 10,
-  Seed: 11,
-  Fungus: 12,
-  Oil: 13,
-  Ice: 14,
-  Steam: 15,
-  Stardust: 16,
-  Meteor: 17,
-  Moonwater: 18,
-  Flower: 19,
-  Glass: 20,
-  Ember: 21,
-  Stem: 23,
-  Rocket: 24,
-  Wellspring: 25,
-  Spark: 26
-};
-
-const CELL_FLAG = {
-  Wet: 1 << 0,
-  Frozen: 1 << 3,
-  Scorched: 1 << 4,
-  Unknown: 1 << 12
-};
+// Ids and flag bits come from materials.ts, not a hand-typed copy. Both tables used to be
+// typed out here and the flag one had fallen behind (no Cosmic, Rooted or Bedded): a test
+// that set CELL_FLAG.Cosmic silently set nothing. `Unknown` is deliberately NOT a game bit —
+// it is what the load tests use to prove bits the game does not name are masked off.
+const { MATERIAL, CELL_FLAG: APP_FLAGS } = materials;
+const CELL_FLAG = { ...APP_FLAGS, Unknown: 1 << 12 };
 
 function readCells(universe) {
   const ptr = wasm.universe_cells_ptr(universe);
@@ -427,18 +401,25 @@ withUniverse(16, 16, 7, (universe) => {
   assert(kindAt(weak, 16, 8, 8) === MATERIAL.Wall, "wall should resist ordinary moss spread");
 });
 
-withUniverse(16, 16, 7, (universe) => {
-  const cells = new Uint8Array(16 * 16 * 8);
-  setCell(cells, 16, 7, 8, MATERIAL.Moss, { age: 12, energy: 170, flags: CELL_FLAG.Wet });
-  setCell(cells, 16, 8, 8, MATERIAL.Wall, { age: 12, energy: 90, flags: CELL_FLAG.Wet });
-  const ptr = wasm.alloc(cells.byteLength);
-  new Uint8Array(wasm.memory.buffer, ptr, cells.byteLength).set(cells);
-  assert(wasm.universe_load_cells(universe, ptr, cells.byteLength) === 1, "strong wall moss cells should load");
-  wasm.dealloc(ptr, cells.byteLength);
-  wasm.universe_tick(universe);
-  const strong = readCells(universe);
-  assert(kindAt(strong, 16, 8, 8) === MATERIAL.Moss, "fed moss should still cross a soaked wall");
-});
+// Only moonwater-charged moss takes a wall; strongly fed PLAIN moss is what a pond produces
+// every tick now that water is conserved, and it must leave the wall alone (ROADMAP Phase 20).
+for (const [flags, crosses, label] of [
+  [CELL_FLAG.Wet, false, "strongly fed plain moss should not take a soaked wall"],
+  [CELL_FLAG.Wet | CELL_FLAG.Cosmic, true, "moonwater-charged moss should take a soaked wall"],
+]) {
+  withUniverse(16, 16, 7, (universe) => {
+    const cells = new Uint8Array(16 * 16 * 8);
+    setCell(cells, 16, 7, 8, MATERIAL.Moss, { age: 12, energy: 170, flags });
+    setCell(cells, 16, 8, 8, MATERIAL.Wall, { age: 12, energy: 90, flags: CELL_FLAG.Wet });
+    const ptr = wasm.alloc(cells.byteLength);
+    new Uint8Array(wasm.memory.buffer, ptr, cells.byteLength).set(cells);
+    assert(wasm.universe_load_cells(universe, ptr, cells.byteLength) === 1, "strong wall moss cells should load");
+    wasm.dealloc(ptr, cells.byteLength);
+    wasm.universe_tick(universe);
+    const strong = readCells(universe);
+    assert((kindAt(strong, 16, 8, 8) === MATERIAL.Moss) === crosses, label);
+  });
+}
 
 withUniverse(16, 16, 13, (universe) => {
   const cells = new Uint8Array(16 * 16 * 8);
