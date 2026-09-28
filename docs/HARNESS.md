@@ -125,6 +125,24 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   the whole scene) that the eight-seed table did not list. `--only` keeps a 32-seed run to a
   couple of minutes.
 
+  **Every seed also gets the audit's own verdict**, from `auditVerdict` in
+  `interaction-scenes.mjs` — the one definition of "passes", which `interaction:audit` uses
+  too, so the two tools cannot disagree about it. A change in how many seeds would pass is
+  always listed as a move. `--per-seed` prints that verdict for every selected check on both
+  builds, naming each failing seed and the floor it missed:
+
+  ```sh
+  npm run audit:drift -- --per-seed --only water.boils,moss.dries
+  ```
+
+  That is the question re-staging a scene keeps asking — "does it pass on 7-8 seeds of 8?" —
+  and a spread comparison cannot answer it: a middle half can hold still while one seed drops
+  under a floor. Its first run found exactly that. `water.boils` passes on **6 of 8 seeds** on
+  `main` (8/8 before 20B, 7/8 after it, 6/8 from the 20E step that stops water deleting fresh
+  steam), because two seeds show their boiling steam for 10-11 ticks against a floor of 30. The
+  audit plays seed #0, which passes, so the gate never saw it. The same run confirms the
+  triage's reading of `ember.quenched`: before 20B it passed on only 3 seeds of 8.
+
   **When a moved metric survives, ask what its cells WERE before asking why they changed.**
   Five 20B "regressions" were the audit's own Wall floor: plain moss used to eat it, so
   checks counted wall cells, then soil falling through the breach. Classifying every

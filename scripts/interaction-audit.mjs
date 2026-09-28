@@ -18,7 +18,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
-  CHECKS, MIN_CELLS, MIN_CONTRAST, MIN_TICKS, colorForCell, loadWasmEngine, runCheck,
+  CHECKS, MIN_CELLS, MIN_CONTRAST, MIN_TICKS, auditVerdict, colorForCell, loadWasmEngine, runCheck,
 } from "./interaction-scenes.mjs";
 
 const root = resolve(import.meta.dirname, "..");
@@ -82,15 +82,16 @@ if (unknown.length || uncovered.length || misfiled.length) {
   process.exit(1);
 }
 
-const results = CHECKS.map((c) => ({ ...c, ...runCheck(c, { engine, colorForCell }) }));
-const vacuous = results.filter((r) => r.vacuous);
-const unreachable = results.filter((r) => !r.vacuous && (r.absent ? r.firstTick >= 0 : r.firstTick < 0));
-const seen = results.filter((r) => !r.vacuous && !r.absent && r.firstTick >= 0);
+// Classified by `auditVerdict`, which `audit:drift` shares, so "passes" means one thing.
 // Visibility is judged only on interactions that actually happened; an unreachable one has
 // a more basic problem, and an `absent` one is supposed to leave nothing behind.
-const invisible = seen.filter(
-  (r) => r.spreadCells < MIN_CELLS || r.visibleTicks < MIN_TICKS || r.contrast < MIN_CONTRAST,
-);
+const results = CHECKS.map((c) => {
+  const r = { ...c, ...runCheck(c, { engine, colorForCell }) };
+  return { ...r, verdict: auditVerdict(r).kind };
+});
+const vacuous = results.filter((r) => r.verdict === "vacuous");
+const unreachable = results.filter((r) => r.verdict === "unreachable");
+const invisible = results.filter((r) => r.verdict === "faint");
 
 const pad = (s, n) => String(s).padEnd(n);
 const lpad = (s, n) => String(s).padStart(n);
@@ -103,7 +104,7 @@ for (const r of results) {
     continue;
   }
   if (r.firstTick < 0) { console.log(`${pad(r.m, 11)} ${pad(r.role, 44)}    NEVER`); continue; }
-  const flag = r.spreadCells < MIN_CELLS || r.visibleTicks < MIN_TICKS || r.contrast < MIN_CONTRAST ? "  <- faint" : "";
+  const flag = r.verdict === "faint" ? "  <- faint" : "";
   console.log(
     `${pad(r.m, 11)} ${pad(r.role, 44)} ${lpad(r.firstTick, 6)} ${lpad(r.spreadCells, 6)} ${lpad(r.visibleTicks, 6)} ${lpad(r.contrast.toFixed(0), 9)}${flag}`,
   );

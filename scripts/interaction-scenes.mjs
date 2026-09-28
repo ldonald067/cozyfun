@@ -150,6 +150,26 @@ function medianContrast(colorForCell, now, before, indices) {
 }
 
 /**
+ * The audit's verdict on one run of one check — the ONE definition of "passes", shared by
+ * `interaction:audit` and `audit:drift` so the two can never disagree about it. `r` is a
+ * `runCheck` result spread over its check (so `ticks` and `absent` are present).
+ *
+ *   vacuous      the predicate was already true on the painted scene
+ *   unreachable  it never happened — or, for an `absent` check, it happened
+ *   faint        it happened but missed a visibility floor; `why` names each one missed
+ */
+export function auditVerdict(r) {
+  if (r.vacuous) return { kind: "vacuous", why: ["true before any tick"] };
+  if (r.absent) return r.firstTick < 0 ? { kind: "pass", why: [] } : { kind: "unreachable", why: [`leaked at tick ${r.firstTick}`] };
+  if (r.firstTick < 0) return { kind: "unreachable", why: [`never happened in ${r.ticks} ticks`] };
+  const why = [];
+  if (r.spreadCells < MIN_CELLS) why.push(`${r.spreadCells} cells < ${MIN_CELLS}`);
+  if (r.visibleTicks < MIN_TICKS) why.push(`shown ${r.visibleTicks} ticks < ${MIN_TICKS}`);
+  if (r.contrast < MIN_CONTRAST) why.push(`contrast ${Math.round(r.contrast)} < ${MIN_CONTRAST}`);
+  return why.length ? { kind: "faint", why } : { kind: "pass", why: [] };
+}
+
+/**
  * Play one check's scene on `engine` and measure its outcome through `colorForCell`.
  * Both are parameters so the same scenes can be run on the shipped build (the audit), on the
  * JS mirror with hooks attached (the clobber census), or on another checkout's build (the

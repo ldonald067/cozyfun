@@ -30,8 +30,11 @@ started, in no particular order:
   choice about vapour volume, not a tweak.
 - **Oil and lava still delete water (19 overwrites across the audit).** Left by decision; oil
   has no sink. Reopen only with a sink for oil.
-- **Consider a per-seed pass/fail mode for `audit:drift`.** Re-staging scenes in 20B needed
-  one a dozen times, and the triage needed `--seeds 32` to separate dice from effects.
+- **`water.boils` passes on only 6 of 8 seeds.** Found by `audit:drift --per-seed` on its first
+  run: two seeds show their boiling steam for 10-11 ticks against a floor of 30. It was 8/8
+  before 20B, 7/8 after it and 6/8 from the 20E step that stops water deleting fresh steam
+  (`122e4ad`) — the same step that took its contrast 115 -> 423 on every seed. The audit plays
+  seed #0, which passes. Below the 7-8-of-8 bar a re-staged scene is held to; not diagnosed.
 
 ## Decisions already made — do not relitigate
 
@@ -55,6 +58,8 @@ All by the owner, recorded in the user's memory and ROADMAP Phase 20:
 - **Branch until green.** A push to `main` deploys, and Railway waits for CI before it
   builds. Fast-forward `main` only once the full gate passes, then `npm run deploy:verify`
   against the host until it reports the new commit (about five minutes).
+- **Ask whether each seed PASSES, not only whether the spread moved:**
+  `npm run audit:drift -- --per-seed --only <ids>` prints the audit's own verdict per seed.
 - **Screen on eight seeds, confirm on 32.** The interaction audit is one seed per check and
   reads dice as effects. `npm run audit:drift -- --base <ref> [--only id,id]` compares the
   working tree with any commit — and at eight seeds it still misfires on wide distributions

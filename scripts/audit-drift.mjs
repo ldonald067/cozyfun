@@ -16,6 +16,14 @@
 //   npm run audit:drift                      working tree against HEAD
 //   npm run audit:drift -- --base origin/main
 //   npm run audit:drift -- --seeds 12 --only stone.erodes,wellspring.pours
+//   npm run audit:drift -- --per-seed --only moss.dries    does each seed PASS the audit?
+//
+// Every seed also gets the audit's own verdict (`auditVerdict`, shared with
+// interaction:audit), so a change in how many seeds would pass is always listed as a move.
+// `--per-seed` prints that verdict for every selected check on both builds, failing seeds by
+// name — the question re-staging a scene keeps asking ("does it pass on 7-8 seeds of 8?"),
+// which a spread comparison cannot answer: a middle half can hold still while one seed drops
+// under a floor.
 //
 // The base side is built from a worktree under .tmp/drift and its results are cached by
 // commit, seed count and the scene file's contents, so comparing twice against the same ref
@@ -26,7 +34,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { CHECKS, colorForCell, loadRenderer, loadWasmEngine, runCheck } from "./interaction-scenes.mjs";
+import { CHECKS, auditVerdict, colorForCell, loadRenderer, loadWasmEngine, runCheck } from "./interaction-scenes.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const arg = (name, fallback) => {
@@ -35,6 +43,7 @@ const arg = (name, fallback) => {
 };
 const baseRef = arg("base", "HEAD");
 const seeds = Number(arg("seeds", "8"));
+const perSeed = process.argv.includes("--per-seed");
 const only = arg("only", "").split(",").filter(Boolean);
 const checks = only.length ? CHECKS.filter((c) => only.includes(c.covers)) : CHECKS;
 const unknown = only.filter((id) => !CHECKS.some((c) => c.covers === id));
@@ -58,11 +67,17 @@ function measure(engine, renderer, label) {
     const runs = [];
     // k = 0 is the audit's own seed, so the audit's single reading is always in the sample.
     for (let k = 0; k < seeds; k++) runs.push(runCheck({ ...check, seed: check.seed + k * 1000 }, { engine, colorForCell: renderer }));
-    out[keyOf(check)] = runs.map((r) => ({
-      // An `absent` check succeeds by never firing, so "reached" means what the check means.
-      reached: r.absent ? r.firstTick < 0 : r.firstTick >= 0,
-      firstTick: r.firstTick, cells: r.spreadCells ?? 0, shown: r.visibleTicks ?? 0, contrast: Math.round(r.contrast ?? 0),
-    }));
+    out[keyOf(check)] = runs.map((r, k) => {
+      const verdict = auditVerdict({ ...check, ...r });
+      return {
+        seed: check.seed + k * 1000,
+        // An `absent` check succeeds by never firing, so "reached" means what the check means.
+        // A vacuous run is not reached: it measured the painted scene, not the interaction.
+        reached: !r.vacuous && (r.absent ? r.firstTick < 0 : r.firstTick >= 0),
+        firstTick: r.firstTick, cells: r.spreadCells ?? 0, shown: r.visibleTicks ?? 0, contrast: Math.round(r.contrast ?? 0),
+        verdict: verdict.kind, why: verdict.why,
+      };
+    });
   });
   if (process.stdout.isTTY) process.stdout.write("\r" + " ".repeat(60) + "\r");
   return out;
@@ -72,7 +87,7 @@ function measure(engine, renderer, label) {
 const baseSha = run("git", ["rev-parse", baseRef]);
 const scenesHash = createHash("sha1").update(readFileSync(resolve(root, "scripts/interaction-scenes.mjs"))).digest("hex").slice(0, 10);
 const driftDir = resolve(root, ".tmp/drift");
-const cacheFile = resolve(driftDir, `v2-${baseSha.slice(0, 12)}-${seeds}seeds-${scenesHash}${only.length ? "-" + only.join("+") : ""}.json`);
+const cacheFile = resolve(driftDir, `v3-${baseSha.slice(0, 12)}-${seeds}seeds-${scenesHash}${only.length ? "-" + only.join("+") : ""}.json`);
 mkdirSync(driftDir, { recursive: true });
 
 let base;
@@ -117,6 +132,8 @@ for (const check of checks) {
   const b = base[keyOf(check)], h = head[keyOf(check)];
   if (!b) { moved.push({ check, notes: ["no base measurement"] }); continue; }
   const notes = [];
+  const bPass = b.filter((r) => r.verdict === "pass").length, hPass = h.filter((r) => r.verdict === "pass").length;
+  if (bPass !== hPass) notes.push(`passes the audit on ${bPass}/${seeds} seeds -> ${hPass}/${seeds}`);
   const bReach = b.filter((r) => r.reached).length, hReach = h.filter((r) => r.reached).length;
   if (bReach !== hReach) notes.push(`reached on ${bReach}/${seeds} seeds -> ${hReach}/${seeds}`);
   const bOk = b.filter((r) => r.reached && !check.absent), hOk = h.filter((r) => r.reached && !check.absent);
@@ -127,6 +144,30 @@ for (const check of checks) {
     }
   }
   if (notes.length) moved.push({ check, notes });
+}
+
+if (perSeed) {
+  // Every selected check, moved or not: the point is the verdict on each seed.
+  const describe = (runs) => {
+    const pass = runs.filter((r) => r.verdict === "pass").length;
+    const failed = runs.map((r, k) => ({ ...r, k })).filter((r) => r.verdict !== "pass");
+    return `${String(pass).padStart(2)}/${seeds} pass` +
+      (failed.length ? "   fails: " + failed.map((r) => `#${r.k} (seed ${r.seed}) ${r.verdict}: ${r.why.join(", ")}`).join("; ") : "");
+  };
+  console.log(`\nAudit verdict per seed: working tree against ${baseRef} (${baseSha.slice(0, 7)}), ${checks.length} checks x ${seeds} seeds.`);
+  console.log(`The verdict is interaction:audit's own (auditVerdict); the audit itself plays seed #0.\n`);
+  let regressions = 0;
+  for (const check of checks) {
+    const b = base[keyOf(check)], h = head[keyOf(check)];
+    const bPass = b ? b.filter((r) => r.verdict === "pass").length : NaN;
+    const hPass = h.filter((r) => r.verdict === "pass").length;
+    if (hPass < bPass) regressions++;
+    console.log(`  ${check.covers.padEnd(22)} ${check.role}${hPass < bPass ? "   <- fewer seeds pass" : ""}`);
+    console.log(`      base  ${b ? describe(b) : "no base measurement"}`);
+    console.log(`      now   ${describe(h)}`);
+  }
+  console.log(`\n${regressions} of ${checks.length} checks pass on fewer seeds than the base.`);
+  process.exit(0);
 }
 
 console.log(`\nAudit drift: working tree against ${baseRef} (${baseSha.slice(0, 7)}), ${checks.length} checks x ${seeds} seeds.`);
