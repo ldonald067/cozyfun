@@ -34,13 +34,14 @@ const { createFallbackEngine } = app.load("engine");
 // certify a return path that production does not perform.
 const { aHeadIsOpen, catchUpRemaining, nextCatchUpChunk, openCrowns, planAbsence, wakeTerrarium } = app.load("slowWorld");
 const { colorForCell } = app.load("rendering/materialColor");
-const { CELL_FLAG } = app.load("materials");
+// Material ids, their names and the flags all come from the compiled materials.ts: hand-typed
+// copies here drifted silently the first time a material was added.
+const { MATERIAL: M, CELL_FLAG } = app.load("materials");
 
 const STRIDE = 8;
-const M = { Wall: 1, Sand: 2, Water: 3, Soil: 5, Fire: 6, Wood: 7, Stone: 9, Seed: 11, Glass: 20 };
-const KIND_NAME = ["empty", "wall", "sand", "water", "smoke", "soil", "fire", "wood", "lava",
-  "stone", "moss", "seed", "fungus", "oil", "ice", "steam", "stardust", "meteor", "moonwater",
-  "flower", "glass", "ember", "pollen", "stem", "rocket", "wellspring", "spark"];
+// Id -> lower-case name, for the "what changed" table.
+const KIND_NAME = [];
+for (const [name, id] of Object.entries(M)) KIND_NAME[id] = name.toLowerCase();
 
 // Long enough for a painted seed to grow, bloom, and spend itself, and for a lit log
 // to burn down to cold char — i.e. long enough to be a scene somebody played in.
@@ -222,7 +223,7 @@ function plantColumns(cells) {
   const columns = new Set();
   for (let i = 0; i < W * H; i++) {
     const kind = cells[i * STRIDE];
-    if (kind === KIND_NAME.indexOf("stem") || kind === KIND_NAME.indexOf("flower")) {
+    if (kind === M.Stem || kind === M.Flower) {
       columns.add(i % W);
     }
   }
@@ -270,7 +271,7 @@ if (!aHeadIsOpen(day.cells, W)) {
   const w = 8;
   const cells = new Uint8Array(w * 8 * STRIDE);
   for (let y = 2; y <= 4; y++) {
-    for (let x = 2; x <= 4; x++) cells[(y * w + x) * STRIDE] = KIND_NAME.indexOf("flower");
+    for (let x = 2; x <= 4; x++) cells[(y * w + x) * STRIDE] = M.Flower;
   }
   // The baseline is built with the same function production uses. Hand-picking the centre
   // cell was wrong and this check caught it: every cell of a 3x3 bloom has three flower

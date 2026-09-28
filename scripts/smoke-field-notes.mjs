@@ -10,6 +10,8 @@ import { compileApp } from "./compile-app.mjs";
 const root = resolve(import.meta.dirname, "..");
 const app = compileApp("field-notes-cjs", ["fieldNotes.ts", "materials.ts"]);
 const { FieldNoteJournal } = app.load("fieldNotes");
+// Material ids from the compiled source, never a hand-typed copy.
+const { MATERIAL: M } = app.load("materials");
 
 // localStorage does not exist in node; the journal already tolerates it throwing, but the
 // ledger has to stay empty or every note would read as already witnessed.
@@ -21,7 +23,6 @@ globalThis.localStorage = {
 const wasm = await WebAssembly.instantiate(
   await readFile(resolve(root, "app/public/sim/cozy_sandbox_sim.wasm")), {});
 const w = wasm.instance.exports;
-const M = { Wall: 1, Sand: 2, Water: 3, Ice: 14, Wellspring: 25 };
 const W = 60, H = 40;
 
 const uni = w.universe_new(W, H, 7);

@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { materialShowcaseScript } from "./material-showcase.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const sourcePath = path.join(root, "app", "src", "materials.ts");
@@ -92,10 +93,13 @@ function auditShowcaseCoverage(materialsSource, showcaseSource, materialIds, fai
     }
   }
 
-  // ...and the VALUE has to match, not just the name. The showcase runs inside the page as a
-  // template literal, so it cannot import CELL_FLAG and carries its own hand-typed copy. The
-  // check above only proves each flag is USED — a showcase that wrote Bedded: 64 would pass
-  // it, set a bit that means nothing, and review every sandstone exhibit as plain lava rock.
+  // ...and the VALUES have to match, not just the names. The showcase runs inside the page and
+  // cannot import, so it used to carry hand-typed copies of both tables; one that wrote
+  // Bedded: 64 passed the name checks above, set a bit that means nothing, and reviewed every
+  // sandstone exhibit as plain lava rock. The builder now writes the real tables into the
+  // script it generates, so this checks the GENERATED script — what the page actually runs —
+  // against this file's own parse of materials.ts, which is an independent path to the same
+  // values. A hand-typed map reintroduced with a wrong value still fails here.
   const bit = (expr) => {
     const shift = expr.match(/^\s*1\s*<<\s*(\d+)\s*$/);
     return shift ? 1 << Number(shift[1]) : Number(expr);
@@ -103,16 +107,30 @@ function auditShowcaseCoverage(materialsSource, showcaseSource, materialIds, fai
   const realFlags = flagBlock
     ? Object.fromEntries([...flagBlock[1].matchAll(/^\s+([A-Za-z]+):\s*([^,\n]+)/gm)].map((m) => [m[1], bit(m[2])]))
     : {};
-  const shownBlock = showcaseSource.match(/const flag = \{([^}]*)\}/);
-  if (!shownBlock) {
-    failures.push("the visual review board has no `const flag = { ... }` map to check against CELL_FLAG");
-  } else {
-    const shownFlags = Object.fromEntries([...shownBlock[1].matchAll(/([A-Za-z]+):\s*(\d+)/g)].map((m) => [m[1], Number(m[2])]));
-    for (const [name, value] of Object.entries(realFlags)) {
-      if (shownFlags[name] !== value) {
+  const materialBlock = materialsSource.match(/export const MATERIAL = \{([\s\S]*?)\} as const;/);
+  const realMaterials = materialBlock
+    ? Object.fromEntries([...materialBlock[1].matchAll(/^\s+([A-Za-z]+):\s+(\d+)/gm)].map((m) => [m[1], Number(m[2])]))
+    : {};
+  const generated = materialShowcaseScript();
+  for (const [table, real, source] of [["material", realMaterials, "MATERIAL"], ["flag", realFlags, "CELL_FLAG"]]) {
+    // The whole line, not up to the first `}`: a map built with a spread nests braces.
+    const shown = generated.match(new RegExp(`^\\s*const ${table} = (.*);\\s*$`, "m"));
+    if (!shown) {
+      failures.push(`the visual review board's generated script has no \`const ${table} = { ... }\` map to check against ${source}`);
+      continue;
+    }
+    let parsed;
+    try {
+      parsed = Function(`return (${shown[1]});`)();
+    } catch {
+      failures.push(`the visual review board's \`const ${table}\` map does not evaluate: ${shown[1].slice(0, 80)}`);
+      continue;
+    }
+    for (const name of new Set([...Object.keys(real), ...Object.keys(parsed)])) {
+      if (parsed[name] !== real[name]) {
         failures.push(
-          `the visual review board's flag.${name} is ${shownFlags[name] ?? "missing"} but CELL_FLAG.${name} is ${value}; ` +
-            `its exhibit would carry the wrong bit and be reviewed as something else`,
+          `the visual review board's ${table}.${name} is ${parsed[name] ?? "missing"} but ${source}.${name} is ${real[name] ?? "missing"}; ` +
+            `its exhibits would carry the wrong value and be reviewed as something else`,
         );
       }
     }

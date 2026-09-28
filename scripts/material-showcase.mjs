@@ -1,13 +1,29 @@
+import { compileApp } from "./compile-app.mjs";
+
 export const MATERIAL_SHOWCASE_QA_LABEL = "material-identity-showcase";
 export const MATERIAL_SHOWCASE_TITLE = "Material Identity Showcase";
 
+// The script below runs inside the page, where it cannot import anything. It used to carry
+// hand-typed copies of MATERIAL and CELL_FLAG for that reason, and a copy with a wrong value
+// sets a bit that means nothing — every exhibit carrying it is reviewed as something else.
+// The builder runs in Node, though, so it writes the real tables into the text it generates.
+let sourceTables;
+export function showcaseTables() {
+  if (!sourceTables) {
+    const { MATERIAL, CELL_FLAG } = compileApp("showcase-cjs", ["materials.ts"]).load("materials");
+    sourceTables = { MATERIAL, CELL_FLAG };
+  }
+  return sourceTables;
+}
+
 export function materialShowcaseScript() {
+  const { MATERIAL, CELL_FLAG } = showcaseTables();
   return `(() => {
     const width = 220;
     const height = 140;
     const stride = 8;
-    const material = { Wall: 1, Sand: 2, Water: 3, Smoke: 4, Soil: 5, Fire: 6, Wood: 7, Lava: 8, Stone: 9, Moss: 10, Seed: 11, Fungus: 12, Oil: 13, Ice: 14, Steam: 15, Stardust: 16, Meteor: 17, Moonwater: 18, Flower: 19, Glass: 20, Ember: 21, Pollen: 22, Stem: 23, Rocket: 24, Wellspring: 25, Spark: 26 };
-    const flag = { Wet: 1, Rooted: 2, Cosmic: 4, Frozen: 8, Scorched: 16, Bedded: 32 };
+    const material = ${JSON.stringify(MATERIAL)};
+    const flag = ${JSON.stringify(CELL_FLAG)};
     const cells = new Uint8Array(width * height * stride);
     const writeU16 = (offset, value) => {
       cells[offset] = value & 255;

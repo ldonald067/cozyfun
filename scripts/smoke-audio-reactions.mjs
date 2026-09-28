@@ -4,32 +4,8 @@ const app = compileApp("audio-reactions-cjs", ["audio/reactions.ts", "materials.
 
 const { detectReactionCues } = app.load("audio/reactions");
 
-const MATERIAL = {
-  Empty: 0,
-  Wall: 1,
-  Sand: 2,
-  Water: 3,
-  Fire: 6,
-  Wood: 7,
-  Stone: 9,
-  Moss: 10,
-  Seed: 11,
-  Oil: 13,
-  Ice: 14,
-  Steam: 15,
-  Stardust: 16,
-  Meteor: 17,
-  Moonwater: 18,
-  Flower: 19,
-  Glass: 20,
-  Ember: 21
-};
-
-const CELL_FLAG = {
-  Wet: 1 << 0,
-  Rooted: 1 << 1,
-  Cosmic: 1 << 2
-};
+// Material ids and flags from the compiled source, never a hand-typed copy.
+const { MATERIAL, CELL_FLAG } = app.load("materials");
 
 const CELL_STRIDE = 8;
 const WIDTH = 4;
