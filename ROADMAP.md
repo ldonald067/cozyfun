@@ -784,3 +784,12 @@ and must not create problems later, so nothing opportunistic rides along with a 
 
 Each step is one commit, closed with the full gate, a live deploy check, and an adversarial
 review.
+
+### After Phase 20: bubbles
+
+Status: done. `audit:drift --per-seed` found `water.boils` passing on 20 seeds of 32: steam made
+under water was deleted by the water sinking into it (`can_sink_through_gas`), so boiled steam
+mostly never surfaced. Gas hotter than mist now trades places with whatever sinks into it, and
+boiling steam surfaces on every seed (32/32). Mist is excluded because bubbling it flooded a
+spring from 7.2% of the board to 29.5%; with the exclusion the water budget is unchanged.
+`lava.scorches` falls 32 -> 29 of 32, explained in docs/HARNESS.md ("Bubbles").

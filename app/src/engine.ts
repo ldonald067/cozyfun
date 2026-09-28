@@ -1522,7 +1522,11 @@ class JsSandboxEngine implements SandboxEngine {
       next[target] === MATERIAL.Empty ||
       (canSinkThroughGas && (old[target] === MATERIAL.Smoke || old[target] === MATERIAL.Steam));
     if (!canMove) return false;
-    next.fill(0, idx, idx + CELL_STRIDE);
+    // Bubbles: sinking into gas hotter than mist that is still there trades places with it —
+    // see Universe::try_move for why mist is excluded.
+    const bubble = canSinkThroughGas && isGas(old[target]) && isGas(next[target]) && readU16(next, target + 4) > MIST_ENERGY;
+    if (bubble) next.copyWithin(idx, target, target + CELL_STRIDE);
+    else next.fill(0, idx, idx + CELL_STRIDE);
     next.set(movingCell, target);
     return true;
   }

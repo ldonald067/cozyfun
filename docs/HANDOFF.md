@@ -15,8 +15,13 @@ decision — including 19 oil and lava overwrites of water. ROADMAP Phase 20 has
 clobber, and what is left of it") lists the 787 overwrites that remain and why each class
 stays.
 
-Everything is green: 124 cargo tests, 31 parity scenarios, 125 interaction checks, the slow
+Everything is green: 126 cargo tests, 32 parity scenarios, 125 interaction checks, the slow
 world (a day away still grows the garden 18 new columns), and the full `npm run check`.
+
+**Since Phase 20: bubbles.** Steam made under water used to be deleted by the water sinking into
+it, so `water.boils` passed on only 20 seeds of 32. Gas hotter than mist now trades places with
+whatever sinks into it; mist does not, because bubbling it flooded a spring to 29.5% of the
+board. ROADMAP ("After Phase 20: bubbles") and docs/HARNESS.md ("Bubbles") have the numbers.
 
 **No next phase is planned.** What to build next is the owner's call. Open threads, none
 started, in no particular order:
@@ -30,11 +35,9 @@ started, in no particular order:
   choice about vapour volume, not a tweak.
 - **Oil and lava still delete water (19 overwrites across the audit).** Left by decision; oil
   has no sink. Reopen only with a sink for oil.
-- **`water.boils` passes on only 6 of 8 seeds.** Found by `audit:drift --per-seed` on its first
-  run: two seeds show their boiling steam for 10-11 ticks against a floor of 30. It was 8/8
-  before 20B, 7/8 after it and 6/8 from the 20E step that stops water deleting fresh steam
-  (`122e4ad`) — the same step that took its contrast 115 -> 423 on every seed. The audit plays
-  seed #0, which passes. Below the 7-8-of-8 bar a re-staged scene is held to; not diagnosed.
+- **The `water.boils` scene is a quench, not a boil.** The lava pokes through the top of its
+  Wall pan and touches the water directly. Bubbles made it pass on 32 seeds of 32, so it is not
+  urgent, but it does not stage what its clause describes ("over sustained flame").
 
 ## Decisions already made — do not relitigate
 
@@ -88,8 +91,10 @@ All by the owner, recorded in the user's memory and ROADMAP Phase 20:
   meeting the rule; seal a one-wide shaft two walls thick, and print the board.
 - **Liquids move before gases in a tick** (bottom-up pass, then top-down), so water can never
   land on steam that MOVED this tick — only on steam a reaction made.
-- **Water plus steam is not conserved even with every clobber closed**: water sinking through
-  a gas cell displaces it by design. Witness water on its own (lost == mist born this tick).
+- **Water plus steam is not conserved even with every clobber closed**: hot steam bubbles up
+  through water, but water sinking into MIST deletes it. Witness water on its own (lost == mist
+  born this tick), and where motes are present, bound it rather than asserting it exactly — a
+  mote can take mist thrown earlier the same tick.
 - **In Rust's `apply_reactions`, `x` inside a match arm is the material kind**, not a
   coordinate (`x if x == Material::Water as u8`). Take coordinates from `idx`.
 - **A sealed test fixture cannot tell "still" from "can't move"** — 20B's first "still water"

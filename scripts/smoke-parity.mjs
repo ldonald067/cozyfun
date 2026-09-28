@@ -124,6 +124,8 @@ function runScenario({ name, w, h, seed, ticks, cells, paint, observe, expect, s
 // The mist scenario's floor: 103 cell-ticks of mist with the rule, 0 with it switched off in
 // both engines, measured on its seed. The floor sits well between them.
 const MIST_FLOOR = 40;
+// The bubble scenario's shafts: [x, steam energy] — hot steam in three, mist in three.
+const BUBBLE_UNITS = [[4, 180], [12, 180], [20, 180], [28, MIST_ENERGY], [36, MIST_ENERGY], [44, MIST_ENERGY]];
 // The vent scenario's units, one per shaft; far enough apart that no two share a wall.
 const VENT_UNITS = [4, 12, 20, 28, 36, 44];
 const DROPPED = { sand: M.Sand, soil: M.Soil, stone: M.Stone, seed: M.Seed, rocket: M.Rocket, pollen: M.Pollen };
@@ -772,8 +774,10 @@ const scenarios = [
     // sink, so they move with try_move, and one landing on water that had just flowed into its
     // path used to overwrite it. A sealed Wall chamber with water and motes scattered high up,
     // all falling together. Nothing is hot, cold or soil, and stardust charging water into
-    // moonwater swaps one water-like cell for another, so water may only leave as mist born
-    // this tick (age 0, MIST_ENERGY).
+    // moonwater swaps one water-like cell for another, so water should leave only as mist born
+    // this tick (age 0, MIST_ENERGY) — a BOUND, not an identity: a mote may still land on mist
+    // thrown earlier the same tick (the open "pollen over steam" class) and erase the evidence.
+    // That costs 0-2 cells a run; removing the guard costs 96 here.
     name: "drifting pollen and stardust never delete water",
     w: 40, h: 40, seed: 4271, ticks: 300,
     paint(p) {
@@ -801,7 +805,41 @@ const scenarios = [
     },
     expect(seen) {
       if ((seen.moteOnWater ?? 0) < 50) return `motes rested on water for only ${seen.moteOnWater ?? 0} cell-ticks`;
-      if (seen.unexplainedLoss) return `${seen.unexplainedLoss} water cells vanished without throwing mist — a mote landed on them`;
+      if ((seen.unexplainedLoss ?? 0) > 5) return `${seen.unexplainedLoss} water cells vanished without throwing mist — a mote landed on them`;
+      return null;
+    },
+  },
+  {
+    // Steam bubbles up through water; mist does not. Six one-wide shafts walled two thick, each
+    // with gas that sat in its bottom cell all tick and water directly above: hot steam in the
+    // left three, mist in the right three. Straight down is the water's only move, so on tick 1
+    // the hot shafts must show water under steam — the gas bubbled up — and the mist shafts
+    // water with no gas left anywhere in the column. Mist is excluded on purpose: letting it
+    // bubble flooded a spring from 7.2% of the board to 29.5% (see Universe::try_move).
+    name: "hot steam bubbles up through water, and mist does not",
+    w: 48, h: 16, seed: 4281, ticks: 60,
+    cells(w, h) {
+      const bytes = new Uint8Array(w * h * STRIDE);
+      const put = (x, y, kind, energy = 0) => { const o = (y * w + x) * STRIDE; bytes[o] = kind; bytes[o + 4] = energy & 255; bytes[o + 5] = energy >> 8; };
+      for (const [cx, energy] of BUBBLE_UNITS) {
+        for (let y = 2; y <= 13; y++) for (const dx of [-2, -1, 1, 2]) put(cx + dx, y, M.Wall);
+        put(cx, 13, M.Wall);
+        put(cx, 12, M.Steam, energy);
+        put(cx, 11, M.Water);
+      }
+      return bytes;
+    },
+    paint() {},
+    observe(seen, cells, w, h, tick) {
+      if (tick !== 1) return;
+      const at = (x, y) => cells[(y * w + x) * STRIDE];
+      const gasIn = (cx) => { let n = 0; for (let y = 2; y <= 12; y++) if (at(cx, y) === M.Steam) n++; return n; };
+      seen.hotBubbled = BUBBLE_UNITS.filter(([cx, e]) => e > MIST_ENERGY && at(cx, 12) === M.Water && at(cx, 11) === M.Steam).length;
+      seen.mistGone = BUBBLE_UNITS.filter(([cx, e]) => e <= MIST_ENERGY && at(cx, 12) === M.Water && gasIn(cx) === 0).length;
+    },
+    expect(seen) {
+      if (seen.hotBubbled !== 3) return `only ${seen.hotBubbled ?? 0} of 3 hot-steam shafts bubbled the steam up past the water`;
+      if (seen.mistGone !== 3) return `only ${seen.mistGone ?? 0} of 3 mist shafts lost their mist to the water — mist is bubbling, which floods a spring`;
       return null;
     },
   },
@@ -834,14 +872,14 @@ const scenarios = [
       const at = (x, y) => cells[(y * w + x) * STRIDE];
       const hotSteam = (x, y) => at(x, y) === M.Steam && (cells[(y * w + x) * STRIDE + 4] | (cells[(y * w + x) * STRIDE + 5] << 8)) > MIST_ENERGY;
       if (tick === 1) seen.heldAboveFreshSteam = VENT_UNITS.filter((cx) => hotSteam(cx, 14) && at(cx, 13) === M.Water).length;
-      // Sank = the water left its shaft cell and the vented steam is gone from under it. The
-      // water may have thrown mist as it landed (MIST_ODDS), so what fills the vent cell now is
-      // water or fresh mist — on this seed one of the six does exactly that.
-      if (tick === 2) seen.sankThroughIt = VENT_UNITS.filter((cx) => at(cx, 13) !== M.Water && !hotSteam(cx, 14) && !hotSteam(cx, 13)).length;
+      // Sank = the water went down into the vent cell and the vented steam BUBBLED up into the
+      // shaft cell it left, rather than being deleted. The water may have thrown mist as it
+      // landed (MIST_ODDS), so the vent cell now holds water or fresh mist, never hot steam.
+      if (tick === 2) seen.sankThroughIt = VENT_UNITS.filter((cx) => hotSteam(cx, 13) && !hotSteam(cx, 14) && at(cx, 14) !== M.Empty).length;
     },
     expect(seen) {
       if (seen.heldAboveFreshSteam !== VENT_UNITS.length) return `only ${seen.heldAboveFreshSteam ?? 0} of ${VENT_UNITS.length} vents kept their fresh steam under the falling water`;
-      if (seen.sankThroughIt !== VENT_UNITS.length) return `only ${seen.sankThroughIt ?? 0} of ${VENT_UNITS.length} waters sank through the steam a tick later — a vent became a lid`;
+      if (seen.sankThroughIt !== VENT_UNITS.length) return `only ${seen.sankThroughIt ?? 0} of ${VENT_UNITS.length} waters sank through the steam a tick later with the steam bubbling up past them — a vent became a lid, or the steam was deleted`;
       return null;
     },
   },
@@ -850,8 +888,8 @@ const scenarios = [
     // Wall chamber while steam rises from the bottom, through each other. Liquids move before
     // gases, so steam meets water that has just flowed by rising into it, which used to delete
     // the water. Nothing here is hot or cold and Wall takes dew as a stain, so the only way
-    // water may leave is as mist born this tick (age 0, MIST_ENERGY). Steam is NOT conserved
-    // and is not meant to be: water sinking through a gas cell displaces it by design.
+    // water may leave is as mist born this tick (age 0, MIST_ENERGY). Steam is NOT conserved:
+    // hot steam bubbles up through water, but water sinking into MIST still deletes it.
     name: "rising steam never deletes falling water",
     w: 40, h: 34, seed: 4211, ticks: 140,
     paint(p) {

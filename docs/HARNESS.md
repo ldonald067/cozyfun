@@ -510,8 +510,9 @@ reason it stays out of water's: it has no sink.
 
 Its witness had to be narrower than it first looked, and the reason is worth keeping. Water
 plus steam is NOT conserved in a heat-free chamber, even with every clobber closed: water
-sinking through a gas cell displaces it outright (`can_sink_through_gas`), which deletes the
-steam by design. So the test and the parity scenario assert the water side only — each tick,
+sinking into mist (`can_sink_through_gas`) deletes it. That was written here as "by design" and
+nothing showed anyone had chosen it; the bubbles below replaced it for every gas hotter than
+mist. So the test and the parity scenario assert the water side only — each tick,
 water lost must equal the mist born that tick (age 0, `MIST_ENERGY`) — and also that steam and
 water actually met, so a scene where they never touch cannot pass.
 
@@ -563,6 +564,29 @@ close the water leaks the motes caused, document the rest as intended.
   sand 2, lava over smoke 1). Too rare to name a rule for.
 
 Phase 20 is closed. `npm run clobber:census` is the instrument if any of these is reopened.
+
+**Bubbles — gas hotter than mist trades places with whatever sinks into it** (after Phase 20).
+This is not a clobber class: the gas sat in the cell all tick, and `can_sink_through_gas`
+simply overwrote it. `audit:drift --per-seed` found what that cost on its first run —
+`water.boils` passed on **20 seeds of 32**, because steam made at the bottom of a pool was eaten
+by the water sinking into it, about seven cells in ten, and on a third of seeds none ever
+surfaced. The clause promises the water "bubbles"; it could not.
+
+**Mist is excluded, and that is the measured half of the design.** Bubbling every gas flooded a
+water spring from 7.2% of the board to 29.5% — the no-sink flood 20B measured — because mist is
+thrown inside a moving pool, and pockets of it left less water moving, so less mist was thrown.
+Hot-only bubbles leave the water budget identical to the last digit (7.2%, 82%, 94%) and the
+census at 789. On 32 seeds: `water.boils` 20 -> 32 passing, `ice.condenses` 26 -> 32,
+`steam.frosts` 26 -> 28, `fire.softens` 32 -> 31 and `lava.scorches` 32 -> 29. That last one is
+explained, not noise: steam that survives beside the check's stone mound condenses back into
+water (11-38 cells against 6-8 on the seeds that lost it) and the running-water rinse clears the
+scorch sooner. It is the dew cycle working, and it stays above the 7-of-8 bar.
+
+`hot_steam_bubbles_up_through_water_but_mist_does_not` and a parity scenario pin both halves;
+each fails by name with the swap removed, and with mist let back in. Adversarial review found the one
+case where a displaced gas moves twice in a tick — dry sand falling two cells through two
+stacked steam cells — and it is accepted and pinned rather than prevented: preventing it means
+deleting the gas. `dry_sand_falling_through_two_steam_cells_keeps_both` asserts both survive.
 
 **The phase's adversarial review found five real problems** after every gate was green, and
 each is fixed with a test that fails on its sabotage: the oil flood above; two heat checks

@@ -29,6 +29,10 @@ mirrored in `app/src/engine.ts` and behave byte-for-byte identically — see the
   (`MIST_ODDS`) — that is the water sink now, and without it a spring floods the tray.
   **Never conserve a liquid that has no sink**: oil was in that guard at first and an oil
   spring flooded a third of the board. What is still open is in `docs/HARNESS.md`.
+- **Hot gas bubbles; mist does not.** A mover sinking into gas that sat there all tick trades
+  places with it when the gas is hotter than `MIST_ENERGY`, so steam rises out of a pool
+  instead of being eaten. Letting mist bubble too flooded a spring to 29.5% of the board:
+  keep anything that changes the mist's fate behind a `water:budget` run.
 - **"Running water" has to be written as running water.** The soot rinse and the char wash
   gate on `liquid_can_flow` — somewhere the water could actually move. They used to take any
   touching water while their comments said "running", and their first fix reused erosion's
