@@ -2301,6 +2301,13 @@ impl Universe {
         if is_water_like(moving_cell.kind) && is_gas(target_next.kind) && target_old.is_empty() {
             return false;
         }
+        // Nor does a mote delete water (ROADMAP Phase 20E). Pollen and stardust are kept out of
+        // `try_fall` so they float on a pond rather than sinking, which left them the old move:
+        // one landing on water that had just flowed into its path overwrote it. Oil and lava
+        // over water are not included — the owner closed these two leaks and no others.
+        if is_mote(moving_cell.kind) && is_water_like(target_next.kind) {
+            return false;
+        }
         let can_move = target_old.is_empty()
             || target_next.is_empty()
             || (can_sink_through_gas
@@ -2460,6 +2467,12 @@ fn is_wellspring_source(kind: u8) -> bool {
 
 fn is_water_like(kind: u8) -> bool {
     kind == Material::Water as u8 || kind == Material::Moonwater as u8
+}
+
+/// Pollen and stardust: light enough to float on a pond, so they move with `try_move`
+/// rather than sinking through liquid with `try_fall`.
+fn is_mote(kind: u8) -> bool {
+    kind == Material::Pollen as u8 || kind == Material::Stardust as u8
 }
 
 fn is_gas(kind: u8) -> bool {
@@ -3205,6 +3218,49 @@ mod tests {
         // through, as before — so a vent is never a lid.
         u.tick();
         assert_eq!(kind_at(&u, 8, 10), Material::Water as u8, "a tick later the water should sink through the steam");
+    }
+
+    #[test]
+    fn drifting_motes_never_delete_water() {
+        // Pollen and stardust drifting down through a pour, in a sealed Wall chamber. They
+        // float rather than sink, so they move with try_move, and one landing on water that had
+        // just flowed into its path used to delete it. Nothing here is hot, cold or soil, and
+        // stardust charging water into moonwater swaps one water-like cell for another, so the
+        // ONLY way water may leave is as mist born this tick.
+        let mut u = Universe::new(32, 32, 5);
+        for y in 1..=30 {
+            for x in 1..=30 {
+                if y == 1 || y == 30 || x == 1 || x == 30 {
+                    set_cell(&mut u, x, y, Material::Wall);
+                }
+            }
+        }
+        let water_like = |u: &Universe| count_kind(u, Material::Water) + count_kind(u, Material::Moonwater);
+        let fresh_mist = |u: &Universe| {
+            u.cells
+                .iter()
+                .filter(|c| c.kind == Material::Steam as u8 && c.age == 0 && c.energy == MIST_ENERGY)
+                .count()
+        };
+        let mut met = 0;
+        for tick in 1..=400u32 {
+            if tick < 300 && tick % 4 == 0 {
+                u.paint(8 + (tick * 7 % 16) as i32, 4, 1, Material::Water as u8, 100);
+            }
+            if tick < 300 && tick % 3 == 0 {
+                let mote = if tick % 2 == 0 { Material::Pollen } else { Material::Stardust };
+                u.paint(6 + (tick * 5 % 20) as i32, 3, 1, mote as u8, 100);
+            }
+            let before = water_like(&u);
+            u.tick();
+            let after = water_like(&u);
+            assert_eq!(before - after, fresh_mist(&u), "water lost at tick {tick} beyond the mist it threw: a mote landed on it");
+            // A mote resting directly on water: the two met.
+            met += (0..u.cells.len() - 32)
+                .filter(|&i| is_mote(u.cells[i].kind) && is_water_like(u.cells[i + 32].kind))
+                .count();
+        }
+        assert!(met > 20, "the motes met the water only {met} times, so this proves nothing");
     }
 
     #[test]

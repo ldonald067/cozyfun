@@ -6,9 +6,11 @@ This roadmap keeps the project focused: make the toy feel good, keep the codebas
 
 Every phase through 19 is complete except Phase 8's remaining subjective listening pass, and
 the September design passes between 19 and 20 all shipped. Phase 20 — replacing the move
-clobber's hidden water sink with a deliberate one — has its instruments (20A), the water
-budget itself (20B), the triage of what 20B moved, and gas conservation (20D) done; the last
-of the clobber (20E) is next. **Start at `docs/HANDOFF.md`.**
+clobber's hidden water sink with a deliberate one — is done: moving water throws a visible
+mist, and water no longer deletes water or freshly vented gas, gas no longer deletes gas or
+water, and pollen and stardust no longer delete water. The 787 overwrites that remain are
+listed class by class, with the reason each stays, in docs/HARNESS.md. No Phase 21 is planned yet.
+**Start at `docs/HANDOFF.md`.**
 
 The sandbox is a playable, deployed browser toy: React/Vite UI, Rust/WASM sim with a byte-identical JS fallback, 18 paintable materials plus the Eraser on the toolbar and 8 generated-only outcomes, six credited room backdrops with room-linked native ambience, optional YouTube Desk Radio, local save/share/postcard/clip export, a click-to-load embed poster, deterministic sim/parity/browser/visual/audio QA wired into local scripts and CI, and a deploy gate that proves which commit the running host is serving. It runs at `pixelfun.littlealbumclub.net` and is iframed into `littlealbumclub.net`. Details live in the phase sections below.
 
@@ -639,8 +641,8 @@ adversarial review whose findings were fixed before moving on.
 
 ## Phase 20: The Water Budget
 
-Status: in progress — 20A, 20B, the triage of what 20B moved, and 20D are done (20B absorbed what the
-plan called 20C), and 20D. Next: 20E. The working plan is `docs/HANDOFF.md`.
+Status: done — 20A, 20B, the triage of what 20B moved, 20D and 20E (20B absorbed what the
+plan called 20C). What the clobber still does is listed, class by class, in docs/HARNESS.md. The working plan is `docs/HANDOFF.md`.
 
 **No rule in the sim decides how much water a scene holds.** The move clobber does: a mover
 may overwrite a cell another mover filled earlier the same tick, and when water flows into
@@ -764,7 +766,21 @@ and must not create problems later, so nothing opportunistic rides along with a 
     lava there is less steam (peak 144 -> 71), because falling water waits a tick above a fresh
     vent and fewer cells boil away; rendered, the two pours are nearly indistinguishable. The
     water budget is unchanged.
-  - Next: decide the classes still open (all under ~200, none between water and gas).
+  - **A mote never deletes water. Done.** Pollen and stardust float instead of sinking, so a
+    mote landing on water that had just flowed into its path overwrote it: 109 pollen over
+    water, 86 stardust over moonwater. Both are 0; the water budget is identical and at 32
+    seeds only gains move. The census closes at 787 overwrites of 3.6 million moves. The
+    slow-world headline moved and is worth reading correctly: every absence now changes more
+    cells (an hour 83 -> 127, a day 150 -> 175), but the garden did not — a day still opens 47
+    flower and 14 stem cells, turns 40 char to moss and grows 18 new columns. The extra is
+    WATER sitting somewhere else (empty -> water 29 -> 41), since pollen no longer deletes it;
+    "cells changed" counts water that moved as change. The hour is not itemised by the audit,
+    so its +44 is attributed by analogy, not measured.
+  - **Everything else is documented as intended**, by the owner's decision, in
+    docs/HARNESS.md ("The move clobber, and what is left of it"): a material over itself
+    (the grain-over-grain guard was rejected earlier as a cheap fix), water winning over a mote
+    or grain, firework debris, and 19 oil/lava-over-water overwrites left because oil has no
+    sink.
 
 Each step is one commit, closed with the full gate, a live deploy check, and an adversarial
 review.

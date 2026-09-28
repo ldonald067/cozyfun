@@ -772,6 +772,44 @@ const scenarios = [
     },
   },
   {
+    // A mote never deletes water (ROADMAP Phase 20E). Pollen and stardust float rather than
+    // sink, so they move with try_move, and one landing on water that had just flowed into its
+    // path used to overwrite it. A sealed Wall chamber with water and motes scattered high up,
+    // all falling together. Nothing is hot, cold or soil, and stardust charging water into
+    // moonwater swaps one water-like cell for another, so water may only leave as mist born
+    // this tick (age 0, MIST_ENERGY).
+    name: "drifting pollen and stardust never delete water",
+    w: 40, h: 40, seed: 4271, ticks: 300,
+    paint(p) {
+      for (let x = 1; x <= 38; x++) { p(x, 1, 1, M.Wall); p(x, 38, 1, M.Wall); }
+      for (let y = 1; y <= 38; y++) { p(1, y, 1, M.Wall); p(38, y, 1, M.Wall); }
+      for (let y = 5; y <= 20; y += 3) for (let x = 6; x <= 33; x += 4) p(x + (y % 2), y, 1, M.Water);
+      for (let y = 4; y <= 22; y += 3) for (let x = 5; x <= 34; x += 3) p(x + (y % 3), y, 1, (x + y) % 2 ? M.Pollen : M.Stardust);
+    },
+    observe(seen, cells, w, h) {
+      let waterLike = 0, fresh = 0, met = 0;
+      for (let i = 0; i < w * h; i++) {
+        const o = i * STRIDE, kind = cells[o];
+        if (kind === M.Water || kind === M.Moonwater) waterLike++;
+        else if (kind === M.Steam && (cells[o + 2] | (cells[o + 3] << 8)) === 0 && (cells[o + 4] | (cells[o + 5] << 8)) === MIST_ENERGY) fresh++;
+        if ((kind === M.Pollen || kind === M.Stardust) && i + w < w * h) {
+          const below = cells[(i + w) * STRIDE];
+          if (below === M.Water || below === M.Moonwater) met++;
+        }
+      }
+      if (seen.waterLike !== undefined && seen.waterLike - waterLike !== fresh) {
+        seen.unexplainedLoss = (seen.unexplainedLoss ?? 0) + (seen.waterLike - waterLike - fresh);
+      }
+      seen.waterLike = waterLike;
+      seen.moteOnWater = (seen.moteOnWater ?? 0) + met;
+    },
+    expect(seen) {
+      if ((seen.moteOnWater ?? 0) < 50) return `motes rested on water for only ${seen.moteOnWater ?? 0} cell-ticks`;
+      if (seen.unexplainedLoss) return `${seen.unexplainedLoss} water cells vanished without throwing mist — a mote landed on them`;
+      return null;
+    },
+  },
+  {
     // Water never deletes a gas that ARRIVED this tick (ROADMAP Phase 20E). Six copies of one
     // unit: lava beside a wet log, a one-wide shaft walled two thick above the log, and water in
     // it one cell above the empty vent cell. On tick 1 the lava vents steam into that cell in the

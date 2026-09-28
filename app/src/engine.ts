@@ -1515,6 +1515,8 @@ class JsSandboxEngine implements SandboxEngine {
     if (isGas(movingCell[0]) && waterLike(next[target])) return false;
     // And water never deletes a gas that arrived this tick — see Universe::try_move.
     if (waterLike(movingCell[0]) && isGas(next[target]) && old[target] === MATERIAL.Empty) return false;
+    // Nor does a mote delete water — see Universe::try_move.
+    if (isMote(movingCell[0]) && waterLike(next[target])) return false;
     const canMove =
       old[target] === MATERIAL.Empty ||
       next[target] === MATERIAL.Empty ||
@@ -1763,6 +1765,11 @@ function wellspringSource(kind: number) {
 
 function waterLike(kind: number) {
   return kind === MATERIAL.Water || kind === MATERIAL.Moonwater;
+}
+
+// Mirrors is_mote: pollen and stardust, which float on a pond instead of sinking.
+function isMote(kind: number) {
+  return kind === MATERIAL.Pollen || kind === MATERIAL.Stardust;
 }
 
 function isGas(kind: number) {

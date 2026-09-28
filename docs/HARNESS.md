@@ -514,7 +514,37 @@ the end). Rendered at play zoom the two pours are nearly indistinguishable, sinc
 is a one-cell-wide thread either way and most of the difference is steam already high above
 the pool. The water budget is unchanged (spring 7.2%, pour 82%, pond 94%).
 
-What remains after 20E is under ~200 per class and none of it involves water and gas.
+**A mote never overwrites water** (20E, the last step). Pollen and stardust float rather
+than sink, so they move with `try_move`, and one landing on water that had just flowed into
+its path deleted it — 109 pollen over water and 86 stardust over moonwater. Both are 0 now; the
+water budget is identical to the last digit, and at 32 seeds only gains move (stardust charges
+38 -> 42 cells of moonwater, a spark hissing over a pond makes 288 -> 435 cells of steam).
+
+**What is left, and why it stays — Phase 20's closing list.** 787 overwrites of 3.6 million
+moves, one seed per audit scene. Every class below was decided by the owner on 2026-09-27:
+close the water leaks the motes caused, document the rest as intended.
+
+- **A material over itself — 602** (pollen 198, stardust 198, lava 55, soil 55, sand 29,
+  oil 26, spark 19, rocket 11, meteor 10, seed 1). Grain-over-grain was proposed earlier in
+  Phase 20 and rejected as a cheap fix: it would have been a guard with no problem behind it.
+  None of it touches water.
+- **Water winning — 94** (moonwater over stardust 41, water over pollen 17, over oil 15, over
+  sand 10, over soil 4, over lava 1, moonwater over oil 5, over soil 1). Nothing here loses
+  water; a pour landing on a drifting mote or a grain is the water's to win.
+- **Firework debris — 58** (smoke over spark 32, rocket over spark 7, rocket over smoke 5,
+  rocket over stardust 3, steam over spark 3, spark over smoke 2, and six single cells —
+  meteor or spark over fire, smoke over a seed, spark or smoke over stardust, spark over a
+  rocket grain). Sparks age out within 60 ticks and smoke within 180; the stardust a burst
+  throws does not age out, so those few cells are a burst thinning its own glitter.
+- **The last water deletions — 19** (oil over water 17, oil over moonwater 1, lava over water 1).
+  Left by decision: the owner closed the two mote leaks and no others, and oil is the one
+  liquid with no sink of its own, the reason it stays out of every water guard. At 17
+  overwrites across every audit scene it is not a budget.
+- **Steam and pollen, singly — 9** (steam over stone 5, pollen over steam 2, steam over oil 1,
+  steam over stardust 1), and **made by a reaction — 5** (stardust over smoke 2, sand over
+  sand 2, lava over smoke 1). Too rare to name a rule for.
+
+Phase 20 is closed. `npm run clobber:census` is the instrument if any of these is reopened.
 
 **The phase's adversarial review found five real problems** after every gate was green, and
 each is fixed with a test that fails on its sabotage: the oil flood above; two heat checks
