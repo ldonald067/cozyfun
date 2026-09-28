@@ -30,9 +30,11 @@ started, in no particular order:
   choice about vapour volume, not a tweak.
 - **Oil and lava still delete water (19 overwrites across the audit).** Left by decision; oil
   has no sink. Reopen only with a sink for oil.
-- **`scripts/smoke-parity.mjs` hand-types its `M` material table.** `CELL_FLAG` is read from
-  `materials.ts` there, the ids are not — the kind of mirror the Traps section below warns
-  about.
+- **Three scripts still hand-type material ids**: `slow-world-audit.mjs`,
+  `smoke-field-notes.mjs` (both can read `MATERIAL` through `compileApp`, as
+  `smoke-parity.mjs` now does), and `material-showcase.mjs`, which runs inside the page as a
+  template literal and cannot import — it needs a check, like the one `material:audit` already
+  makes for its flag map, rather than an import.
 - **Consider a per-seed pass/fail mode for `audit:drift`.** Re-staging scenes in 20B needed
   one a dozen times, and the triage needed `--seeds 32` to separate dice from effects.
 
@@ -92,7 +94,7 @@ All by the owner, recorded in the user's memory and ROADMAP Phase 20:
   coordinate (`x if x == Material::Water as u8`). Take coordinates from `idx`.
 - **A sealed test fixture cannot tell "still" from "can't move"** — 20B's first "still water"
   tests put a lid on the pond and so missed that open air above counted as flow.
-- **Hand-typed copies of `MATERIAL` / `CELL_FLAG` rot.** Read them from `materials.ts`; the
-  audit and smoke scripts do, and the parity script still has one table to go.
+- **Hand-typed copies of `MATERIAL` / `CELL_FLAG` rot.** Read them from `materials.ts`, as the
+  parity script and the interaction audit do; three scripts still carry copies (listed above).
 - **Field notes fire once ever.** A note triggered by the wrong cause is spent for good; give
   it a `requires` rather than trusting the kind alone.

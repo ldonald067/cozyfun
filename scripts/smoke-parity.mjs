@@ -22,20 +22,16 @@ const root = resolve(import.meta.dirname, "..");
 // The TS engine as CommonJS, through the one compile every harness shares.
 const app = compileApp("parity-cjs", ["engine.ts", "materials.ts"]);
 const { createFallbackEngine } = app.load("engine");
-// Flags come from the compiled source rather than a hand-typed copy: a mirrored constant
-// with nothing checking it is a promise, and this file already owns one of those in `M`.
-const { CELL_FLAG } = app.load("materials");
+// Material ids and flags come from the compiled source rather than hand-typed copies: a
+// mirrored constant with nothing checking it is a promise, and this file used to keep one for
+// every material id.
+const { MATERIAL: M, CELL_FLAG } = app.load("materials");
 
 const wasmBytes = await readFile(resolve(root, "app/public/sim/cozy_sandbox_sim.wasm"));
 const { instance } = await WebAssembly.instantiate(wasmBytes, {});
 const wasm = instance.exports;
 
 const STRIDE = 8;
-const M = {
-  Wall: 1, Sand: 2, Water: 3, Smoke: 4, Soil: 5, Fire: 6, Wood: 7, Lava: 8, Stone: 9, Moss: 10,
-  Seed: 11, Fungus: 12, Oil: 13, Ice: 14, Steam: 15, Stardust: 16, Meteor: 17, Moonwater: 18,
-  Flower: 19, Glass: 20, Ember: 21, Pollen: 22, Stem: 23, Rocket: 24, Wellspring: 25, Spark: 26,
-};
 const BYTE_NAME = ["kind", "variant", "age.lo", "age.hi", "energy.lo", "energy.hi", "flags.lo", "flags.hi"];
 
 function wasmCells(uni) {
