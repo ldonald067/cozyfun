@@ -592,12 +592,12 @@ function wellspringColor({ color, variant, energy, time, cells, width, height, x
     ((x ^ y) + (hash >> 2)) % 11 === 0;
   if (!rune) return out;
   // A spring held under a chill is LISTENING: the sim stills it and reopens its drinking
-  // branch, so a misattuned spring can be re-taught. Nothing said so on screen, and the
-  // interaction audit measures it as the least discoverable rule in the game — about 57
-  // seconds of setup for a 1.9-second event across four cells, with no field note possible
-  // because Wellspring is paintable. This is a third rune state, distinct from both dormant
-  // pewter and the attuned glow: a cold blue-white breathing on its own slow clock, which
-  // reads as waiting rather than as either sleeping or lit.
+  // branch, so a misattuned spring can be re-taught. Nothing said so on screen, and it is
+  // the least discoverable rule in the game — only two gestures and about six seconds
+  // (docs/MATERIAL_AUDIT.md), but nothing in play suggests trying them. This is a third
+  // rune state, distinct from both dormant pewter and the attuned glow: a cold blue-white
+  // breathing on its own slow clock, which reads as waiting rather than as either sleeping
+  // or lit.
   //
   // Presentation only. Reading neighbours is allowed; the stilling itself is the sim's.
   if (chilled) {

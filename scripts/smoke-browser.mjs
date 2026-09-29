@@ -534,8 +534,8 @@ async function main() {
     // about 866 ticks.
     //
     // A budget whose unit is ticks cannot be written as a constant number of seconds:
-    // 866 ticks is ~33s only on a machine sustaining 26 ticks/second, and a loaded CI
-    // runner does not. So measure the rate and derive the deadline from it.
+    // 866 ticks is ~43s on a machine sustaining the 20 ticks/second a 60 Hz display gets,
+    // and a loaded CI runner does not. So measure the rate and derive the deadline from it.
     // Saving is the only way to read the engine's tick count from outside, but it
     // overwrites the manual save — and the away-growth check downstream stages exactly
     // that key. Left unrestored, that check silently ended up ageing this cleared tray
@@ -706,8 +706,8 @@ async function main() {
     // production. "No player has ever seen a flower" is a mistake this repo has already
     // made once, and it was invisible to every test that did not start from the brush.
     //
-    // Waiting for a bloom from bare seed in real time would take about two and a half
-    // minutes at 26 ticks/second. So the scene is planted, aged, and reloaded, and the
+    // Waiting for a bloom from bare seed in real time would take over three minutes at
+    // the 20 ticks/second a 60 Hz display gets. So the scene is planted, aged, and reloaded, and the
     // wake-up catch-up covers most of that growth in seconds — which also makes this the
     // check that proves the absence path GROWS something, where the status-text assertion
     // above deliberately does not. How LONG an absence is staged is load-bearing and is

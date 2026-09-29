@@ -37,7 +37,7 @@ type NoteRule = FieldNote & {
   // A moment that is a STATE rather than a new kind, so no count rises and the detector
   // above cannot see it. Used for exactly one thing, and reluctantly: re-teaching a
   // wellspring changes a cell's remembered material, which is invisible to a per-kind
-  // census. Measured, that interaction is TWO gestures and about two seconds -- ice beside
+  // census. Measured, that interaction is TWO gestures and about six seconds -- ice beside
   // the spring, then the new material on top -- and it is still the least discoverable rule
   // in the game, because nothing in play suggests trying it. This is the one note that
   // teaches rather than observes.

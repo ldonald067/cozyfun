@@ -48,10 +48,20 @@ export function redmeanDistance([r1, g1, b1], [r2, g2, b2]) {
   return Math.sqrt((2 + rMean / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rMean) / 256) * db * db);
 }
 
+// How many sim ticks a player sees per second. A tick is NOT a frame: `App.tsx` ticks at most
+// once per animation frame, and only once SIM_TICK_MS has passed since the last tick, so on a
+// 60 Hz display a tick lands every ceil(SIM_TICK_MS / 16.7ms) frames. Every seconds figure a
+// harness prints goes through this. It was a hard-coded 60 here for as long as the audit
+// existed, so every duration quoted from it read three times too short — measured in the
+// shipped bundle on 2026-09-29 at 20.2 ticks/s and 60.2 frames/s.
+const simTickMs = readFileSync(resolve(repoRoot, "app/src/App.tsx"), "utf8").match(/^const SIM_TICK_MS = (\d+);$/m);
+if (!simTickMs) throw new Error("interaction-scenes: SIM_TICK_MS not found in app/src/App.tsx; the audit cannot turn ticks into seconds without it");
+export const TICKS_PER_SECOND = 60 / Math.ceil(Number(simTickMs[1]) / (1000 / 60));
+
 // What "visible" means, in units the player experiences. A cell is 4 screen pixels at the
-// shipped 220x140 grid, so a one-cell outcome is a 4x4 speck and a 10-tick one is 0.16s.
+// shipped 220x140 grid, so a one-cell outcome is a 4x4 speck and a 10-tick one is half a second.
 export const MIN_CELLS = 4;      // measured over the outcome's whole life, not at one instant
-export const MIN_TICKS = 30;     // half a second at 60fps
+export const MIN_TICKS = 30;     // about 1.5 s of play on a 60 Hz display, not the 0.5 s once written here
 export const MIN_CONTRAST = 24;  // below this the outcome is the same colour as what it replaced
 
 // Engines, as the runner sees them: create a board, paint it, tick it, read its bytes.
@@ -879,8 +889,8 @@ export const CHECKS = [
     outcome: (g, before) => g.gained(M.Stone, F.Cosmic, before) },
 
   { m: "Meteor", covers: "meteor.falls", role: "falls as impact heat", w: 30, h: 64, seed: 119, ticks: 300,
-    // A tall sky, because that is where a meteor is seen: in a short scene it is on screen
-    // for barely a third of a second and the fall itself never registers.
+    // A tall sky, because that is where a meteor is seen: in a 34-row scene it is on screen
+    // for 24 ticks, barely a second, and the fall itself never registers.
     paint: (p) => { p(15, 5, 1, M.Meteor); },
     // Its descent, measured from below the row it was painted on — the whole fall is what
     // the player watches, but counting the painted cell itself would be measuring the brush.

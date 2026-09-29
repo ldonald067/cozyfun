@@ -131,7 +131,7 @@ const BLOOM_SHAPES: [&[(i32, i32)]; 8] = [
 
 /// A bloom runs on a slower clock than the rest of the life materials: it loses
 /// energy once every this many ticks instead of every tick. The old bloom carried
-/// 90 energy at 1/tick — about a second and a half of life — which is why an
+/// 90 energy at 1/tick — about four and a half seconds of life — which is why an
 /// untended flower emitted one or two pollen motes at most and then sat inert
 /// forever. Slowing the clock buys a watchable open → dust → wilt arc while
 /// keeping every material's energy under 255, which is what the scene-import

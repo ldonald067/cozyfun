@@ -8,7 +8,7 @@ and hot-only bubbles, live and verified at `e50b700`; this rewrite changes only 
 **Phase 20 — the water budget — is done, and so is the bubble fix that followed it.** Moving
 water throws a faint visible mist (`MIST_ODDS`, 1 in 450 per move), which is the game's one
 deliberate water sink: a settled pond keeps every drop, a puddle on open ground dries in
-15-30 s, and a spring settles into a lake of ~7% of the board. Five move-clobber classes are
+roughly twenty seconds to two minutes of play, and a spring settles into a lake of ~7% of the board. Five move-clobber classes are
 closed (water over water, gas over gas, gas over water, water over freshly vented gas,
 pollen/stardust over water); the 789 overwrites left are listed class by class, with the reason
 each stays, in docs/HARNESS.md ("The move clobber, and what is left of it"). Since then, gas

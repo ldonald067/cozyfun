@@ -18,7 +18,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
-  CHECKS, MIN_CELLS, MIN_CONTRAST, MIN_TICKS, auditVerdict, colorForCell, loadWasmEngine, runCheck,
+  CHECKS, MIN_CELLS, MIN_CONTRAST, MIN_TICKS, TICKS_PER_SECOND, auditVerdict, colorForCell, loadWasmEngine, runCheck,
 } from "./interaction-scenes.mjs";
 
 const root = resolve(import.meta.dirname, "..");
@@ -112,7 +112,7 @@ for (const r of results) {
 console.log("-".repeat(86));
 console.log(`CELLS = cells the outcome ever occupied. SHOWN = ticks on screen. CONTRAST = median`);
 console.log(`colour distance from what it replaced, through the real renderer. Floors: ${MIN_CELLS} cells,`);
-console.log(`${MIN_TICKS} ticks (${(MIN_TICKS / 60).toFixed(2)}s at 60fps), ${MIN_CONTRAST} contrast.`);
+console.log(`${MIN_TICKS} ticks (${(MIN_TICKS / TICKS_PER_SECOND).toFixed(2)}s at ${TICKS_PER_SECOND} ticks/s), ${MIN_CONTRAST} contrast.`);
 
 if (vacuous.length) {
   console.error(
@@ -143,7 +143,7 @@ if (invisible.length) {
         .map((r) => {
           const why = [];
           if (r.spreadCells < MIN_CELLS) why.push(`touches only ${r.spreadCells} cell(s) in its whole life`);
-          if (r.visibleTicks < MIN_TICKS) why.push(`on screen ${r.visibleTicks} tick(s) = ${(r.visibleTicks / 60).toFixed(2)}s`);
+          if (r.visibleTicks < MIN_TICKS) why.push(`on screen ${r.visibleTicks} tick(s) = ${(r.visibleTicks / TICKS_PER_SECOND).toFixed(2)}s`);
           if (r.contrast < MIN_CONTRAST) why.push(`contrast ${r.contrast.toFixed(0)} vs what it replaced`);
           return `  - ${r.m}: ${r.role} — ${why.join(", ")}`;
         })

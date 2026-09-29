@@ -161,7 +161,7 @@ section used to describe a three-step chain — chill the spring, clear the old 
 faces, then present a new one — and the middle step is not needed. Measured from a pooled,
 attuned spring: dropping the new material on it with no ice never works (correct, that is
 `an_unchilled_spring_keeps_its_first_identity`), but **ice beside it and the new material on
-top re-teaches it in 121 ticks — two gestures, two seconds**, with its own pool still all
+top re-teaches it in 121 ticks — two gestures, about six seconds**, with its own pool still all
 around it. The audit's "first fires at tick 1500" is its script's own schedule, not the
 rule's cost: that check simply does not start offering a new source until then.
 

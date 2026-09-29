@@ -338,9 +338,10 @@ export function materialShowcaseScript() {
     setCell(172, 117, material.Wellspring, 0, 40, 0, 1);
 
     // A third wellspring state: a spring held under a chill is LISTENING, and re-drinks the
-    // next source that touches it. That is the least discoverable rule in the game — the
-    // interaction audit measures ~57 seconds of setup for a 1.9-second event across four
-    // cells — and nothing said so on screen until the renderer grew a rune state for it.
+    // next source that touches it. That is the least discoverable rule in the game — only
+    // two gestures and about six seconds (docs/MATERIAL_AUDIT.md), but nothing in play
+    // suggests trying them — and nothing said so on screen until the renderer grew a rune
+    // state for it.
     // Placed beside the dormant block on purpose: waiting must not read as asleep.
     setCell(176, 117, material.Wellspring, 0, 40, 0, 2);
     setCell(176, 116, material.Ice, 0, 200, 0, 1);

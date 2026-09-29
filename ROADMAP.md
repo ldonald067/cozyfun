@@ -604,7 +604,8 @@ running a scenario through it, because the app carried no build identity at all.
   sitting 77/107/126 apart while every other pairing was 168+; the bluebell went deep and the
   forget-me-not became a magenta **cosmos**, lifting the worst pair to 140. And a spring held
   under ice — the least discoverable rule in the game at ~57 seconds of setup for a
-  1.9-second event — now shows a third rune state.
+  1.9-second event (audit ticks read at 60 a second, where the app runs about 20; and
+  docs/MATERIAL_AUDIT.md has the real cost, two gestures) — now shows a third rune state.
 - **The skills live in the repo now.** `/adversarial-review` and `/design-review` sit
   complete under `.claude/skills/`, including the `brain/` principles the reviewer text
   depends on. Two copies of the first one had been drifting 175 lines apart, and the tracked
@@ -665,7 +666,8 @@ and must not create problems later, so nothing opportunistic rides along with a 
 - **20B — moving water throws mist, and liquids stop deleting liquids. Done.** Three
   decisions from the owner shaped it: **lakes are a feature** (a spring settles into a real
   pond, ~7% of the board, that stops growing), **puddles dry** (a puddle on open ground
-  evaporates in 15-30 s while a pond that fills its basin keeps every drop — one knob sets
+  evaporates in 15-30 s (ticks read at 60 a second; the app runs about 20, so in play it is
+  roughly twenty seconds to two minutes — corrected 2026-09-29) while a pond that fills its basin keeps every drop — one knob sets
   both, and 1-in-450 keeps a pour close to today's 84% — 82%, once mist stopped raining back), and the mist stays visible, which an
   interaction-audit check now enforces.
 
