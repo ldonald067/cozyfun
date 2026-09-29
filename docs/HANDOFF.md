@@ -1,106 +1,132 @@
 # Handoff — where the work is, and what to do next
 
-*Rewritten at each handoff, never appended to. Written 2026-09-27; `main` carries the end of
-Phase 20.*
+*Rewritten at each handoff, never appended to. Written 2026-09-29. `main` carries Phase 20
+and hot-only bubbles, live and verified at `e50b700`; this rewrite changes only docs.*
 
 ## Where things stand
 
-**Phase 20 — the water budget — is done.** The game's accidental water sink (movers
-overwriting cells another mover had filled that tick) is replaced by a deliberate, visible
-one: moving water throws a faint mist (`MIST_ODDS`, 1 in 450 per move). A settled pond keeps
-every drop, a puddle on open ground dries in 15-30 s, and a spring settles into a lake of
-~7% of the board. Five overwrite classes are closed: water over water, gas over gas, gas over
-water, water over freshly vented gas, and pollen/stardust over water. Others remain by
-decision — including 19 oil and lava overwrites of water. ROADMAP Phase 20 has every step with its numbers; docs/HARNESS.md ("The move
-clobber, and what is left of it") lists the 787 overwrites that remain and why each class
-stays.
+**Phase 20 — the water budget — is done, and so is the bubble fix that followed it.** Moving
+water throws a faint visible mist (`MIST_ODDS`, 1 in 450 per move), which is the game's one
+deliberate water sink: a settled pond keeps every drop, a puddle on open ground dries in
+15-30 s, and a spring settles into a lake of ~7% of the board. Five move-clobber classes are
+closed (water over water, gas over gas, gas over water, water over freshly vented gas,
+pollen/stardust over water); the 789 overwrites left are listed class by class, with the reason
+each stays, in docs/HARNESS.md ("The move clobber, and what is left of it"). Since then, gas
+hotter than mist trades places with whatever sinks into it, so boiled steam surfaces instead of
+being eaten by the water above it; mist is excluded because bubbling it flooded a spring to
+29.5% of the board. ROADMAP Phase 20 and "After Phase 20: bubbles" have every number.
+
+The harness grew two things worth knowing. `audit:drift --per-seed` prints the audit's own
+verdict for every seed, which is how the bubble bug was found; and every script now reads
+material ids and flags from `materials.ts` — the material showcase, which cannot import, has
+the real tables written into it by its Node builder, and `material:audit` checks the result.
 
 Everything is green: 126 cargo tests, 32 parity scenarios, 125 interaction checks, the slow
-world (a day away still grows the garden 18 new columns), and the full `npm run check`.
+world (a day away grows the garden 18 new columns), and the full `npm run check`.
 
-**Since Phase 20: bubbles.** Steam made under water used to be deleted by the water sinking into
-it, so `water.boils` passed on only 20 seeds of 32. Gas hotter than mist now trades places with
-whatever sinks into it; mist does not, because bubbling it flooded a spring to 29.5% of the
-board. ROADMAP ("After Phase 20: bubbles") and docs/HARNESS.md ("Bubbles") have the numbers.
+## What to do next
 
-**No next phase is planned.** What to build next is the owner's call. Open threads, none
-started, in no particular order:
+No next phase is planned; what to build is the owner's call. The threads below are measured,
+not remembered.
+
+### 1. Checks that pass the gate only on a lucky seed
+
+`interaction:audit` plays ONE seed per check. Measured 2026-09-29 on 32 seeds
+(`npm run audit:drift -- --seeds 32 --per-seed`): 106 of 125 checks pass on all 32, and four
+fall below the 7-of-8 bar a re-staged scene is held to. **None of the four was caused by
+bubbles** — each was compared against the commit before them (`ed522fa`) and is unchanged or
+better.
+
+| check | seeds passing | how it fails |
+| --- | --- | --- |
+| `rocket.climbs` (a lit grain climbs with a glittering trail) | **8 / 32** (5 before bubbles) | 21 seeds on screen 27-28 ticks against a floor of 30; 3 never climb |
+| `stem.climbs` (unfurls side leaves) | 26 / 32 | 2 leaf cells against a floor of 4 |
+| `ice.stresses` (frost-stresses damp hard materials) | 27 / 32 | 3 cells against 4 |
+| `moss.dries` (dries and scorches before burning) | 27 / 32 | 2-3 cells against 4 |
+
+`rocket.climbs` is the one to start with: it has been passing on a lucky seed for as long as
+anyone can tell, and it misses by one or two ticks on almost every seed, which says the
+flight is either genuinely under half a second or the scene gives it too little room — find
+out which before touching anything. Do not tune the fixture until it passes; a re-staged scene
+must be what a player would do. Fifteen more pass on 28-31 seeds (28 meets the bar); the full list is one
+command away.
+
+### 2. Design questions for the owner
 
 - **Phase 8's subjective listening pass** is the one unfinished item from before Phase 20.
-- **One watering grows a minimum plant.** Measured in the 20B triage: a planter watered once
-  leaves most plants at the minimum 4-cell stalk and 58% leafless, before and after 20B
-  alike. Whether one watering should grow a leafy plant is a design question.
+- **One watering grows a minimum plant.** A planter watered once leaves most plants at the
+  minimum 4-cell stalk and 58% leafless, before and after 20B alike. Whether one watering
+  should grow a leafy plant is a design question, not a bug.
 - **Steam reads as a dotted thread.** docs/VISUAL_PIPELINE.md records that no renderer change
-  can fix it and that the lever is emitting steam in small clusters in the sim — a design
-  choice about vapour volume, not a tweak.
-- **Oil and lava still delete water (19 overwrites across the audit).** Left by decision; oil
-  has no sink. Reopen only with a sink for oil.
-- **The `water.boils` scene is a quench, not a boil.** The lava pokes through the top of its
-  Wall pan and touches the water directly. Bubbles made it pass on 32 seeds of 32, so it is not
-  urgent, but it does not stage what its clause describes ("over sustained flame").
+  can fix it; the lever is emitting steam in small clusters in the sim, a choice about vapour
+  volume.
+- **Oil and lava still delete water** (19 overwrites across the audit). Left by decision: oil
+  has no sink. Reopen only together with a sink for oil.
+
+### 3. Fixture debt
+
+- **The `water.boils` scene is a quench, not a boil.** Paint order lets the lava poke through
+  the top of its Wall pan into the water, so its steam comes from a direct quench rather than
+  "sustained flame". It passes on 32 of 32, so it is not urgent, but it does not stage what its
+  clause describes.
 
 ## Decisions already made — do not relitigate
 
-All by the owner, recorded in the user's memory and ROADMAP Phase 20:
+All by the owner, each after seeing measurements; recorded in ROADMAP and the operator's
+memory:
 
 - **Mist is visible**, never a silent delete. An interaction check enforces it.
-- **Lakes are a feature**: a spring fills a real pond that stops growing.
-- **Puddles dry** (1-in-450). That rate also sets spring size; they are one knob.
-- **Gases are conserved and smoke keeps its 180-tick life** (20D), though a lidded fire's smoke
-  doubles.
-- **The clobber's remaining classes stay** (20E): only the pollen and stardust water leaks were
-  closed. Grain-over-grain was rejected as a cheap fix.
-- **No cheap fixes.** Every change needs its own justification and must not create a problem
-  later. Do not bundle opportunistic fixes into a step, and never tune a fixture until it
-  passes — a re-staged scene must be what a player would do, and pass on 7-8 seeds of 8.
+- **Lakes are a feature** and **puddles dry** (1-in-450) — one knob sets both.
+- **Gases are conserved and smoke keeps its 180-tick life**, though a lidded fire's smoke doubles.
+- **Only the pollen and stardust water leaks were closed** in 20E; the other clobber classes
+  stay. "Grains never overwrite grains" was rejected as a cheap fix.
+- **Bubbles are hot-only.** Mist must not bubble (the spring floods); `lava.scorches` falling
+  32 -> 29 of 32 was accepted with it.
 - **A rain-filled sand basin turning to sandstone is geology**, not a bug.
-- **Never conserve a liquid that has no sink.** Oil is deliberately NOT conserved.
+- **Never conserve a liquid that has no sink.** Oil is deliberately not conserved.
+- **No cheap fixes.** Every change needs its own justification and must not create a problem
+  later; do not bundle opportunistic fixes into a step.
 
-## How to work (this is what caught every real bug in Phase 20)
+## How to work
 
-- **Branch until green.** A push to `main` deploys, and Railway waits for CI before it
-  builds. Fast-forward `main` only once the full gate passes, then `npm run deploy:verify`
-  against the host until it reports the new commit (about five minutes).
+- **Branch until green.** A push to `main` deploys, and Railway waits for CI before it builds.
+  Fast-forward `main` only once the full gate passes, then run `npm run deploy:verify` until it
+  reports the new commit (about five minutes), and `npm run qa:live` when the change is visible.
 - **Ask whether each seed PASSES, not only whether the spread moved:**
-  `npm run audit:drift -- --per-seed --only <ids>` prints the audit's own verdict per seed.
-- **Screen on eight seeds, confirm on 32.** The interaction audit is one seed per check and
-  reads dice as effects. `npm run audit:drift -- --base <ref> [--only id,id]` compares the
-  working tree with any commit — and at eight seeds it still misfires on wide distributions
-  (10 of 17 in the triage). Re-run anything you would act on with `--seeds 32 --only ...`.
+  `npm run audit:drift -- --per-seed --only <ids>`. Screen on 8 seeds, confirm on 32 — at 8 the
+  spread comparison misfires on wide distributions (10 of 17 in the 20B triage).
 - **When a moved metric survives, ask what its cells WERE** before asking why they changed:
   five triage "regressions" were the audit's own Wall floor.
 - **A changed witness can hide a real loss.** `water.boils` was filed as a witness change and
-  was also losing its steam to the water above it. Measure what the new witness sees.
-- **Water tools:** `npm run water:budget` (spring, oil spring, pour, sand into a pond) and
-  `npm run clobber:census` (every overwrite by mover, victim and origin).
+  was also losing its steam; measure what the new witness sees.
+- **Water tools:** `npm run water:budget` and `npm run clobber:census`. Anything that changes
+  mist's fate goes behind a `water:budget` run.
 - **Vacuity-test every gate you touch**: sabotage the rule in BOTH engines, rebuild with
-  `npm run build:sim`, and watch the gate fail by name. `PARITY_ONLY=<name text> npm run
-  test:parity` runs one scenario. A parity scenario may start from exact cells with
-  `cells(w, h)` when painting cannot reach a state reliably.
-- **Close each step with `/adversarial-review`** (Codex; check `codex login status`). In 20B
-  it found five real problems after every gate was green.
+  `npm run build:sim`, and watch the gate fail by name. `PARITY_ONLY=<name text>` runs one
+  parity scenario; `cells(w, h)` starts one from exact bytes when painting cannot reach a state.
+- **Close each step with `/adversarial-review`** (Codex; check `codex login status`). If Codex
+  is out of usage, wait for the reset — the skill forbids falling back to a same-model review.
 
 ## Traps this work already paid for
 
-- **A piped gate hides its exit code.** `npm run x | tail` returns tail's status; a failed
-  `material:audit` reached a commit that way. Redirect to a file and check `$?`.
-- **`.tmp/` compiles go stale.** A reviewer's number was wrong (54 vs 76) from a stale
-  compile; `scripts/compile-app.mjs` rebuilds fresh — use it rather than reading old folders.
-- **Liquids side-hop two cells**: they jump a one-cell wall, and a one-cell floor lets them
-  drain diagonally. Twice in 20E a fixture passed because the water stepped aside instead of
-  meeting the rule; seal a one-wide shaft two walls thick, and print the board.
-- **Liquids move before gases in a tick** (bottom-up pass, then top-down), so water can never
-  land on steam that MOVED this tick — only on steam a reaction made.
-- **Water plus steam is not conserved even with every clobber closed**: hot steam bubbles up
-  through water, but water sinking into MIST deletes it. Witness water on its own (lost == mist
-  born this tick), and where motes are present, bound it rather than asserting it exactly — a
-  mote can take mist thrown earlier the same tick.
+- **A piped gate hides its exit code.** `npm run x | tail` returns tail's status. Redirect to a
+  file and check `$?`.
+- **A fixture can pass for the wrong reason.** Twice in 20E the water side-hopped around the
+  rule instead of meeting it (liquids hop two cells and jump a one-cell wall). Seal a one-wide
+  shaft two walls thick, and print the board before trusting a pass.
+- **Liquids move before gases in a tick** (bottom-up pass, then top-down), so water can only
+  land on steam a reaction made, never on steam that moved.
+- **Water plus steam is not conserved**: hot steam bubbles, but water sinking into mist deletes
+  it. Witness water alone (lost == mist born this tick), and where motes are present bound it
+  rather than asserting it — a mote can take mist thrown earlier the same tick.
+- **A claim that something is "by design" needs a source.** The deletion bubbles replaced was
+  written up as designed and nothing showed anyone had chosen it.
+- **Sabotaging compiled output: patch before the first load.** A loaded CommonJS module is
+  cached, so a patch applied afterwards silently tests the unpatched code.
+- **`.tmp/` compiles go stale.** `scripts/compile-app.mjs` rebuilds fresh; do not read old
+  folders, including a reviewer's.
 - **In Rust's `apply_reactions`, `x` inside a match arm is the material kind**, not a
-  coordinate (`x if x == Material::Water as u8`). Take coordinates from `idx`.
-- **A sealed test fixture cannot tell "still" from "can't move"** — 20B's first "still water"
-  tests put a lid on the pond and so missed that open air above counted as flow.
-- **Hand-typed copies of `MATERIAL` / `CELL_FLAG` rot.** Read them from `materials.ts` through
-  `compileApp`, as every script now does. Page-side code that cannot import (the material
-  showcase) has the real tables written into it by its Node builder instead.
-- **Field notes fire once ever.** A note triggered by the wrong cause is spent for good; give
-  it a `requires` rather than trusting the kind alone.
+  coordinate. Take coordinates from `idx`.
+- **A sealed test fixture cannot tell "still" from "can't move."**
+- **Hand-typed copies of `MATERIAL` / `CELL_FLAG` rot.** Read them through `compileApp`.
+- **Field notes fire once ever.** Give a note a `requires` rather than trusting the kind alone.

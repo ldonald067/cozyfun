@@ -9,7 +9,9 @@ the September design passes between 19 and 20 all shipped. Phase 20 — replacin
 clobber's hidden water sink with a deliberate one — is done: moving water throws a visible
 mist, and water no longer deletes water or freshly vented gas, gas no longer deletes gas or
 water, and pollen and stardust no longer delete water. The 787 overwrites that remain are
-listed class by class, with the reason each stays, in docs/HARNESS.md. No Phase 21 is planned yet.
+listed class by class, with the reason each stays, in docs/HARNESS.md. Since then, hot steam
+bubbles up through water instead of being deleted by it ("After Phase 20: bubbles"). No Phase
+21 is planned yet.
 **Start at `docs/HANDOFF.md`.**
 
 The sandbox is a playable, deployed browser toy: React/Vite UI, Rust/WASM sim with a byte-identical JS fallback, 18 paintable materials plus the Eraser on the toolbar and 8 generated-only outcomes, six credited room backdrops with room-linked native ambience, optional YouTube Desk Radio, local save/share/postcard/clip export, a click-to-load embed poster, deterministic sim/parity/browser/visual/audio QA wired into local scripts and CI, and a deploy gate that proves which commit the running host is serving. It runs at `pixelfun.littlealbumclub.net` and is iframed into `littlealbumclub.net`. Details live in the phase sections below.
@@ -609,13 +611,6 @@ running a scenario through it, because the app carried no build identity at all.
   one — better tailored to this repo — had never executed once while `AGENTS.md` described it
   as the reviewer this project spawns. One copy, backed up by the same push that ships the
   game.
-
-### The reaction-cell clobber moved to Phase 20
-
-This section used to describe `fix/reaction-cell-clobber` as a pushed, unmerged branch. The
-branch was deleted on 2026-08-26 — its only unique content was a two-line change — and the
-problem it tried to fix is now Phase 20, where it turned out to be about water rather than
-reactions.
 
 ## Between 19 and 20: September design passes
 
