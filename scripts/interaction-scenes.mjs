@@ -242,6 +242,10 @@ export function runCheck(check, { engine, colorForCell }) {
 // hole straight through the floor, and the liquid under test drained away through it.
 export const FLOOR_FROM_BOTTOM = 4;
 
+// The rocket launch fixture three scenes share: a default-brush pile with a default-brush flame
+// dropped on its top. See `rocket.climbs`.
+const launchFixture = (p) => { p(15, 37, 4, M.Rocket); p(15, 31, 4, M.Fire); };
+
 
 export const CHECKS = [
   // ---- Hard materials -----------------------------------------------------------------
@@ -918,32 +922,56 @@ export const CHECKS = [
     paint: (p) => { p(15, 10, 3, M.Rocket); },
     outcome: (g, before) => g.appeared(M.Rocket, before) },
   { m: "Rocket", covers: "rocket.climbs", role: "a lit grain climbs fast with a glittering trail", w: 30, h: 44, seed: 123, ticks: 900,
-    paint: (p) => { p(15, 38, 2, M.Rocket); p(15, 36, 1, M.Fire); },
+    // The launch fixture this and the next two scenes share: a pile at the DEFAULT brush with a
+    // default-brush flame dropped on its top, which is what a player paints. It used to be a
+    // radius-2 pile of about nine grains with a one-cell flame, and on that `rocket.climbs`
+    // passed on 8 seeds of 32 before rockets could shove through their own charge and 23 after.
+    // At the default brush it is 11 and 32, so the size is not what makes it pass.
+    paint: (p) => launchFixture(p),
     outcome: (g, before, memo) => {
       memo.high ??= new Set();
       for (const i of [...g.all(M.Rocket), ...g.all(M.Spark)]) if (g.xyOf(i)[1] < 24) memo.high.add(i);
       return [...memo.high].filter((i) => g.kindOf(i) === M.Rocket || g.kindOf(i) === M.Spark);
     } },
+  { m: "Rocket", covers: "rocket.fuses", role: "a lit line of powder burns its length", w: 80, h: 30, seed: 134, ticks: 400,
+    // A line dragged along the floor with a flame dropped on its left end, which is how a
+    // player lays a fuse. The outcome is lit grain more than 24 cells from the flame: the
+    // light has to travel along the line to get there, one grain lighting the next.
+    paint: (p) => { for (let x = 6; x <= 70; x++) p(x, 24, 1, M.Rocket); p(6, 22, 1, M.Fire); },
+    outcome: (g) => g.all(M.Rocket).filter((i) => g.energyAt(i) > 0 && g.xyOf(i)[0] > 30) },
   { m: "Rocket", covers: "rocket.bursts", role: "bursts into a firework shell of sparks and stardust", w: 30, h: 44, seed: 124, ticks: 900,
-    paint: (p) => { p(15, 38, 2, M.Rocket); p(15, 36, 1, M.Fire); },
+    paint: (p) => launchFixture(p),
     outcome: (g, before) => g.appeared(M.Stardust, before) },
 
   { m: "Spark", covers: "spark.flies", role: "flies outward from a burst then droops and fades", w: 30, h: 44, seed: 125, ticks: 900,
-    paint: (p) => { p(15, 38, 2, M.Rocket); p(15, 36, 1, M.Fire); },
+    paint: (p) => launchFixture(p),
     outcome: (g, before, memo) => {
       memo.flung ??= new Set();
       for (const i of g.all(M.Spark)) if (Math.abs(g.xyOf(i)[0] - 15) > 3) memo.flung.add(i);
       return [...memo.flung].filter((i) => g.kindOf(i) === M.Spark);
     } },
-  { m: "Spark", covers: "spark.lights", role: "lights rocket powder it reaches in flight", w: 34, h: 44, seed: 126, ticks: 1200,
-    paint: (p) => { p(17, 38, 2, M.Rocket); p(17, 36, 1, M.Fire); p(8, 30, 2, M.Rocket); p(26, 30, 2, M.Rocket); },
+  { m: "Spark", covers: "spark.lights", role: "lights rocket powder it reaches in flight", w: 60, h: 44, seed: 126, ticks: 1200,
+    // Three default-brush charges on the floor of a room, the middle one lit. The ROOF is what
+    // makes this reachable now. A lit charge goes up whole (`try_thrust`) and bursts some 25
+    // cells up, and outward sparks never come back down that far — so in open air a second
+    // charge catches on 2 seeds of 32. Under a Wall ceiling the rockets burst against it and
+    // the sparks reach the floor: 32 of 32 with the roof at y=28, 30 or 32 alike.
+    paint: (p) => {
+      p(30, 37, 4, M.Rocket); p(15, 37, 4, M.Rocket); p(45, 37, 4, M.Rocket);
+      for (let x = 1; x < 59; x++) p(x, 30, 1, M.Wall);
+      p(30, 33, 2, M.Fire);
+    },
+    // A far charge that has caught, and once one has, the sparks thrown out over it — what is
+    // lit NOW, with no cell remembered. An earlier version remembered every cell a lit grain had
+    // touched and kept counting it while it held any rocket grain at all, so a far pile that
+    // caught and burst in place scored its leftover UNLIT powder for the rest of the run: 1,193
+    // ticks "on screen" on most seeds, where the honest reading was about 34. The sparks wait
+    // for the catch because the lit charge's own shell reaches this far too: adversarial review
+    // took both far piles out and still passed seed 8126 on sparks alone.
     outcome: (g, before, memo) => {
-      // A far-off charge that has caught: inert powder sits at energy 0, so a lit one is
-      // the proof. Counting the powder itself would be true before a single tick.
-      memo.lit ??= new Set();
-      for (const i of g.all(M.Rocket)) if (g.energyAt(i) > 0 && Math.abs(g.xyOf(i)[0] - 17) > 5) memo.lit.add(i);
-      for (const i of g.all(M.Spark)) if (Math.abs(g.xyOf(i)[0] - 17) > 7) memo.lit.add(i);
-      return [...memo.lit].filter((i) => g.kindOf(i) === M.Rocket || g.kindOf(i) === M.Spark);
+      const caught = g.all(M.Rocket).filter((i) => g.energyAt(i) > 0 && Math.abs(g.xyOf(i)[0] - 30) > 8);
+      if (caught.length) memo.caught = true;
+      return memo.caught ? [...caught, ...g.all(M.Spark).filter((i) => Math.abs(g.xyOf(i)[0] - 30) > 10)] : [];
     } },
 
   { m: "Wellspring", covers: "wellspring.drinks", role: "drinks the identity of the first source that touches it", w: 30, h: 26, seed: 130, ticks: 900,

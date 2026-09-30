@@ -124,6 +124,12 @@ function runScenario({ name, w, h, seed, ticks, cells, paint, observe, expect, s
 // The mist scenario's floor: 103 cell-ticks of mist with the rule, 0 with it switched off in
 // both engines, measured on its seed. The floor sits well between them.
 const MIST_FLOOR = 40;
+// The rocket-shove scenario's floor: 13 flame shoves witnessed with the rule, 0 with
+// `try_thrust` switched off in both engines, measured on its seed.
+const SHOVE_FLOOR = 6;
+// The fuse scenario's floor: the light reaches x=62 with `light_touching_powder`, and x=8
+// with it switched off in both engines — the grains at the lit end and nothing more.
+const FUSE_REACH = 40;
 // The bubble scenario's shafts: [x, steam energy] — hot steam in three, mist in three.
 const BUBBLE_UNITS = [[4, 180], [12, 180], [20, 180], [28, MIST_ENERGY], [36, MIST_ENERGY], [44, MIST_ENERGY]];
 // The vent scenario's units, one per shaft; far enough apart that no two share a wall.
@@ -195,6 +201,66 @@ const scenarios = [
       p(14, 54, 5, M.Rocket); p(9, 54, 1, M.Fire);
       p(20, 40, 2, M.Wood);
     },
+  },
+  (() => {
+    // A lit grain shoves straight up through its own charge (`try_thrust`) instead of
+    // bursting under it. The witness is the FLAME moving down: fire never moves on its own, and
+    // nothing in this scene can make new fire, so a flame cell turning up one row lower, under a
+    // lit grain that was just beneath it, can only be a shove. The powder half is not used: a
+    // lit grain lights the powder it touches, so several grains are lit at once and one can
+    // slide diagonally into the cell another vacated — which looks like a powder swap without
+    // any shove at all (measured: 6 "swaps" with the rule off in both engines).
+    let prev = null;
+    return {
+      name: "a lit charge shoves up through its own powder and flame",
+      w: 40, h: 70, seed: 4242, ticks: 120,
+      // The flame goes INSIDE the charge, so the grains it lights have it over them.
+      paint(p) {
+        p(20, 62, 4, M.Rocket);
+        p(20, 62, 2, M.Fire);
+        for (let x = 0; x < 40; x++) p(x, 67, 1, M.Wall);
+      },
+      observe(seen, cells, w, h) {
+        seen.flameShoved ??= 0;
+        if (prev) {
+          const kind = (c, x, y) => c[(y * w + x) * STRIDE];
+          const lit = (c, x, y) => kind(c, x, y) === M.Rocket && (c[(y * w + x) * STRIDE + 4] | (c[(y * w + x) * STRIDE + 5] << 8)) > 0;
+          // The grain may take its second, open-air step in the same tick, so it can be one
+          // cell higher than the flame it traded with.
+          for (let y = 1; y < h - 1; y++) {
+            for (let x = 0; x < w; x++) {
+              if (kind(prev, x, y) !== M.Fire || kind(prev, x, y + 1) === M.Fire || !lit(prev, x, y + 1)) continue;
+              if (kind(cells, x, y + 1) === M.Fire && (lit(cells, x, y) || lit(cells, x, y - 1))) seen.flameShoved++;
+            }
+          }
+        }
+        prev = cells.slice();
+      },
+      expect: (seen) => (seen.flameShoved >= SHOVE_FLOOR ? null : `only ${seen.flameShoved} lit grains shoved past the flame (floor ${SHOVE_FLOOR})`),
+    };
+  })(),
+  {
+    // A lit grain lights the powder it touches (`light_touching_powder`), so a line of powder
+    // lit at one end burns its length as a wave of launches. The witness is how far along the
+    // line the light gets: without the rule the grains at the lit end fly off and the rest of
+    // the line never catches.
+    name: "a lit line of powder burns its length",
+    w: 70, h: 30, seed: 5151, ticks: 140,
+    paint(p) {
+      for (let x = 6; x <= 60; x++) p(x, 24, 1, M.Rocket);
+      for (let x = 0; x < 70; x++) p(x, 26, 1, M.Wall);
+      p(6, 22, 1, M.Fire);
+    },
+    observe(seen, cells, w, h) {
+      seen.furthestLit ??= 0;
+      for (let y = 20; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const i = (y * w + x) * STRIDE;
+          if (cells[i] === M.Rocket && (cells[i + 4] | (cells[i + 5] << 8)) > 0) seen.furthestLit = Math.max(seen.furthestLit, x);
+        }
+      }
+    },
+    expect: (seen) => (seen.furthestLit >= FUSE_REACH ? null : `the light reached only x=${seen.furthestLit} of a line running to x=60 (floor ${FUSE_REACH})`),
   },
   {
     // Hearth conduction, with the heat reachable ONLY through masonry. An adversarial review

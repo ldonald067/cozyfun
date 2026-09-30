@@ -328,6 +328,37 @@ Current cosmic rules:
 - A falling meteor sheds sparks in its wake, so a shower streaks instead of dropping silently — and those sparks can light rocket fuses on the way down, or hiss into steam over water.
 - A cosmic-charged fungus sows a stardust grain instead of spreading as it digests, spending the charge: the fairy ring.
 - Rocket powder is inert until any flame lights its fuse; the lit grain climbs fast and bursts into a spark shell that droops, twinkles out, and can light more powder.
+- **A lit charge goes up whole, and a lit line burns its length.** Two rules do it together,
+  and the second exists because the first broke something.
+
+  A lit grain used to take anything above it for a ceiling and burst there, so a pile lit by
+  a flame dropped onto it went off where it lay: on the 220x140 board at the default brush, a
+  median of **2 grains of ~24 flew and 12 burst on the ground**, most of them under the very
+  flame that lit them — while the tray promises powder that "leaps skyward and bursts".
+  `try_thrust` now trades places with the charge — unlit powder, a grain lit this tick, the
+  flame, and the spark, smoke and stardust the grain ahead leaves — when the cell is part of
+  the charge at both ends of the tick. Anything else, sand, wall or a lid, is still a ceiling.
+
+  **Those ground bursts were also the only thing relaying the light through a charge**, and
+  nothing documented that. A line of powder dragged at the default brush and lit at one end
+  used to crackle along its length on the ground — full length on 7 of 16 seeds — and with
+  grains flying it burned about 6 cells: the ones at the lit end left and the rest never
+  caught. `light_touching_powder` relays it directly instead: a lit grain lights the unlit
+  powder it touches, the way a flame does, with no roll.
+
+  Measured over 32 seeds with both: **12 grains fly from a default-brush pile (18 from a small
+  dab of flame), 13 are in the air at once, none bursts on the ground and none is left
+  unlit**, and a dragged line burns its full length on **16 of 16** seeds (a thin one on 14 of
+  16, against none before) as a wave of launches sweeping along it. The push is straight up,
+  so a pile's volley rises as one column and fans out only in open air.
+
+  Two costs are measured and were accepted. **Separate piles rarely set each other off now**:
+  12 cells apart the second catches on 12 of 32 seeds against 30, and 16 apart on 1 against
+  12 — the ground bursts were what threw sparks across the gap. Piles that touch share the
+  light, and a line of powder between two piles is now the reliable fuse, which is what a fuse
+  is. And about one burst in eight goes off above the reach of a single fuse (45 of 373 air
+  bursts, against 2 of 91): a burst re-lights a neighbour already in flight (`ignited_cell`
+  resets its fuse), and a volley is what puts grains side by side.
 - Wellspring blocks drink the first touching source material and pour it back out, feeding
   *through* their own pool rather than only into bare faces. A spring submerges itself within
   seconds, and an adjacent-empty rule then blocks every face and stops the source dead —

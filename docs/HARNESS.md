@@ -64,8 +64,23 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
 
   Two lessons are baked into the metrics. Size is the union over the outcome's whole life, not the peak at one instant, or a gradual rule like a fungus mat reverting to soil scores as invisible while being perfectly obvious. And an outcome that is a *transition* ("was glass, is sand now") must be made sticky, or it scores 2 ticks no matter how permanent its result is.
 
+  **A sticky outcome is only honest while the cell still holds the outcome.** `spark.lights`
+  remembered every cell a lit grain had touched and kept counting it while it held any rocket
+  grain at all, lit or not. A far pile that caught and burst where it lay left unlit powder in
+  those cells, so the check scored **1,193 ticks on screen on most seeds** for powder sitting
+  still; on the seeds where nothing lingered it read 26-34, which was the honest number all
+  along. Nobody noticed until rockets started flying and the leftover powder stopped being
+  there. It now counts what is lit or thrown NOW. When you remember cells, filter them on the
+  outcome, not on the material.
+
+  **Its first honest version still had a hole, and adversarial review found it**: it counted
+  sparks thrown out over the far charges, and the lit charge's own shell reaches that far. With
+  both far piles removed it still passed one seed of 32, on sparks alone, at exactly the floor.
+  The sparks now count only once a far charge has been seen lit: 32 of 32 as staged, 0 of 32
+  with the far piles gone. Credit the aftermath of an outcome only after witnessing the outcome.
+
   The scenes and the runner that plays them live in `scripts/interaction-scenes.mjs`, shared
-  with `audit:drift` and `clobber:census` so all three measure the same 124 scenes. Material
+  with `audit:drift` and `clobber:census` so all three measure the same scenes. Material
   ids and flags there are read from `materials.ts`, not typed out. **The audit measures each
   check on ONE seed**, which is right for "does it happen" and wrong for "did my change move
   it" — use `audit:drift` for that.

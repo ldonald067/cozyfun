@@ -2140,6 +2140,7 @@ impl Universe {
             self.burst_rocket(idx, x, y, cell, old, next);
             return;
         }
+        self.light_touching_powder(x, y, old, next);
         let sway = if self.chance(3) {
             if self.tick_count % 2 == 0 { 1 } else { -1 }
         } else {
@@ -2155,6 +2156,9 @@ impl Universe {
                 break;
             }
         }
+        if !moved && self.try_thrust(idx, x, y - 1, flying, old, next) {
+            moved = true;
+        }
         if !moved {
             self.burst_rocket(idx, x, y, cell, old, next);
             return;
@@ -2169,6 +2173,53 @@ impl Universe {
                 next[idx] = Cell::new(Material::Smoke as u8, cell.variant, 70);
             }
         }
+    }
+
+    /// A lit grain lights the unlit powder it touches, the way a flame does. `try_thrust`
+    /// took away the ground bursts that used to relay the light through a charge, and with
+    /// them the fuse: a line of powder dragged at the default brush and lit at one end burned
+    /// its full length on 7 of 16 seeds before, and on none once grains flew — the ones at
+    /// the lit end left and the rest of the line sat there. This relays the light directly
+    /// instead, so a whole charge goes up and a line burns its length as a wave of launches:
+    /// 16 of 16. Four neighbours, no roll; the same 220 fuse a flame or a spark lights.
+    fn light_touching_powder(&self, x: i32, y: i32, old: &[Cell], next: &mut [Cell]) {
+        for (dx, dy) in [(0, -1), (0, 1), (-1, 0), (1, 0)] {
+            let (nx, ny) = (x + dx, y + dy);
+            if !self.in_bounds(nx, ny) {
+                continue;
+            }
+            let n = self.idx(nx as u32, ny as u32);
+            let unlit = |c: Cell| c.kind == Material::Rocket as u8 && c.energy == 0;
+            if unlit(old[n]) && unlit(next[n]) {
+                next[n].energy = 220;
+            }
+        }
+    }
+
+    /// A lit grain shoves straight up through its own charge instead of taking it for a
+    /// ceiling. A grain that burst whenever anything sat above it made a lit pile go off where
+    /// it lay: at the default brush, 2 grains of ~24 flew and 12 burst on the ground, most of
+    /// them under the very flame that lit them. It trades places, so nothing is deleted.
+    ///
+    /// The cell has to be part of the charge at BOTH ends of the tick. `old` is the guard every
+    /// rule reads: it keeps the shove to what was already there when the tick began, so it
+    /// never shoves something that has only just caught fire or wandered in. `next` is needed
+    /// too, because the grain ahead leaves its trail in the cell it vacates THIS tick — once
+    /// powder and flame were shoved, that trail was the commonest thing a following grain
+    /// burst under. Anything else — sand, wall, a lid — is still a ceiling, and the grain
+    /// bursts under it.
+    fn try_thrust(&self, idx: usize, nx: i32, ny: i32, cell: Cell, old: &[Cell], next: &mut [Cell]) -> bool {
+        if !self.in_bounds(nx, ny) || next[idx].kind != cell.kind {
+            return false;
+        }
+        let target = self.idx(nx as u32, ny as u32);
+        if !is_rocket_charge(old[target].kind) || !is_rocket_charge(next[target].kind) {
+            return false;
+        }
+        let moving = next[idx];
+        next[idx] = next[target];
+        next[target] = moving;
+        true
     }
 
     fn burst_rocket(&mut self, idx: usize, x: i32, y: i32, cell: Cell, old: &[Cell], next: &mut [Cell]) {
@@ -2492,6 +2543,16 @@ fn is_water_like(kind: u8) -> bool {
 /// rather than sinking through liquid with `try_fall`.
 fn is_mote(kind: u8) -> bool {
     kind == Material::Pollen as u8 || kind == Material::Stardust as u8
+}
+
+/// What a climbing rocket grain shoves aside rather than bursting under (`try_thrust`): its
+/// own powder, lit or not, the flame that lit it, and the exhaust of the grain ahead.
+fn is_rocket_charge(kind: u8) -> bool {
+    kind == Material::Rocket as u8
+        || kind == Material::Fire as u8
+        || kind == Material::Stardust as u8
+        || kind == Material::Spark as u8
+        || kind == Material::Smoke as u8
 }
 
 fn is_gas(kind: u8) -> bool {
@@ -3159,6 +3220,143 @@ mod tests {
                 .any(|c| c.kind == Material::Rocket as u8 && c.energy > 0),
             "a lit rocket pinned under stone should burst instead of hovering"
         );
+    }
+
+    /// A one-wide Wall shaft on a Wall floor, so a lit grain has nowhere to sway and must go
+    /// straight up through whatever is stacked above it.
+    fn rocket_shaft(u: &mut Universe, x: u32, top: u32, floor: u32) {
+        for y in top..floor {
+            set_cell(u, x - 1, y, Material::Wall);
+            set_cell(u, x + 1, y, Material::Wall);
+        }
+        for dx in 0..3 {
+            set_cell(u, x - 1 + dx, floor, Material::Wall);
+        }
+    }
+
+    #[test]
+    fn a_lit_grain_shoves_up_through_its_own_powder_and_flame() {
+        let mut u = Universe::new(16, 48, 7);
+        // Left: a lit grain under five grains of its own unlit powder.
+        rocket_shaft(&mut u, 4, 20, 40);
+        for y in 34..39 {
+            set_cell(&mut u, 4, y, Material::Rocket);
+        }
+        set_cell_state(&mut u, 4, 39, Material::Rocket, 0, 220, 0);
+        // Right: a lit grain under the flame, which is the commonest ceiling a lit pile has.
+        rocket_shaft(&mut u, 11, 20, 40);
+        set_cell(&mut u, 11, 38, Material::Fire);
+        set_cell_state(&mut u, 11, 39, Material::Rocket, 0, 220, 0);
+        for _ in 0..8 {
+            u.tick();
+        }
+        let lit_above = |x: u32, row: u32| {
+            (0..row).any(|y| kind_at(&u, x, y) == Material::Rocket as u8 && energy_at(&u, x, y) > 0)
+        };
+        assert!(
+            !u.cells.iter().any(|c| c.kind == Material::Stardust as u8),
+            "neither grain should have burst: its own powder and the flame are not a ceiling"
+        );
+        assert!(lit_above(4, 34), "the grain should have climbed out through the powder stacked on it");
+        assert!(lit_above(11, 36), "the grain should have climbed out through the flame above it");
+        // The powder catches from the grain beneath it (`light_touching_powder`), so it is
+        // lit and climbing too — but every grain is still there.
+        let grains = u.cells.iter().filter(|c| c.kind == Material::Rocket as u8).count();
+        assert_eq!(grains, 7, "shoving trades places with the charge; it must not delete any grain");
+    }
+
+    #[test]
+    fn a_following_grain_climbs_through_the_trail_of_the_one_ahead() {
+        // The grain ahead leaves a spark or a puff of smoke in the cell it vacates, which is
+        // exactly where the grain behind it is going. Over several seeds, so the trail is
+        // actually laid on some of them, rather than trusting one seed to have rolled it.
+        let mut trails = 0;
+        for seed in 1..=16 {
+            let mut u = Universe::new(16, 40, seed);
+            rocket_shaft(&mut u, 8, 16, 34);
+            set_cell_state(&mut u, 8, 32, Material::Rocket, 0, 220, 0);
+            set_cell_state(&mut u, 8, 33, Material::Rocket, 0, 220, 0);
+            u.tick();
+            assert!(
+                !u.cells.iter().any(|c| c.kind == Material::Stardust as u8),
+                "seed {seed}: the following grain burst on the trail of the grain ahead"
+            );
+            let lit = u
+                .cells
+                .iter()
+                .filter(|c| c.kind == Material::Rocket as u8 && c.energy > 0)
+                .count();
+            assert_eq!(lit, 2, "seed {seed}: both grains should still be in flight");
+            // The trail the follower shoved past ends up where the follower started.
+            let left = kind_at(&u, 8, 33);
+            if left == Material::Spark as u8 || left == Material::Smoke as u8 {
+                trails += 1;
+            }
+        }
+        assert!(trails > 0, "no seed laid a trail in the follower's path, so this proved nothing");
+    }
+
+    #[test]
+    fn a_lit_grain_still_bursts_under_sand() {
+        // Only the rocket's own charge is shoved aside. Sand is somebody else's lid.
+        let mut u = Universe::new(16, 48, 7);
+        rocket_shaft(&mut u, 8, 20, 40);
+        for y in 34..39 {
+            set_cell(&mut u, 8, y, Material::Sand);
+        }
+        set_cell_state(&mut u, 8, 39, Material::Rocket, 0, 220, 0);
+        u.tick();
+        assert_eq!(
+            kind_at(&u, 8, 39),
+            Material::Stardust as u8,
+            "a lit grain under sand should burst where it is"
+        );
+        let sand = u.cells.iter().filter(|c| c.kind == Material::Sand as u8).count();
+        assert_eq!(sand, 5, "the sand lid should be untouched");
+    }
+
+    /// A line of powder on a Wall floor, `from..=to` along row `y`, and a lit grain at `lit_x`.
+    fn fuse_line(u: &mut Universe, y: u32, from: u32, to: u32, lit_x: u32) {
+        for x in 0..u.width {
+            set_cell(u, x, y + 1, Material::Wall);
+        }
+        for x in from..=to {
+            set_cell(u, x, y, Material::Rocket);
+        }
+        set_cell_state(u, lit_x, y, Material::Rocket, 0, 220, 0);
+    }
+
+    #[test]
+    fn a_lit_grain_lights_the_powder_it_touches() {
+        // A line lit at one end burns its length, each grain lighting the next as it leaves.
+        let mut u = Universe::new(32, 48, 7);
+        fuse_line(&mut u, 39, 4, 27, 3);
+        let mut furthest = 0;
+        for _ in 0..40 {
+            u.tick();
+            for x in 0..32 {
+                for y in 30..40 {
+                    if kind_at(&u, x, y) == Material::Rocket as u8 && energy_at(&u, x, y) > 0 {
+                        furthest = furthest.max(x);
+                    }
+                }
+            }
+        }
+        assert!(furthest >= 26, "the light should run the length of the line, reached only x={furthest}");
+    }
+
+    #[test]
+    fn a_lit_grain_does_not_light_powder_it_is_not_touching() {
+        // The same line with a two-cell gap before it: nothing jumps the gap.
+        let mut u = Universe::new(32, 48, 7);
+        fuse_line(&mut u, 39, 4, 27, 1);
+        for _ in 0..30 {
+            u.tick();
+        }
+        let unlit = (4..=27)
+            .filter(|&x| kind_at(&u, x, 39) == Material::Rocket as u8 && energy_at(&u, x, 39) == 0)
+            .count();
+        assert_eq!(unlit, 24, "a grain that never touched the line should not have lit any of it");
     }
 
     /// The deliberate water sink (ROADMAP Phase 20): water throws mist only when it MOVES.

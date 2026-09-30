@@ -109,7 +109,7 @@ Some key reactions:
 - Seeds are now potential: wet rooted seeds can bloom into flowers, moss beds can overtake them, and nearby fungus can rot them.
 - Moss is carpet growth: it spreads over damp soil and wood but does not bloom.
 - Wall and stone are intentionally separate: stone is natural, weatherable, easier for moss/condensation to affect, and falls when nothing supports it; wall is sealed construction that stains but resists casual moss, and is the only material that never moves. Build scaffolds and test fixtures out of wall.
-- Rocket powder lies inert until any flame lights it; a lit grain whooshes skyward trailing glitter and bursts into a multicolor firework shell of sparks that droop, twinkle, and fade, chain-lighting neighboring powder.
+- Rocket powder lies inert until any flame lights it; a lit grain lights the powder it touches and whooshes skyward trailing glitter, shoving up through its own charge, so a pile goes up as a volley and a line of powder burns along like a fuse. Each grain bursts into a multicolor firework shell of sparks that droop, twinkle, and fade, chain-lighting neighboring powder.
 - Wellspring blocks drink the identity of the first material to touch them (water, lava, sand, stardust, and more), then pour it back out from open faces forever. Nearby ice stills the spring and also reopens it: a chilled spring re-drinks whatever touches it next, so a misattuned block can be re-taught instead of being ruined.
 - Stardust, meteor, and moonwater add the cozy/cosmic identity.
 

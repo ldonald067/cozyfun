@@ -1113,6 +1113,7 @@ class JsSandboxEngine implements SandboxEngine {
       this.burstRocket(idx, x, y, cell, old, next);
       return;
     }
+    this.lightTouchingPowder(x, y, old, next);
     const sway = this.chance(3) ? (this.ticks % 2 === 0 ? 1 : -1) : 0;
     let moved = false;
     let nx = x;
@@ -1123,6 +1124,7 @@ class JsSandboxEngine implements SandboxEngine {
         break;
       }
     }
+    if (!moved && this.thrust(idx, x, y - 1, cell, old, next)) moved = true;
     if (!moved) {
       this.burstRocket(idx, x, y, cell, old, next);
       return;
@@ -1134,6 +1136,28 @@ class JsSandboxEngine implements SandboxEngine {
       if (this.chance(3)) writeCellBytes(next, idx, MATERIAL.Spark, SPARK_DOWN, 110);
       else if (this.chance(2)) writeCellBytes(next, idx, MATERIAL.Smoke, cell[1], 70);
     }
+  }
+
+  // Mirrors Universe::light_touching_powder: a lit grain lights the unlit powder it touches.
+  private lightTouchingPowder(x: number, y: number, old: Uint8Array, next: Uint8Array) {
+    for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+      if (!this.inBounds(x + dx, y + dy)) continue;
+      const n = this.index(x + dx, y + dy);
+      const unlit = (cells: Uint8Array) => cells[n] === MATERIAL.Rocket && readU16(cells, n + 4) === 0;
+      if (unlit(old) && unlit(next)) writeU16(next, n + 4, 220);
+    }
+  }
+
+  // Mirrors Universe::try_thrust: a lit grain trades places with its own charge rather than
+  // bursting under it, when the cell is part of the charge at both ends of the tick.
+  private thrust(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
+    if (!this.inBounds(x, y) || next[idx] !== cell[0]) return false;
+    const target = this.index(x, y);
+    if (!rocketCharge(old[target]) || !rocketCharge(next[target])) return false;
+    const moving = next.slice(idx, idx + CELL_STRIDE);
+    next.copyWithin(idx, target, target + CELL_STRIDE);
+    next.set(moving, target);
+    return true;
   }
 
   private burstRocket(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
@@ -1774,6 +1798,17 @@ function waterLike(kind: number) {
 // Mirrors is_mote: pollen and stardust, which float on a pond instead of sinking.
 function isMote(kind: number) {
   return kind === MATERIAL.Pollen || kind === MATERIAL.Stardust;
+}
+
+// Mirrors is_rocket_charge: what a climbing rocket grain shoves aside (see Universe::try_thrust).
+function rocketCharge(kind: number) {
+  return (
+    kind === MATERIAL.Rocket ||
+    kind === MATERIAL.Fire ||
+    kind === MATERIAL.Stardust ||
+    kind === MATERIAL.Spark ||
+    kind === MATERIAL.Smoke
+  );
 }
 
 function isGas(kind: number) {

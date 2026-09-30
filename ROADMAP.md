@@ -10,8 +10,9 @@ clobber's hidden water sink with a deliberate one — is done: moving water thro
 mist, and water no longer deletes water or freshly vented gas, gas no longer deletes gas or
 water, and pollen and stardust no longer delete water. The 787 overwrites that remain are
 listed class by class, with the reason each stays, in docs/HARNESS.md. Since then, hot steam
-bubbles up through water instead of being deleted by it ("After Phase 20: bubbles"). No Phase
-21 is planned yet.
+bubbles up through water instead of being deleted by it ("After Phase 20: bubbles"), and lit
+rocket powder goes up as a volley while a line of powder burns like a fuse ("After Phase 20:
+rockets"). No Phase 21 is planned yet.
 **Start at `docs/HANDOFF.md`.**
 
 The sandbox is a playable, deployed browser toy: React/Vite UI, Rust/WASM sim with a byte-identical JS fallback, 18 paintable materials plus the Eraser on the toolbar and 8 generated-only outcomes, six credited room backdrops with room-linked native ambience, optional YouTube Desk Radio, local save/share/postcard/clip export, a click-to-load embed poster, deterministic sim/parity/browser/visual/audio QA wired into local scripts and CI, and a deploy gate that proves which commit the running host is serving. It runs at `pixelfun.littlealbumclub.net` and is iframed into `littlealbumclub.net`. Details live in the phase sections below.
@@ -790,3 +791,15 @@ mostly never surfaced. Gas hotter than mist now trades places with whatever sink
 boiling steam surfaces on every seed (32/32). Mist is excluded because bubbling it flooded a
 spring from 7.2% of the board to 29.5%; with the exclusion the water budget is unchanged.
 `lava.scorches` falls 32 -> 29 of 32, explained in docs/HARNESS.md ("Bubbles").
+
+### After Phase 20: rockets
+
+Status: done. The tray promises rocket powder that "leaps skyward and bursts", and a pile lit
+at the default brush sent up 2 grains of ~24 while 12 burst on the ground. A lit grain now
+shoves up through its own charge and lights the powder it touches, so a pile goes up whole
+and a dragged line of powder burns like a fuse. The owner chose this over the volley alone
+and over a random blend, accepting that piles with a gap between them rarely set each other
+off in open air any more. `rocket.climbs`, which the last handoff found passing on a lucky
+seed, now passes on every seed, and `rocket.fuses` is new. The measurements and costs live in
+docs/VISUAL_PIPELINE.md ("A lit charge goes up whole"); why each audit scene moved is written
+at the scene, in scripts/interaction-scenes.mjs.
