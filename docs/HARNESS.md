@@ -103,6 +103,21 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   and changed the rule. The scene now has a twin without the pour, an `absent` check that must
   stay bare, so the precondition is part of the gate.
 
+  **Take the actor away too.** `wellspring.reattune` passed 32 of 32 with the wellspring
+  painted as plain Wall: its witness was "sand that appeared", and the scene's own sand dabs
+  appear. `lava.scorches` counted new scorched stone, and 123 of the 205 cells it counted over
+  32 seeds were lava that water had quenched into stone, which is `lava.quenched`. Neither
+  failed, so nobody looked. If a check still passes with the material it is named after
+  removed, or credits another clause's product, it is not evidence.
+
+  **An outcome that undoes something is measured against the something.** Contrast is scored
+  against the scene as painted, so a rinse read as clean stone against clean stone. That is
+  partly why `water.rinses` drifted to counting wet stone instead. A check may set
+  `memo.against` to a grid of its own, and `water.rinses` sets it to the last tick before any
+  soot washed off: black turning clean scores 196 or more. Its scene was rebuilt too. A
+  one-cell flame beside a mound sooted ONE stone cell at most. A stone pillar with a log fire
+  at its foot soots 12 cells up its face on every seed, because smoke rises straight past it.
+
   The scenes and the runner that plays them live in `scripts/interaction-scenes.mjs`, shared
   with `audit:drift` and `clobber:census` so all three measure the same scenes. Material
   ids and flags there are read from `materials.ts`, not typed out. **The audit measures each

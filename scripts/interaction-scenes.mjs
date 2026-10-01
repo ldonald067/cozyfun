@@ -232,7 +232,11 @@ export function runCheck(check, { engine, colorForCell }) {
       peakSnapshot = grid(view().slice(), w, h);
     }
   }
-  const contrast = peakSnapshot ? medianContrast(colorForCell, peakSnapshot, before, peakIndices) : 0;
+  // Contrast is against the scene as painted, unless the check set `memo.against` to a grid
+  // of its own. An outcome that UNDOES an intermediate state — soot rinsed off a rock that was
+  // painted clean — would otherwise be scored as clean stone against clean stone, when what
+  // the player sees is black turning clean.
+  const contrast = peakSnapshot ? medianContrast(colorForCell, peakSnapshot, memo.against ?? before, peakIndices) : 0;
   uni.free();
   return { firstTick, vacuous: false, peakCells, spreadCells: touched.size, visibleTicks, contrast, absent };
 }
@@ -321,19 +325,31 @@ export const CHECKS = [
       for (const i of g.appeared(M.Steam, before)) memo.wisps.add(i);
       return [...memo.wisps].filter((i) => g.kindOf(i) === M.Steam);
     } },
-  { m: "Water", covers: "water.rinses", role: "rinses soot from scorched stone", w: 30, h: 26, seed: 10, ticks: 2500,
-    // Burn against the rock first, THEN wash it — the order a player uses. Soot comes from
-    // smoke touching the stone, and a fire on top of the rock sends its smoke straight up and
-    // away, so sooting used to be luck: the water painted at the start raced the smoke and
-    // won on one seed in eight, before and after ROADMAP Phase 20. A fire against the rock's
-    // side climbs its face, and the pour lands once it is black: 8 seeds of 8.
-    paint: (p) => { p(15, 19, 3, M.Stone); p(11, 21, 1, M.Fire); },
-    act: (p, t) => { if (t === 200) p(15, 11, 3, M.Water); },
+  { m: "Water", covers: "water.rinses", role: "rinses soot from scorched stone", w: 40, h: 34, seed: 10, ticks: 2200,
+    // Burn beside the rock first, THEN wash it — the order a player uses. Soot is smoke
+    // touching dry stone, and smoke rises straight up, so it blackens a face it climbs past:
+    // a stone pillar dragged up beside a log fire, not a mound with a flame at its side.
+    //
+    // The mound is what this used to be, with a one-cell dab of fire, and it sooted ONE stone
+    // cell at most — none at all on 4 seeds of 32, which failed. The witness then counted every
+    // wet stone cell once that speck was gone, so it scored the pour wetting the rock, not
+    // soot coming off it. The pillar soots 12 cells up its face on every seed, and the pour
+    // on its top runs down the face and rinses nearly all of them.
+    //
+    // The witness is stone that was sooty and is now clean and wet, and it is measured against
+    // the scene on the last tick before anything washed off, because black turning clean is
+    // what a player sees. Against the rock as painted, it would score clean against clean.
+    paint: (p) => { for (let y = 25; y >= 12; y--) p(24, y, 4, M.Stone); p(15, 26, 3, M.Wood); p(15, 20, 4, M.Fire, 55); },
+    act: (p, t) => { if (t === 700) p(24, 4, 4, M.Water, 55); },
     outcome: (g, before, memo) => {
-      const sooty = g.all(M.Stone).filter((i) => g.hasFlag(i, F.Scorched));
-      if (sooty.length) { memo.sooted = true; return []; }
-      if (!memo.sooted) return [];
-      return g.all(M.Stone).filter((i) => g.hasFlag(i, F.Wet));
+      memo.sooty ??= new Set();
+      memo.rinsed ??= new Set();
+      for (const i of g.all(M.Stone)) if (g.hasFlag(i, F.Scorched)) memo.sooty.add(i);
+      for (const i of memo.sooty) {
+        if (g.kindOf(i) === M.Stone && !g.hasFlag(i, F.Scorched) && g.hasFlag(i, F.Wet)) memo.rinsed.add(i);
+      }
+      if (!memo.rinsed.size) memo.against = grid(g.cells.slice(), g.w, g.h);
+      return [...memo.rinsed].filter((i) => g.kindOf(i) === M.Stone && !g.hasFlag(i, F.Scorched));
     } },
   { m: "Moonwater", covers: "moonwater.cleans", role: "cleans oil into stardust", w: 30, h: 26, seed: 11, ticks: 900,
     paint: (p) => { p(15, 20, 3, M.Oil); p(15, 15, 3, M.Moonwater); },
@@ -351,7 +367,11 @@ export const CHECKS = [
 
   // ---- Heat ---------------------------------------------------------------------------
   { m: "Fire", covers: "fire.ignites", role: "ignites wood into ember", w: 30, h: 26, seed: 14, ticks: 900,
-    paint: (p) => { p(15, 20, 4, M.Wood); p(15, 15, 1, M.Fire); },
+    // A flame at the default brush on a log. A one-cell dab caught on tick 1-3 or never: it
+    // burns out so fast that on 4 seeds of 32 it missed the log entirely. The brush catches on
+    // 32 of 32 with at least 32 ember cells; wood.burns below is the same scene, and moved the
+    // same way.
+    paint: (p) => { p(15, 20, 4, M.Wood); p(15, 13, 4, M.Fire, 55); },
     outcome: (g, before) => g.appeared(M.Ember, before) },
   { m: "Fire", covers: "fire.softens", role: "softens into steam against water", w: 30, h: 26, seed: 15, ticks: 400,
     // Water poured from above onto a flame, which is how a player puts a fire out. A blob
@@ -638,8 +658,20 @@ export const CHECKS = [
       return [...memo.high].filter((i) => g.kindOf(i) === M.Steam);
     } },
   { m: "Steam", covers: "steam.frosts", role: "frosts into ice near ice", w: 26, h: 30, seed: 69, ticks: 1500,
-    paint: (p) => { p(13, 24, 3, M.Water); p(13, 25, 2, M.Lava); p(13, 16, 2, M.Ice); },
-    outcome: (g, before) => g.appeared(M.Ice, before) },
+    // A pond, lava dropped into it a second later, and ice held over the steam — at the default
+    // brush. The old scene was a small pool and a small ice dab: the lava quenches in about 60
+    // ticks, so the steam comes as one brief narrow burst, and most of it rose past the dab,
+    // which caught 2-3 cells on 4 seeds of 32. This catches at least 13 on all 32.
+    //
+    // The witness is ice that was STEAM the tick before. Counting any new ice also took water
+    // that splashed up and froze: 6 of 707 cells over 32 seeds here.
+    paint: (p) => { p(13, 23, 4, M.Water, 55); p(13, 12, 4, M.Ice); },
+    act: (p, t) => { if (t === 20) p(13, 23, 4, M.Lava, 55); },
+    outcome: (g, before, memo, prev) => {
+      memo.frost ??= new Set();
+      for (const i of g.appeared(M.Ice, before)) if (prev.kindOf(i) === M.Steam) memo.frost.add(i);
+      return [...memo.frost].filter((i) => g.kindOf(i) === M.Ice);
+    } },
   { m: "Soil", covers: "soil.falls", role: "falls as organic substrate", w: 26, h: 26, seed: 70, ticks: 300,
     paint: (p) => { p(13, 8, 2, M.Soil); },
     outcome: (g, before) => g.appeared(M.Soil, before) },
@@ -673,7 +705,9 @@ export const CHECKS = [
     outcome: (g, before) => g.appeared(M.Soil, before) },
 
   { m: "Wood", covers: "wood.burns", role: "burns through the ember arc instead of vanishing", w: 30, h: 26, seed: 76, ticks: 1500,
-    paint: (p) => { p(15, 20, 4, M.Wood); p(15, 15, 1, M.Fire); },
+    // Lit at the default brush, for the reason given at fire.ignites: a dab missed the log on
+    // 4 seeds of 32.
+    paint: (p) => { p(15, 20, 4, M.Wood); p(15, 13, 4, M.Fire, 55); },
     outcome: (g, before) => g.appeared(M.Ember, before) },
   { m: "Wood", covers: "wood.steams", role: "vents steam while wet before igniting", w: 30, h: 26, seed: 77, ticks: 1500,
     // The flame beside the soaked log, not stacked three cells above it with the water in

@@ -49,16 +49,30 @@ No next phase is planned; what to build is the owner's call.
 
 ### 1. The rest of the lucky-seed list
 
-`stem.climbs` (side leaves), `ice.stresses` and `moss.dries` were fixed on 2026-09-30. In
-every case the rule was fine and the scene was not what a player does. `stem.climbs` and
-`moss.dries` were smaller than anything a player paints: they are now a dragged seed bed, and
-a carpet and flame at the default brush. `ice.stresses` had a worse problem that review
-found. Its ice was painted one cell clear of the rock, so frost only got across when the pour
-froze into a bridge, which meant the scene passed only if everything was painted at once. Its
-materials are now painted one after another, with the ice touching the rock. All three pass
-32 of 32, and the reasoning is written at each scene. What is left is the fifteen that pass on
-28-31 seeds of 32; re-measure them with `npm run audit:drift -- --seeds 32 --per-seed` before
-starting.
+Re-measured on 2026-10-01 over all 127 checks at 32 seeds: 13 failed on at least one seed.
+Four were fixed that day, all re-staged at the default brush and each failing on all 32 seeds
+with its rule switched off. `fire.ignites` (wood) and `wood.burns` needed a flame, not a
+one-cell dab, which caught on tick 1-3 or never. `steam.frosts` needed a pond with lava dropped
+in and ice held over it, and now counts only ice that was steam. `water.rinses` needed a stone
+pillar beside a log fire, because a flame beside a mound sooted one cell at most, and its
+witness had been counting wet stone rather than soot coming off.
+
+**Two checks were found certifying nothing**, and they are the next thing to settle:
+
+- **`wellspring.reattune` passes 32 of 32 with no wellspring at all.** Its witness is "sand
+  that appeared", which the scene's own sand dabs satisfy. Witnessed honestly, as spring cells
+  that remembered water and now remember sand, it fails on every seed. A player's spring sits
+  in its own outflow (a pool, or a pile it buries itself in), and a re-teach sequence that
+  ends in a sand pour has not been found yet. Three explanations were tested and none held,
+  so this needs a proper investigation, and probably the owner, before the scene is rebuilt.
+  The cargo test passes because it hand-places a bare spring.
+- **`lava.scorches` mostly counts `lava.quenched`.** Of 205 scorched-stone cells over 32 seeds,
+  123 were lava that water quenched into stone; only 82 were the rock being scorched. Counting
+  the painted rock alone, it fails on every seed (2-3 cells). Lava against a wetted rock at
+  the default brush passes 18 of 32.
+
+Still at 29-31 of 32, untouched: `fire.softens`, `meteor.trail`, `stem.burns`,
+`fungus.fairyring`, `oil.ignites` and `meteor.shocked` (31 each), and `fire.thaws` below.
 
 **`fire.thaws` joined that list when ice stopped frosting dry stone**, and it is the thinnest:
 31 of 32, with 4 thawed cells on almost every seed, which is exactly the floor. Its ice dab
