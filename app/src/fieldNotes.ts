@@ -1,4 +1,4 @@
-import { CELL_STRIDE, MATERIAL } from "./materials";
+import { CELL_FLAG, CELL_STRIDE, MATERIAL } from "./materials";
 
 // Mystical field notes: one-line observations that appear the FIRST time the player's
 // terrarium produces something, written as if the desk's occupant noticed it too.
@@ -42,7 +42,23 @@ type NoteRule = FieldNote & {
   // in the game, because nothing in play suggests trying it. This is the one note that
   // teaches rather than observes.
   when?: (cells: Uint8Array, width: number, height: number) => boolean;
+  // A count of cells in a STATE rather than of a kind, fed through the same rising-count test
+  // as `kind`: the first sample of a session is a baseline, so a restored scene that already
+  // holds the state does not announce it. Used where the moment is the state appearing.
+  census?: (cells: Uint8Array) => number;
 };
+
+// Stone and wall carrying frost. Ice only frosts masonry that holds water, so this is the
+// moment a player who wetted a rock and set ice against it sees the cold take hold.
+function frostedMasonry(cells: Uint8Array): number {
+  let n = 0;
+  for (let offset = 0; offset < cells.length; offset += CELL_STRIDE) {
+    const kind = cells[offset];
+    if (kind !== MATERIAL.Stone && kind !== MATERIAL.Wall) continue;
+    if ((cells[offset + 6] | (cells[offset + 7] << 8)) & CELL_FLAG.Frozen) n++;
+  }
+  return n;
+}
 
 // A wellspring with ice against it: the sim stills it and reopens its drinking branch, so
 // this is the exact moment the player can re-teach it. Matches the sim's own test -- a
@@ -80,6 +96,10 @@ const NOTE_RULES: readonly NoteRule[] = [
     text: "the cold has hushed the spring — it will drink whatever you offer it next" },
   { id: "stone.born", kind: MATERIAL.Stone, requires: [MATERIAL.Lava],
     text: "the lava grows a skin of new stone" },
+  // A dry rock beside ice stays bare, so this is a two-material discovery nothing in the tray
+  // mentions. The note rewards finding it and names the cause — the water, not the ice alone.
+  { id: "ice.stresses", kind: MATERIAL.Stone, census: frostedMasonry, atLeast: 4,
+    text: "the cold found the water hiding in the stone" },
   { id: "ember.glows", kind: MATERIAL.Ember,
     text: "the wood keeps its warmth as embers" },
   { id: "pollen.drifts", kind: MATERIAL.Pollen,
@@ -119,6 +139,7 @@ function loadLedger(): Set<string> {
 export class FieldNoteJournal {
   private witnessed = loadLedger();
   private lastCounts: Map<number, number> | null = null;
+  private lastCensus = new Map<string, number>();
   // Negative infinity, not 0: performance.now() is small early in a session, and a
   // zero sentinel silently put every fresh page inside the cooldown for its first
   // 45 seconds — which is exactly when a new player's first discovery happens.
@@ -135,6 +156,17 @@ export class FieldNoteJournal {
   }
 
   /**
+   * The scene was replaced wholesale (a load or an import), so the next sample is a baseline
+   * again, exactly like the first sample of a session. Without this, whatever the loaded
+   * scene already holds reads as a rise against the scene it replaced, and a once-ever note
+   * is spent on something the player did not just discover. The witnessed ledger is kept.
+   */
+  rebaseline() {
+    this.lastCounts = null;
+    this.lastCensus = new Map();
+  }
+
+  /**
    * Feed one snapshot of cell bytes; returns a note the first time a legible moment
    * appears, or null. Callers own the cadence (every SAMPLE_EVERY_TICKS) and must
    * not sample during catch-up fast-forward — retroactive discoveries are exactly
@@ -146,8 +178,14 @@ export class FieldNoteJournal {
       const kind = cells[offset];
       if (kind !== MATERIAL.Empty) counts.set(kind, (counts.get(kind) ?? 0) + 1);
     }
+    const census = new Map<string, number>();
+    for (const rule of NOTE_RULES) {
+      if (rule.census && !this.witnessed.has(rule.id)) census.set(rule.id, rule.census(cells));
+    }
     const previous = this.lastCounts;
+    const previousCensus = this.lastCensus;
     this.lastCounts = counts;
+    this.lastCensus = census;
     // The first sample of a session is baseline only: a restored scene full of glass
     // must not "discover" glass the player made last week.
     if (!previous) return null;
@@ -158,11 +196,12 @@ export class FieldNoteJournal {
       if (rule.when) {
         if (!rule.when(cells, width, height)) continue;
       } else {
-      const have = counts.get(rule.kind) ?? 0;
-      const had = previous.get(rule.kind) ?? 0;
+      const have = rule.census ? census.get(rule.id) ?? 0 : counts.get(rule.kind) ?? 0;
+      const had = rule.census ? previousCensus.get(rule.id) ?? 0 : previous.get(rule.kind) ?? 0;
       if (have <= had || have < (rule.atLeast ?? 1)) continue;
       if (rule.requires && !rule.requires.some((kind) => (counts.get(kind) ?? 0) > 0)) continue;
-      if (BRUSH_GUARDED.has(rule.kind) && now - (this.lastPaintAt.get(rule.kind) ?? -Infinity) < BRUSH_GUARD_MS) continue;
+      // A census counts a state no brush can paint, so the brush guard has nothing to guard.
+      if (!rule.census && BRUSH_GUARDED.has(rule.kind) && now - (this.lastPaintAt.get(rule.kind) ?? -Infinity) < BRUSH_GUARD_MS) continue;
       }
 
       this.witnessed.add(rule.id);

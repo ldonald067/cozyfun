@@ -70,4 +70,69 @@ if (!fired) {
     "a chilled wellspring produced no field note, so the only channel that teaches " +
     "re-attunement is silent. Check aSpringIsListening against the sim's own ice test.");
 }
-console.log(`Field note smoke passed: a chilled spring says "${fired.text}"`);
+
+// Frost in stone is a two-material discovery: ice frosts only masonry that holds water, so the
+// note must fire for a wetted rock and stay silent for a dry one. Each scene gets its own
+// journal, since a note fired anywhere starts the 45-second cooldown for all of them.
+const frostScene = ({ pour, sampleFrom }) => {
+  const u = w.universe_new(W, H, 11);
+  const p = (x, y, r, m, d = 100) => w.universe_paint(u, x, y, r, m, d);
+  const view = () => new Uint8Array(w.memory.buffer, w.universe_cells_ptr(u), w.universe_cells_byte_len(u));
+  for (let x = 0; x < W; x++) p(x, 30, 1, M.Wall);
+  p(30, 25, 4, M.Stone);
+  const j = new FieldNoteJournal();
+  let now = 100_000, note = null;
+  for (let t = 1; t <= 900 && !note; t++) {
+    if (pour && t === 20) p(30, 16, 4, M.Water, 55);
+    if (t === 60) p(23, 25, 4, M.Ice);
+    w.universe_tick(u);
+    now += 16;
+    if (t >= sampleFrom && t % 30 === 0) note = j.sample(view(), now, W, H);
+  }
+  w.universe_free(u);
+  return note;
+};
+const wetNote = frostScene({ pour: true, sampleFrom: 0 });
+if (!wetNote || wetNote.id !== "ice.stresses") {
+  throw new Error(`ice against a wetted rock should say the cold found the water; got ${wetNote ? wetNote.id : "nothing"}`);
+}
+const dryNote = frostScene({ pour: false, sampleFrom: 0 });
+if (dryNote) throw new Error(`a dry rock against ice fired "${dryNote.id}" — dry stone must not frost, and nothing else happens here`);
+// A scene that was already frosted when the session began is not a discovery: the journal's
+// first sample is a baseline, so frost that is simply still there must not announce itself.
+const restoredNote = frostScene({ pour: true, sampleFrom: 600 });
+if (restoredNote) throw new Error(`frost that was already in the stone when sampling began fired "${restoredNote.id}"`);
+
+// The same promise for a scene loaded or imported MID-session, which keeps the journal: the
+// app calls rebaseline() after the swap. Without it, frost already in the loaded scene reads
+// as a rise against the scene it replaced. The control proves this case reaches that problem.
+const boardAt = ({ pour, ticks }) => {
+  const u = w.universe_new(W, H, 11);
+  const p = (x, y, r, m, d = 100) => w.universe_paint(u, x, y, r, m, d);
+  for (let x = 0; x < W; x++) p(x, 30, 1, M.Wall);
+  p(30, 25, 4, M.Stone);
+  for (let t = 1; t <= ticks; t++) {
+    if (pour && t === 20) p(30, 16, 4, M.Water, 55);
+    if (t === 60) p(23, 25, 4, M.Ice);
+    w.universe_tick(u);
+  }
+  const bytes = new Uint8Array(w.memory.buffer, w.universe_cells_ptr(u), w.universe_cells_byte_len(u)).slice();
+  w.universe_free(u);
+  return bytes;
+};
+const bareRock = boardAt({ pour: false, ticks: 10 }), frostedRock = boardAt({ pour: true, ticks: 600 });
+const loadMidSession = (rebaseline) => {
+  const j = new FieldNoteJournal();
+  let now = 100_000;
+  j.sample(bareRock, (now += 500), W, H);
+  j.sample(bareRock, (now += 500), W, H);
+  if (rebaseline) j.rebaseline();
+  return j.sample(frostedRock, (now += 500), W, H) ?? j.sample(frostedRock, (now += 500), W, H);
+};
+if (!loadMidSession(false)) {
+  throw new Error("the mid-session load control fired no note, so the rebaseline case below proves nothing");
+}
+const loadedNote = loadMidSession(true);
+if (loadedNote) throw new Error(`a loaded scene's existing frost fired "${loadedNote.id}" after rebaseline()`);
+
+console.log(`Field note smoke passed: a chilled spring says "${fired.text}"; a wetted rock against ice says "${wetNote.text}", a dry one says nothing`);

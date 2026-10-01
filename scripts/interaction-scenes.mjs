@@ -382,18 +382,23 @@ export const CHECKS = [
     // ice was against the flank.
     //
     // Painted touching, it no longer matters which comes first: pour then ice passes 32 of 32
-    // with at least 7 frosted cells, still 32 of 32 with the ice seven seconds late (stone
-    // stays wet until its dampness drains), and ice then pour passes 32 of 32 with at least 10.
+    // with at least 6 frosted cells, still 32 of 32 with the ice seven seconds late (stone
+    // stays wet until its dampness drains), and ice then pour passes 32 of 32 with at least 4.
     //
-    // What this does NOT show is that the dampness matters, and in play it does not. Ice frosts
-    // a wet stone or wall cell for certain and a dry one at 1 in 4 a tick, and that frost leaves
-    // energy 72, which the next tick reads as dampness over 40. So a dry rock ends exactly as
-    // frosted, on the same tick: with the pour left out, this scene still passes 32 of 32 with
-    // 7 cells at contrast 296 (290 with it). Whether the clause should lose "damp" or the rule
-    // should honour it is an open owner question in docs/HANDOFF.md.
+    // Only the pour makes it happen. Dry masonry used to frost just the same — it fell through
+    // to the generic freeze, whose energy the next tick read as dampness — so this scene passed
+    // 32 of 32 with no water at all, and "damp" in the clause meant nothing. The check below is
+    // this exact scene without the pour, and it must stay bare.
     paint: (p) => { p(20, 21, 4, M.Stone); },
     act: (p, t) => { if (t === 20) p(20, 12, 4, M.Water, 55); if (t === 60) p(13, 21, 4, M.Ice); },
     outcome: (g, before) => g.gained(M.Stone, F.Frozen, before) },
+  { m: "Ice", covers: "ice.stresses", role: "leaves dry stone and wall bare", w: 40, h: 30, seed: 20, ticks: 1500,
+    absent: true,
+    // The scene above, gesture for gesture, without the pour — so it cannot pass merely because
+    // the ice never reached anything. The ice touches the rock and the dry floor bricks under it.
+    paint: (p) => { p(20, 21, 4, M.Stone); },
+    act: (p, t) => { if (t === 60) p(13, 21, 4, M.Ice); },
+    outcome: (g, before) => [...g.gained(M.Stone, F.Frozen, before), ...g.gained(M.Wall, F.Frozen, before)] },
 
   // ---- Life ---------------------------------------------------------------------------
   { m: "Soil", covers: "soil.greens", role: "greens into moss when watered", w: 30, h: 26, seed: 21, ticks: 900,

@@ -1,7 +1,8 @@
 # Handoff — where the work is, and what to do next
 
-*Rewritten at each handoff, never appended to. Written 2026-09-30, after two batches: the
-tick-rate correction (live and verified at `cfe32df`) and rockets that fly (see below).*
+*Rewritten at each handoff, never appended to. Written 2026-09-30 and brought up to date on
+2026-10-01: the tick-rate correction, rockets that fly, three lucky-seed checks, and frost that
+needs water (see below).*
 
 ## Where things stand
 
@@ -32,7 +33,13 @@ passing on leftover UNLIT powder — its witness remembered cells and kept count
 grain sat in them — and it now stages its charges under a roof, where sparks can reach the next
 charge, with a witness that credits sparks only after a far charge is seen lit.
 
-Everything is green: 131 cargo tests, 34 parity scenarios, 126 interaction checks bound to all
+**Ice frosts only wet stone and wall** (2026-10-01). A dry rock beside ice used to frost
+exactly like a wet one, so "damp" in `[ice.stresses]` meant nothing. The owner chose to make it
+mean something, as a two-material discovery, and the first frost in masonry now gets a field
+note. `ice_leaves_dry_stone_and_wall_unfrosted`, a parity scenario witnessing both halves, an
+`absent` audit twin and the field-note smoke all fail by name with the old rule.
+
+Everything is green: 132 cargo tests, 35 parity scenarios, 127 interaction checks bound to all
 118 role ids, the slow world (a day away grows the garden 18 new columns), and the full
 `npm run check`.
 
@@ -53,6 +60,16 @@ materials are now painted one after another, with the ice touching the rock. All
 28-31 seeds of 32; re-measure them with `npm run audit:drift -- --seeds 32 --per-seed` before
 starting.
 
+**`fire.thaws` joined that list when ice stopped frosting dry stone**, and it is the thinnest:
+31 of 32, with 4 thawed cells on almost every seed, which is exactly the floor. Its ice dab
+sits on top of the rock. The old rule frosted 7 cells around it: 3 on the rock's wet surface
+and 4 inside the rock, where the water never reached. Only the wet ones frost now. Painting
+more water, a default-brush rock and pour, or a dragged line of ice did not help: a brush
+paints over the wet surface it is meant to touch, and fire painted over frost paints over the
+frost too. Frost on stone is a thin layer where ice meets wet stone, so thawing it is small
+by nature. Re-stage it with a different frozen material if it needs more, rather than tuning
+the stone scene.
+
 **Then the remembered-cell witnesses.** 27 checks remember every cell an outcome ever touched
 and keep counting it while it holds the same MATERIAL, not the same outcome. Two of those were
 found counting leftovers today — `spark.lights` credited unlit powder, `moss.dries` credited moss
@@ -61,14 +78,6 @@ nobody noticed. docs/HARNESS.md lists how to tell; the 27 are not audited yet.
 
 ### 2. Design questions for the owner
 
-- **Ice frosts dry stone exactly like damp stone**, while `[ice.stresses]` promises "damp".
-  The rule frosts a wet stone or wall for certain and a dry one at 1 in 4 a tick (ROADMAP Phase
-  7C meant that as certain against random). But the random frost writes energy 72, and the next
-  tick reads that as dampness over 40, so both end in the same state. On the audit scene with
-  the pour removed: 32 of 32, 7 cells, contrast 296 against 290 with it. Nothing on screen
-  separates them, and the tray never mentions it. Either drop "damp" from the clause (no
-  change to play), or make dry stone and wall stop frosting. The second is a rule change, and
-  it would also mean a dry wall no longer cracks under freeze-thaw.
 
 - **The sim runs faster on faster screens.** `App.tsx` sets `lastSimTick = time` rather than
   advancing it by `SIM_TICK_MS`, so ticks land on frame boundaries: 20 a second at 60 Hz and,
@@ -97,6 +106,15 @@ nobody noticed. docs/HARNESS.md lists how to tell; the 27 are not audited yet.
 ## Decisions already made — do not relitigate
 
 All by the owner, each after seeing measurements:
+
+- **Ice frosts only stone and wall that hold water** (2026-09-30), and a field note marks the
+  first time. A dry rock beside ice used to frost just the same. Dropping "damp" from the
+  clause was the other option; the owner chose a hidden two-material discovery, because a wet
+  rock meeting ice happens in ordinary play. Cracking a wall now needs water in it too, but
+  melting ice supplies that: an ice block against a dry wall, then lava, still cracks it on 13
+  of 16 seeds (15 before), because the meltwater wets the wall first. What stopped is the
+  quick version, a small dab of ice and then fire on a dry wall, which cracked on 16 of 16
+  seeds at the first touch and now never does.
 
 - **Rockets: a lit grain shoves through its own charge and lights the powder it touches**
   (2026-09-30), over the volley alone and a random blend, accepting that separate piles rarely

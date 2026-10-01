@@ -1093,12 +1093,13 @@ class JsSandboxEngine implements SandboxEngine {
         writeCellBytes(next, nidx, MATERIAL.Ice, old[nidx + 1], 110, 0, CELL_FLAG.Cosmic);
       } else if (other === MATERIAL.Steam && this.chance(4)) {
         writeCellBytes(next, nidx, MATERIAL.Ice, old[nidx + 1], 70);
-      } else if (
-        (other === MATERIAL.Stone || other === MATERIAL.Wall) &&
-        ((readU16(old, nidx + 6) & CELL_FLAG.Wet) || readU16(old, nidx + 4) > 40)
-      ) {
-        writeU16(next, nidx + 4, Math.max(88, readU16(next, nidx + 4)));
-        writeU16(next, nidx + 6, (readU16(next, nidx + 6) | CELL_FLAG.Frozen) & ~CELL_FLAG.Scorched);
+      } else if (other === MATERIAL.Stone || other === MATERIAL.Wall) {
+        // Frost gets into masonry only through the water it holds; dry masonry must not fall
+        // through to the generic freeze (and its roll) below. Mirrors `lib.rs`.
+        if ((readU16(old, nidx + 6) & CELL_FLAG.Wet) || readU16(old, nidx + 4) > 40) {
+          writeU16(next, nidx + 4, Math.max(88, readU16(next, nidx + 4)));
+          writeU16(next, nidx + 6, (readU16(next, nidx + 6) | CELL_FLAG.Frozen) & ~CELL_FLAG.Scorched);
+        }
       } else if (freezable(other) && this.chance(4)) {
         writeU16(next, nidx + 4, Math.max(72, readU16(next, nidx + 4)));
         writeU16(next, nidx + 6, readU16(next, nidx + 6) | CELL_FLAG.Frozen);

@@ -130,6 +130,9 @@ const SHOVE_FLOOR = 6;
 // The fuse scenario's floor: the light reaches x=62 with `light_touching_powder`, and x=8
 // with it switched off in both engines — the grains at the lit end and nothing more.
 const FUSE_REACH = 40;
+// The wet/dry frost scenario: 4 cells of the wet rock frost, and none of the dry masonry; with
+// dry masonry let back into the generic freeze in both engines, the dry rock and wall frost.
+const WET_FROST_FLOOR = 3;
 // The bubble scenario's shafts: [x, steam energy] — hot steam in three, mist in three.
 const BUBBLE_UNITS = [[4, 180], [12, 180], [20, 180], [28, MIST_ENERGY], [36, MIST_ENERGY], [44, MIST_ENERGY]];
 // The vent scenario's units, one per shaft; far enough apart that no two share a wall.
@@ -261,6 +264,39 @@ const scenarios = [
       }
     },
     expect: (seen) => (seen.furthestLit >= FUSE_REACH ? null : `the light reached only x=${seen.furthestLit} of a line running to x=60 (floor ${FUSE_REACH})`),
+  },
+  {
+    // Frost gets into masonry only through the water it holds. Two rocks, each with ice
+    // against its flank, kept apart by a wall: the left one has water poured over it, the
+    // right one stays dry, and so does the dividing wall the right-hand ice also touches. The
+    // witness asks for both halves, because a rule that frosted nothing would pass the dry one.
+    name: "ice frosts a wet rock and leaves a dry one bare",
+    w: 40, h: 24, seed: 6262, ticks: 200,
+    paint(p) {
+      for (let x = 0; x < 40; x++) { p(x, 20, 1, M.Wall); p(x, 21, 1, M.Wall); }
+      for (let y = 4; y <= 19; y++) { p(19, y, 1, M.Wall); p(20, y, 1, M.Wall); }
+      p(9, 17, 2, M.Stone); p(6, 17, 1, M.Ice); p(9, 10, 2, M.Water);
+      p(25, 17, 2, M.Stone); p(22, 17, 1, M.Ice);
+    },
+    observe(seen, cells, w, h) {
+      let wet = 0;
+      seen.dryFrosted ??= 0;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const i = (y * w + x) * STRIDE;
+          if (!((cells[i + 6] | (cells[i + 7] << 8)) & CELL_FLAG.Frozen)) continue;
+          if (x < 19 && cells[i] === M.Stone) wet++;
+          if (x >= 19 && (cells[i] === M.Stone || cells[i] === M.Wall)) seen.dryFrosted++;
+        }
+      }
+      seen.wetFrosted = Math.max(seen.wetFrosted ?? 0, wet);
+    },
+    expect: (seen) =>
+      seen.dryFrosted > 0
+        ? `dry masonry frosted against ice (${seen.dryFrosted} cell-ticks); only wet masonry may`
+        : seen.wetFrosted >= WET_FROST_FLOOR
+          ? null
+          : `only ${seen.wetFrosted} cells of the wet rock frosted (floor ${WET_FROST_FLOOR})`,
   },
   {
     // Hearth conduction, with the heat reachable ONLY through masonry. An adversarial review

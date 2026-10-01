@@ -1278,11 +1278,16 @@ impl Universe {
                             next[nidx].flags = FLAG_COSMIC;
                         } else if other.kind == Material::Steam as u8 && self.chance(4) {
                             next[nidx] = Cell::new(Material::Ice as u8, other.variant, 70);
-                        } else if (other.kind == Material::Stone as u8 || other.kind == Material::Wall as u8)
-                            && (other.flags & FLAG_WET != 0 || other.energy > 40)
-                        {
-                            next[nidx].flags = (next[nidx].flags | FLAG_FROZEN) & !FLAG_SCORCHED;
-                            next[nidx].energy = next[nidx].energy.max(88);
+                        } else if other.kind == Material::Stone as u8 || other.kind == Material::Wall as u8 {
+                            // Frost gets into masonry only through the water it holds, so a
+                            // dry rock beside ice stays bare and a wet one frosts. Dry masonry
+                            // used to fall through to the generic 1-in-4 freeze below, and the
+                            // 72 energy that wrote was read as dampness the next tick: dry and
+                            // damp ended identically frosted, and "damp" meant nothing.
+                            if other.flags & FLAG_WET != 0 || other.energy > 40 {
+                                next[nidx].flags = (next[nidx].flags | FLAG_FROZEN) & !FLAG_SCORCHED;
+                                next[nidx].energy = next[nidx].energy.max(88);
+                            }
                         } else if is_freezable(other.kind) && self.chance(4) {
                             next[nidx].flags |= FLAG_FROZEN;
                             next[nidx].energy = next[nidx].energy.max(72);
@@ -4196,6 +4201,29 @@ mod tests {
         assert_eq!(kind_at(&u, 7, 9), Material::Wall as u8);
         assert!(flags_at(&u, 7, 9) & FLAG_FROZEN != 0);
         assert_eq!(flags_at(&u, 7, 9) & FLAG_SCORCHED, 0);
+    }
+
+    #[test]
+    fn ice_leaves_dry_stone_and_wall_unfrosted() {
+        // The other half of the test above. Frost gets into masonry through the water it
+        // holds, so a dry rock or wall can sit against ice indefinitely and stay bare.
+        let mut u = Universe::new(16, 16, 7);
+        set_cell(&mut u, 7, 8, Material::Ice);
+        set_cell(&mut u, 8, 8, Material::Stone);
+        set_cell(&mut u, 8, 9, Material::Wall); // bedrock so the stone stays put
+        set_cell(&mut u, 7, 9, Material::Wall);
+        for tick in 0..300 {
+            u.tick();
+            for (x, y) in [(8, 8), (8, 9), (7, 9)] {
+                assert_eq!(
+                    flags_at(&u, x, y) & FLAG_FROZEN,
+                    0,
+                    "dry masonry at ({x},{y}) frosted against ice on tick {tick}"
+                );
+            }
+        }
+        assert_eq!(kind_at(&u, 7, 8), Material::Ice as u8);
+        assert_eq!(kind_at(&u, 8, 8), Material::Stone as u8);
     }
 
     #[test]

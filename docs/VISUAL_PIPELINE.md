@@ -223,6 +223,14 @@ Current life/water rules:
 Current temperature rules:
 
 - Ice freezes nearby water, condenses steam into frost, and marks nearby living/substrate cells as frozen.
+- **Ice frosts stone and wall only where they hold water.** A dry rock against ice stays bare;
+  pour water over it and the frost takes hold where the ice touches, and a field note marks
+  the first time. It is a discovery nothing in the tray mentions, chosen by the owner on
+  2026-09-30 because a wet rock meeting ice happens in ordinary play.
+  Dry masonry used to frost as well. It fell through to the generic 1-in-4 freeze, and the 72
+  energy that wrote was read as dampness over 40 the next tick. Measured on the audit's scene,
+  a dry rock frosted 7 cells at contrast 296 against 290 wet, on the same tick, so "damp" in
+  the clause meant nothing.
 - Frozen seeds and growth stay dormant until they thaw.
 - Heat thaws frozen cells first, then dries wet scorchable cells, then burns only after that buffer is gone.
 - **The buffer's steam is the only part of it a player can see, so it has to have room to

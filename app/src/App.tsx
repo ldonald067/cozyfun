@@ -593,6 +593,7 @@ export function App() {
     const result = loadLocal(engine);
     if (result.loaded) {
       applySnapshotMetadata(result.metadata);
+      fieldNoteJournalRef.current?.rebaseline();
     }
     setStatus(result.loaded ? "browser save loaded" : "no browser save yet");
   }
@@ -609,6 +610,7 @@ export function App() {
     const result = snapshot ? applySnapshot(engine, snapshot) : { loaded: false, metadata: null };
     if (result.loaded) {
       applySnapshotMetadata(result.metadata);
+      fieldNoteJournalRef.current?.rebaseline();
     }
     setStatus(result.loaded ? "scene JSON imported" : "invalid scene file");
     event.target.value = "";

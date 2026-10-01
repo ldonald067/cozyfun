@@ -99,7 +99,9 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   passed 32 of 32 with the pour left out, because dry stone beside ice frosts too, so it was
   never evidence that the stone has to be "damp". A check can be reliable and still not
   show the condition its clause names. If the scene passes without the precondition, the clause
-  or the rule is wrong, and deciding which is the owner's call (docs/HANDOFF.md).
+  or the rule is wrong, and deciding which is the owner's call. Here the owner kept the clause
+  and changed the rule. The scene now has a twin without the pour, an `absent` check that must
+  stay bare, so the precondition is part of the gate.
 
   The scenes and the runner that plays them live in `scripts/interaction-scenes.mjs`, shared
   with `audit:drift` and `clobber:census` so all three measure the same scenes. Material
