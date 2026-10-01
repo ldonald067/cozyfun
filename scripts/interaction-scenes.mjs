@@ -370,10 +370,29 @@ export const CHECKS = [
   { m: "Ice", covers: "ice.condenses", role: "condenses steam into frost", w: 26, h: 26, seed: 19, ticks: 900,
     paint: (p) => { p(13, 20, 3, M.Water); p(13, 21, 2, M.Lava); p(13, 10, 2, M.Ice); },
     outcome: (g, before) => g.appeared(M.Ice, before) },
-  { m: "Ice", covers: "ice.stresses", role: "frost-stresses damp hard materials", w: 26, h: 26, seed: 20, ticks: 1500,
-    // The stone has to be damp *where the ice touches it*, so the water runs across the
-    // whole slab top rather than soaking one column three cells away from the ice.
-    paint: (p) => { p(13, 19, 3, M.Stone); p(11, 15, 1, M.Ice); p(15, 13, 2, M.Water); },
+  { m: "Ice", covers: "ice.stresses", role: "frost-stresses damp hard materials", w: 40, h: 30, seed: 20, ticks: 1500,
+    // A rock, a pour over it, then ice against its flank — one gesture after another, at the
+    // default brush and the app's own water density, the way a player switches materials.
+    //
+    // The ice has to TOUCH the rock, and for a long time it did not. It was painted one cell
+    // clear of the flank, and frost reached the stone only because the pour froze into a bridge
+    // across the gap — so the scene passed only while the ice was already waiting for the water.
+    // Painted a second after the pour (water at tick 20, ice at 40), that layout froze nothing
+    // on 32 seeds of 32. Printing the board is what showed the gap; the comment here claimed the
+    // ice was against the flank.
+    //
+    // Painted touching, it no longer matters which comes first: pour then ice passes 32 of 32
+    // with at least 7 frosted cells, still 32 of 32 with the ice seven seconds late (stone
+    // stays wet until its dampness drains), and ice then pour passes 32 of 32 with at least 10.
+    //
+    // What this does NOT show is that the dampness matters, and in play it does not. Ice frosts
+    // a wet stone or wall cell for certain and a dry one at 1 in 4 a tick, and that frost leaves
+    // energy 72, which the next tick reads as dampness over 40. So a dry rock ends exactly as
+    // frosted, on the same tick: with the pour left out, this scene still passes 32 of 32 with
+    // 7 cells at contrast 296 (290 with it). Whether the clause should lose "damp" or the rule
+    // should honour it is an open owner question in docs/HANDOFF.md.
+    paint: (p) => { p(20, 21, 4, M.Stone); },
+    act: (p, t) => { if (t === 20) p(20, 12, 4, M.Water, 55); if (t === 60) p(13, 21, 4, M.Ice); },
     outcome: (g, before) => g.gained(M.Stone, F.Frozen, before) },
 
   // ---- Life ---------------------------------------------------------------------------
@@ -389,12 +408,25 @@ export const CHECKS = [
   { m: "Pollen", covers: "pollen.drifts", role: "is released by a mature flower", w: 40, h: 34, seed: 24, ticks: 5000,
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
     outcome: (g, before) => g.appeared(M.Pollen, before) },
-  { m: "Stem", covers: "stem.climbs", role: "unfurls side leaves as it climbs", w: 40, h: 34, seed: 25, ticks: 3500,
+  { m: "Stem", covers: "stem.climbs", role: "unfurls side leaves as it climbs", w: 60, h: 34, seed: 25, ticks: 3500,
     // A generous watering. A stalk's height is fixed by the seed's energy when it germinates,
     // and since puddles on open ground dry as mist (ROADMAP Phase 20) a thin pour leaves the
     // bed's top dry too soon: a short stalk and no leaves on 5 seeds of 8. Watering again
-    // later does not help — the height is already decided. A proper pour: 7 of 8, as before.
-    paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 17, 4, M.Water); },
+    // later does not help — the height is already decided.
+    //
+    // A dragged BED, not one stamp — "paint a bed, not a plot" (docs/HARNESS.md). Leaves come
+    // one per stalk or none, plants keep six cells apart, and a single seed stamp holds two or
+    // three plants, so the old scene lived or died on whether one of them leafed: one leaf in
+    // the whole scene on 6 seeds of 32. Stamping the seeds at the default brush did not help
+    // (23 of 32), because a stamp is still one plot. A player's planter watered once grows a
+    // median of 13 plants and 12 leaves on the play board; this bed passes 32 of 32 with at
+    // least 4 leaves. (The witness counts each leaf together with the stalk cell it clings to,
+    // so the audit reports that as 8 cells.)
+    paint: (p) => {
+      for (let x = 14; x <= 46; x++) p(x, 28, 4, M.Soil);
+      for (let x = 14; x <= 46; x++) p(x, 23, 4, M.Seed);
+      for (let x = 14; x <= 46; x += 2) p(x, 17, 4, M.Water);
+    },
     outcome: (g) => g.all(M.Stem).filter((i) => {
       const [x, y] = g.xyOf(i);
       return g.kindAt(x - 1, y) === M.Stem || g.kindAt(x + 1, y) === M.Stem;
@@ -711,27 +743,29 @@ export const CHECKS = [
   { m: "Moss", covers: "moss.overtaken", role: "is overtaken by fungus when old or wet", w: 30, h: 26, seed: 91, ticks: 3000,
     paint: (p) => { p(15, 20, 4, M.Moss); p(15, 16, 1, M.Fungus); p(15, 13, 2, M.Water); },
     outcome: (g, before) => g.appeared(M.Fungus, before) },
-  { m: "Moss", covers: "moss.dries", role: "dries and scorches before burning", w: 40, h: 26, seed: 92, ticks: 900,
+  { m: "Moss", covers: "moss.dries", role: "dries and scorches before burning", w: 60, h: 30, seed: 92, ticks: 900,
     // The moss has to be WET first: measured on a dry mat, fire skips straight to burning
     // and the scorch step the docs describe never happens at all.
     //
     // A soaked carpet lit from one end, soon after watering. The scorch is a moving front —
     // each cell holds it for only ~20 ticks before it burns — so it is seen on a strip the
-    // fire has to travel, not on a mound it eats in thirty ticks. The old scene waited 400
-    // ticks and lit into a puddle; it passed only because moss had eaten the audit's Wall
-    // floor beside a puddle that never dried, and that scorched floor was what it counted.
-    // With walls kept (ROADMAP Phase 20) and puddles drying, it saw nothing on 6 seeds of 8.
-    // Watered every two columns rather than three: at three, a seed where the fire failed to
-    // catch left 2-3 scorched cells, and small RNG shifts elsewhere flipped which seeds those
-    // were. At two, 8 seeds of 8 with at least 19 cells — margin, not a lucky pass.
-    paint: (p) => { for (let x = 8; x <= 32; x += 2) p(x, 20, 2, M.Moss); for (let x = 8; x <= 32; x += 2) p(x, 14, 1, M.Water); },
-    act: (p, t) => { if (t === 150) p(6, 19, 1, M.Fire); },
-    // Sticky, for the same reason as wood: scorch is a step on the way to burning.
-    outcome: (g, before, memo) => {
-      memo.charred ??= new Set();
-      for (const i of g.all(M.Moss)) if (g.hasFlag(i, F.Scorched)) memo.charred.add(i);
-      return [...memo.charred].filter((i) => g.kindOf(i) === M.Moss);
-    } },
+    // fire has to travel, not on a mound it eats in thirty ticks.
+    //
+    // Carpet and flame are painted at the DEFAULT brush, which is what a player does. The scene
+    // used a two-cell strip lit by a one-cell flame at its far edge, where the watering pools,
+    // and it was a coin flip: on 5 seeds of 32 the flame went out before the fire caught,
+    // leaving 2 scorched cells against a floor of 4. The rule was never in doubt — on the play
+    // board a watered default-brush carpet lit the same way scorches 124-129 cells on every
+    // seed — so the scene was measuring the fixture. At the default brush: 32 of 32, at least
+    // 52 cells each.
+    paint: (p) => { for (let x = 10; x <= 50; x++) p(x, 22, 4, M.Moss); for (let x = 10; x <= 50; x += 2) p(x, 12, 1, M.Water); },
+    act: (p, t) => { if (t === 150) p(10, 15, 4, M.Fire); },
+    // Moss that is scorched NOW. This used to remember every cell ever scorched and keep
+    // counting it while it held moss — and moss the fire did not finish recovers once the
+    // standing water re-wets it, so 25,546 of 33,543 counted cell-ticks over 32 seeds were
+    // moss that was no longer scorched, reported as a median of 744 ticks on screen. The
+    // moving front is what a player sees, and it is on screen 65-85 ticks.
+    outcome: (g) => g.all(M.Moss).filter((i) => g.hasFlag(i, F.Scorched)) },
   { m: "Seed", covers: "seed.roots", role: "roots on soil, and on other rooted seeds through a bed", w: 40, h: 34, seed: 93, ticks: 1500,
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
     outcome: (g, before) => g.gained(M.Seed, F.Rooted, before) },

@@ -42,14 +42,33 @@ No next phase is planned; what to build is the owner's call.
 
 ### 1. The rest of the lucky-seed list
 
-Measured 2026-09-29 on 32 seeds and not moved by the rocket work (an 8-seed drift over all 126
-checks moved only rocket and spark checks): `stem.climbs` passes on 26, `ice.stresses` on 27,
-`moss.dries` on 27, against the 28-of-32 bar. Fifteen more pass on 28-31. Re-measure before
-starting — `npm run audit:drift -- --seeds 32 --per-seed --only <ids>` — and take them the way
-`rocket.climbs` went: find out why before touching anything. That one was a fixture smaller
-than anything a player paints plus a witness measuring the wrong thing, not the rule.
+`stem.climbs` (side leaves), `ice.stresses` and `moss.dries` were fixed on 2026-09-30. In
+every case the rule was fine and the scene was not what a player does. `stem.climbs` and
+`moss.dries` were smaller than anything a player paints: they are now a dragged seed bed, and
+a carpet and flame at the default brush. `ice.stresses` had a worse problem that review
+found. Its ice was painted one cell clear of the rock, so frost only got across when the pour
+froze into a bridge, which meant the scene passed only if everything was painted at once. Its
+materials are now painted one after another, with the ice touching the rock. All three pass
+32 of 32, and the reasoning is written at each scene. What is left is the fifteen that pass on
+28-31 seeds of 32; re-measure them with `npm run audit:drift -- --seeds 32 --per-seed` before
+starting.
+
+**Then the remembered-cell witnesses.** 27 checks remember every cell an outcome ever touched
+and keep counting it while it holds the same MATERIAL, not the same outcome. Two of those were
+found counting leftovers today — `spark.lights` credited unlit powder, `moss.dries` credited moss
+that had recovered from its scorch — and neither failed because of it, which is exactly why
+nobody noticed. docs/HARNESS.md lists how to tell; the 27 are not audited yet.
 
 ### 2. Design questions for the owner
+
+- **Ice frosts dry stone exactly like damp stone**, while `[ice.stresses]` promises "damp".
+  The rule frosts a wet stone or wall for certain and a dry one at 1 in 4 a tick (ROADMAP Phase
+  7C meant that as certain against random). But the random frost writes energy 72, and the next
+  tick reads that as dampness over 40, so both end in the same state. On the audit scene with
+  the pour removed: 32 of 32, 7 cells, contrast 296 against 290 with it. Nothing on screen
+  separates them, and the tray never mentions it. Either drop "damp" from the clause (no
+  change to play), or make dry stone and wall stop frosting. The second is a rule change, and
+  it would also mean a dry wall no longer cracks under freeze-thaw.
 
 - **The sim runs faster on faster screens.** `App.tsx` sets `lastSimTick = time` rather than
   advancing it by `SIM_TICK_MS`, so ticks land on frame boundaries: 20 a second at 60 Hz and,
@@ -127,7 +146,11 @@ All by the owner, each after seeing measurements:
   throws on the first `tick()`, and the frame loop silently stops.
 - **A piped gate hides its exit code.** Redirect to a file and check `$?`.
 - **A fixture can pass for the wrong reason.** Print the board before trusting a pass; liquids
-  hop two cells and jump a one-cell wall.
+  hop two cells and jump a one-cell wall. `ice.stresses` claimed its ice sat against the rock,
+  but there was a one-cell gap that only frozen water could cross.
+- **A scene painted all at once hides ordering.** A player switches materials, and that takes
+  a second. Paint later gestures with `act` at a player's pace, and use the app's densities
+  (`PAINT_DENSITY` in `App.tsx`: 55 for powders and liquids).
 - **A claim that something is "by design" needs a source.** Nothing showed anyone had chosen
   the water-into-mist deletion that bubbles replaced.
 - **Sabotaging compiled output: patch before the first load.** A loaded CommonJS module is

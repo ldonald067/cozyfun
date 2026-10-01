@@ -79,6 +79,28 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   The sparks now count only once a far charge has been seen lit: 32 of 32 as staged, 0 of 32
   with the far piles gone. Credit the aftermath of an outcome only after witnessing the outcome.
 
+  **`moss.dries` had the same leftover problem, in a different disguise.** It remembered every
+  cell ever scorched and counted it while it held moss — and moss the fire did not finish
+  recovers once standing water re-wets it. Over 32 seeds, 25,546 of 33,543 counted cell-ticks
+  were moss that was no longer scorched, reported as a median of 744 ticks on screen where the
+  moving front is really visible for 65-85. Its cell count was honest, which is why nothing
+  looked wrong. **27 checks still remember cells and filter them on the material alone**; many
+  are legitimate (a grain that fell is still that grain), but that list has not been audited.
+
+  **Stage the gestures in the order a player makes them.** `ice.stresses` painted rock, water
+  and ice before the first tick, with the ice one cell clear of the rock. It passed on every
+  seed because the pour froze into a bridge across that gap. Adversarial review delayed the ice
+  by one second, and it passed on 16 of 32; at the app's water density, on none. Its comment
+  said the ice was against the rock, and only printing the board showed the gap. Paint each
+  gesture after the first with `act`, a second or two apart, at the app's `PAINT_DENSITY`. With
+  the ice actually touching the rock, either order passes 32 of 32.
+
+  **Then take the clause's precondition away and run it again.** The re-staged scene still
+  passed 32 of 32 with the pour left out, because dry stone beside ice frosts too, so it was
+  never evidence that the stone has to be "damp". A check can be reliable and still not
+  show the condition its clause names. If the scene passes without the precondition, the clause
+  or the rule is wrong, and deciding which is the owner's call (docs/HANDOFF.md).
+
   The scenes and the runner that plays them live in `scripts/interaction-scenes.mjs`, shared
   with `audit:drift` and `clobber:census` so all three measure the same scenes. Material
   ids and flags there are read from `materials.ts`, not typed out. **The audit measures each
