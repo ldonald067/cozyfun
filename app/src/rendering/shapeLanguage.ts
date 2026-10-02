@@ -1,4 +1,4 @@
-import { CELL_FLAG, MATERIAL, MATERIAL_BY_ID, type MaterialId } from "../materials";
+import { CELL_FLAG, MATERIAL, MATERIAL_BY_ID, WELLSPRING_TAUGHT, type MaterialId } from "../materials";
 import { adjustRgb, hexToRgb, mixRgb, type Rgb } from "./color";
 import { cardinalNeighborCount, contactInfo, edgeInfo, hasNearbyKind, kindAt, readU16, sameKind, sameLiquid } from "./cells";
 import { hashCell } from "./hash";
@@ -529,7 +529,7 @@ export const WELLSPRING_TINTS: Record<number, Rgb> = {
   [MATERIAL.Rocket]: [216, 92, 106]
 };
 
-function wellspringColor({ color, variant, energy, time, cells, width, height, x, y }: ShapeContext) {
+function wellspringColor({ color, variant, energy, flags, time, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
   const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Wellspring);
   // Dark basalt, lifted just enough to silhouette against the #091018 sky. It used to
@@ -582,8 +582,17 @@ function wellspringColor({ color, variant, energy, time, cells, width, height, x
   // one rim cell in five.
   const BODY_WASH = 0.3;
   const CHILL_WASH = 0.6;
-  if (chilled) out = mixRgb(out, [40, 56, 74], CHILL_WASH);
+  // A chilled spring that has LEARNED something is drawn lit with it, under a light rime. The
+  // ice holds the lesson until it is gone, and a water spring's own pool usually freezes solid
+  // around it, so without this a player who did everything right saw nothing change. It
+  // starts from the attuned look rather than from frost on purpose: frost with a little tint
+  // passes through the dormant spring's pewter on the way, and for some materials it landed
+  // within a few redmean of it, which reads as a spring that forgot everything.
+  const learned = chilled && Boolean(flags & WELLSPRING_TAUGHT) && Boolean(tint);
+  const LEARNED_RIME = 0.2;
+  if (chilled && !learned) out = mixRgb(out, [40, 56, 74], CHILL_WASH);
   else if (tint) out = mixRgb(out, mixRgb(tint, [255, 255, 255], 0.55), BODY_WASH);
+  if (learned) out = mixRgb(out, [40, 56, 74], LEARNED_RIME);
   // Small placements (1-2 cells, mostly exposed) always carve: a lone block must
   // still read as runed stone, and attuned-vs-dormant must survive at that size.
   const rune =
@@ -600,7 +609,7 @@ function wellspringColor({ color, variant, energy, time, cells, width, height, x
   // or lit.
   //
   // Presentation only. Reading neighbours is allowed; the stilling itself is the sim's.
-  if (chilled) {
+  if (chilled && !learned) {
     // Frosted DARK with bright pips, not lit. A pale blue glow was the obvious first choice
     // and it measured 22 from a water-attuned spring — under every contrast floor in the
     // repo, so a chilled dormant block read as "attuned to water". Hue cannot solve this:
@@ -634,6 +643,8 @@ function wellspringColor({ color, variant, energy, time, cells, width, height, x
     // spring is only a couple of cells on screen, and they read against ANY
     // remembered material rather than depending on its hue.
     if (hash % 5 === 0) out = mixRgb(out, [255, 253, 244], 0.5 + pulse * 0.24);
+    // Learned and still held by the ice: the same frost pips the listening state wears.
+    if (learned && hash % 3 === 0) out = mixRgb(out, [214, 238, 250], 0.4);
     return out;
   }
   // Dormant runes sleep in colourless pewter. Deliberately desaturated rather than

@@ -158,6 +158,16 @@ const PETAL_SHED_AGE: u16 = 1200;
 const WELLSPRING_POUR: u32 = 7;
 /// How far a spring will push through its own material to reach open space.
 const WELLSPRING_REACH: i32 = 4;
+/// On a wellspring, the rooted flag latches a lesson learned under the current chill, so the
+/// spring holds it until the ice is gone. Every other reader of `FLAG_ROOTED` is guarded on a
+/// seed, stem or flower, and the spring's renderer reads no flags. It is a flag rather than
+/// spare bits of `energy` because a scene load clamps energy to 255: a latch kept there turned
+/// a spring saved mid-lesson into one remembering material 255, which never pours.
+const FLAG_TAUGHT: u16 = FLAG_ROOTED;
+/// How long a re-taught spring keeps its latch once it is free of ice, in ticks (about 30 s).
+/// The cell's own `age` is the clock: nothing else reads a wellspring's age, and a scene load
+/// keeps it, where it clamps energy.
+const LESSON_HOLD: u16 = 600;
 
 /// Below this an ember has gone out: inert char that only relights from outside.
 const COLD_CHAR_ENERGY: u16 = 30;
@@ -809,11 +819,11 @@ impl Universe {
                     let chilled = neighbors
                         .iter()
                         .any(|&nidx| old[nidx].kind == Material::Ice as u8);
-                    if cell.energy == 0 || chilled {
+                    let remembered = cell.energy;
+                    let taught = cell.flags & FLAG_TAUGHT != 0;
+                    if remembered == 0 {
                         // An unattuned wellspring drinks the identity of the first source
-                        // material that touches it, consuming that cell. A spring stilled
-                        // by ice can be re-taught the same way, so a first-touch misattunement
-                        // is fixable — remove the ice and it pours the newly drunk material.
+                        // material that touches it, consuming that cell.
                         for nidx in neighbors {
                             let other = old[nidx];
                             if is_wellspring_source(other.kind)
@@ -826,7 +836,24 @@ impl Universe {
                                 break;
                             }
                         }
-                    } else if is_wellspring_source(cell.energy as u8) {
+                    } else if !taught && self.learn_or_adopt(idx, remembered, chilled, &neighbors, old, next) {
+                        // Learned or took up a lesson this tick; it holds still while it does.
+                    } else if chilled {
+                        // Stilled by the ice. A taught cell holds its lesson and restarts its
+                        // hold; an untaught one is still listening.
+                        if taught && next[idx].kind == Material::Wellspring as u8 {
+                            next[idx].age = 0;
+                        }
+                    } else if is_wellspring_source(remembered as u8) {
+                        // A taught cell pours its lesson as soon as it is free, but keeps the
+                        // latch for LESSON_HOLD ticks more. Letting go the moment the ice left
+                        // was a relapse: a pool still freezing outward chilled the cell again,
+                        // its old water now counted as new, and it learned that back. Measured
+                        // with sand dropped a quarter-second after the ice, 2-4 seeds of 6 on
+                        // the real board ended mixed or back on water; one cell flipped 21 times.
+                        if taught && cell.age >= LESSON_HOLD && next[idx].kind == Material::Wellspring as u8 {
+                            next[idx].flags &= !FLAG_TAUGHT;
+                        }
                         // Attuned: pour the remembered material, feeding THROUGH its own
                         // body rather than only into a bare face. The source guard rejects
                         // out-of-range ids from imported scenes.
@@ -1399,6 +1426,77 @@ impl Universe {
             }
         }
         indices
+    }
+
+    /// Re-teaching a wellspring, for an attuned cell that is not already holding a lesson.
+    /// Returns true when it learned or took one up this tick.
+    ///
+    /// Chilled, it drinks the first touching source that is NOT what it already pours. A
+    /// spring sits in its own pool or pile, and drinking that back is why a lesson used to
+    /// fade a tick after it was offered: measured on the real board, a water spring with sand
+    /// dropped on it poured only water again on 2 seeds of 3 once the ice was cleared.
+    ///
+    /// Chilled or not, it also takes up a different lesson that a taught neighbour holds, so
+    /// the whole spring learns, not just the few cells the new material landed on. The
+    /// dormant core never attuned and never reaches here, so it stays dark.
+    fn learn_or_adopt(
+        &self,
+        idx: usize,
+        remembered: u16,
+        chilled: bool,
+        neighbors: &[usize],
+        old: &[Cell],
+        next: &mut [Cell],
+    ) -> bool {
+        if next[idx].kind != Material::Wellspring as u8 {
+            return false;
+        }
+        // Drinking is only for a cell with no lesson beside it. Without this, a cell the lesson
+        // had reached and let go of could be chilled again by its own pool freezing outward, and
+        // the old pool water was now a "new" material to it: dropping sand a quarter-second after
+        // the ice flipped one cell 21 times between water and sand, and the spring ended water.
+        // Next to a held lesson a cell can only take that lesson up.
+        let lesson_beside = neighbors.iter().any(|&nidx| {
+            old[nidx].kind == Material::Wellspring as u8 && old[nidx].flags & FLAG_TAUGHT != 0
+        });
+        if chilled && !lesson_beside {
+            for &nidx in neighbors {
+                let other = old[nidx];
+                if is_wellspring_source(other.kind) && other.kind as u16 != remembered {
+                    next[idx].energy = other.kind as u16;
+                    next[idx].flags |= FLAG_TAUGHT;
+                    next[idx].age = 0;
+                    if next[nidx].kind == other.kind {
+                        next[nidx] = Cell::empty();
+                    }
+                    return true;
+                }
+            }
+        }
+        // Taking up a lesson relays it, even for a cell that already remembers that material:
+        // otherwise a spring partly attuned to it already (sand from an earlier offering, say)
+        // stopped the lesson at its first matching cell. Only a FRESH lesson is taken up — one
+        // learned or taken up last tick, or held under ice right now (a chilled holder restarts
+        // its age every tick). Ageing latches beside each other would otherwise re-teach one
+        // another forever, and the latch would never clear once the ice was gone. A lesson that
+        // starts the natural way spreads both ways and its fronts cancel where they meet:
+        // measured on a closed 676-cell ring, every latch cleared within ~700 ticks of the ice
+        // going. Only a lesson staged by hand (in a loaded scene) to run ONE way round a ring
+        // longer than LESSON_HOLD keeps circling, and that spring still pours its lesson; it
+        // just cannot be taught again. Review found it; it is recorded rather than guarded.
+        for &nidx in neighbors {
+            let other = old[nidx];
+            if other.kind == Material::Wellspring as u8
+                && other.flags & FLAG_TAUGHT != 0
+                && other.age <= 1
+            {
+                next[idx].energy = other.energy;
+                next[idx].flags |= FLAG_TAUGHT;
+                next[idx].age = 0;
+                return true;
+            }
+        }
+        false
     }
 
     fn neighbor_has_kind(&self, cells: &[Cell], idx: usize, kind: u8) -> bool {
@@ -5171,6 +5269,146 @@ mod tests {
         assert_eq!(kind_at(&u, 9, 8), Material::Empty as u8, "re-attunement consumes the new source cell");
     }
 
+    #[test]
+    fn a_chilled_spring_ignores_its_own_pool_and_keeps_the_new_lesson() {
+        // The test above hand-places a bare spring. A real one sits in its own pool, and
+        // the scan reaches that pool first: water on the left comes before sand on the right.
+        let mut u = Universe::new(16, 16, 7);
+        for x in 5..=11 {
+            set_cell(&mut u, x, 9, Material::Wall);
+        }
+        set_cell_state(&mut u, 8, 8, Material::Wellspring, 0, Material::Water as u16, 0);
+        set_cell(&mut u, 8, 7, Material::Ice);
+        set_cell(&mut u, 7, 8, Material::Water);
+        set_cell(&mut u, 9, 8, Material::Sand);
+        u.tick();
+        assert_eq!(energy_at(&u, 8, 8), Material::Sand as u16, "it learns the NEW material, not its own pool");
+        let water = u.cells.iter().filter(|c| c.kind == Material::Water as u8).count();
+        assert_eq!(water, 1, "its own pool water is left alone");
+        // More of its old material arrives while it is still chilled: the lesson holds.
+        let pool = u.idx(7, 8);
+        u.cells[pool] = Cell::new(Material::Water as u8, 0, starting_energy(Material::Water as u8));
+        for _ in 0..20 {
+            u.tick();
+            assert_eq!(energy_at(&u, 8, 8), Material::Sand as u16, "a lesson holds while the ice does");
+        }
+        // Lift the chill and it pours what it learned, still holding the latch for a while.
+        let ice = u.idx(8, 7);
+        u.cells[ice] = Cell::empty();
+        for _ in 0..60 {
+            u.tick();
+        }
+        assert_eq!(energy_at(&u, 8, 8), Material::Sand as u16, "it still remembers sand once the ice is gone");
+        assert!(
+            u.cells.iter().filter(|c| c.kind == Material::Sand as u8).count() > 1,
+            "a freed spring pours its new material straight away"
+        );
+        assert_ne!(flags_at(&u, 8, 8) & FLAG_TAUGHT, 0, "it keeps the latch through the hold");
+        for _ in 0..LESSON_HOLD {
+            u.tick();
+        }
+        assert_eq!(flags_at(&u, 8, 8) & FLAG_TAUGHT, 0, "and lets go once the hold has passed");
+    }
+
+    #[test]
+    fn a_lesson_relays_through_cells_that_already_know_it() {
+        // A one-cell-wide spring, water except one cell that already remembers sand, so the
+        // lesson has no way round it. Ice and sand touch only the left end.
+        let mut u = Universe::new(16, 16, 7);
+        for x in 2..=13 {
+            set_cell(&mut u, x, 7, Material::Wall);
+            set_cell(&mut u, x, 9, Material::Wall);
+        }
+        for x in 4..=10 {
+            let memory = if x == 6 { Material::Sand } else { Material::Water };
+            set_cell_state(&mut u, x, 8, Material::Wellspring, 0, memory as u16, 0);
+        }
+        set_cell(&mut u, 11, 8, Material::Wall);
+        set_cell(&mut u, 3, 8, Material::Wall);
+        set_cell(&mut u, 4, 7, Material::Ice);
+        set_cell(&mut u, 5, 7, Material::Sand);
+        for _ in 0..20 {
+            u.tick();
+        }
+        for x in 4..=10 {
+            assert_eq!(energy_at(&u, x, 8), Material::Sand as u16, "spring cell ({x},8) never got the lesson");
+        }
+    }
+
+    #[test]
+    fn a_lesson_lets_go_of_the_whole_spring_once_the_ice_is_gone() {
+        // Relaying must not let ageing latches re-teach each other forever.
+        let mut u = Universe::new(16, 16, 7);
+        for x in 3..=12 {
+            set_cell(&mut u, x, 9, Material::Wall);
+        }
+        for x in 5..=9 {
+            set_cell_state(&mut u, x, 8, Material::Wellspring, 0, Material::Water as u16, 0);
+        }
+        set_cell(&mut u, 4, 8, Material::Ice);
+        set_cell(&mut u, 4, 7, Material::Sand);
+        for _ in 0..10 {
+            u.tick();
+        }
+        let ice = u.idx(4, 8);
+        u.cells[ice] = Cell::empty();
+        for _ in 0..(LESSON_HOLD as usize + 40) {
+            u.tick();
+        }
+        for x in 5..=9 {
+            assert_eq!(energy_at(&u, x, 8), Material::Sand as u16, "spring cell ({x},8) lost its lesson");
+            assert_eq!(flags_at(&u, x, 8) & FLAG_TAUGHT, 0, "spring cell ({x},8) never let go of the latch");
+        }
+    }
+
+    #[test]
+    fn a_freshly_taught_spring_chilled_again_does_not_relearn_its_old_pool() {
+        // The relapse the hold exists for: a spring just re-taught to sand, free and pouring,
+        // is chilled again by its old pool freezing outward, with that pool's water beside it.
+        let mut u = Universe::new(16, 16, 7);
+        for x in 5..=11 {
+            set_cell(&mut u, x, 9, Material::Wall);
+        }
+        set_cell_state(&mut u, 8, 8, Material::Wellspring, 0, Material::Sand as u16, FLAG_TAUGHT);
+        for _ in 0..30 {
+            u.tick();
+        }
+        set_cell(&mut u, 7, 7, Material::Ice);
+        set_cell(&mut u, 7, 8, Material::Water);
+        set_cell(&mut u, 9, 8, Material::Water);
+        for _ in 0..20 {
+            u.tick();
+            assert_eq!(energy_at(&u, 8, 8), Material::Sand as u16, "it took its old water back");
+        }
+    }
+
+    #[test]
+    fn a_lesson_spreads_through_the_attuned_spring_but_not_its_dormant_core() {
+        // Ice and sand touch only the left end of a two-row spring. Every attuned cell
+        // should learn sand; the one dormant cell never attuned and must stay dark.
+        let mut u = Universe::new(16, 16, 7);
+        for x in 3..=12 {
+            set_cell(&mut u, x, 10, Material::Wall);
+        }
+        for y in 8..=9 {
+            for x in 5..=10 {
+                set_cell_state(&mut u, x, y, Material::Wellspring, 0, Material::Water as u16, 0);
+            }
+        }
+        set_cell_state(&mut u, 8, 9, Material::Wellspring, 0, 0, 0);
+        set_cell(&mut u, 4, 8, Material::Ice);
+        set_cell(&mut u, 4, 9, Material::Sand);
+        for _ in 0..12 {
+            u.tick();
+        }
+        for y in 8..=9 {
+            for x in 5..=10 {
+                let expect = if (x, y) == (8, 9) { 0 } else { Material::Sand as u16 };
+                assert_eq!(energy_at(&u, x, y), expect, "spring cell ({x},{y})");
+            }
+        }
+    }
+
     /// A spring attuned to a POWDER entombs itself: the grain piles up, nothing drinks it,
     /// and once no empty cell lies within WELLSPRING_REACH of any face the pour stops. That is
     /// the real bound on a powder spring, and it is worth pinning both halves of. (A water
@@ -5488,6 +5726,30 @@ mod tests {
         let flags = reloaded.cells[reloaded.idx(3, 3)].flags;
         assert_ne!(flags & FLAG_BEDDED, 0, "a reload stripped the bedded flag — it is missing from FLAG_MASK");
         assert_ne!(flags & FLAG_WET, 0, "and it must not take the other flags with it");
+    }
+
+    #[test]
+    fn a_lesson_held_under_ice_survives_a_save_and_reload() {
+        // The latch is a flag because a load clamps energy to 255. Saved mid-lesson, the
+        // spring must come back still remembering the new material and still holding it.
+        let mut u = Universe::new(8, 8, 7);
+        set_cell_state(&mut u, 3, 3, Material::Wellspring, 0, Material::Sand as u16, FLAG_TAUGHT);
+        let bytes: Vec<u8> = u
+            .cells
+            .iter()
+            .flat_map(|c| {
+                let mut b = vec![c.kind, c.variant];
+                b.extend_from_slice(&c.age.to_le_bytes());
+                b.extend_from_slice(&c.energy.to_le_bytes());
+                b.extend_from_slice(&c.flags.to_le_bytes());
+                b
+            })
+            .collect();
+        let mut reloaded = Universe::new(8, 8, 7);
+        assert!(reloaded.load_cells(&bytes), "the saved board should load");
+        let cell = reloaded.cells[reloaded.idx(3, 3)];
+        assert_eq!(cell.energy, Material::Sand as u16, "a reload changed what the spring remembers");
+        assert_ne!(cell.flags & FLAG_TAUGHT, 0, "a reload dropped the lesson's latch");
     }
 
     /// The build-protection half. A deep DRY dune is buried but not flooded, so it comes

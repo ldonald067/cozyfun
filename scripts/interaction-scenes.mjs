@@ -38,6 +38,8 @@ if (!mistEnergy) throw new Error("interaction-scenes: MIST_ENERGY not found in a
 export const MIST_ENERGY = Number(mistEnergy[1]);
 const thermalSteam = (g, before) => g.appeared(M.Steam, before).filter((i) => g.energyAt(i) > MIST_ENERGY);
 export const F = current.materials.CELL_FLAG;
+// On a wellspring, a lesson learned under ice and held until the ice is gone.
+const TAUGHT = current.materials.WELLSPRING_TAUGHT;
 export const STRIDE = 8;
 
 // Perceptual-ish colour distance, matching scripts/material-contrast.mjs so "how different
@@ -1067,15 +1069,27 @@ export const CHECKS = [
     paint: (p) => { p(15, 19, 1, M.Wellspring); p(15, 16, 1, M.Water); p(11, 19, 2, M.Ice); p(19, 19, 2, M.Ice); },
     act: (p, t) => { if (t % 300 === 0) { p(11, 19, 2, M.Ice); p(19, 19, 2, M.Ice); } },
     outcome: (g, before) => g.appeared(M.Water, before).filter((i) => g.xyOf(i)[1] > 20) },
-  { m: "Wellspring", covers: "wellspring.reattune", role: "re-drinks a new source while held under that chill", w: 30, h: 26, seed: 129, ticks: 8000,
-    paint: (p) => { p(15, 19, 1, M.Wellspring); p(15, 16, 1, M.Water); },
+  { m: "Wellspring", covers: "wellspring.reattune", role: "re-drinks a new source while held under that chill", w: 60, h: 40, seed: 129, ticks: 1500,
+    // A spring painted at the default brush and taught water, ice set beside it, then sand
+    // dropped on top. The witness is spring cells HOLDING sand as a lesson, once they had
+    // remembered water, measured against the last tick before any did: the listening frost
+    // turning into the learned look, which is what a player sees.
+    //
+    // The old witness was "sand that appeared", and the scene's own sand dabs appear: it passed
+    // 32 of 32 with the wellspring painted as plain Wall. Witnessed honestly it failed on every
+    // seed, because the rule itself failed in play — a chilled spring drank its own pool the
+    // tick after the sand, so the lesson faded. See `learn_or_adopt` in sim/src/lib.rs.
+    paint: (p) => { p(30, 28, 4, M.Wellspring); },
     act: (p, t) => {
-      if (t > 600 && t % 200 === 0) { p(11, 19, 2, M.Ice); p(19, 19, 2, M.Ice); }
-      if (t >= 1500 && t < 3000 && t % 60 === 0) p(15, 16, 1, M.Sand);
+      if (t === 20) p(30, 18, 4, M.Water, 55);
+      if (t === 120) p(21, 28, 4, M.Ice);
+      if (t === 160) p(30, 18, 4, M.Sand, 55);
     },
     outcome: (g, before, memo) => {
-      memo.poured ??= new Set();
-      for (const i of g.appeared(M.Sand, before)) memo.poured.add(i);
-      return [...memo.poured].filter((i) => g.kindOf(i) === M.Sand);
+      const springs = g.all(M.Wellspring);
+      if (springs.some((i) => g.energyAt(i) === M.Water)) memo.knewWater = true;
+      const learned = memo.knewWater ? springs.filter((i) => g.energyAt(i) === M.Sand && g.hasFlag(i, TAUGHT)) : [];
+      if (!learned.length) memo.against = grid(g.cells.slice(), g.w, g.h);
+      return learned;
     } },
 ];

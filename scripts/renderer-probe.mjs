@@ -39,7 +39,7 @@ const note = (line) => { if (!quiet) console.log(line); };
 const app = compileApp("probe-renderer", ["rendering/materialColor.ts", "materials.ts"]);
 const { colorForCell } = app.load("rendering/materialColor");
 const shape = app.load("rendering/shapeLanguage");
-const { MATERIAL, CELL_FLAG } = app.load("materials");
+const { MATERIAL, CELL_FLAG, WELLSPRING_TAUGHT } = app.load("materials");
 
 // ------------------------------------------------------------------ the mirrored constants
 // The renderer reads three numbers that BELONG to the simulation, so that a seed head is
@@ -415,6 +415,50 @@ function assertFloor(label, floor, worst, detail) {
       `worst at ${at}. Sleeping, remembering and listening have to be three different blocks, ` +
       `and at radius ${r} they are ${worst} apart against a design bar of 45. This floor is a ` +
       `ratchet holding today's value, not the bar.`);
+  }
+
+  // A fourth state: a chilled spring that has LEARNED a new material and holds it until the
+  // ice is gone (WELLSPRING_TAUGHT). It has to read apart from LISTENING, or a player cannot
+  // tell the lesson took, and apart from DORMANT, or it reads as a spring that forgot
+  // everything. It is deliberately close to ATTUNED — the same memory under a light rime — so
+  // that pair is not gated. Every attunable material, because the tint is the material's.
+  // Rim cells only, like every chill pair above.
+  const SOURCES = [MATERIAL.Sand, MATERIAL.Water, MATERIAL.Soil, MATERIAL.Fire, MATERIAL.Lava, MATERIAL.Oil,
+    MATERIAL.Seed, MATERIAL.Stardust, MATERIAL.Meteor, MATERIAL.Moonwater, MATERIAL.Rocket];
+  const rimMean = (r, energy, flags, ice, time) => {
+    const offsets = disc(r);
+    const inBlock = new Set(offsets.map(([dx, dy]) => `${CX + dx},${CY + dy}`));
+    const cells = springBoard((put) => {
+      for (const [dx, dy] of offsets) put(CX + dx, CY + dy, MATERIAL.Wellspring, energy, 40, flags, (CX + dx) & 7);
+      if (!ice) return;
+      for (const [dx, dy] of offsets) {
+        for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = CX + dx + ax, ny = CY + dy + ay;
+          if (!inBlock.has(`${nx},${ny}`)) put(nx, ny, MATERIAL.Ice, 0, 200, 0, nx & 7);
+        }
+      }
+    });
+    const rim = offsets.filter(([dx, dy]) => [[1, 0], [-1, 0], [0, 1], [0, -1]]
+      .some(([ax, ay]) => !inBlock.has(`${CX + dx + ax},${CY + dy + ay}`)));
+    const cols = rim.map(([dx, dy]) => springColourAt(cells, CX + dx, CY + dy, time));
+    return cols.reduce((a, c) => [a[0] + c[0], a[1] + c[1], a[2] + c[2]], [0, 0, 0]).map((v) => v / cols.length);
+  };
+  // Measured worst per radius when the state was added (2026-10-01), less a point of slack.
+  const LEARNED_RATCHET = { 1: 75, 4: 90, 8: 87, 12: 85 };
+  for (const r of [1, 4, 8, 12]) {
+    let worst = Infinity, at = null;
+    for (const source of SOURCES) {
+      for (const t of TIMES) {
+        const learned = rimMean(r, source, WELLSPRING_TAUGHT, true, t);
+        for (const [name, other] of [["listening", rimMean(r, source, 0, true, t)], ["dormant", rimMean(r, 0, 0, false, t)]]) {
+          const d = redmean(learned, other);
+          if (d < worst) { worst = d; at = `learned vs ${name}, material ${source}, time ${t}`; }
+        }
+      }
+    }
+    assertFloor(`wellspring learned state, radius ${r}`, LEARNED_RATCHET[r], Math.round(worst),
+      `worst at ${at}. A spring that learned under the ice must not look like one still listening ` +
+      `or one that forgot; design bar 45, floor is a ratchet on today's value.`);
   }
 }
 

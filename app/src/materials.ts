@@ -16,6 +16,11 @@ export const CELL_FLAG_MASK =
   CELL_FLAG.Wet | CELL_FLAG.Rooted | CELL_FLAG.Cosmic | CELL_FLAG.Frozen | CELL_FLAG.Scorched
   | CELL_FLAG.Bedded;
 
+// On a wellspring, the rooted flag means a lesson learned under the current chill, held until
+// the ice is gone. One name for the engine and the renderer; `FLAG_TAUGHT` in sim/src/lib.rs
+// is the same bit and says why it is a flag rather than spare bits of energy.
+export const WELLSPRING_TAUGHT = CELL_FLAG.Rooted;
+
 export const MATERIAL = {
   Empty: 0,
   Wall: 1,

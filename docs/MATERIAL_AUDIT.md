@@ -64,7 +64,7 @@ Every toolbar material is a product choice. Each material in `app/src/materials.
 | Meteor | [meteor.falls] Falls as impact heat; [meteor.impacts] impacts into stone, stardust, and a fire ring; [meteor.shocked] shocked into scorched stone by water; [meteor.bursts] bursts into stardust against moonwater; [meteor.vitrifies] vitrifies nearby sand on impact; [meteor.trail] sheds a downward spark trail as it falls, so a shower streaks and can light rocket fuses it passes. | Tests: `water_shocks_meteor_into_steam_and_stone`, `meteor_moonwater_contact_bursts_to_stardust`, `meteor_impact_vitrifies_nearby_sand`, `a_falling_meteor_streaks_a_spark_trail`; source: `update_meteor` owns fall and impact heat. |
 | Rocket | [rocket.falls] Falls and piles as inert powder so charges and fuse lines can be laid calmly; [rocket.lights] any flame (fire, lava, hot ember, meteor) lights its fuse instead of burning it in place; [rocket.climbs] a lit grain climbs fast with sway and a glittering smoke trail, shoving straight up through its own charge — unlit powder, the flame that lit it, the trail of the grain ahead — so a lit pile goes up as a volley instead of bursting where it lies; [rocket.fuses] a lit grain lights the unlit powder it touches, so a whole charge goes up and a line of powder lit at one end burns its length as a wave of launches, while a gap of air stops it; [rocket.bursts] bursts at fuse end or against a ceiling — anything but its own charge — into a multicolor firework shell of sparks plus stardust, chain-lighting neighboring powder. | Tests: `rocket_powder_falls_inert_without_flame`, `flame_launches_rocket_skyward`, `lit_rocket_bursts_into_sparks_and_stardust`, `rocket_burst_blooms_a_spark_shell_that_fades`, `rocket_bursts_when_it_hits_a_ceiling`, `a_lit_grain_shoves_up_through_its_own_powder_and_flame`, `a_following_grain_climbs_through_the_trail_of_the_one_ahead`, `a_lit_grain_still_bursts_under_sand`, `a_lit_grain_lights_the_powder_it_touches`, `a_lit_grain_does_not_light_powder_it_is_not_touching`; source: `update_rocket` owns flight, `burst_rocket` owns the burst. |
 | Spark | [spark.flies] Flies outward from a rocket burst then droops and fades, twinkling in firework hues and casting warm light; [spark.lights] reaching rocket powder during its outward flight lights its fuse; [spark.hisses] hisses out into a wisp of steam when it meets water, so fireworks sizzle over a pond. | Tests: `rocket_burst_blooms_a_spark_shell_that_fades`, `spark_hisses_into_steam_on_water`; source: `update_spark` owns expansion, droop, and fade. |
-| Wellspring | [wellspring.drinks] Drinks the identity of the first source material that touches it, consuming that cell with a rune-glow attunement; [wellspring.pours] endlessly pours the remembered material, pushing up through its own pool rather than choking once its faces are submerged; [wellspring.blocks] blocks flow like sealed construction while dormant or between pours; [wellspring.stilled] nearby ice stills the spring until the cold is removed; [wellspring.reattune] a spring held under that chill re-drinks a touching source, so a first-touch misattunement can be re-taught instead of being permanent. | Tests: `wellspring_drinks_first_touch_identity`, `attuned_wellspring_emits_its_material`, `unattuned_wellspring_stays_dormant`, `ice_stills_the_spring`, `ice_lets_a_wellspring_be_reattuned`, `an_unchilled_spring_keeps_its_first_identity`; source: the wellspring arm in `apply_reactions` owns absorb and emit. |
+| Wellspring | [wellspring.drinks] Drinks the identity of the first source material that touches it, consuming that cell with a rune-glow attunement; [wellspring.pours] endlessly pours the remembered material, pushing up through its own pool rather than choking once its faces are submerged; [wellspring.blocks] blocks flow like sealed construction while dormant or between pours; [wellspring.stilled] nearby ice stills the spring until the cold is removed; [wellspring.reattune] a spring held under that chill drinks the first NEW source that touches it, never its own pool, holds the lesson while the ice does and spreads it through the whole attuned spring, so a first-touch misattunement can be re-taught instead of being permanent. | Tests: `wellspring_drinks_first_touch_identity`, `attuned_wellspring_emits_its_material`, `unattuned_wellspring_stays_dormant`, `ice_stills_the_spring`, `ice_lets_a_wellspring_be_reattuned`, `a_chilled_spring_ignores_its_own_pool_and_keeps_the_new_lesson`, `a_lesson_spreads_through_the_attuned_spring_but_not_its_dormant_core`, `a_freshly_taught_spring_chilled_again_does_not_relearn_its_old_pool`, `a_lesson_held_under_ice_survives_a_save_and_reload`, `an_unchilled_spring_keeps_its_first_identity`; source: the wellspring arm in `apply_reactions` owns absorb and emit. |
 
 ## Current Cuts
 
@@ -164,6 +164,30 @@ attuned spring: dropping the new material on it with no ice never works (correct
 top re-teaches it in 121 ticks — two gestures, about six seconds**, with its own pool still all
 around it. The audit's "first fires at tick 1500" is its script's own schedule, not the
 rule's cost: that check simply does not start offering a new source until then.
+
+**And those two gestures were measured on the wrong thing.** What switched after 121 ticks was
+a cell's remembered material, and it switched BACK a tick or two later. A chilled spring drank
+the first source touching it every tick, and a spring sits in its own pool, so it drank the
+sand and then its own water again. On the 220x140 board at the default brush (a water spring,
+ice beside it, sand dropped on top, the ice then cleared) it poured only water on 2 seeds of 3,
+and a trickle of sand from 2 of its 28 cells on the third. The interaction audit never saw it:
+its witness was "sand that appeared", and it passed 32 of 32 with no spring painted at all.
+
+So on 2026-10-01 the owner had the rule made to stick. A chilled spring now ignores the
+material it already pours, so its pool cannot talk it back. The first new material latches as a
+lesson, and the lesson spreads through every attuned cell; the dormant core still never learns.
+The lesson is held until the ice is gone and for about 30 seconds after. Letting go at once was
+a second relapse: a pool still freezing outward chilled a freed cell again, and to a sand spring
+the old water then counted as new. On the same board the spring now ends on sand on 18 of 18
+seeds, including sand dropped a quarter-second after the ice, which relapsed on 2-4 seeds of 6
+before the hold. Adversarial review then found the lesson stopping at any cell that already
+remembered its material, which a spring partly taught by an earlier offering has; it now relays
+through them, taking up only a fresh lesson so the latch still clears once the ice is gone. Two
+DIFFERENT materials offered at opposite ends at the same moment split the spring between them,
+and that is left as it is: the offering was ambiguous, and nothing in play has shown it.
+While the ice is still there, the spring shows what it learned: the learned
+look is a fourth rune state (see docs/VISUAL_PIPELINE.md). That matters because a water spring's
+pool usually freezes solid around it, so it stays chilled until the player clears or melts it.
 
 So the problem was never that the interaction is fiddly. It is that nothing in play suggests
 trying it, and the two channels that could say so were both dismissed too early.

@@ -229,10 +229,11 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
 
   It also closes a gap **four independent reviewers found**: the renderer mirrors `PETAL_SHED_AGE`, `POLLEN_RESERVE` and `COLD_CHAR_ENERGY` so a seed head is drawn under exactly the condition that makes it one, and ash is full exactly when the sim calls an ember out — but parity only compares Rust with `engine.ts`, and neither knew a third copy existed. The probe parses all three sources and fails when they disagree.
 
-  Sixteen checks are gated as of this writing: cold char against the empty tray and against
+  Twenty checks are gated as of this writing: cold char against the empty tray and against
   its hearth surround, wet against dry char, a bud against the seed head it becomes, a seed
   head against its own flower's hue, the wellspring's three rune states against each other at
-  four brush sizes, all 28 bloom-species pairs, **BLOOM_SHAPES agreeing across sim, engine
+  four brush sizes, a fourth (a lesson learned under ice) against listening and dormant for
+  every material a spring can learn, again at four sizes, all 28 bloom-species pairs, **BLOOM_SHAPES agreeing across sim, engine
   and showcase**, **a meteor in flight against fire, its own sparks and stardust**, **soil and wood
   wearing different fabrics**, and three for **sandstone** — against the sand it forms from,
   against the ground around it, and whether it is actually laid in beds.

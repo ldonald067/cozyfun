@@ -57,16 +57,17 @@ in and ice held over it, and now counts only ice that was steam. `water.rinses` 
 pillar beside a log fire, because a flame beside a mound sooted one cell at most, and its
 witness had been counting wet stone rather than soot coming off.
 
-**Two checks were found certifying nothing**, and they are the next thing to settle:
+**Two checks were found certifying nothing.** One is fixed:
 
-- **`wellspring.reattune` passes 32 of 32 with no wellspring at all.** Its witness is "sand
-  that appeared", which the scene's own sand dabs satisfy. Witnessed honestly, as spring cells
-  that remembered water and now remember sand, it fails on every seed. A player's spring sits
-  in its own outflow (a pool, or a pile it buries itself in), and a re-teach sequence that
-  ends in a sand pour has not been found yet. Three explanations were tested and none held,
-  so this needs a proper investigation, and probably the owner, before the scene is rebuilt.
-  The cargo test passes because it hand-places a bare spring.
-- **`lava.scorches` mostly counts `lava.quenched`.** Of 205 scorched-stone cells over 32 seeds,
+- **`wellspring.reattune` passed 32 of 32 with no wellspring at all**, because its witness was
+  sand the scene had painted. Underneath, the rule failed in play: a chilled spring drank its own
+  pool the tick after the sand, so the lesson faded. On the owner's decision (2026-10-01) a
+  chilled spring now ignores what it already pours. It latches the first new material, spreads
+  it through the whole attuned spring, and holds it until the ice is gone and about 30 s after.
+  It is drawn in a fourth rune state, learned, while the ice still holds it. That state matters
+  because a water spring's pool usually freezes solid around it. The audit check now witnesses
+  the held lesson: 32 of 32, 0 of 32 with no spring and 0 of 32 with no ice.
+- **Still open: `lava.scorches` mostly counts `lava.quenched`.** Of 205 scorched-stone cells over 32 seeds,
   123 were lava that water quenched into stone; only 82 were the rock being scorched. Counting
   the painted rock alone, it fails on every seed (2-3 cells). Lava against a wetted rock at
   the default brush passes 18 of 32.

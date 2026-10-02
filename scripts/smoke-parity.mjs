@@ -133,6 +133,11 @@ const FUSE_REACH = 40;
 // The wet/dry frost scenario: 4 cells of the wet rock frost, and none of the dry masonry; with
 // dry masonry let back into the generic freeze in both engines, the dry rock and wall frost.
 const WET_FROST_FLOOR = 3;
+// The re-taught spring scenario: pool cells (water, ice and mist) that may go missing before it
+// counts as the spring drinking its own pool. One does, measured: a grain of the sand the freed
+// spring pours falls into a mist cell, and a grain sinking into mist deletes it (only gas
+// hotter than mist bubbles up; see docs/HARNESS.md).
+const POOL_SLACK = 2;
 // The bubble scenario's shafts: [x, steam energy] — hot steam in three, mist in three.
 const BUBBLE_UNITS = [[4, 180], [12, 180], [20, 180], [28, MIST_ENERGY], [36, MIST_ENERGY], [44, MIST_ENERGY]];
 // The vent scenario's units, one per shaft; far enough apart that no two share a wall.
@@ -264,6 +269,75 @@ const scenarios = [
       }
     },
     expect: (seen) => (seen.furthestLit >= FUSE_REACH ? null : `the light reached only x=${seen.furthestLit} of a line running to x=60 (floor ${FUSE_REACH})`),
+  },
+  {
+    // Re-teaching a spring that sits in its own pool. A water spring, a pool around it, ice at
+    // one corner and sand resting on top. Under the old rule the chilled cells drank the sand
+    // and then their own pool on the next tick, so the lesson faded; now a chilled spring
+    // ignores what it already pours, latches what it learns, and the lesson spreads through the
+    // block. The witness asks for every spring cell to end remembering sand, including the one
+    // touching neither the ice nor the sand, and for the pool to be left alone while it does.
+    name: "a chilled spring in its own pool learns sand and keeps it",
+    w: 24, h: 16, seed: 7373, ticks: 80,
+    cells(w, h) {
+      const bytes = new Uint8Array(w * h * STRIDE);
+      const put = (x, y, kind, energy = 0) => { const o = (y * w + x) * STRIDE; bytes[o] = kind; bytes[o + 4] = energy & 255; bytes[o + 5] = energy >> 8; };
+      for (let x = 0; x < w; x++) { put(x, 14, M.Wall); put(x, 15, M.Wall); }
+      for (let y = 9; y <= 13; y++) { put(5, y, M.Wall); put(17, y, M.Wall); }
+      for (let y = 11; y <= 13; y++) for (let x = 6; x <= 16; x++) put(x, y, M.Water, 30);
+      for (let y = 11; y <= 12; y++) for (let x = 10; x <= 12; x++) put(x, y, M.Wellspring, M.Water);
+      put(9, 10, M.Ice);
+      put(11, 10, M.Sand);
+      return bytes;
+    },
+    paint() {},
+    observe(seen, cells, w, h, tick) {
+      const springs = [];
+      for (let y = 11; y <= 12; y++) for (let x = 10; x <= 12; x++) springs.push(cells[(y * w + x) * STRIDE + 4]);
+      seen.sandAtEnd = springs.filter((e) => e === M.Sand).length;
+      seen.farCell = cells[(12 * w + 12) * STRIDE + 4] === M.Sand;
+      // Water, ice and mist together. The pool freezes as the scene runs, and the sand the
+      // freed spring pours stirs it into a little mist; both move cells from one to another,
+      // while a spring drinking its pool removes them outright.
+      let pool = 0;
+      for (let i = 0; i < w * h; i++) if ([M.Water, M.Ice, M.Steam].includes(cells[i * STRIDE])) pool++;
+      if (tick === 0) seen.poolBefore = pool;
+      seen.poolLow = Math.min(seen.poolLow ?? pool, pool);
+    },
+    expect(seen) {
+      if (seen.sandAtEnd !== 6) return `only ${seen.sandAtEnd} of 6 spring cells remember sand at the end — the lesson faded or did not spread`;
+      if (!seen.farCell) return "the cell touching neither the ice nor the sand never learned — the lesson did not spread";
+      if (seen.poolLow < seen.poolBefore - POOL_SLACK) return `water, ice and mist fell from ${seen.poolBefore} to ${seen.poolLow} cells — the chilled spring drank its own pool`;
+      return null;
+    },
+  },
+  {
+    // A lesson relays through a cell that already remembers that material. Adversarial review
+    // found it stopping there: a one-cell-wide spring, water except one cell that remembers
+    // sand, with ice and sand at the left end, kept everything past that cell on water. The
+    // witness asks for all seven cells on sand, and for the last one to have held the latch.
+    name: "a lesson relays through a spring cell that already knows it",
+    w: 16, h: 16, seed: 8484, ticks: 40,
+    cells(w, h) {
+      const bytes = new Uint8Array(w * h * STRIDE);
+      const put = (x, y, kind, energy = 0) => { const o = (y * w + x) * STRIDE; bytes[o] = kind; bytes[o + 4] = energy & 255; bytes[o + 5] = energy >> 8; };
+      for (let x = 2; x <= 13; x++) { put(x, 7, M.Wall); put(x, 9, M.Wall); }
+      for (let x = 4; x <= 10; x++) put(x, 8, M.Wellspring, x === 6 ? M.Sand : M.Water);
+      put(3, 8, M.Wall); put(11, 8, M.Wall);
+      put(4, 7, M.Ice); put(5, 7, M.Sand);
+      return bytes;
+    },
+    paint() {},
+    observe(seen, cells, w) {
+      let sand = 0;
+      for (let x = 4; x <= 10; x++) if (cells[(8 * w + x) * STRIDE + 4] === M.Sand) sand++;
+      seen.sandAtEnd = sand;
+      if (cells[(8 * w + 10) * STRIDE + 6] & CELL_FLAG.Rooted) seen.lastCellTaught = true;
+    },
+    expect: (seen) =>
+      seen.sandAtEnd !== 7
+        ? `only ${seen.sandAtEnd} of 7 spring cells remember sand — the lesson stopped at the cell that already knew it`
+        : seen.lastCellTaught ? null : "the far cell never held the latch",
   },
   {
     // Frost gets into masonry only through the water it holds. Two rocks, each with ice

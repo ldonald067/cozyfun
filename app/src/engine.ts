@@ -1,4 +1,4 @@
-import { CELL_FLAG, CELL_FLAG_MASK, CELL_STRIDE, MATERIAL } from "./materials";
+import { CELL_FLAG, CELL_FLAG_MASK, CELL_STRIDE, MATERIAL, WELLSPRING_TAUGHT } from "./materials";
 
 export type SandboxEngine = {
   source: "wasm" | "js";
@@ -940,11 +940,11 @@ class JsSandboxEngine implements SandboxEngine {
     const neighbors = this.neighbors(x, y);
     const chilled = neighbors.some((nidx) => old[nidx] === MATERIAL.Ice);
     const energy = readU16(old, idx + 4);
-    if (energy === 0 || chilled) {
+    const remembered = energy;
+    const taught = (readU16(old, idx + 6) & WELLSPRING_TAUGHT) !== 0;
+    if (remembered === 0) {
       // An unattuned wellspring drinks the identity of the first source material
-      // that touches it, consuming that cell. A spring stilled by ice can be
-      // re-taught the same way, so a first-touch misattunement is fixable — remove
-      // the ice and it pours the newly drunk material.
+      // that touches it, consuming that cell.
       for (const nidx of neighbors) {
         const other = old[nidx];
         if (wellspringSource(other) && next[idx] === MATERIAL.Wellspring) {
@@ -953,11 +953,22 @@ class JsSandboxEngine implements SandboxEngine {
           break;
         }
       }
-    } else if (wellspringSource(energy & 255)) {
+    } else if (!taught && this.learnOrAdopt(idx, remembered, chilled, neighbors, old, next)) {
+      // Learned or took up a lesson this tick; it holds still while it does.
+    } else if (chilled) {
+      // Stilled by the ice. A taught cell holds its lesson and restarts its hold; an untaught
+      // one is still listening.
+      if (taught && next[idx] === MATERIAL.Wellspring) writeU16(next, idx + 2, 0);
+    } else if (wellspringSource(remembered)) {
+      // A taught cell pours its lesson once free but keeps the latch for LESSON_HOLD ticks;
+      // see the sim for the relapse this prevents.
+      if (taught && readU16(old, idx + 2) >= LESSON_HOLD && next[idx] === MATERIAL.Wellspring) {
+        writeU16(next, idx + 6, readU16(next, idx + 6) & ~WELLSPRING_TAUGHT);
+      }
       // Attuned: pour the remembered material, feeding THROUGH its own body rather than
       // only into a bare face. See `apply_reactions` in sim/src/lib.rs for the
       // measurement behind this and for why there is no output cap.
-      const source = energy & 255;
+      const source = remembered;
       for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0], [0, 1]]) {
         let target = -1;
         for (let step = 1; step <= WELLSPRING_REACH; step++) {
@@ -975,6 +986,40 @@ class JsSandboxEngine implements SandboxEngine {
         }
       }
     }
+  }
+
+  // Re-teaching a wellspring, for an attuned cell not already holding a lesson. Chilled,
+  // it drinks the first touching source that is NOT what it already pours; chilled or not,
+  // it takes up a different lesson a taught neighbour holds. Mirrors `learn_or_adopt` in
+  // sim/src/lib.rs, which has the measurement behind it.
+  private learnOrAdopt(idx: number, remembered: number, chilled: boolean, neighbors: number[], old: Uint8Array, next: Uint8Array) {
+    if (next[idx] !== MATERIAL.Wellspring) return false;
+    // Drinking is only for a cell with no lesson beside it; see `learn_or_adopt` for the relapse.
+    const lessonBeside = neighbors.some((nidx) => old[nidx] === MATERIAL.Wellspring && (readU16(old, nidx + 6) & WELLSPRING_TAUGHT) !== 0);
+    if (chilled && !lessonBeside) {
+      for (const nidx of neighbors) {
+        const other = old[nidx];
+        if (wellspringSource(other) && other !== remembered) {
+          writeU16(next, idx + 4, other);
+          writeU16(next, idx + 6, readU16(next, idx + 6) | WELLSPRING_TAUGHT);
+          writeU16(next, idx + 2, 0);
+          if (next[nidx] === other) next.fill(0, nidx, nidx + CELL_STRIDE);
+          return true;
+        }
+      }
+    }
+    // Taking up a lesson relays it, even for a cell that already remembers that material; only
+    // a FRESH lesson is taken up (see `learn_or_adopt` in the sim for both reasons).
+    for (const nidx of neighbors) {
+      const lesson = readU16(old, nidx + 4);
+      if (old[nidx] === MATERIAL.Wellspring && (readU16(old, nidx + 6) & WELLSPRING_TAUGHT) !== 0 && readU16(old, nidx + 2) <= 1) {
+        writeU16(next, idx + 4, lesson);
+        writeU16(next, idx + 6, readU16(next, idx + 6) | WELLSPRING_TAUGHT);
+        writeU16(next, idx + 2, 0);
+        return true;
+      }
+    }
+    return false;
   }
 
   // Hearth masonry: a wall beside a live flame radiates gentle warmth, thawing
@@ -1648,6 +1693,8 @@ const SEED_SOAK_LOSS = 20;
 // measurement these come from.
 const WELLSPRING_POUR = 7;
 const WELLSPRING_REACH = 4;
+// How long a re-taught spring keeps its latch once free of ice. Mirrors LESSON_HOLD in the sim.
+const LESSON_HOLD = 600;
 
 // Below this an ember has gone out: inert char that only relights from outside.
 const COLD_CHAR_ENERGY = 30;

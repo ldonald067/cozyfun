@@ -31,7 +31,7 @@ The simulation stores each cell in an 8-byte record:
 - visual variant (also a spark's flight direction)
 - age
 - energy (dual-purposed per material: water temperature, stem growth budget, stone dampness, wall freeze-thaw stress, rocket fuse, wellspring's remembered material id)
-- state flags (wet, rooted, cosmic, frozen, scorched, bedded) shared by sim, fallback, and renderer — `bedded` marks stone laid down as sediment rather than cooled from lava, and is the only way the renderer can tell the two rocks apart
+- state flags (wet, rooted, cosmic, frozen, scorched, bedded) shared by sim, fallback, and renderer — `bedded` marks stone laid down as sediment rather than cooled from lava, and is the only way the renderer can tell the two rocks apart. On a wellspring, `rooted` means a lesson learned under ice and still held (`WELLSPRING_TAUGHT`), and the spring's `age` times how long it keeps holding it once the ice is gone; every other reader of `rooted` checks for a plant first
 
 Rendering is allowed to inspect these bytes, but it should not mutate them. Visual polish belongs in the renderer unless a real behavior change is needed.
 
