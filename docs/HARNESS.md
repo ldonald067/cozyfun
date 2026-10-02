@@ -107,7 +107,7 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   painted as plain Wall: its witness was "sand that appeared", and the scene's own sand dabs
   appear. `lava.scorches` counted new scorched stone, and 123 of the 205 cells it counted over
   32 seeds were lava that water had quenched into stone, which is `lava.quenched`. Neither
-  failed, so nobody looked. If a check still passes with the material it is named after
+  failed, so nobody looked. Both now witness their own clause; see their scenes. If a check still passes with the material it is named after
   removed, or credits another clause's product, it is not evidence.
 
   **An outcome that undoes something is measured against the something.** Contrast is scored

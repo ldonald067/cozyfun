@@ -57,7 +57,7 @@ in and ice held over it, and now counts only ice that was steam. `water.rinses` 
 pillar beside a log fire, because a flame beside a mound sooted one cell at most, and its
 witness had been counting wet stone rather than soot coming off.
 
-**Two checks were found certifying nothing.** One is fixed:
+**Two checks were found certifying nothing.** Both are fixed:
 
 - **`wellspring.reattune` passed 32 of 32 with no wellspring at all**, because its witness was
   sand the scene had painted. Underneath, the rule failed in play: a chilled spring drank its own
@@ -67,10 +67,15 @@ witness had been counting wet stone rather than soot coming off.
   It is drawn in a fourth rune state, learned, while the ice still holds it. That state matters
   because a water spring's pool usually freezes solid around it. The audit check now witnesses
   the held lesson: 32 of 32, 0 of 32 with no spring and 0 of 32 with no ice.
-- **Still open: `lava.scorches` mostly counts `lava.quenched`.** Of 205 scorched-stone cells over 32 seeds,
-  123 were lava that water quenched into stone; only 82 were the rock being scorched. Counting
-  the painted rock alone, it fails on every seed (2-3 cells). Lava against a wetted rock at
-  the default brush passes 18 of 32.
+- **`lava.scorches` mostly counted `lava.quenched`**: 123 of 205 scorched-stone cells over 32
+  seeds were lava that water had quenched. Counting only the painted rock it failed on every seed,
+  and that turned out to be the game: lava rarely scorches stone, because the water that wets a
+  rock crusts the lava against it, and a drained rock dries before lava arrives. What scorches
+  is masonry with water still spread on it: the check is a watered wall with lava set beside it,
+  and the scorch lands mostly on the wall floor the pour spread across, not the slab (0-3
+  cells). 31 of 32, a median of about 12 cells at contrast 130 or more, and 0 of 32 with no
+  water, no lava or the scorch switched off. A tray that pools the water quenches the lava
+  instead (25-28 of 32).
 
 Still at 29-31 of 32, untouched: `fire.softens`, `meteor.trail`, `stem.burns`,
 `fungus.fairyring`, `oil.ignites` and `meteor.shocked` (31 each), and `fire.thaws` below.

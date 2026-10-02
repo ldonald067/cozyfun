@@ -758,15 +758,30 @@ export const CHECKS = [
   { m: "Lava", covers: "lava.vitrifies", role: "vitrifies dry sand into glass", w: 30, h: 26, seed: 86, ticks: 900,
     paint: (p) => { p(15, 20, 4, M.Sand); p(15, 15, 2, M.Lava); },
     outcome: (g, before) => g.appeared(M.Glass, before) },
-  { m: "Lava", covers: "lava.scorches", role: "dries, scorches and thaws its neighbours", w: 30, h: 26, seed: 87, ticks: 1200,
-    // A SPLASH, not a stream. At radius 2 this was a pool that sat on the stone, and once
-    // erosion started carrying grains off it became an endless stream re-wetting the rock
-    // faster than lava could dry it: the scorch outcome fell to contrast 22, under the
-    // floor. Lava drying a wet neighbour is what the clause claims, so the fixture gives it
-    // a finite wetting to dry. Measured, the outcome is more visible this way than it was
-    // before erosion ever moved: 143 against 99.
-    paint: (p) => { p(15, 20, 3, M.Stone); p(15, 16, 1, M.Water); p(20, 20, 2, M.Lava); },
-    outcome: (g, before) => g.gained(M.Stone, F.Scorched, before) },
+  { m: "Lava", covers: "lava.scorches", role: "dries, scorches and thaws its neighbours", w: 50, h: 34, seed: 87, ticks: 1500,
+    // A wall watered, then lava set beside it five seconds later, at the default brush. Lava
+    // dries a wet neighbour it touches and leaves it scorched; the witness is cells that were
+    // PAINTED as wall and gained the scorch, never anything the lava itself became.
+    //
+    // Most of that scorch lands on the scene's wall FLOOR, not the slab: the pour runs off the
+    // slab and spreads thin across the floor, and the lava flows over the wet bricks. Review
+    // measured it: the slab alone gives 0-3 cells and passes no seed, the floor gives the rest.
+    // So this is lava meeting masonry that still has water spread on it, which is what scorches
+    // in play; a floor a player builds is that surface. A tray deep enough to hold a pool did
+    // worse (25-28 of 32), because a pool quenches the lava instead.
+    //
+    // This used to be a rock, a water splash and lava, counting any stone that gained the
+    // scorch. Over 32 seeds, 123 of the 205 cells it counted were lava quenched into scorched
+    // stone, which is lava.quenched; counting the painted rock alone it failed on every seed,
+    // at 2-3 cells. Lava rarely scorches stone in play: the water that wets the rock boils
+    // against the lava and crusts it into a stone wall between them, and once the pour has
+    // run off, a rock dries before the lava arrives. Here the scorch is plainly visible: a
+    // median of about 12 cells at contrast 130 or more, 31 of 32 seeds, and 31-32 with the
+    // lava at tick 60, 140 or 200, so the timing is not tuned. The low seed is real rather
+    // than staging: how much wet surface the lava reaches depends on where the pour ran.
+    paint: (p) => { p(25, 25, 4, M.Wall); },
+    act: (p, t) => { if (t === 20) p(25, 16, 4, M.Water, 55); if (t === 100) p(16, 25, 4, M.Lava, 55); },
+    outcome: (g, before) => g.gained(M.Wall, F.Scorched, before).filter((i) => before.kindOf(i) === M.Wall) },
 
   { m: "Ice", covers: "ice.pauses", role: "pauses life in frozen dormancy", w: 30, h: 26, seed: 88, ticks: 2500,
     absent: true,
