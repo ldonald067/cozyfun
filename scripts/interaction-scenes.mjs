@@ -253,6 +253,10 @@ export const FLOOR_FROM_BOTTOM = 4;
 const launchFixture = (p) => { p(15, 37, 4, M.Rocket); p(15, 31, 4, M.Fire); };
 
 
+// The flame stem.burns sweeps over its garden. Its witness skips stalks under these strokes,
+// because a stalk the brush painted over did not catch.
+const STEM_FLAMES = Array.from({ length: 9 }, (_, k) => [14 + 4 * k, 14]);
+
 export const CHECKS = [
   // ---- Hard materials -----------------------------------------------------------------
   { m: "Wall", covers: "wall.anchored", role: "stays anchored where natural stone falls", w: 24, h: 24, seed: 1, ticks: 120,
@@ -377,8 +381,11 @@ export const CHECKS = [
     outcome: (g, before) => g.appeared(M.Ember, before) },
   { m: "Fire", covers: "fire.softens", role: "softens into steam against water", w: 30, h: 26, seed: 15, ticks: 400,
     // Water poured from above onto a flame, which is how a player puts a fire out. A blob
-    // painted beside the fire just falls past it before anything can happen.
-    paint: (p) => { p(15, 20, 1, M.Fire); p(15, 14, 2, M.Water); },
+    // painted beside the fire just falls past it before anything can happen. At the default
+    // brush, the pour half a second after the flame: a one-cell dab under a small blob made
+    // 2 cells of steam on 1 seed of 32; this makes at least 53 on all 32.
+    paint: (p) => { p(15, 20, 4, M.Fire, 55); },
+    act: (p, t) => { if (t === 10) p(15, 11, 4, M.Water, 55); },
     outcome: thermalSteam },
   { m: "Lava", covers: "lava.cools", role: "crusts into stone on its own", w: 26, h: 24, seed: 16, ticks: 3000,
     paint: (p) => { p(13, 18, 2, M.Lava); },
@@ -446,13 +453,13 @@ export const CHECKS = [
     // three plants, so the old scene lived or died on whether one of them leafed: one leaf in
     // the whole scene on 6 seeds of 32. Stamping the seeds at the default brush did not help
     // (23 of 32), because a stamp is still one plot. A player's planter watered once grows a
-    // median of 13 plants and 12 leaves on the play board; this bed passes 32 of 32 with at
-    // least 4 leaves. (The witness counts each leaf together with the stalk cell it clings to,
-    // so the audit reports that as 8 cells.)
+    // median of 13 plants and 12 leaves on the play board; this bed, at the app's density,
+    // passes 32 of 32 with at least 4 leaves. (The witness counts each leaf together with the
+    // stalk cell it clings to, so the audit reports that as 8 cells.)
     paint: (p) => {
-      for (let x = 14; x <= 46; x++) p(x, 28, 4, M.Soil);
-      for (let x = 14; x <= 46; x++) p(x, 23, 4, M.Seed);
-      for (let x = 14; x <= 46; x += 2) p(x, 17, 4, M.Water);
+      for (let x = 14; x <= 46; x++) p(x, 28, 4, M.Soil, 55);
+      for (let x = 14; x <= 46; x++) p(x, 23, 4, M.Seed, 55);
+      for (let x = 14; x <= 46; x += 2) p(x, 17, 4, M.Water, 55);
     },
     outcome: (g) => g.all(M.Stem).filter((i) => {
       const [x, y] = g.xyOf(i);
@@ -485,8 +492,12 @@ export const CHECKS = [
   { m: "Meteor", covers: "meteor.impacts", role: "impacts into stone and fire", w: 30, h: 34, seed: 33, ticks: 900,
     paint: (p) => { p(15, 28, 3, M.Stone); p(15, 6, 1, M.Meteor); },
     outcome: (g, before) => [...g.appeared(M.Stardust, before), ...g.appeared(M.Fire, before)] },
-  { m: "Meteor", covers: "meteor.trail", role: "sheds a spark trail as it falls", w: 30, h: 40, seed: 34, ticks: 200,
-    paint: (p) => { p(15, 6, 1, M.Meteor); },
+  { m: "Meteor", covers: "meteor.trail", role: "sheds a spark trail as it falls", w: 40, h: 140, seed: 34, ticks: 250,
+    // The real board's height, and a meteor at the default brush. On a 40-row board the rock
+    // hits bottom almost at once, so the trail was on screen 29 ticks on 1 seed of 32, and a
+    // default-brush meteor there sat at exactly the 30-tick floor. Falling the height of the
+    // tray it trails for at least 129 ticks on all 32. Only a meteor makes sparks here.
+    paint: (p) => { p(20, 6, 4, M.Meteor, 55); },
     outcome: (g) => g.all(M.Spark) },
   { m: "Meteor", covers: "meteor.bursts", role: "bursts into stardust against moonwater", w: 30, h: 34, seed: 35, ticks: 900,
     paint: (p) => { p(15, 28, 4, M.Moonwater); p(15, 6, 1, M.Meteor); },
@@ -901,17 +912,29 @@ export const CHECKS = [
       for (const i of g.appeared(M.Stem, before)) memo.fallen.add(i);
       return [...memo.fallen].filter((i) => g.kindOf(i) === M.Stem);
     } },
-  { m: "Stem", covers: "stem.burns", role: "burns like living growth", w: 40, h: 34, seed: 106, ticks: 5000,
-    paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
-    // A broad sweep: which column the bed sprouts in is the sim's choice and moves with the
-    // seed, so a flame aimed at one guessed cell simply misses.
-    act: (p, t) => { if (t >= 2500 && t < 3200 && t % 10 === 0) for (let x = 14; x <= 26; x += 2) for (const y of [17, 20]) p(x, y, 1, M.Fire); },
-    // Measured as the stalk catching, not as the scorch flag: scorch is the step heat takes
-    // on WET growth, and a stalk that has been standing a while is dry enough to skip it.
+  { m: "Stem", covers: "stem.burns", role: "burns like living growth", w: 60, h: 34, seed: 106, ticks: 3500,
+    // The garden stem.climbs grows (a dragged seed bed, generously watered), then a flame
+    // swept over it at the default brush.
+    //
+    // Measured as a stalk CATCHING, not as the scorch flag: scorch is the step heat takes on
+    // WET growth, and a stalk standing a while is dry enough to skip it. And never a stalk
+    // the flame's own brush painted over: that is paint, not burning. The old scene dabbed
+    // small flames among one planter's plants for 700 ticks and counted those too; without
+    // them it passed 7 of 32. Honestly witnessed, with the garden at the app's density, this
+    // passes 32 of 32, on screen at least 33 ticks: a burning cell turns to smoke at 1 in 18 a
+    // tick, so fire here is a flare, and a stalk fire is about that long.
+    paint: (p) => {
+      for (let x = 14; x <= 46; x++) p(x, 28, 4, M.Soil, 55);
+      for (let x = 14; x <= 46; x++) p(x, 23, 4, M.Seed, 55);
+      for (let x = 14; x <= 46; x += 2) p(x, 17, 4, M.Water, 55);
+    },
+    act: (p, t) => { if (t === 2500) for (const [x, y] of STEM_FLAMES) p(x, y, 4, M.Fire, 55); },
     outcome: (g, before, memo, prev) => {
       memo.burnt ??= new Set();
       for (let i = 0; i < g.size; i++) {
         if (prev.kindOf(i) !== M.Stem) continue;
+        const [x, y] = g.xyOf(i);
+        if (STEM_FLAMES.some(([fx, fy]) => (x - fx) ** 2 + (y - fy) ** 2 <= 16)) continue;
         if (g.kindOf(i) === M.Fire || g.kindOf(i) === M.Ember) memo.burnt.add(i);
       }
       return [...memo.burnt].filter((i) => g.kindOf(i) === M.Fire || g.kindOf(i) === M.Ember);
@@ -950,6 +973,9 @@ export const CHECKS = [
     paint: (p) => { p(15, 20, 3, M.Fungus); p(15, 16, 2, M.Moonwater); },
     outcome: (g, before) => g.gained(M.Fungus, F.Cosmic, before) },
   { m: "Fungus", covers: "fungus.fairyring", role: "sows a stardust grain as a charged fairy ring", w: 30, h: 26, seed: 114, ticks: 6000,
+    // 31 of 32: one seed sows 3 grains in five minutes against a median of 45. The ring is
+    // slow by design; at 9000 ticks that seed reaches 4. Lengthening the window would change
+    // the question this check asks, so it is left.
     paint: (p) => { p(15, 20, 6, M.Soil); p(15, 15, 4, M.Fungus); p(15, 10, 4, M.Moonwater); },
     outcome: (g, before, memo) => {
       memo.grains ??= new Set();
@@ -965,6 +991,12 @@ export const CHECKS = [
       return [...memo.sheet].filter((i) => g.kindOf(i) === M.Oil);
     } },
   { m: "Oil", covers: "oil.ignites", role: "ignites readily near heat", w: 30, h: 26, seed: 131, ticks: 600,
+    // Left as it is at 31 of 32, on purpose. The short seed shows its fire for 27 ticks, and
+    // that is how long oil burns: a burning cell turns to smoke at 1 in 18 a tick, so a pool
+    // this size flares for about a second and a half. Re-staging did not help. A settled
+    // default-brush pool sheets thin across the floor's bumps into separate puddles (14-23
+    // of 32), and oil poured onto a burning log flares just as briefly (27-30). A flame
+    // painted ONTO a settled pool would also count the oil it painted over as catching.
     paint: (p) => { p(15, 20, 3, M.Oil); p(15, 16, 1, M.Fire); },
     outcome: (g, before, memo, prev) => {
       memo.caught ??= new Set();
@@ -994,11 +1026,32 @@ export const CHECKS = [
       return [...memo.fell].filter((i) => g.kindOf(i) === M.Meteor);
     } },
   { m: "Meteor", covers: "meteor.shocked", role: "is shocked into scorched stone by water", w: 30, h: 34, seed: 120, ticks: 900,
-    paint: (p) => { p(15, 28, 4, M.Water); p(15, 5, 1, M.Meteor); },
-    outcome: (g, before, memo) => {
-      memo.shocked ??= new Set();
-      for (const i of g.all(M.Stone)) if (g.hasFlag(i, F.Scorched)) memo.shocked.add(i);
-      return [...memo.shocked].filter((i) => g.kindOf(i) === M.Stone);
+    // A pond, then a meteor dropped into it, at the default brush. The witness is the stone
+    // each SHOCK makes: a meteor cell turning straight into scorched stone, which is what the
+    // water does to it, followed as that stone sinks (it only moves down or diagonally down).
+    //
+    // It used to count any scorched stone. With that witness, this scene without its pond
+    // passed 12 of 32 (the old one-cell meteor, 1 of 32): a meteor landing on something
+    // solid makes plain stone, and its own fire ring's smoke soots it. A first fix counted all
+    // new stone once any shock had happened, and review found that crediting stone the
+    // meteor's own cells made by landing on each other in mid-air, before any water. Now: 32
+    // of 32, at least 15 cells, and 0 of 32 with no pond. The scorch itself is brief: the
+    // stone sinks through water the impact has stirred, which rinses it, so it stays past the
+    // floor on 26 of 32 seeds and is gone within a second on the rest.
+    paint: (p) => { p(15, 28, 4, M.Water, 55); },
+    act: (p, t) => { if (t === 20) p(15, 6, 4, M.Meteor, 55); },
+    outcome: (g, before, memo, prev) => {
+      memo.tracked ??= new Set();
+      const next = new Set();
+      for (const i of memo.tracked) {
+        if (g.kindOf(i) === M.Stone) { next.add(i); continue; }
+        for (const j of [i + g.w, i + g.w - 1, i + g.w + 1]) {
+          if (j < g.size && g.kindOf(j) === M.Stone && prev.kindOf(j) !== M.Stone && !next.has(j)) { next.add(j); break; }
+        }
+      }
+      for (const i of g.all(M.Stone)) if (prev.kindOf(i) === M.Meteor && g.hasFlag(i, F.Scorched)) next.add(i);
+      memo.tracked = next;
+      return [...next];
     } },
   { m: "Meteor", covers: "meteor.vitrifies", role: "vitrifies nearby sand on impact", w: 30, h: 34, seed: 121, ticks: 900,
     paint: (p) => { p(15, 28, 6, M.Sand); p(15, 5, 1, M.Meteor); p(21, 5, 1, M.Meteor); p(9, 5, 1, M.Meteor); },

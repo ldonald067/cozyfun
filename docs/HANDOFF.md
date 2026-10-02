@@ -77,8 +77,25 @@ witness had been counting wet stone rather than soot coming off.
   water, no lava or the scorch switched off. A tray that pools the water quenches the lava
   instead (25-28 of 32).
 
-Still at 29-31 of 32, untouched: `fire.softens`, `meteor.trail`, `stem.burns`,
-`fungus.fairyring`, `oil.ignites` and `meteor.shocked` (31 each), and `fire.thaws` below.
+**The six at 31 of 32 were taken on 2026-10-02**, and two more witnesses were found counting
+the wrong thing. `meteor.shocked` counted any scorched stone, which a meteor landing on
+something solid also makes once its fire ring's smoke soots it: re-staged with that witness and
+no pond it passed 12 of 32. It now follows the stone each shock makes, 32 of 32 and 0 of 32
+without water. `stem.burns` counted stalks its own flame dabs painted over, and without them
+passed 7 of 32; a garden at the app's density swept by a flame, painted-over stalks excluded,
+passes 32 of 32. `stem.climbs` now paints that garden at the app's density too (still 32/32).
+`fire.softens` (32/32) and `meteor.trail` (32/32 on the real board's height) only needed the
+default brush. Two are left at 31 on purpose, with the reason at each scene: `oil.ignites`
+(burning oil flares for about a second and a half, since a burning cell turns to smoke at 1 in
+18 a tick) and `fungus.fairyring` (slow by design).
+
+**One possible rule question came out of it**: the scorch a meteor shock promises is often
+brief. The shocked stone sinks through water the impact stirred, which rinses it, so it stays
+past the floor on 26 of 32 seeds. The rinse was gated on flowing water in Phase 20 to stop
+exactly this; an impact makes its own flow.
+
+What is left thin: `fire.thaws`, `oil.ignites`, `fungus.fairyring` and `lava.scorches`, all
+at 31 of 32, each explained at its scene.
 
 **`fire.thaws` joined that list when ice stopped frosting dry stone**, and it is the thinnest:
 31 of 32, with 4 thawed cells on almost every seed, which is exactly the floor. Its ice dab

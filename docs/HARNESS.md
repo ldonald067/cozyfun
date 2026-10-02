@@ -108,7 +108,16 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   appear. `lava.scorches` counted new scorched stone, and 123 of the 205 cells it counted over
   32 seeds were lava that water had quenched into stone, which is `lava.quenched`. Neither
   failed, so nobody looked. Both now witness their own clause; see their scenes. If a check still passes with the material it is named after
-  removed, or credits another clause's product, it is not evidence.
+  removed, or credits another clause's product, it is not evidence. `meteor.shocked` is a
+  third: its witness passed 12 of 32 with the pond left out, on impact stone sooted by smoke.
+  Its first fix, "count new stone once a shock has happened", still credited stone the meteor
+  made by landing on itself before any water; it now follows each shock's own stone.
+
+  **Never count what the scene's own brush painted.** A gesture painted with `act` lands
+  after `before` was taken, so a witness of the form "was X last tick, is Y now" credits the
+  brush. `stem.burns` counted stalks its own flame dabs painted over: without them it passed 7
+  of 32. It now skips cells under its strokes. The same trap rules out dropping a flame onto a
+  settled oil pool, which would count the oil it painted over as catching.
 
   **An outcome that undoes something is measured against the something.** Contrast is scored
   against the scene as painted, so a rinse read as clean stone against clean stone. That is
