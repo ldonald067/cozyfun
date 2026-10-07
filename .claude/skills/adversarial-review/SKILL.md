@@ -77,8 +77,11 @@ Determine which model you are, then spawn reviewers on the opposite:
 **If you are Claude** → spawn Codex reviewers via `codex exec`:
 
 ```sh
-codex exec --skip-git-repo-check -o "$REVIEW_DIR/skeptic.md" "prompt" 2>/dev/null
+codex exec --skip-git-repo-check -o "$REVIEW_DIR/skeptic.md" "prompt" < /dev/null 2>/dev/null
 ```
+
+Close stdin with `< /dev/null`. In a background shell `codex exec` otherwise prints "Reading
+additional input from stdin..." and waits forever (2026-10-07).
 
 Use `--profile edit` only if the reviewer needs to run tests. Default to read-only.
 Run with `run_in_background: true`, monitor via `TaskOutput` with `block: true, timeout: 600000`.

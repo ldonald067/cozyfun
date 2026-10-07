@@ -84,8 +84,11 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   recovers once standing water re-wets it. Over 32 seeds, 25,546 of 33,543 counted cell-ticks
   were moss that was no longer scorched, reported as a median of 744 ticks on screen where the
   moving front is really visible for 65-85. Its cell count was honest, which is why nothing
-  looked wrong. **27 checks still remember cells and filter them on the material alone**; many
-  are legitimate (a grain that fell is still that grain), but that list has not been audited.
+  looked wrong. **Every check that remembers cells has now been asked the four questions**
+  below (actor away, precondition away, brush, leftovers). Fifteen failed one, and
+  `fire.dries` is still open, with the reason at its scene.
+  Many that passed are legitimate for the reason they look it: a grain that fell is still
+  that grain.
 
   **Stage the gestures in the order a player makes them.** `ice.stresses` painted rock, water
   and ice before the first tick, with the ice one cell clear of the rock. It passed on every
@@ -126,6 +129,20 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   soot washed off: black turning clean scores 196 or more. Its scene was rebuilt too. A
   one-cell flame beside a mound sooted ONE stone cell at most. A stone pillar with a log fire
   at its foot soots 12 cells up its face on every seed, because smoke rises straight past it.
+
+  **The last pass over the remembered-cell checks found three new disguises.** A guard that
+  latches on the wrong event: `stem.footing`'s `memo.cut` turned true at the first sprout,
+  not at the cut, so it counted the plant growing and passed 32 of 32 with no cut. A speed
+  claim witnessed by position: `sand.pours` counted sand that had fallen two rows, which a
+  one-cell-a-tick fall also does, and with the two-cell drop sabotaged out of the sim it
+  still passed 32 of 32; its first fix asked for sand ahead of a one-cell fall, and review
+  showed a lead won in the first three ticks lasts the whole fall, so it now asks for a pace.
+  A precondition already gone: `ember.quenched` poured on its log 70 seconds after the last
+  live ember, so it watched cold char get wet and passed with the quench taken out of the
+  sim. A scene that changes the actor's state: `wellspring.blocks` dropped
+  sand on a dormant spring, which drinks sand and wakes, so it counted sand on a spring
+  pouring sand. Then the familiar one: `soil.breathes` counted the sprinkle's own spray and
+  passed with no soil at all. Each scene says what it witnesses now.
 
   The scenes and the runner that plays them live in `scripts/interaction-scenes.mjs`, shared
   with `audit:drift` and `clobber:census` so all three measure the same scenes. Material

@@ -1,7 +1,8 @@
 # Handoff — where the work is, and what to do next
 
-*Rewritten at each handoff, never appended to. Written 2026-10-07. Live at `5c39044`; the full
-gate, CI and `deploy:verify` were green there.*
+*Rewritten at each handoff, never appended to. Written 2026-10-07, after the remembered-cell
+witness audit. The full gate was green on that batch; see `git log` for the live commit and run
+`npm run deploy:verify` to confirm it.*
 
 ## Work within the owner's usage limits
 
@@ -13,57 +14,68 @@ The owner hits usage limits early, so keep each chat lean:
 - **Measure narrowly.** `npm run audit:drift -- --seeds 32 --per-seed --only <ids>` takes a
   couple of minutes. Surveying all 127 checks at 32 seeds took over ten, so do it rarely.
 - **Write scratch scripts once and reuse them.** `.tmp/lucky/measure.mjs` exports
-  `find(id, role)` and `measure(label, check)`, which prints pass count, cells, ticks and
-  contrast over 32 seeds. `.tmp/lucky/board.mjs <id> <seed k> <ticks>` prints a check's board.
+  `find(id, role)` and `measure(label, check)` (pass count, cells, ticks, contrast over 32
+  seeds). `.tmp/lucky/board.mjs <id> <seed k> <ticks>` prints a check's board.
+  `.tmp/witness/audit.mjs` runs actor-away and precondition-away variants of a check and
+  tallies what its counted cells ARE (`measure(label, check, classify)`); copy its pattern.
 - **Run the full gate (`npm run check`, ~8 minutes) once per batch**, not after every edit.
 
-## What to do next: audit the remembered-cell witnesses
+## What to do next
 
-A check whose witness remembers cells (`memo.x ??= new Set()`) can count leftovers, another
-clause's outcome, or the scene's own brushwork. It reads as a reliable pass while proving
-nothing. This work found seven that did: `spark.lights`, `moss.dries`, `wellspring.reattune`,
-`lava.scorches`, `water.rinses`, `meteor.shocked` and `stem.burns`. None had failed.
+**1. The owner's call on `fire.dries`** (see Design questions). Its witness is known to be
+wrong and is left in place, marked OPEN at its scene, because the honest one fails the audit's
+own seed.
 
-**Not yet audited (20):** `water.flows` (both checks), `glass.shatters`, `wall.hearth`,
-`stone.blocks`, `sand.pours`, `sand.drains`, `water.hydrates`, `steam.rises`, `soil.breathes`,
-`fire.dries`, `fire.thaws`, `pollen.drifts`, `stem.footing`, `ember.glows`, `ember.quenched`,
-`oil.floats`, `meteor.falls`, `meteor.vitrifies`, `wellspring.blocks`.
-Already re-examined: `water.rinses`, `steam.frosts`, `stem.burns`, `meteor.shocked`,
-`oil.ignites`, `fungus.fairyring`, `rocket.climbs`, `spark.flies`.
+**2. Audit the clause halves no check witnesses.** The remembered-cell audit is finished: every
+check that remembers cells has been asked the four questions (docs/HARNESS.md, "A sticky
+outcome is only honest..."), and 15 failed one. Review then found a different gap: a clause
+with two promises, where the check witnesses one. Known so far:
 
-**The four questions to ask of each** (docs/HARNESS.md, "A sticky outcome is only honest...",
-has the worked examples):
+- `ember.glows` "weakly spreads fire": the painted flame lights the whole log, and with ember
+  ignition taken out of a copy of the sim the check still passed 28 of 32.
+- `ember.quenched` "running water washes cold char away": not witnessed at all.
+- `wellspring.blocks` "between pours": the check now witnesses only a dormant spring.
 
-1. **Take the actor away.** Paint the material the check is named after as Wall, or leave it
-   out. It must then fail on every seed.
-2. **Take the precondition away** (the water, the flame, the ice). It must fail.
-3. **Does it credit the brush?** A gesture painted with `act` lands after `before` is taken,
-   so "was X last tick, is Y now" counts cells the brush painted over.
-4. **Does it credit another clause, or a leftover?** Classify every counted cell by what it was
-   when painted and what it is now, and filter remembered cells on the OUTCOME, not on the
-   material.
+The rest of `docs/MATERIAL_AUDIT.md` has not been read for this. For each compound clause,
+ask whether sabotaging the second half in the sim would fail any check. Adding a witness means
+a second check under the same id (as `water.flows` has two).
 
-If a witness fails one of these, fix it and re-measure at 32 seeds. If the honest version then
-fails on most seeds, the interaction may not happen in play. That is what the wellspring was,
-and it needs the owner's decision, not a re-staged scene.
+## How a witness gets checked (the method that found all of this)
+
+1. **Take the actor away** (paint it as Wall, or leave it out). It must fail on every seed.
+2. **Take the precondition away.** It must fail. A precondition can also be gone already:
+   `ember.quenched` poured 70 s after the last live ember.
+3. **Does it credit the brush?** A gesture painted with `act` lands after `before` is taken.
+4. **Does it credit another clause, or a leftover?** Classify what every counted cell is NOW,
+   and filter on the outcome, not the material.
+5. **Sabotage the rule in the sim** (`sim/src/lib.rs` is enough for the audit, which runs
+   wasm; `npm run build:sim`, measure, `git checkout sim/src/lib.rs`, rebuild). This is the
+   only test that catches a witness of the wrong KIND: a position standing in for a speed
+   (`sand.pours`), natural cooling standing in for a quench. Review caught both after the
+   first four questions had passed them.
 
 ## Where things stand
 
-The interaction audit has 127 checks bound to all 118 role ids. All pass on the audit's seed,
-and on 32 seeds all but four pass every seed. Those four are `fire.thaws`, `oil.ignites`,
-`fungus.fairyring` and `lava.scorches`, each at 31 of 32 with the reason at its scene. Recent
-rule changes, with their reasoning in docs/VISUAL_PIPELINE.md and docs/MATERIAL_AUDIT.md:
-
-- **Rockets fly as a volley, and a line of powder is a fuse** (`try_thrust`,
-  `light_touching_powder`).
-- **Ice frosts only stone and wall that hold water**, with a field note the first time.
-- **A wellspring can really be re-taught.** A chilled spring ignores its own pool, latches the
-  first new material (`FLAG_TAUGHT`, the rooted flag on a spring), spreads it through every
-  attuned cell, holds it for `LESSON_HOLD` after the ice goes, and shows a fourth rune state,
-  "learned", while the ice holds it.
+The interaction audit has 127 checks bound to all 118 role ids. All pass on the audit's seed.
+On 32 seeds, five do not pass every seed, each with its reason at its scene: `fire.thaws`,
+`oil.ignites`, `fungus.fairyring` and `lava.scorches` at 31, and `stem.footing` at 30 (the
+stalk can grow wholly below the cut). `sand.pours` passes every seed but is thin by nature: its
+pace is on screen 34 ticks at least, against the floor of 30.
 
 ## Design questions for the owner
 
+- **`fire.dries` cannot show its clause as staged.** Heat scorches only WET wood; dry wood
+  ignites straight to ember. In its scene the water pools in a dip on the log, the flames meet
+  dry wood, and 3-7 wet cells on the skin scorch, on screen 9 ticks on the audit's seed (22 of
+  32 seeds pass). The old witness passed because it counted ember (ignition) and smoke soot.
+  Either the rule makes scorch last longer or reach deeper, or the scene soaks the log another
+  way. Default-brush flames made it worse (0 of 32). Needs a picture before choosing.
+- **A cut stalk's flowers hang in mid-air.** The stalk falls; its flowers stay where they
+  were for about two minutes, then fade in place.
+- **A burning log is live for only 5-7 seconds.** It catches all at once and is cold char
+  after that, so a player has to douse it within seconds to see a quench.
+- **A dormant wellspring only ever blocks non-sources.** It drinks the first sand, water, soil
+  or oil that touches it and wakes, so a player sees "blocks while dormant" only with stone.
 - **A meteor shock's scorch is often brief.** The stone sinks through water the impact stirred,
   and the rinse clears the scorch: it stays past the floor on 26 of 32 seeds.
 - **The sim runs faster on faster screens.** `App.tsx` sets `lastSimTick = time`, so a 60 Hz
@@ -102,8 +114,8 @@ All by the owner, after seeing measurements:
 - **Seconds are ticks over ~20**, never 60.
 - **Print the board before believing a fixture.** Most wrong turns in this work were a fixture
   that did not stage what its comment claimed.
-- **Vacuity-test every gate you touch**: sabotage the rule in BOTH engines, rebuild with
-  `npm run build:sim`, and watch the gate fail by name.
+- **Vacuity-test every gate you touch**: sabotage the rule, rebuild with `npm run build:sim`,
+  and watch the gate fail by name.
 - **Close each batch with `/adversarial-review`** (Codex; check `codex login status`). It
-  caught a real problem in nearly every batch of this work.
+  caught a real problem in every batch of this work, including this one.
 - **For a design choice, show the owner a rendered picture** and explain it plainly.

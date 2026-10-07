@@ -595,26 +595,32 @@ export const CHECKS = [
     // A stone basin, so the pooling persists instead of the water sluicing off a slab. The
     // water starts clear of the stone: painted onto it, the check would be true before a tick.
     paint: (p) => { p(15, 19, 3, M.Stone); p(9, 16, 2, M.Stone); p(21, 16, 2, M.Stone); p(15, 8, 3, M.Water); },
-    outcome: (g, before, memo) => {
-      memo.held ??= new Set();
-      for (const i of g.all(M.Water)) {
-        const [x, y] = g.xyOf(i);
-        if (g.kindAt(x, y + 1) === M.Stone) memo.held.add(i);
-      }
-      return [...memo.held].filter((i) => g.kindOf(i) === M.Water);
-    } },
+    // Water standing on stone NOW. It used to remember every cell that had ever held water over
+    // stone and count it while it held any water: 3% of what it counted over 32 seeds was water
+    // with no stone left under it.
+    outcome: (g) => g.all(M.Water).filter((i) => {
+      const [x, y] = g.xyOf(i);
+      return g.kindAt(x, y + 1) === M.Stone;
+    }) },
   { m: "Stone", covers: "stone.weathers", role: "condenses steam harder than sealed wall", w: 26, h: 30, seed: 57, ticks: 1500,
     paint: (p) => { p(13, 24, 3, M.Water); p(13, 25, 2, M.Lava); p(13, 14, 3, M.Stone); },
     outcome: (g, before) => g.gained(M.Stone, F.Wet, before) },
 
-  { m: "Sand", covers: "sand.pours", role: "pours fast as dry powder, two cells per tick", w: 26, h: 30, seed: 58, ticks: 60,
-    // Painted at row 6 with radius 1, so the lowest grain starts at row 7. Anything at row 9
-    // after a single tick can only have moved two cells in that tick.
+  { m: "Sand", covers: "sand.pours", role: "pours fast as dry powder, two cells per tick", w: 26, h: 64, seed: 58, ticks: 120,
+    // Painted at row 6 with radius 1, so the lowest grain starts at row 7. The witness is sand
+    // below row 7 + 1.5t after t ticks: a pour keeping up a pace no one-cell fall can.
+    //
+    // It used to be any sand that had reached row 9, counted while it stayed sand. A fall of
+    // one cell a tick gets there two ticks later and stays, so with the two-cell drop taken
+    // out of the sim it still passed 32 of 32. Its first fix, sand below row 7 + t, was fooled
+    // the same way by review: a lead gained in the first ticks lasts the whole fall, and with
+    // the drop allowed only for three ticks it passed 32 of 32 too. At 1.5 a tick that is 0 of
+    // 32. The pace needs room to show, and 64 rows is under half the app's 140-row world; it
+    // is on screen at least 34 ticks, so this is a thin pass by nature, not by staging.
     paint: (p) => { p(13, 6, 1, M.Sand); },
     outcome: (g, before, memo) => {
-      memo.deep ??= new Set();
-      for (const i of g.all(M.Sand)) if (g.xyOf(i)[1] >= 9) memo.deep.add(i);
-      return [...memo.deep].filter((i) => g.kindOf(i) === M.Sand);
+      memo.t = (memo.t ?? -1) + 1; // called once before the first tick, then once a tick
+      return g.all(M.Sand).filter((i) => g.xyOf(i)[1] > 7 + 1.5 * memo.t);
     } },
   { m: "Sand", covers: "sand.drains", role: "drains dry back to loose grains", w: 26, h: 26, seed: 59, ticks: 3000,
     paint: (p) => { p(13, 19, 3, M.Sand); p(13, 15, 1, M.Water); },
@@ -702,11 +708,13 @@ export const CHECKS = [
     // A sprinkle, not a downpour: the brush has a density control and a solid column of
     // water lands on the vents and drowns the wisps it just released.
     act: (p, t) => { if (t >= 800 && t < 860 && t % 6 === 0) p(15, 11, 5, M.Water, 12); },
-    outcome: (g, before, memo) => {
-      memo.mist ??= new Set();
-      for (const i of g.all(M.Steam)) memo.mist.add(i);
-      return [...memo.mist].filter((i) => g.kindOf(i) === M.Steam);
-    } },
+    // Steam hotter than mist. Petrichor vents its wisp at energy 90 and moving water throws
+    // spray at MIST_ENERGY, and nothing in this scene is hot, so nothing else makes steam.
+    // It used to count every steam cell, and the sprinkle's own spray was most of it: it
+    // passed 32 of 32 with the soil painted as stone, with no soil at all, and with the water
+    // arriving before the soil had a dry spell to break. Now 32 of 32 as staged, and 0 of 32
+    // for each of those.
+    outcome: (g) => g.all(M.Steam).filter((i) => g.energyAt(i) > MIST_ENERGY) },
   { m: "Soil", covers: "soil.roots", role: "roots wet seeds for blooming", w: 30, h: 26, seed: 73, ticks: 900,
     paint: (p) => { p(15, 20, 3, M.Soil); p(15, 17, 1, M.Seed); p(15, 14, 2, M.Water); },
     outcome: (g, before) => g.gained(M.Seed, F.Rooted, before) },
@@ -741,6 +749,14 @@ export const CHECKS = [
   { m: "Fire", covers: "fire.dries", role: "dries and scorches wet cells first", w: 30, h: 26, seed: 81, ticks: 1500,
     paint: (p) => { p(15, 20, 6, M.Wood); p(15, 13, 4, M.Water); },
     act: (p, t) => { if (t === 300) { p(22, 20, 1, M.Fire); p(8, 20, 1, M.Fire); } },
+    // OPEN, and not evidence yet. This witness passes 32 of 32 with the water left out, and
+    // three quarters of what it counts is ember, which is the wood igniting. Heat scorches only
+    // WET wood (`heat_softens_cell`); the scorch it finds on dry wood is smoke sooting it. The
+    // honest witness, wood that was wet last tick and is dry and scorched now, passes 22 of 32
+    // and fails this check's own seed at 9 ticks: the water pools in a dip on the log, the
+    // flames meet dry wood, and only 3-7 wet cells on its skin ever scorch. Default-brush
+    // flames made it 0 of 32. Whether the rule or the scene should change is the owner's call.
+    //
     // Sticky: scorch is the step before ignition, so it is gone again moments later.
     outcome: (g, before, memo) => {
       memo.charred ??= new Set();
@@ -906,10 +922,16 @@ export const CHECKS = [
     // Sever the BASE only. Clearing the whole band erased the stalk outright, and then the
     // predicate had no fallen segments left to count — it measured a wipe, not a collapse.
     act: (p, t) => { if (t === 2500) for (let x = 16; x <= 24; x++) p(x, 22, 1, M.Empty); },
-    outcome: (g, before, memo) => {
-      if (!memo.cut) { memo.cut = g.count(M.Stem) > 0; return []; }
+    // A segment DROPPING: stem in a cell that had none, with stem above it the tick before,
+    // counted while it lies where it landed. It used to count every stalk cell that appeared
+    // once any stem existed (its `memo.cut` turned true at the first sprout, not at the cut),
+    // so it measured the plant growing, and passed 32 of 32 with the cut left out. Now 0 of 32
+    // without the cut and 30 of 32 with it: on two seeds the stalk grows from the soil beside
+    // the seed pile and stands wholly below the cut, which takes its tip and leaves nothing
+    // above to fall.
+    outcome: (g, before, memo, prev) => {
       memo.fallen ??= new Set();
-      for (const i of g.appeared(M.Stem, before)) memo.fallen.add(i);
+      for (const i of g.all(M.Stem)) if (i >= g.w && prev.kindOf(i) !== M.Stem && prev.kindOf(i - g.w) === M.Stem) memo.fallen.add(i);
       return [...memo.fallen].filter((i) => g.kindOf(i) === M.Stem);
     } },
   { m: "Stem", covers: "stem.burns", role: "burns like living growth", w: 60, h: 34, seed: 106, ticks: 3500,
@@ -949,18 +971,36 @@ export const CHECKS = [
 
   { m: "Ember", covers: "ember.glows", role: "glows hot and weakly spreads fire", w: 30, h: 26, seed: 109, ticks: 1500,
     paint: (p) => { p(15, 20, 4, M.Wood); p(15, 16, 1, M.Fire); },
-    outcome: (g, before, memo) => {
-      memo.hot ??= new Set();
-      for (const i of g.all(M.Ember)) if (g.energyAt(i) > 150) memo.hot.add(i);
-      return [...memo.hot].filter((i) => g.kindOf(i) === M.Ember);
-    } },
+    // Ember that is hot NOW. Remembering every ember once hot and counting it while it was
+    // ember at all counted cooled char: 97% of its cell-ticks over 32 seeds. This witnesses the
+    // glow only. The painted flame lights the whole log itself, so the clause's other half,
+    // that an ember weakly spreads fire, is not witnessed: review took ember ignition out of a
+    // copy of the sim and this still passed 28 of 32.
+    outcome: (g) => g.all(M.Ember).filter((i) => g.energyAt(i) > 150) },
   { m: "Ember", covers: "ember.quenched", role: "quenches wet under water and washes cold char away", w: 30, h: 26, seed: 110, ticks: 4000,
+    // Water poured on the log two seconds after it is lit, while it still burns. A log this
+    // size catches all at once and is cold char five to seven seconds later, and this used to
+    // pour at 75 seconds: it witnessed cold char getting wet, never a quench, and review found
+    // it passed 32 of 32 with the quench taken out of the sim.
+    //
+    // The witness is a live ember (energy at least the sim's COLD_CHAR_ENERGY, 30) that turned
+    // wet and lost 20 or more energy in one tick, counted while it stays wet. The quench takes
+    // 120 at once; natural cooling never takes 20, and "any drop" passed 32 of 32 on cooling
+    // alone with the quench sabotaged. Its contrast is against the tick before the first
+    // quench, not the painted wood. 32 of 32 as staged; 0 of 32 with the pour at 75 s, and 0
+    // of 32 with the quench sabotaged. The clause's second half, running water washing cold
+    // char away, is not witnessed here.
     paint: (p) => { p(15, 20, 4, M.Wood); p(15, 16, 1, M.Fire); },
-    act: (p, t) => { if (t === 1500) p(15, 13, 4, M.Water); },
-    outcome: (g, before, memo) => {
-      memo.doused ??= new Set();
-      for (const i of g.all(M.Ember)) if (g.hasFlag(i, F.Wet)) memo.doused.add(i);
-      return [...memo.doused].filter((i) => g.kindOf(i) === M.Ember);
+    act: (p, t) => { if (t === 40) p(15, 13, 4, M.Water); },
+    outcome: (g, before, memo, prev) => {
+      memo.quenched ??= new Set();
+      for (const i of g.all(M.Ember)) {
+        if (!g.hasFlag(i, F.Wet) || prev.kindOf(i) !== M.Ember || prev.hasFlag(i, F.Wet)) continue;
+        if (prev.energyAt(i) < 30 || prev.energyAt(i) - g.energyAt(i) < 20) continue;
+        memo.quenched.add(i);
+        memo.against ??= prev;
+      }
+      return [...memo.quenched].filter((i) => g.kindOf(i) === M.Ember && g.hasFlag(i, F.Wet));
     } },
 
   { m: "Fungus", covers: "fungus.overtakes", role: "overtakes old or wet moss", w: 30, h: 26, seed: 111, ticks: 3000,
@@ -1123,15 +1163,18 @@ export const CHECKS = [
     paint: (p) => { p(15, 19, 1, M.Wellspring); p(15, 15, 1, M.Water); },
     outcome: (g) => g.all(M.Wellspring).filter((i) => g.energyAt(i) > 0) },
   { m: "Wellspring", covers: "wellspring.blocks", role: "blocks flow like sealed construction while dormant", w: 30, h: 26, seed: 127, ticks: 400,
-    paint: (p) => { p(13, 19, 1, M.Wellspring); p(17, 19, 1, M.Wellspring); p(9, 19, 2, M.Wall); p(21, 19, 2, M.Wall); p(15, 8, 4, M.Sand); },
-    outcome: (g, before, memo) => {
-      memo.held ??= new Set();
-      for (const i of g.all(M.Sand)) {
-        const [x, y] = g.xyOf(i);
-        if (g.kindAt(x, y + 1) === M.Wellspring) memo.held.add(i);
-      }
-      return [...memo.held].filter((i) => g.kindOf(i) === M.Sand);
-    } },
+    // Stone dropped on the springs, because a dormant spring drinks the first source that
+    // touches it, and sand, water, soil and oil are all sources. This used to drop sand, which
+    // woke both springs on the first grain: of what it counted over 32 seeds, 128 cell-ticks
+    // were sand on a dormant spring and 76,160 sand on one attuned to sand, which pushes its
+    // own sand up through the pile. Stone is no source, so the spring stays dormant under it.
+    // The witness is stone resting on a spring that is still dormant now. The clause's other
+    // half, that an attuned spring blocks flow between pours, is not witnessed.
+    paint: (p) => { p(13, 19, 1, M.Wellspring); p(17, 19, 1, M.Wellspring); p(9, 19, 2, M.Wall); p(21, 19, 2, M.Wall); p(15, 8, 4, M.Stone); },
+    outcome: (g) => g.all(M.Stone).filter((i) => {
+      const [x, y] = g.xyOf(i);
+      return g.kindAt(x, y + 1) === M.Wellspring && g.energyAt((y + 1) * g.w + x) === 0;
+    }) },
   { m: "Wellspring", covers: "wellspring.stilled", role: "is stilled by nearby ice", w: 30, h: 26, seed: 128, ticks: 3000,
     absent: true,
     paint: (p) => { p(15, 19, 1, M.Wellspring); p(15, 16, 1, M.Water); p(11, 19, 2, M.Ice); p(19, 19, 2, M.Ice); },
