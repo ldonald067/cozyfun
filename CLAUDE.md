@@ -102,14 +102,19 @@ history.
 Directory rules load themselves: `sim/CLAUDE.md` and `app/src/rendering/CLAUDE.md` are
 pulled in when you read a file there. Read these when the task touches them, not by default:
 
-- Architecture and module boundaries: @docs/ARCHITECTURE.md
-- Review bar: @docs/CODE_REVIEW.md
-- Renderer layers and shape language: @docs/VISUAL_PIPELINE.md
-- Audio design and constraints: @docs/AUDIO.md
-- The gates and what each proves: @docs/HARNESS.md
-- Material roster and interaction matrix: @docs/MATERIAL_AUDIT.md
-- Deploy and embedding: @docs/EMBEDDING.md
-- Asset provenance and licences: @ASSET_CREDITS.md
+- Architecture and module boundaries: `docs/ARCHITECTURE.md`
+- Review bar: `docs/CODE_REVIEW.md`
+- Renderer layers and shape language: `docs/VISUAL_PIPELINE.md`
+- Audio design and constraints: `docs/AUDIO.md`
+- The gates and what each proves: `docs/HARNESS.md`
+- Material roster and interaction matrix: `docs/MATERIAL_AUDIT.md`
+- Deploy and embedding: `docs/EMBEDDING.md`
+- Asset provenance and licences: `ASSET_CREDITS.md`
+
+These are plain paths on purpose. An `@` link loads the whole file into every chat, and
+these eight came to about 230 KB (roughly 58k tokens) before any work began. The owner runs
+into usage limits, so read them on demand, and `grep -n` for the section you need rather
+than reading a 70 KB file whole.
 
 Two skills ship **in this repo**, under `.claude/skills/`, complete — including the `brain/`
 principles the reviewer text depends on. They belong here rather than in the operator's

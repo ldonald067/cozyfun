@@ -1,217 +1,109 @@
 # Handoff — where the work is, and what to do next
 
-*Rewritten at each handoff, never appended to. Written 2026-09-30 and brought up to date on
-2026-10-01: the tick-rate correction, rockets that fly, three lucky-seed checks, and frost that
-needs water (see below).*
+*Rewritten at each handoff, never appended to. Written 2026-10-07. Live at `5c39044`; the full
+gate, CI and `deploy:verify` were green there.*
+
+## Work within the owner's usage limits
+
+The owner hits usage limits early, so keep each chat lean:
+
+- **Read docs on demand, in ranges.** `CLAUDE.md` names the deep docs as plain paths, so they
+  no longer load into every chat. `grep -n` for the section you need, then read only those
+  lines. `HARNESS.md`, `VISUAL_PIPELINE.md` and `MATERIAL_AUDIT.md` are 40-70 KB each.
+- **Measure narrowly.** `npm run audit:drift -- --seeds 32 --per-seed --only <ids>` takes a
+  couple of minutes. Surveying all 127 checks at 32 seeds took over ten, so do it rarely.
+- **Write scratch scripts once and reuse them.** `.tmp/lucky/measure.mjs` exports
+  `find(id, role)` and `measure(label, check)`, which prints pass count, cells, ticks and
+  contrast over 32 seeds. `.tmp/lucky/board.mjs <id> <seed k> <ticks>` prints a check's board.
+- **Run the full gate (`npm run check`, ~8 minutes) once per batch**, not after every edit.
+
+## What to do next: audit the remembered-cell witnesses
+
+A check whose witness remembers cells (`memo.x ??= new Set()`) can count leftovers, another
+clause's outcome, or the scene's own brushwork. It reads as a reliable pass while proving
+nothing. This work found seven that did: `spark.lights`, `moss.dries`, `wellspring.reattune`,
+`lava.scorches`, `water.rinses`, `meteor.shocked` and `stem.burns`. None had failed.
+
+**Not yet audited (20):** `water.flows` (both checks), `glass.shatters`, `wall.hearth`,
+`stone.blocks`, `sand.pours`, `sand.drains`, `water.hydrates`, `steam.rises`, `soil.breathes`,
+`fire.dries`, `fire.thaws`, `pollen.drifts`, `stem.footing`, `ember.glows`, `ember.quenched`,
+`oil.floats`, `meteor.falls`, `meteor.vitrifies`, `wellspring.blocks`.
+Already re-examined: `water.rinses`, `steam.frosts`, `stem.burns`, `meteor.shocked`,
+`oil.ignites`, `fungus.fairyring`, `rocket.climbs`, `spark.flies`.
+
+**The four questions to ask of each** (docs/HARNESS.md, "A sticky outcome is only honest...",
+has the worked examples):
+
+1. **Take the actor away.** Paint the material the check is named after as Wall, or leave it
+   out. It must then fail on every seed.
+2. **Take the precondition away** (the water, the flame, the ice). It must fail.
+3. **Does it credit the brush?** A gesture painted with `act` lands after `before` is taken,
+   so "was X last tick, is Y now" counts cells the brush painted over.
+4. **Does it credit another clause, or a leftover?** Classify every counted cell by what it was
+   when painted and what it is now, and filter remembered cells on the OUTCOME, not on the
+   material.
+
+If a witness fails one of these, fix it and re-measure at 32 seeds. If the honest version then
+fails on most seeds, the interaction may not happen in play. That is what the wellspring was,
+and it needs the owner's decision, not a re-staged scene.
 
 ## Where things stand
 
-**A tick is not a frame.** The app ticks the sim at most once per animation frame, and only
-once `SIM_TICK_MS` (38) has passed, so a 60 Hz display gets a tick every third frame: **20.2
-ticks a second, measured in the shipped bundle**, not the 60 every duration in the docs had
-been read at. The audit's 30-tick visibility floor stays where it is, by the owner's decision —
-it just means about 1.5 s of play, not 0.5 s. `TICKS_PER_SECOND` in
-`scripts/interaction-scenes.mjs` derives the rate from `SIM_TICK_MS`, the audit prints through
-it, and the durations quoted around the repo were corrected (a puddle dries in roughly twenty
-seconds to two minutes, not 15-30 s).
+The interaction audit has 127 checks bound to all 118 role ids. All pass on the audit's seed,
+and on 32 seeds all but four pass every seed. Those four are `fire.thaws`, `oil.ignites`,
+`fungus.fairyring` and `lava.scorches`, each at 31 of 32 with the reason at its scene. Recent
+rule changes, with their reasoning in docs/VISUAL_PIPELINE.md and docs/MATERIAL_AUDIT.md:
 
-**Rockets fly, and a line of powder is a fuse.** A pile lit at the default brush used to send
-up 2 grains of ~24 and burst 12 on the ground, because a lit grain took its own powder and the
-flame that lit it for a ceiling. Two rules, both in `update_rocket` and mirrored in `engine.ts`:
-`try_thrust` lets a lit grain shove straight up through its own charge, and
-`light_touching_powder` lets it light the unlit powder it touches. The second exists because
-the first removed the ground bursts that had been relaying light through a charge, which killed
-the fuse a dragged line of powder used to be. Over 32 seeds: 12 grains fly, none bursts on the
-ground, none is left unlit, and a line burns its full length on 16 of 16. The owner chose this
-after comparing it with the volley alone and with a random blend. docs/VISUAL_PIPELINE.md
-("A lit charge goes up whole") has every number and both accepted costs.
+- **Rockets fly as a volley, and a line of powder is a fuse** (`try_thrust`,
+  `light_touching_powder`).
+- **Ice frosts only stone and wall that hold water**, with a field note the first time.
+- **A wellspring can really be re-taught.** A chilled spring ignores its own pool, latches the
+  first new material (`FLAG_TAUGHT`, the rooted flag on a spring), spreads it through every
+  attuned cell, holds it for `LESSON_HOLD` after the ice goes, and shows a fourth rune state,
+  "learned", while the ice holds it.
 
-The last handoff's first thread was `rocket.climbs` passing on 8 seeds of 32. It passes on 32
-now, and the reason it failed was never the flight: it was a radius-2 fixture (the app paints at
-4) and a witness counting the burst's sparks. On the way, `spark.lights` turned out to have been
-passing on leftover UNLIT powder — its witness remembered cells and kept counting whatever rocket
-grain sat in them — and it now stages its charges under a roof, where sparks can reach the next
-charge, with a witness that credits sparks only after a far charge is seen lit.
+## Design questions for the owner
 
-**Ice frosts only wet stone and wall** (2026-10-01). A dry rock beside ice used to frost
-exactly like a wet one, so "damp" in `[ice.stresses]` meant nothing. The owner chose to make it
-mean something, as a two-material discovery, and the first frost in masonry now gets a field
-note. `ice_leaves_dry_stone_and_wall_unfrosted`, a parity scenario witnessing both halves, an
-`absent` audit twin and the field-note smoke all fail by name with the old rule.
-
-Everything is green: 132 cargo tests, 35 parity scenarios, 127 interaction checks bound to all
-118 role ids, the slow world (a day away grows the garden 18 new columns), and the full
-`npm run check`.
-
-## What to do next
-
-No next phase is planned; what to build is the owner's call.
-
-### 1. The rest of the lucky-seed list
-
-Re-measured on 2026-10-01 over all 127 checks at 32 seeds: 13 failed on at least one seed.
-Four were fixed that day, all re-staged at the default brush and each failing on all 32 seeds
-with its rule switched off. `fire.ignites` (wood) and `wood.burns` needed a flame, not a
-one-cell dab, which caught on tick 1-3 or never. `steam.frosts` needed a pond with lava dropped
-in and ice held over it, and now counts only ice that was steam. `water.rinses` needed a stone
-pillar beside a log fire, because a flame beside a mound sooted one cell at most, and its
-witness had been counting wet stone rather than soot coming off.
-
-**Two checks were found certifying nothing.** Both are fixed:
-
-- **`wellspring.reattune` passed 32 of 32 with no wellspring at all**, because its witness was
-  sand the scene had painted. Underneath, the rule failed in play: a chilled spring drank its own
-  pool the tick after the sand, so the lesson faded. On the owner's decision (2026-10-01) a
-  chilled spring now ignores what it already pours. It latches the first new material, spreads
-  it through the whole attuned spring, and holds it until the ice is gone and about 30 s after.
-  It is drawn in a fourth rune state, learned, while the ice still holds it. That state matters
-  because a water spring's pool usually freezes solid around it. The audit check now witnesses
-  the held lesson: 32 of 32, 0 of 32 with no spring and 0 of 32 with no ice.
-- **`lava.scorches` mostly counted `lava.quenched`**: 123 of 205 scorched-stone cells over 32
-  seeds were lava that water had quenched. Counting only the painted rock it failed on every seed,
-  and that turned out to be the game: lava rarely scorches stone, because the water that wets a
-  rock crusts the lava against it, and a drained rock dries before lava arrives. What scorches
-  is masonry with water still spread on it: the check is a watered wall with lava set beside it,
-  and the scorch lands mostly on the wall floor the pour spread across, not the slab (0-3
-  cells). 31 of 32, a median of about 12 cells at contrast 130 or more, and 0 of 32 with no
-  water, no lava or the scorch switched off. A tray that pools the water quenches the lava
-  instead (25-28 of 32).
-
-**The six at 31 of 32 were taken on 2026-10-02**, and two more witnesses were found counting
-the wrong thing. `meteor.shocked` counted any scorched stone, which a meteor landing on
-something solid also makes once its fire ring's smoke soots it: re-staged with that witness and
-no pond it passed 12 of 32. It now follows the stone each shock makes, 32 of 32 and 0 of 32
-without water. `stem.burns` counted stalks its own flame dabs painted over, and without them
-passed 7 of 32; a garden at the app's density swept by a flame, painted-over stalks excluded,
-passes 32 of 32. `stem.climbs` now paints that garden at the app's density too (still 32/32).
-`fire.softens` (32/32) and `meteor.trail` (32/32 on the real board's height) only needed the
-default brush. Two are left at 31 on purpose, with the reason at each scene: `oil.ignites`
-(burning oil flares for about a second and a half, since a burning cell turns to smoke at 1 in
-18 a tick) and `fungus.fairyring` (slow by design).
-
-**One possible rule question came out of it**: the scorch a meteor shock promises is often
-brief. The shocked stone sinks through water the impact stirred, which rinses it, so it stays
-past the floor on 26 of 32 seeds. The rinse was gated on flowing water in Phase 20 to stop
-exactly this; an impact makes its own flow.
-
-What is left thin: `fire.thaws`, `oil.ignites`, `fungus.fairyring` and `lava.scorches`, all
-at 31 of 32, each explained at its scene.
-
-**`fire.thaws` joined that list when ice stopped frosting dry stone**, and it is the thinnest:
-31 of 32, with 4 thawed cells on almost every seed, which is exactly the floor. Its ice dab
-sits on top of the rock. The old rule frosted 7 cells around it: 3 on the rock's wet surface
-and 4 inside the rock, where the water never reached. Only the wet ones frost now. Painting
-more water, a default-brush rock and pour, or a dragged line of ice did not help: a brush
-paints over the wet surface it is meant to touch, and fire painted over frost paints over the
-frost too. Frost on stone is a thin layer where ice meets wet stone, so thawing it is small
-by nature. Re-stage it with a different frozen material if it needs more, rather than tuning
-the stone scene.
-
-**Then the remembered-cell witnesses.** 27 checks remember every cell an outcome ever touched
-and keep counting it while it holds the same MATERIAL, not the same outcome. Two of those were
-found counting leftovers today — `spark.lights` credited unlit powder, `moss.dries` credited moss
-that had recovered from its scorch — and neither failed because of it, which is exactly why
-nobody noticed. docs/HARNESS.md lists how to tell; the 27 are not audited yet.
-
-### 2. Design questions for the owner
-
-
-- **The sim runs faster on faster screens.** `App.tsx` sets `lastSimTick = time` rather than
-  advancing it by `SIM_TICK_MS`, so ticks land on frame boundaries: 20 a second at 60 Hz and,
-  by the same arithmetic, about 24 at 120 Hz (only 60 Hz was measured). Making it frame-rate
-  independent would change the speed of the game for everyone, which is why it is a question.
-- **The rocket volley rises as one tight column**, because the shove is straight up and grains
-  only sway in open air, and **about one burst in eight goes off extra high**, because a burst
-  re-lights a neighbour already in flight (`ignited_cell` resets its fuse). Both were shown to
-  the owner and accepted; either could be revisited.
-- **Separate piles no longer set each other off in open air** (12 cells apart: 12 seeds of 32,
-  against 30). Accepted; a line of powder between them is the fuse now.
-- **Phase 8's subjective listening pass** is still the one unfinished item from before Phase 20.
-- **One watering grows a minimum plant** — most plants in a once-watered planter stop at the
-  4-cell minimum stalk. A design question, not a bug.
-- **Steam reads as a dotted thread.** No renderer change can fix it; the lever is emitting steam
-  in small clusters in the sim.
-- **Oil and lava still delete water** (19 overwrites across the audit). Left by decision: oil
-  has no sink. Reopen only together with a sink for oil.
-
-### 3. Fixture debt
-
-- **The `water.boils` scene is a quench, not a boil.** Lava pokes through the top of its Wall
-  pan into the water. It passes 32 of 32, so it is not urgent, but it does not stage what its
-  clause describes.
+- **A meteor shock's scorch is often brief.** The stone sinks through water the impact stirred,
+  and the rinse clears the scorch: it stays past the floor on 26 of 32 seeds.
+- **The sim runs faster on faster screens.** `App.tsx` sets `lastSimTick = time`, so a 60 Hz
+  display gets ~20 ticks a second and 120 Hz about 24 (only 60 Hz was measured).
+- **The rocket volley rises as one column**, and about one burst in eight goes off extra high.
+  Both were shown and accepted.
+- **Phase 8's listening pass** is the one unfinished item from before Phase 20.
+- **One watering grows a minimum plant** (a 4-cell stalk).
+- **Steam reads as a dotted thread.** The lever is in the sim (emit steam in small clusters),
+  not the renderer.
+- **Oil and lava still delete water** (19 overwrites). Left by decision: oil has no sink.
+- **Fixture debt:** the `water.boils` scene is really a quench (lava pokes through its pan).
 
 ## Decisions already made — do not relitigate
 
-All by the owner, each after seeing measurements:
+All by the owner, after seeing measurements:
 
-- **Ice frosts only stone and wall that hold water** (2026-09-30), and a field note marks the
-  first time. A dry rock beside ice used to frost just the same. Dropping "damp" from the
-  clause was the other option; the owner chose a hidden two-material discovery, because a wet
-  rock meeting ice happens in ordinary play. Cracking a wall now needs water in it too, but
-  melting ice supplies that: an ice block against a dry wall, then lava, still cracks it on 13
-  of 16 seeds (15 before), because the meltwater wets the wall first. What stopped is the
-  quick version, a small dab of ice and then fire on a dry wall, which cracked on 16 of 16
-  seeds at the first touch and now never does.
-
-- **Rockets: a lit grain shoves through its own charge and lights the powder it touches**
-  (2026-09-30), over the volley alone and a random blend, accepting that separate piles rarely
-  chain in open air.
-- **The audit floor stays at 30 ticks**; the fix was to its description, not its value.
-- **Mist is visible**, never a silent delete. An interaction check enforces it.
-- **Lakes are a feature** and **puddles dry** (1-in-450) — one knob sets both.
-- **Gases are conserved and smoke keeps its 180-tick life**, though a lidded fire's smoke doubles.
-- **Only the pollen and stardust water leaks were closed** in 20E; the other clobber classes
-  stay. "Grains never overwrite grains" was rejected as a cheap fix.
-- **Bubbles are hot-only.** Mist must not bubble (the spring floods).
-- **A rain-filled sand basin turning to sandstone is geology**, not a bug.
-- **Never conserve a liquid that has no sink.** Oil is deliberately not conserved.
-- **No cheap fixes.** Every change needs its own justification and must not create a problem
-  later; do not bundle opportunistic fixes into a step.
+- Wellspring re-teaching sticks for the whole spring, and the learned state is shown
+  (2026-10-01). Two materials offered at opposite ends at once may split a spring; that is
+  accepted.
+- Ice frosts only wet masonry (2026-09-30). A dry wall no longer cracks from a quick dab of ice
+  and fire; meltwater still lets a block of ice and lava crack it.
+- Rockets: a lit grain shoves through its own charge and lights the powder it touches.
+- The audit floor stays at 30 ticks (about 1.5 s of play at ~20 ticks a second).
+- Mist is visible; lakes are a feature; puddles dry (1 in 450); gases are conserved; bubbles are
+  hot-only; never conserve a liquid with no sink; a rain-filled sand basin becoming sandstone
+  is geology.
+- **No cheap fixes**, and never tune a fixture until it passes: if the honest version is thin,
+  say so at the scene.
 
 ## How to work
 
-- **Branch until green.** A push to `main` deploys, and Railway waits for CI before it builds.
-  Fast-forward `main` only once the full gate passes, then run `npm run deploy:verify` until it
-  reports the new commit, and `npm run qa:live` when the change is visible.
-- **Seconds are ticks over `TICKS_PER_SECOND`**, which is about 20. Never divide by 60.
-- **Ask whether each seed PASSES:** `npm run audit:drift -- --per-seed --only <ids>`. Screen on 8
-  seeds, confirm on 32.
-- **Measure at play scale before you believe a fixture.** The rocket numbers that mattered —
-  flights, ground bursts, a neighbour catching, a fuse burning — came from the 220x140 board at
-  the default brush and the app's paint density (55 for powders and fire), not from the audit's
-  30x44 scene. `.tmp/` scratch scripts are cheap; write one.
-- **Show the owner a picture when the choice is visual.** The rocket decision changed twice once
-  the owner could see a filmstrip rendered through `colorForCell`.
+- **Branch until green.** A push to `main` deploys, and Railway waits for CI. Fast-forward
+  `main` after the full gate, then `npm run deploy:verify`; add `npm run qa:live` when players
+  can see the change.
+- **Seconds are ticks over ~20**, never 60.
+- **Print the board before believing a fixture.** Most wrong turns in this work were a fixture
+  that did not stage what its comment claimed.
 - **Vacuity-test every gate you touch**: sabotage the rule in BOTH engines, rebuild with
   `npm run build:sim`, and watch the gate fail by name.
-- **Close each step with `/adversarial-review`** (Codex; check `codex login status`).
-
-## Traps this work already paid for
-
-- **A remembered-cell witness can count leftovers.** Filter remembered cells on the outcome,
-  not on the material; `spark.lights` scored 1,193 ticks of unlit powder that way.
-- **Credit an outcome's aftermath only after witnessing the outcome.** Sparks "over the far
-  charge" came from the near charge's own shell.
-- **A new rule can make a working witness ambiguous.** Once lit grains light their neighbours,
-  a grain sliding into a vacated cell looked like a shove; the parity witness now tracks the
-  flame, which cannot move on its own.
-- **A flame dropped a row above settled powder never touches it.** Find the powder's top first,
-  or a fuse measurement reads zero on every build.
-- **Hooking the wasm: wrap a COPY of the exports.** The exports object is frozen, a Proxy over it
-  throws on the first `tick()`, and the frame loop silently stops.
-- **A piped gate hides its exit code.** Redirect to a file and check `$?`.
-- **A fixture can pass for the wrong reason.** Print the board before trusting a pass; liquids
-  hop two cells and jump a one-cell wall. `ice.stresses` claimed its ice sat against the rock,
-  but there was a one-cell gap that only frozen water could cross.
-- **A scene painted all at once hides ordering.** A player switches materials, and that takes
-  a second. Paint later gestures with `act` at a player's pace, and use the app's densities
-  (`PAINT_DENSITY` in `App.tsx`: 55 for powders and liquids).
-- **A claim that something is "by design" needs a source.** Nothing showed anyone had chosen
-  the water-into-mist deletion that bubbles replaced.
-- **Sabotaging compiled output: patch before the first load.** A loaded CommonJS module is
-  cached, so a later patch silently tests the unpatched code.
-- **Hand-typed copies of `MATERIAL` / `CELL_FLAG` rot.** Read them through `compileApp`.
-- **`.tmp/` compiles go stale.** `scripts/compile-app.mjs` rebuilds fresh.
-- **In Rust's `apply_reactions`, `x` inside a match arm is the material kind**, not a
-  coordinate. Take coordinates from `idx`.
-- **Field notes fire once ever.** Give a note a `requires` rather than trusting the kind alone.
+- **Close each batch with `/adversarial-review`** (Codex; check `codex login status`). It
+  caught a real problem in nearly every batch of this work.
+- **For a design choice, show the owner a rendered picture** and explain it plainly.
