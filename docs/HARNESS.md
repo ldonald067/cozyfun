@@ -85,8 +85,9 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   were moss that was no longer scorched, reported as a median of 744 ticks on screen where the
   moving front is really visible for 65-85. Its cell count was honest, which is why nothing
   looked wrong. **Every check that remembers cells has now been asked the four questions**
-  below (actor away, precondition away, brush, leftovers). Fifteen failed one, and
-  `fire.dries` is still open, with the reason at its scene.
+  below (actor away, precondition away, brush, leftovers). Fifteen failed one. The last,
+  `fire.dries`, was a gap in the rule rather than the check: embers lit wet fuel without
+  drying it, so a burning log never showed it. Embers dry wet fuel now (see its scene).
   Many that passed are legitimate for the reason they look it: a grain that fell is still
   that grain.
 

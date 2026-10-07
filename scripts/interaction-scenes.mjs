@@ -749,19 +749,27 @@ export const CHECKS = [
   { m: "Fire", covers: "fire.dries", role: "dries and scorches wet cells first", w: 30, h: 26, seed: 81, ticks: 1500,
     paint: (p) => { p(15, 20, 6, M.Wood); p(15, 13, 4, M.Water); },
     act: (p, t) => { if (t === 300) { p(22, 20, 1, M.Fire); p(8, 20, 1, M.Fire); } },
-    // OPEN, and not evidence yet. This witness passes 32 of 32 with the water left out, and
-    // three quarters of what it counts is ember, which is the wood igniting. Heat scorches only
-    // WET wood (`heat_softens_cell`); the scorch it finds on dry wood is smoke sooting it. The
-    // honest witness, wood that was wet last tick and is dry and scorched now, passes 22 of 32
-    // and fails this check's own seed at 9 ticks: the water pools in a dip on the log, the
-    // flames meet dry wood, and only 3-7 wet cells on its skin ever scorch. Default-brush
-    // flames made it 0 of 32. Whether the rule or the scene should change is the owner's call.
+    // Wood that was wet last tick and is dry and scorched now, counted while it stays dry and
+    // scorched: water can wet it again without clearing the scorch, and that is not the outcome.
+    // Heat scorches only WET wood, so the transition is the drying itself; smoke soots only dry
+    // wood and cannot make it.
     //
-    // Sticky: scorch is the step before ignition, so it is gone again moments later.
-    outcome: (g, before, memo) => {
-      memo.charred ??= new Set();
-      for (const i of g.all(M.Wood)) if (g.hasFlag(i, F.Scorched)) memo.charred.add(i);
-      return [...memo.charred].filter((i) => g.kindOf(i) === M.Wood || g.kindOf(i) === M.Ember);
+    // This used to count any wood ever scorched while it was wood or ember. It passed 32 of 32
+    // with the water left out, three quarters of its count was ember, and what scorch it found
+    // on dry wood was smoke. Honestly witnessed it failed this check's own seed, because only
+    // the flame dried wet wood: a burning log is mostly ember, and ember lit wet wood straight
+    // through (434 wet cells over 32 seeds, against 180 dried first). Since embers dry wet fuel
+    // too (2026-10-07, the owner's call after a filmstrip), none skip the step: 32 of 32 on the
+    // usual seeds (81 + k*1000), on screen at least 54 ticks, and 0 of 32 without the water or
+    // without the flame. Review tried seeds 1-32 as well: 29, the other three scorching fewer
+    // than 4 cells. Counting scorched wood the pool had wet again read 1,195 ticks; that was
+    // leftovers.
+    outcome: (g, before, memo, prev) => {
+      memo.dried ??= new Set();
+      for (const i of g.all(M.Wood)) {
+        if (g.hasFlag(i, F.Scorched) && !g.hasFlag(i, F.Wet) && prev.kindOf(i) === M.Wood && prev.hasFlag(i, F.Wet)) memo.dried.add(i);
+      }
+      return [...memo.dried].filter((i) => g.kindOf(i) === M.Wood && g.hasFlag(i, F.Scorched) && !g.hasFlag(i, F.Wet));
     } },
   { m: "Fire", covers: "fire.thaws", role: "thaws frozen cells", w: 30, h: 26, seed: 82, ticks: 3000,
     paint: (p) => { p(15, 20, 3, M.Stone); p(15, 16, 1, M.Water); },

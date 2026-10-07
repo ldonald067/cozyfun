@@ -707,6 +707,14 @@ class JsSandboxEngine implements SandboxEngine {
             continue;
           }
           if (emberEnergy > 90 && flammable(other) && this.chance(Math.floor((burnChance(other) * 3) / 2))) {
+            // Dries before ignition, as a flame does: the same roll dries a wet neighbour
+            // instead of lighting it. See the ember arm in lib.rs for the measurement.
+            const otherFlags = readU16(old, nidx + 6);
+            if (scorchable(other) && otherFlags & CELL_FLAG.Wet && !(otherFlags & CELL_FLAG.Frozen)) {
+              writeU16(next, nidx + 6, (readU16(next, nidx + 6) & ~CELL_FLAG.Wet) | CELL_FLAG.Scorched);
+              writeU16(next, nidx + 4, Math.max(0, readU16(next, nidx + 4) - 42));
+              continue;
+            }
             writeIgnitedCell(next, nidx, other, old[nidx + 1], 210);
           }
         }

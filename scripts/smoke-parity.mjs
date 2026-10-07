@@ -142,6 +142,9 @@ const POOL_SLACK = 2;
 const BUBBLE_UNITS = [[4, 180], [12, 180], [20, 180], [28, MIST_ENERGY], [36, MIST_ENERGY], [44, MIST_ENERGY]];
 // The vent scenario's units, one per shaft; far enough apart that no two share a wall.
 const VENT_UNITS = [4, 12, 20, 28, 36, 44];
+// The burning-log scenario's floor: wet wood an ember dried, with no flame beside it. 75 with
+// the rule and 0 with it switched off in both engines, measured on its seed.
+const EMBER_DRY_FLOOR = 30;
 const DROPPED = { sand: M.Sand, soil: M.Soil, stone: M.Stone, seed: M.Seed, rocket: M.Rocket, pollen: M.Pollen };
 
 const scenarios = [
@@ -1192,6 +1195,50 @@ const scenarios = [
       if (seen.lidSandAfter !== seen.lidSandBefore) return `the lidded bed changed: ${seen.lidSandBefore} sand before, ${seen.lidSandAfter} after`;
       return null;
     },
+  },
+  {
+    // An ember dries wet fuel before lighting it, as a flame does. A log with water poured on
+    // it and a flame at each end: the flames light the ends, the burn travels through the log
+    // as ember, and the ember reaches the wet skin under the pool. The witness is wood that was
+    // wet last tick and is scorched and dry now with no flame beside it, so an ember dried it:
+    // a flame dries what it touches, and smoke soots only dry wood.
+    name: "a burning log dries its wet skin before it catches",
+    w: 30, h: 26, seed: 8181, ticks: 240,
+    paint(p) {
+      p(15, 20, 6, M.Wood);
+      p(15, 13, 4, M.Water);
+      for (let x = 1; x < 30; x += 3) p(x, 22, 1, M.Wall);
+      p(22, 20, 1, M.Fire);
+      p(8, 20, 1, M.Fire);
+    },
+    observe(seen, cells, w, h) {
+      const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? -1 : cells[(y * w + x) * STRIDE]);
+      const flags = (i) => cells[i * STRIDE + 6] | (cells[i * STRIDE + 7] << 8);
+      const wetBefore = seen.wetBefore ?? new Set();
+      const flameBefore = seen.flameBefore ?? new Set();
+      const wetNow = new Set();
+      const flameNow = new Set();
+      for (let i = 0; i < w * h; i++) if (cells[i * STRIDE] === M.Fire) flameNow.add(i);
+      seen.emberDried ??= 0;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        if (at(x, y) !== M.Wood) continue;
+        const f = flags(i);
+        if (f & CELL_FLAG.Wet) { wetNow.add(i); continue; }
+        if (!(f & CELL_FLAG.Scorched) || !wetBefore.has(i)) continue;
+        let flame = false;
+        // A flame beside it this tick or last: the drying happened between the two.
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const j = (y + dy) * w + x + dx;
+          if (at(x + dx, y + dy) === M.Fire || (at(x + dx, y + dy) !== -1 && flameBefore.has(j))) flame = true;
+        }
+        if (!flame) seen.emberDried++;
+      }
+      // Kept off the printed record: only the count is worth reading.
+      Object.defineProperty(seen, "wetBefore", { value: wetNow, writable: true, enumerable: false, configurable: true });
+      Object.defineProperty(seen, "flameBefore", { value: flameNow, writable: true, enumerable: false, configurable: true });
+    },
+    expect: (seen) => (seen.emberDried >= EMBER_DRY_FLOOR ? null : `embers dried ${seen.emberDried} wet wood cells (floor ${EMBER_DRY_FLOOR})`),
   },
 ];
 

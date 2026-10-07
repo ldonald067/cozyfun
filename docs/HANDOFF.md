@@ -1,8 +1,9 @@
 # Handoff — where the work is, and what to do next
 
 *Rewritten at each handoff, never appended to. Written 2026-10-07, after the remembered-cell
-witness audit. The full gate was green on that batch; see `git log` for the live commit and run
-`npm run deploy:verify` to confirm it.*
+witness audit and the ember-drying rule it led to. See `git log` for the live commit and run
+`npm run deploy:verify` to confirm it; check `gh run list` first, because a red CI run makes
+Railway skip the commit for good (a rerun does not revive it, a new push does).*
 
 ## Work within the owner's usage limits
 
@@ -22,13 +23,11 @@ The owner hits usage limits early, so keep each chat lean:
 
 ## What to do next
 
-**1. The owner's call on `fire.dries`** (see Design questions). Its witness is known to be
-wrong and is left in place, marked OPEN at its scene, because the honest one fails the audit's
-own seed.
-
-**2. Audit the clause halves no check witnesses.** The remembered-cell audit is finished: every
+**Audit the clause halves no check witnesses.** The remembered-cell audit is finished: every
 check that remembers cells has been asked the four questions (docs/HARNESS.md, "A sticky
-outcome is only honest..."), and 15 failed one. Review then found a different gap: a clause
+outcome is only honest..."), and 15 failed one. The last, `fire.dries`, was a rule gap:
+embers lit wet fuel without drying it. The owner chose to fix the rule (2026-10-07), so embers
+now dry wet fuel before lighting it, as a flame does. Review then found a different gap: a clause
 with two promises, where the check witnesses one. Known so far:
 
 - `ember.glows` "weakly spreads fire": the painted flame lights the whole log, and with ember
@@ -64,12 +63,10 @@ pace is on screen 34 ticks at least, against the floor of 30.
 
 ## Design questions for the owner
 
-- **`fire.dries` cannot show its clause as staged.** Heat scorches only WET wood; dry wood
-  ignites straight to ember. In its scene the water pools in a dip on the log, the flames meet
-  dry wood, and 3-7 wet cells on the skin scorch, on screen 9 ticks on the audit's seed (22 of
-  32 seeds pass). The old witness passed because it counted ember (ignition) and smoke soot.
-  Either the rule makes scorch last longer or reach deeper, or the scene soaks the log another
-  way. Default-brush flames made it worse (0 of 32). Needs a picture before choosing.
+- **A soaked log leaves a few scorched cells unburnt.** Since embers dry wet fuel, the wet
+  skin under a pool chars, and a couple of cells the embers dried but went cold before lighting
+  stay on top of the char heap (2 cells, 75 s later, on the audit's seed). Shown and accepted
+  as part of the ember-drying decision; worth a look in play.
 - **A cut stalk's flowers hang in mid-air.** The stalk falls; its flowers stay where they
   were for about two minutes, then fade in place.
 - **A burning log is live for only 5-7 seconds.** It catches all at once and is cold char
@@ -93,6 +90,9 @@ pace is on screen 34 ticks at least, against the floor of 30.
 
 All by the owner, after seeing measurements:
 
+- Embers dry wet fuel before lighting it, as a flame does (2026-10-07, after a filmstrip):
+  the same roll, so nothing changes without wet fuel beside an ember. Fire's `[fire.dries]`
+  clause says so.
 - Wellspring re-teaching sticks for the whole spring, and the learned state is shown
   (2026-10-01). Two materials offered at opposite ends at once may split a spring; that is
   accepted.

@@ -1386,6 +1386,22 @@ impl Universe {
                             && is_flammable(other.kind)
                             && self.chance(burn_chance(other.kind) * 3 / 2)
                         {
+                            // Dries before ignition, as a flame does: the roll that would light
+                            // a wet neighbour dries and scorches it instead, with the flame's
+                            // drying heat. A burning log is mostly ember, and it used to light
+                            // wet wood straight through, so a soaked log never showed it: over
+                            // 32 seeds of the fire.dries scene, 434 wet cells went straight to
+                            // ember and 180 were dried first; now none skip the step. It spends
+                            // the same roll, so a scene with no wet fuel beside an ember plays
+                            // out exactly as before. A frozen cell is left to the existing rules.
+                            if is_scorchable(other.kind)
+                                && other.flags & FLAG_WET != 0
+                                && other.flags & FLAG_FROZEN == 0
+                            {
+                                next[nidx].flags = (next[nidx].flags & !FLAG_WET) | FLAG_SCORCHED;
+                                next[nidx].energy = next[nidx].energy.saturating_sub(42);
+                                continue;
+                            }
                             next[nidx] = ignited_cell(other, 210);
                         }
                     }
@@ -4165,6 +4181,56 @@ mod tests {
         assert_eq!(kind_at(&u, 8, 8), Material::Moss as u8);
         assert!(flags_at(&u, 8, 8) & FLAG_SCORCHED != 0);
         assert_eq!(flags_at(&u, 8, 8) & FLAG_WET, 0);
+    }
+
+    #[test]
+    fn ember_dries_wet_fuel_before_lighting_it() {
+        // Wood keeps its wet flag only while water touches it, so a walled cup of water sits
+        // diagonally above it, out of the ember's reach (water beside an ember quenches it).
+        // Watched transition by transition: smoke soots only DRY wood, so wood that was wet
+        // last tick and is scorched and dry now was dried by the ember.
+        let mut u = Universe::new(16, 16, 5);
+        set_cell_state(&mut u, 7, 8, Material::Ember, 0, 230, 0);
+        set_cell_state(&mut u, 8, 8, Material::Wood, 0, 140, FLAG_WET);
+        set_cell(&mut u, 9, 7, Material::Water);
+        for (x, y) in [(7, 7), (8, 7), (10, 7), (11, 7), (9, 8), (10, 8)] {
+            set_cell(&mut u, x, y, Material::Wall);
+        }
+        for x in 6..12 {
+            set_cell(&mut u, x, 9, Material::Wall);
+        }
+        let (mut dried, mut was_wet) = (0, true);
+        for _ in 0..120 {
+            u.tick();
+            let (kind, flags) = (kind_at(&u, 8, 8), flags_at(&u, 8, 8));
+            assert!(!was_wet || kind == Material::Wood as u8, "wet wood lit without drying first");
+            if kind != Material::Wood as u8 {
+                break;
+            }
+            if was_wet && flags & FLAG_SCORCHED != 0 && flags & FLAG_WET == 0 {
+                dried += 1;
+            }
+            was_wet = flags & FLAG_WET != 0;
+        }
+        assert!(dried > 0, "the ember never dried the wet wood beside it");
+    }
+
+    #[test]
+    fn ember_still_lights_dry_fuel() {
+        // The other side of drying: dry fuel has nothing to dry, so the same roll lights it.
+        let mut u = Universe::new(16, 16, 5);
+        set_cell_state(&mut u, 7, 8, Material::Ember, 0, 230, 0);
+        set_cell_state(&mut u, 8, 8, Material::Wood, 0, 0, 0);
+        for x in 6..10 {
+            set_cell(&mut u, x, 9, Material::Wall);
+        }
+        for _ in 0..80 {
+            u.tick();
+            if kind_at(&u, 8, 8) == Material::Ember as u8 {
+                return;
+            }
+        }
+        panic!("an ember should light the dry wood beside it within 80 ticks");
     }
 
     #[test]
