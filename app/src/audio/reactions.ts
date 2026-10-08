@@ -25,6 +25,13 @@ const COSMIC_MARK_KINDS = new Set<number>([MATERIAL.Seed, MATERIAL.Moss, MATERIA
 export function detectReactionCues(before: Uint8Array, after: Uint8Array): ReactionCue[] {
   const found = new Set<ReactionCue>();
   const len = Math.min(before.byteLength, after.byteLength);
+  // A bloom adds flower cells. A head falling with its cut stalk only moves them, and every
+  // cell it lands in reads as Empty -> Flower, so the bloom cue needs the count to have grown.
+  let flowerGain = 0;
+  for (let idx = 0; idx + CELL_STRIDE <= len; idx += CELL_STRIDE) {
+    if (after[idx] === MATERIAL.Flower) flowerGain++;
+    if (before[idx] === MATERIAL.Flower) flowerGain--;
+  }
 
   for (let idx = 0; idx + CELL_STRIDE <= len; idx += CELL_STRIDE) {
     const beforeKind = before[idx];
@@ -58,7 +65,7 @@ export function detectReactionCues(before: Uint8Array, after: Uint8Array): React
     }
     // A stalk blooms by writing a Flower into the empty cell above its tip, so the
     // real transition is Empty->Flower; also covers any in-place Seed/Stem->Flower.
-    if (afterKind === MATERIAL.Flower && beforeKind !== MATERIAL.Flower) {
+    if (flowerGain > 0 && afterKind === MATERIAL.Flower && beforeKind !== MATERIAL.Flower) {
       found.add("bloom");
     }
     if (beforeKind === MATERIAL.Empty && afterKind === MATERIAL.Stem) {

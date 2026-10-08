@@ -942,6 +942,38 @@ export const CHECKS = [
       for (const i of g.all(M.Stem)) if (i >= g.w && prev.kindOf(i) !== M.Stem && prev.kindOf(i - g.w) === M.Stem) memo.fallen.add(i);
       return [...memo.fallen].filter((i) => g.kindOf(i) === M.Stem);
     } },
+  { m: "Stem", covers: "stem.footing", role: "a severed stalk's bloom comes down with it", w: 60, h: 34, seed: 106, ticks: 3500,
+    // The garden stem.burns grows (a dragged seed bed, generously watered), cut along the
+    // stalks' bases with an eraser stroke once it has bloomed. The check above watches the
+    // stalk fall; this one watches the bloom, because a bloom had no footing rule at all and
+    // hung in the air for about two minutes after its stalk went. Here, not the one-plant
+    // scene above: one watering grows a 1-5 cell head that drops about three rows, and that
+    // passed 15 of 32 for being small, not for hanging.
+    //
+    // The witness is a bloom cell DROPPING once the cut is made: a flower where there was
+    // none, under the bottom of a run of flower cells whose top has emptied, so the run moved
+    // down. A petal unfurling under another petal moves nothing above it, and late blooms
+    // still do that past the cut. 32 of 32; 0 of 32 without the cut, and 0 of 32 on the
+    // build before blooms had footing.
+    paint: (p) => {
+      for (let x = 14; x <= 46; x++) p(x, 28, 4, M.Soil, 55);
+      for (let x = 14; x <= 46; x++) p(x, 23, 4, M.Seed, 55);
+      for (let x = 14; x <= 46; x += 2) p(x, 17, 4, M.Water, 55);
+    },
+    act: (p, t) => { if (t === 2500) for (let x = 14; x <= 46; x++) p(x, 18, 1, M.Empty); },
+    outcome: (g, before, memo, prev) => {
+      memo.t = (memo.t ?? -1) + 1; // called once before the first tick, then once a tick
+      memo.down ??= new Set();
+      if (memo.t >= 2500) {
+        for (const i of g.all(M.Flower)) {
+          if (i < g.w || prev.kindOf(i) === M.Flower || prev.kindOf(i - g.w) !== M.Flower) continue;
+          let top = i - g.w;
+          while (top >= g.w && prev.kindOf(top - g.w) === M.Flower) top -= g.w;
+          if (g.kindOf(top) !== M.Flower) memo.down.add(i);
+        }
+      }
+      return [...memo.down].filter((i) => g.kindOf(i) === M.Flower);
+    } },
   { m: "Stem", covers: "stem.burns", role: "burns like living growth", w: 60, h: 34, seed: 106, ticks: 3500,
     // The garden stem.climbs grows (a dragged seed bed, generously watered), then a flame
     // swept over it at the default brush.
@@ -951,8 +983,11 @@ export const CHECKS = [
     // the flame's own brush painted over: that is paint, not burning. The old scene dabbed
     // small flames among one planter's plants for 700 ticks and counted those too; without
     // them it passed 7 of 32. Honestly witnessed, with the garden at the app's density, this
-    // passes 32 of 32, on screen at least 33 ticks: a burning cell turns to smoke at 1 in 18 a
-    // tick, so fire here is a flare, and a stalk fire is about that long.
+    // passed 32 of 32, on screen at least 33 ticks: a burning cell turns to smoke at 1 in 18 a
+    // tick, so fire here is a flare, and a stalk fire is about that long. Since a bloom falls
+    // with its burnt stalk (2026-10-08) it is 31 of 32: the falling heads change every roll
+    // after the burn, and seed #6's flare lasts 28 ticks. The rest did not weaken (median 114
+    // ticks on screen, against 111), so the scene is left as it is.
     paint: (p) => {
       for (let x = 14; x <= 46; x++) p(x, 28, 4, M.Soil, 55);
       for (let x = 14; x <= 46; x++) p(x, 23, 4, M.Seed, 55);

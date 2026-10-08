@@ -18,7 +18,8 @@
 // the engine and the real renderer, and that is the second consumer that makes this
 // a module rather than a private helper in `App.tsx`.
 
-import { CELL_STRIDE, MATERIAL } from "./materials";
+import { BLOOM_SHAPES } from "./engine";
+import { CELL_FLAG, CELL_STRIDE, MATERIAL } from "./materials";
 
 /** Slow steps added by each doubling of the time away. */
 const SLOW_STEPS_PER_DOUBLING = 4;
@@ -149,9 +150,10 @@ export function nextCatchUpChunk(remaining: number): number {
  */
 export function openCrowns(cells: Uint8Array, width: number): number[] {
   const count = cells.length / CELL_STRIDE;
+  const standing = standingHeads(cells, width);
   const crowns: number[] = [];
   for (let i = 0; i < count; i++) {
-    if (cells[i * CELL_STRIDE] !== MATERIAL.Flower) continue;
+    if (!standing.has(i)) continue;
     const x = i % width;
     const y = Math.floor(i / width);
     let petals = 0;
@@ -167,6 +169,33 @@ export function openCrowns(cells: Uint8Array, width: number): number[] {
     if (petals >= CROWN_NEIGHBOURS) crowns.push(i);
   }
   return crowns;
+}
+
+/**
+ * The cells of every head still standing: a rooted crown and the flowers of its kind at its
+ * shape's offsets, which is what the sim holds up (`flower_has_footing`). A head that fell
+ * with its cut stalk has lost its rooted crown, so it is loose petals, not a bloom. Counted as
+ * one, its landing spot read as a head opening and cut a 3,750-tick catch-up to 600.
+ */
+function standingHeads(cells: Uint8Array, width: number): Set<number> {
+  const count = cells.length / CELL_STRIDE;
+  const height = Math.floor(count / width);
+  const standing = new Set<number>();
+  for (let i = 0; i < count; i++) {
+    const o = i * CELL_STRIDE;
+    if (cells[o] !== MATERIAL.Flower || !((cells[o + 6] | (cells[o + 7] << 8)) & CELL_FLAG.Rooted)) continue;
+    standing.add(i);
+    const x = i % width;
+    const y = Math.floor(i / width);
+    for (const [dx, dy] of BLOOM_SHAPES[cells[o + 1] & 7]) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+      const p = (ny * width + nx) * CELL_STRIDE;
+      if (cells[p] === MATERIAL.Flower && cells[p + 1] === cells[o + 1]) standing.add(ny * width + nx);
+    }
+  }
+  return standing;
 }
 
 /** Is any bloom open at all? The gate's phrasing of the same question. */

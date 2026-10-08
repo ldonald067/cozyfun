@@ -1397,6 +1397,21 @@ class JsSandboxEngine implements SandboxEngine {
     return false;
   }
 
+  // A flower cell stands on whatever is under it; a petal also hangs from its crown, at the
+  // offset its bloom shape opened it at. The crown gets no sideways hold (see lib.rs).
+  private flowerHasFooting(x: number, y: number, cell: Uint8Array, old: Uint8Array) {
+    if (y + 1 >= this.h) return true;
+    if (old[this.index(x, y + 1)] !== MATERIAL.Empty) return true;
+    if (readU16(cell, 6) & CELL_FLAG.Rooted) return false;
+    return BLOOM_SHAPES[cell[1] & 7].some(([dx, dy]) => {
+      const cx = x - dx;
+      const cy = y - dy;
+      if (!this.inBounds(cx, cy)) return false;
+      const crown = this.index(cx, cy);
+      return old[crown] === MATERIAL.Flower && Boolean(readU16(old, crown + 6) & CELL_FLAG.Rooted) && old[crown + 1] === cell[1];
+    });
+  }
+
   // Leaves unfurl in alternating pairs as the stalk climbs, so a grown plant reads as a
   // plant instead of a bare pole. Placement is a pure function of height — no RNG — so it
   // cannot desynchronise the two engines. Leaf energy stays under the growth threshold,
@@ -1462,6 +1477,13 @@ class JsSandboxEngine implements SandboxEngine {
 
   private flower(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
     if (next[idx] !== MATERIAL.Flower || readU16(next, idx + 6) & CELL_FLAG.Frozen) return;
+    // A cut stalk's bloom falls with it; a crown that has lost its stalk is no longer rooted.
+    // See update_flower in lib.rs.
+    if (!this.flowerHasFooting(x, y, cell, old)) {
+      writeU16(next, idx + 6, readU16(next, idx + 6) & ~CELL_FLAG.Rooted);
+      this.powder(idx, x, y, cell, old, next);
+      return;
+    }
     const age = readU16(cell, 2);
     const energy = readU16(cell, 4);
     const flags = readU16(cell, 6);
@@ -1733,7 +1755,7 @@ const PLANT_SPACING = 6;
 // One species per plant, chosen by `variant & 7` — the same number that picks its hue in
 // the renderer. Petals are listed in opening order and every offset touches one already
 // placed. Mirrors BLOOM_SHAPES in sim/src/lib.rs.
-const BLOOM_SHAPES: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [
+export const BLOOM_SHAPES: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [
   // 0 Cornflower -- see sim/src/lib.rs for the shape reasoning.
   [[-2, -2], [-1, -2], [1, -2], [2, -2], [-3, -1], [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [3, -1], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0], [-2, 1], [2, 1]],
   // 1 Poppy -- see sim/src/lib.rs for the shape reasoning.

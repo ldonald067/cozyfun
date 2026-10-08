@@ -94,10 +94,16 @@ export function materialShowcaseScript() {
     // A lilac bloom showing the head's state cues: one flank smothered by oil, the other
     // lit cosmic by moonwater. This used to be six loose rooted crowns at six variants,
     // which now reads as six separate half-open buds in six different hues.
+    // On a stalk with a wall foot, and every petal at one of the tulip's own offsets: a bloom
+    // stands on its stalk and a petal hangs from its crown, so a crown on nothing falls while
+    // the page runs, and so does a petal off its shape. This one had both, and two petals
+    // under the crown at (+-1, +1) where no tulip grows any.
     setCell(88, 57, material.Flower, 100, 48, flag.Rooted, 4);
-    for (const [dx, dy] of [[0, -1], [-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    for (const [dx, dy] of [[0, -1], [-1, -1], [1, -1], [-1, 0], [1, 0]]) {
       setCell(88 + dx, 57 + dy, material.Flower, 95, 44, 0, 4);
     }
+    for (let y = 58; y <= 60; y++) setCell(88, y, material.Stem, 20, 50, 0, 4);
+    setCell(88, 61, material.Wall);
     setCell(90, 57, material.Oil, 70, 20);
     setCell(90, 58, material.Oil, 70, 20);
     setCell(87, 54, material.Moonwater, 140, 22, flag.Cosmic);

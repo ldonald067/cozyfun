@@ -1871,6 +1871,29 @@ impl Universe {
         false
     }
 
+    /// A flower cell stands on whatever is under it, as a stalk segment does. A petal also
+    /// hangs from its crown, found at the offset its bloom shape opened it at, so a whole head
+    /// is held by the one cell sitting on the stalk's tip. The crown gets no sideways hold: a
+    /// cosmos has petals beside and under its crown, and the head would hold itself up.
+    fn flower_has_footing(&self, x: i32, y: i32, cell: Cell, old: &[Cell]) -> bool {
+        if y + 1 >= self.height as i32 || !old[self.idx(x as u32, (y + 1) as u32)].is_empty() {
+            return true;
+        }
+        if cell.flags & FLAG_ROOTED != 0 {
+            return false;
+        }
+        BLOOM_SHAPES[usize::from(cell.variant) & 7].iter().any(|&(dx, dy)| {
+            let (cx, cy) = (x - dx, y - dy);
+            if !self.in_bounds(cx, cy) {
+                return false;
+            }
+            let crown = old[self.idx(cx as u32, cy as u32)];
+            crown.kind == Material::Flower as u8
+                && crown.flags & FLAG_ROOTED != 0
+                && crown.variant == cell.variant
+        })
+    }
+
     /// Leaves unfurl in alternating pairs as the stalk climbs, so a grown plant
     /// reads as a plant instead of a bare pole. Placement is a pure function of
     /// height — no RNG — so it cannot desynchronise the two engines. Leaf energy
@@ -1968,6 +1991,16 @@ impl Universe {
 
     fn update_flower(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
         if next[idx].kind != Material::Flower as u8 || next[idx].flags & FLAG_FROZEN != 0 {
+            return;
+        }
+        // Nothing used to ask whether a bloom was held up, so cutting a stalk dropped the
+        // stalk and left its head hanging in the air for about two minutes. A crown that has
+        // lost its stalk is no longer rooted: it falls as a loose petal, and cannot re-open on
+        // the ground or sow seed from there.
+        let (x, y) = self.xy(idx);
+        if !self.flower_has_footing(x, y, cell, old) {
+            next[idx].flags &= !FLAG_ROOTED;
+            self.update_powder(idx, cell, old, next, 1);
             return;
         }
         let cosmic = cell.flags & FLAG_COSMIC != 0;
@@ -4001,6 +4034,8 @@ mod tests {
         let peak_of = |variant: u8| {
             let mut u = Universe::new(20, 20, 3);
             set_cell_state(&mut u, 10, 10, Material::Flower, 20, BLOOM_ENERGY, FLAG_ROOTED);
+            // The crown stands on its stalk, as in play; a crown on nothing falls.
+            set_cell(&mut u, 10, 11, Material::Wall);
             let idx = u.idx(10, 10);
             u.cells[idx].variant = variant;
             let mut peak = 0usize;
@@ -4018,7 +4053,9 @@ mod tests {
             peak
         };
         for variant in 0..8u8 {
-            let full = 1 + BLOOM_SHAPES[usize::from(variant)].len();
+            // (0, 1) is where the stalk stands, so no head can open a petal there. The daisy
+            // and the sunflower list one; it was only ever reached by a crown hung in the air.
+            let full = 1 + BLOOM_SHAPES[usize::from(variant)].iter().filter(|&&o| o != (0, 1)).count();
             let peak = peak_of(variant);
             assert!(
                 peak + 1 >= full,
@@ -4028,9 +4065,11 @@ mod tests {
                  its budget runs out; a shape bigger than that is a promise the sim cannot keep."
             );
         }
+        // The cornflower against the lavender spike. This compared the sunflower once, and the
+        // two differed only by the sunflower's petal at (0, 1), which the stalk always fills.
         assert_ne!(
             peak_of(0),
-            peak_of(3),
+            peak_of(5),
             "different variants should grow visibly different blooms"
         );
     }
@@ -4040,6 +4079,7 @@ mod tests {
         // Only the rooted crown opens. Without this the head would grow without bound.
         let mut u = Universe::new(16, 16, 3);
         set_cell_state(&mut u, 8, 8, Material::Flower, 20, PETAL_ENERGY, 0);
+        set_cell(&mut u, 8, 9, Material::Wall);
         for _ in 0..400 {
             u.tick();
         }
@@ -4058,6 +4098,7 @@ mod tests {
         let mut u = Universe::new(16, 16, 5);
         set_cell_state(&mut u, 8, 8, Material::Flower, 30, 100, 0);
         set_cell_state(&mut u, 8, 7, Material::Flower, 30, 100, 0);
+        set_cell(&mut u, 8, 9, Material::Wall);
         let mut puffed = false;
         for _ in 0..600 {
             u.tick();
@@ -4073,6 +4114,7 @@ mod tests {
     fn a_spent_petal_sheds_as_a_drifting_mote() {
         let mut u = Universe::new(16, 16, 9);
         set_cell_state(&mut u, 8, 4, Material::Flower, PETAL_SHED_AGE + 40, 20, 0);
+        set_cell(&mut u, 8, 5, Material::Wall);
         let mut shed = false;
         for _ in 0..4000 {
             u.tick();
@@ -4092,16 +4134,60 @@ mod tests {
     fn a_fresh_crown_holds_its_petals() {
         // Pairs with the shed test: without this, "petals fall off" could be passing
         // because every bloom crumbles immediately rather than only when spent.
+        // A spent crown on a stalk stub, so it opens nothing more, and one petal where its
+        // shape puts it: the petal hangs from the crown and nothing else.
         let mut u = Universe::new(16, 16, 9);
-        set_cell_state(&mut u, 8, 4, Material::Flower, 30, PETAL_ENERGY, 0);
+        let (dx, dy) = BLOOM_SHAPES[0][0];
+        set_cell_state(&mut u, 8, 6, Material::Flower, 30, 0, FLAG_ROOTED);
+        set_cell(&mut u, 8, 7, Material::Wall);
+        let petal = ((8 + dx) as u32, (6 + dy) as u32);
+        set_cell_state(&mut u, petal.0, petal.1, Material::Flower, 30, PETAL_ENERGY, 0);
         for _ in 0..600 {
             u.tick();
         }
         assert_eq!(
-            kind_at(&u, 8, 4),
+            kind_at(&u, petal.0, petal.1),
             Material::Flower as u8,
             "a young, fed petal should stay on the bloom"
         );
+    }
+
+    #[test]
+    fn a_cut_stalk_drops_its_bloom() {
+        // A stalk on a floor with its crown on top and one petal where the shape puts it. Held
+        // while the stalk stands; cut the stalk and the whole head comes down, the crown no
+        // longer rooted. Before, the stalk fell and the head hung in the air.
+        let mut u = Universe::new(16, 16, 9);
+        let (dx, dy) = BLOOM_SHAPES[0][0];
+        let petal = ((8 + dx) as u32, (8 + dy) as u32);
+        for x in 0..16 {
+            set_cell(&mut u, x, 14, Material::Wall);
+        }
+        for y in 9..14 {
+            set_cell_state(&mut u, 8, y, Material::Stem, 30, 20, 0);
+        }
+        set_cell_state(&mut u, 8, 8, Material::Flower, 30, 0, FLAG_ROOTED);
+        set_cell_state(&mut u, petal.0, petal.1, Material::Flower, 30, PETAL_ENERGY, 0);
+        for _ in 0..60 {
+            u.tick();
+        }
+        assert_eq!(kind_at(&u, 8, 8), Material::Flower as u8, "a crown on its stalk stays put");
+        assert_eq!(kind_at(&u, petal.0, petal.1), Material::Flower as u8, "and so does its petal");
+
+        set_cell(&mut u, 8, 12, Material::Empty);
+        for _ in 0..60 {
+            u.tick();
+        }
+        let heads: Vec<(u32, u32)> = (0..16u32)
+            .flat_map(|y| (0..16u32).map(move |x| (x, y)))
+            .filter(|&(x, y)| kind_at(&u, x, y) == Material::Flower as u8)
+            .collect();
+        assert_eq!(heads.len(), 2, "the head falls; it does not vanish");
+        assert!(!heads.contains(&(8, 8)) && !heads.contains(&petal), "the head still hangs where it grew: {heads:?}");
+        for &(x, y) in &heads {
+            assert_ne!(kind_at(&u, x, y + 1), Material::Empty as u8, "a bloom cell at ({x},{y}) rests on nothing");
+            assert_eq!(flags_at(&u, x, y) & FLAG_ROOTED, 0, "a fallen crown is no longer rooted");
+        }
     }
 
     #[test]

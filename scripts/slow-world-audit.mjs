@@ -28,7 +28,7 @@ import { compileApp } from "./compile-app.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const app = compileApp("slow-world-cjs", ["engine.ts", "materials.ts", "slowWorld.ts", "rendering/materialColor.ts"]);
-const { createFallbackEngine } = app.load("engine");
+const { createFallbackEngine, BLOOM_SHAPES } = app.load("engine");
 // The SAME absence policy the app runs, not a copy of it. `wakeTerrarium` owns the
 // step count, the tick count, and the order they are applied in, so this gate cannot
 // certify a return path that production does not perform.
@@ -267,14 +267,21 @@ if (!aHeadIsOpen(day.cells, W)) {
 //     baseline, the first 250-tick chunk sees yesterday's flower and cuts a 4,000-tick
 //     catch-up to 600, so leaving while the garden is in bloom — the likeliest moment to
 //     wander off — buys an absence that does almost nothing.
+// A real head: a rooted crown with a cornflower's petals at their offsets. It was a 3x3 block of
+// flowers once, which no plant grows; since only a standing head counts (see 3d), a block with
+// no rooted crown is not a bloom.
+const w = 12;
+const headAt = (cy, rooted) => {
+  const cells = new Uint8Array(w * 12 * STRIDE);
+  const put = (x, y, flags) => { const o = (y * w + x) * STRIDE; cells[o] = M.Flower; cells[o + 6] = flags; };
+  put(5, cy, rooted ? CELL_FLAG.Rooted : 0);
+  for (const [dx, dy] of BLOOM_SHAPES[0]) put(5 + dx, cy + dy, 0);
+  return cells;
+};
 {
-  const w = 8;
-  const cells = new Uint8Array(w * 8 * STRIDE);
-  for (let y = 2; y <= 4; y++) {
-    for (let x = 2; x <= 4; x++) cells[(y * w + x) * STRIDE] = M.Flower;
-  }
+  const cells = headAt(4, true);
   // The baseline is built with the same function production uses. Hand-picking the centre
-  // cell was wrong and this check caught it: every cell of a 3x3 bloom has three flower
+  // cell was wrong and this check caught it: several cells of a head have three flower
   // neighbours, so a head contributes several crowns, not one.
   const asNew = catchUpRemaining(cells, 4000, w, new Set());
   const asOld = catchUpRemaining(cells, 4000, w, new Set(openCrowns(cells, w)));
@@ -286,6 +293,19 @@ if (!aHeadIsOpen(day.cells, W)) {
       `a head that was ALREADY open when the player left cut the catch-up to ${asOld} ticks.\n` +
         `    The absence is then spent on a bloom this wake had nothing to do with.`,
     );
+  }
+}
+
+// 3d. A head that falls with its cut stalk during the wake is not a new bloom. Blooms stand on
+//     their stalks now, so a cut plant's head comes down; when a player returns while that is
+//     happening, the head lands somewhere new. Counted by position as an open head, that cut
+//     a 3,750-tick catch-up to 600 and stunted the whole terrarium. Review found it.
+{
+  const standing = headAt(4, true);
+  const fallen = headAt(7, false);
+  const left = catchUpRemaining(fallen, 4000, w, new Set(openCrowns(standing, w)));
+  if (left !== 4000) {
+    failures.push(`a head that FELL with its cut stalk read as a new bloom and cut the catch-up to ${left} ticks`);
   }
 }
 

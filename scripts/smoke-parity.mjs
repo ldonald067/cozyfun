@@ -142,6 +142,9 @@ const POOL_SLACK = 2;
 const BUBBLE_UNITS = [[4, 180], [12, 180], [20, 180], [28, MIST_ENERGY], [36, MIST_ENERGY], [44, MIST_ENERGY]];
 // The vent scenario's units, one per shaft; far enough apart that no two share a wall.
 const VENT_UNITS = [4, 12, 20, 28, 36, 44];
+// The cut-bloom scenario's floor: bloom cells seen dropping once the stalk is cut. 62 with the
+// rule and 0 with it switched off in both engines, measured on its seed.
+const BLOOM_DROP_FLOOR = 30;
 // The burning-log scenario's floor: wet wood an ember dried, with no flame beside it. 75 with
 // the rule and 0 with it switched off in both engines, measured on its seed.
 const EMBER_DRY_FLOOR = 30;
@@ -1240,7 +1243,68 @@ const scenarios = [
     },
     expect: (seen) => (seen.emberDried >= EMBER_DRY_FLOOR ? null : `embers dried ${seen.emberDried} wet wood cells (floor ${EMBER_DRY_FLOOR})`),
   },
+  {
+    // A bloom stands on its stalk, and a petal hangs from its crown. Two heads built cell by
+    // cell, each crown on a stalk: a full cornflower whose stalk has a gap cut in it, and a
+    // lavender spike whose stalk is whole. The cut head must come down and no crown in it may
+    // stay rooted; the whole one must not move a cell. Offsets are BLOOM_SHAPES 0 and 5.
+    name: "a cut stalk's bloom comes down and a whole one stands",
+    w: 30, h: 20, seed: 6262, ticks: 60,
+    cells(w, h) {
+      const bytes = new Uint8Array(w * h * STRIDE);
+      const put = (x, y, kind, variant = 0, energy = 0, flags = 0) => {
+        const o = (y * w + x) * STRIDE;
+        bytes[o] = kind; bytes[o + 1] = variant; bytes[o + 2] = 30;
+        bytes[o + 4] = energy & 255; bytes[o + 5] = energy >> 8; bytes[o + 6] = flags & 255; bytes[o + 7] = flags >> 8;
+      };
+      for (let x = 0; x < w; x++) { put(x, 18, M.Wall); put(x, 19, M.Wall); }
+      for (const [cx, variant, cut] of [[8, 0, true], [21, 5, false]]) {
+        for (let y = 13; y <= 17; y++) if (!(cut && y === 15)) put(cx, y, M.Stem, variant, 20);
+        put(cx, 12, M.Flower, variant, 0, CELL_FLAG.Rooted);
+        for (const [dx, dy] of CUT_BLOOM_SHAPES[variant]) put(cx + dx, 12 + dy, M.Flower, variant, 60);
+      }
+      return bytes;
+    },
+    paint() {},
+    observe(seen, cells, w, h, tick) {
+      const kind = (x, y) => cells[(y * w + x) * STRIDE];
+      const isFlower = (i) => cells[i * STRIDE] === M.Flower;
+      const before = seen.flowersBefore;
+      const now = new Set();
+      for (let i = 0; i < w * h; i++) if (isFlower(i)) now.add(i);
+      seen.dropped ??= 0;
+      if (before) {
+        for (const i of now) {
+          if (i < w || before.has(i) || !before.has(i - w)) continue;
+          let top = i - w;
+          while (top >= w && before.has(top - w)) top -= w;
+          if (!now.has(top)) seen.dropped++;
+        }
+      }
+      Object.defineProperty(seen, "flowersBefore", { value: now, writable: true, enumerable: false, configurable: true });
+      const lavender = [...now].filter((i) => i % w >= 17).sort().join();
+      if (tick === 0) Object.defineProperty(seen, "lavenderAtStart", { value: lavender, enumerable: false });
+      seen.lavenderMoved = lavender !== seen.lavenderAtStart;
+      seen.cutHeadRooted = 0;
+      for (let y = 0; y < h; y++) for (let x = 0; x < 15; x++) {
+        const o = (y * w + x) * STRIDE;
+        if (kind(x, y) === M.Flower && (cells[o + 6] | (cells[o + 7] << 8)) & CELL_FLAG.Rooted) seen.cutHeadRooted++;
+      }
+    },
+    expect(seen) {
+      if (seen.dropped < BLOOM_DROP_FLOOR) return `only ${seen.dropped} bloom cells were seen dropping (floor ${BLOOM_DROP_FLOOR})`;
+      if (seen.cutHeadRooted) return "the cut cornflower still has a rooted crown, so it never lost its footing";
+      if (seen.lavenderMoved) return "the lavender on its whole stalk moved";
+      return null;
+    },
+  },
 ];
+
+// BLOOM_SHAPES 0 (cornflower) and 5 (lavender) from sim/src/lib.rs, for the cut-bloom scenario.
+const CUT_BLOOM_SHAPES = {
+  0: [[-2, -2], [-1, -2], [1, -2], [2, -2], [-3, -1], [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [3, -1], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0], [-2, 1], [2, 1]],
+  5: [[0, -1], [-1, -2], [1, -2], [0, -3], [-1, -4], [1, -4], [0, -5]],
+};
 
 // PARITY_ONLY=<text> runs just the scenarios whose name contains it. It exists for
 // vacuity-testing: the harness stops at the first failing scenario, so sabotaging a rule that

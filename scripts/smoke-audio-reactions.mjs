@@ -56,6 +56,15 @@ expectCues("stalk tip bloom", (_before, after) => {
   setCell(after, 1, 1, MATERIAL.Flower);
 }, ["bloom"]);
 
+// A cut stalk's head falls a cell at a time, and each cell it lands in reads Empty -> Flower.
+// Nothing bloomed: the count of flower cells did not grow.
+expectCues("a falling bloom stays silent", (before, after) => {
+  setCell(before, 1, 1, MATERIAL.Flower);
+  setCell(before, 1, 2, MATERIAL.Flower);
+  setCell(after, 1, 2, MATERIAL.Flower);
+  setCell(after, 1, 3, MATERIAL.Flower);
+}, []);
+
 expectCues("cosmic water charge", (before, after) => {
   setCell(before, 1, 1, MATERIAL.Water);
   setCell(after, 1, 1, MATERIAL.Moonwater, { flags: CELL_FLAG.Cosmic });
