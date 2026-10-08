@@ -31,10 +31,12 @@ The owner hits usage limits early, so keep each chat lean:
    `docs/MATERIAL_AUDIT.md` has not been read for this. For each compound clause, ask whether
    sabotaging the second half in the sim fails any check; a new witness is a second check
    under the same id.
-2. **Harden the CI browser launch.** `test:browser` timed out waiting for Chrome's debugger on
-   the runner once (2026-10-07). The helper retries once and gave up, Railway skipped the
-   commit, and the site sat on old code with nothing saying so. `scripts/browser-qa-helpers.mjs`
-   `launchBrowserOnce` / `waitUntil` is where it failed.
+2. **Harden `test:browser` on CI.** It flaked twice in two days, each time making Railway skip
+   a good commit for good: Chrome's debugger never started (2026-10-07, `launchBrowserOnce` in
+   `scripts/browser-qa-helpers.mjs`, after its one retry), and no drizzle reached the cleared
+   tray in 2,200 ticks on a runner sampling 17 ticks a second (2026-10-08, the weather check in
+   `scripts/smoke-browser.mjs`). Both passed on a rerun and locally. Until it is fixed, a red
+   CI run on a good commit needs a rerun to confirm the flake and then a new push to deploy.
 3. **Look for other consumers that read "a cell became X" as an event.** Review found two for
    flowers once flowers could move (the slow world's open-head count and the bloom sound). The
    same reading may exist for other materials that move.
