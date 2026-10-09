@@ -1,6 +1,6 @@
 # Handoff — where the work is, and what to do next
 
-*Rewritten at each handoff, never appended to. Written 2026-10-08, after blooms got footing.
+*Rewritten at each handoff, never appended to. Written 2026-10-09, after four clause halves got witnesses.
 See `git log` for the live commit. Check `gh run list` first and only then run
 `npm run deploy:verify`: a red CI run makes Railway skip that commit for good (a rerun does not
 revive it, a new push does).*
@@ -13,7 +13,13 @@ The owner hits usage limits early, so keep each chat lean:
   for the section you need, then read only those lines. `HARNESS.md`, `VISUAL_PIPELINE.md` and
   `MATERIAL_AUDIT.md` are 40-70 KB each.
 - **Measure narrowly.** `npm run audit:drift -- --seeds 32 --per-seed --only <ids>` takes a
-  couple of minutes; all 128 checks at 8 seeds against `main` takes about five.
+  couple of minutes; all 132 checks at 8 seeds against `main` takes about five.
+- **Sabotage with `.tmp/halves/sab.mjs <name> [seeds] [id,id]`.** It applies a find/replace from
+  `.tmp/halves/sabotages.mjs` to a copy of `app/src/engine.ts`, compiles it, and plays every
+  check (or the listed ids) on the JS mirror and on an unsabotaged copy, counting a seed as
+  caught only where the baseline passes and the sabotage fails: about 95 s a seed for all
+  checks. No cargo build. Launch parallel runs about 12 s apart: each recompiles the shared `.tmp/audit-renderer`
+  on start, and two at once crash. Keep the dice where you can (leave the `chance()` roll).
 - **Reuse the scratch scripts.** `.tmp/lucky/measure.mjs` exports `find(id, role)` and
   `measure(label, check)` (pass count, cells, ticks, contrast over 32 seeds).
   `.tmp/lucky/board.mjs <id> <seed k> <ticks>` prints a check's board. `.tmp/witness/audit.mjs`
@@ -23,21 +29,31 @@ The owner hits usage limits early, so keep each chat lean:
 
 ## What to do next
 
-1. **Audit the clause halves no check witnesses.** A clause with two promises, where the check
-   witnesses one. Known: `ember.glows` "weakly spreads fire" (the painted flame lights the
-   whole log; with ember ignition taken out of the sim the check still passed 28 of 32),
-   `ember.quenched` "running water washes cold char away" (not witnessed at all), and
-   `wellspring.blocks` "between pours" (only a dormant spring is witnessed). The rest of
-   `docs/MATERIAL_AUDIT.md` has not been read for this. For each compound clause, ask whether
-   sabotaging the second half in the sim fails any check; a new witness is a second check
-   under the same id.
-2. **Harden `test:browser` on CI.** It flaked twice in two days, each time making Railway skip
+1. **Witness the clause halves sabotage found unwitnessed.** With each taken out of the JS
+   mirror, no check fails on any seed: `sand.clumps` "slows when wet", `sand.settles` "through
+   oil", `water.boils` and `ice.freezes` "hot water melts ice" (one rule, two clauses),
+   `ice.freezes` "hot water resists" freezing, `moss.spreads` "bursting to two patches",
+   `moss.colonizes` "a soaked wall when moonwater has charged it", `stem.burns` "freezes like
+   living growth", and `lava.scorches` "thaws". A new witness is a second check under the same
+   id; the four added on 2026-10-09 (`ember.glows`, `ember.quenched`, `wellspring.blocks`,
+   `fire.dries`) show the shape. Already witnessed: lava lighting fuel and lava flowing, and
+   plain moss never taking a wall (`wall.resists`).
+2. **Sabotage the halves not yet tried.** Read but not sabotaged: `flower.pollen` (more often
+   when cosmic, dulls to grey), `pollen.seeds` (carries the cosmic spark), `seed.germinates`
+   (through standing water, taller when cosmic), `meteor.trail` (lights fuses), `rocket.lights`
+   (lava, hot ember, meteor), `rocket.bursts` (against a ceiling, chain-lighting),
+   `rocket.fuses` (a gap stops it), `stardust.energizes` (fungus), `stardust.etches` (wall),
+   `meteor.impacts` (stardust), `fungus.cosmic` (moonwater), `fungus.digests` (soil),
+   `water.rinses` (wall), `oil.smothers` (strips wet), `wall.hearth` (thaw needs contact),
+   `wellspring.stilled` (until the cold is removed), `wellspring.pours` (through its own pool),
+   `smoke.rises` (fades), `stone.slumps` (pillars hold), `soil.breathes` (any open face).
+3. **Harden `test:browser` on CI.** It flaked twice in two days, each time making Railway skip
    a good commit for good: Chrome's debugger never started (2026-10-07, `launchBrowserOnce` in
    `scripts/browser-qa-helpers.mjs`, after its one retry), and no drizzle reached the cleared
    tray in 2,200 ticks on a runner sampling 17 ticks a second (2026-10-08, the weather check in
    `scripts/smoke-browser.mjs`). Both passed on a rerun and locally. Until it is fixed, a red
    CI run on a good commit needs a rerun to confirm the flake and then a new push to deploy.
-3. **Look for other consumers that read "a cell became X" as an event.** Review found two for
+4. **Look for other consumers that read "a cell became X" as an event.** Review found two for
    flowers once flowers could move (the slow world's open-head count and the bloom sound). The
    same reading may exist for other materials that move.
 
@@ -57,6 +73,11 @@ The owner hits usage limits early, so keep each chat lean:
 
 Live, all with the full gate, CI and `deploy:verify` green:
 
+- **Four clause halves have witnesses**, each a second check under its id, each 0 of 32 with
+  its half taken out of the JS mirror: an ember lighting wood with no flame beside it
+  (`ember.glows`), running water washing cold char away (`ember.quenched`), stone resting on
+  an attuned spring (`wellspring.blocks`), and an ember drying wet wood (`fire.dries`: with
+  ember drying taken out the old check still passed 10 of 32, because it pools flame and ember).
 - **Remembered-cell witness audit finished.** Every check that remembers cells was asked the
   questions above; 15 failed one and were fixed. The last, `fire.dries`, was a rule gap.
 - **Embers dry wet fuel before lighting it**, as a flame does (owner's call after a filmstrip).
@@ -65,10 +86,11 @@ Live, all with the full gate, CI and `deploy:verify` green:
   rule never fires on a standing plant: 48 of 48 uncut garden runs end byte-identical to the
   build before. The slow world's open-head count and the bloom sound now ignore a falling head.
 
-The interaction audit has 128 checks bound to all 118 role ids; all pass on the audit's seed.
-On 32 seeds, six do not pass every seed, each with its reason at its scene: `fire.thaws`,
-`oil.ignites`, `fungus.fairyring`, `lava.scorches` and `stem.burns` at 31, and the stalk check
-of `stem.footing` at 30. `sand.pours` passes every seed but is thin by nature (34 ticks
+The interaction audit has 132 checks bound to all 118 role ids; all pass on the audit's seed.
+On 32 seeds, seven do not pass every seed, each with its reason at its scene: `fire.thaws`,
+`oil.ignites`, `fungus.fairyring`, `lava.scorches` and `stem.burns` at 31, the stalk check
+of `stem.footing` at 30, and the ember check of `fire.dries` at 29. The char-wash check of
+`ember.quenched` is thin by nature (5 cells at the least). `sand.pours` passes every seed but is thin by nature (34 ticks
 against the floor of 30).
 
 ## Design questions for the owner

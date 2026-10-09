@@ -771,6 +771,35 @@ export const CHECKS = [
       }
       return [...memo.dried].filter((i) => g.kindOf(i) === M.Wood && g.hasFlag(i, F.Scorched) && !g.hasFlag(i, F.Wet));
     } },
+  { m: "Fire", covers: "fire.dries", role: "the embers it leaves dry wet fuel the same way", w: 30, h: 26, seed: 138, ticks: 1500,
+    // The check above counts wood dried by flame and by ember together, so it passed 10 of 32
+    // with ember drying taken out of the JS mirror. This is its scene, counting only wood dried
+    // with no flame, lava or meteor beside it last tick: an ember did it. And only wood not
+    // already scorched: a warm hearth brick clears the wet from wood the pool wet again, and
+    // that leftover scorch let one seed pass with ember drying taken out. 29 of 32, a median of
+    // 14 cells; on the other three the embers dry 0, 1 and 0 cells. 0 of 32 with ember drying
+    // taken out, without the water, or without the flame.
+    paint: (p) => { p(15, 20, 6, M.Wood); p(15, 13, 4, M.Water); },
+    act: (p, t) => { if (t === 300) { p(22, 20, 1, M.Fire); p(8, 20, 1, M.Fire); } },
+    outcome: (g, before, memo, prev) => {
+      memo.dried ??= new Set();
+      memo.t = (memo.t ?? -1) + 1; // called once before the first tick, then once a tick
+      // The flames land on tick 300 after `prev` was taken, so `prev` cannot see what they
+      // dry on that tick; it credited 60 of 470 cells over 32 seeds to embers.
+      if (memo.t === 300) return [...memo.dried].filter((i) => g.kindOf(i) === M.Wood && g.hasFlag(i, F.Scorched) && !g.hasFlag(i, F.Wet));
+      for (const i of g.all(M.Wood)) {
+        if (!g.hasFlag(i, F.Scorched) || g.hasFlag(i, F.Wet) || prev.kindOf(i) !== M.Wood || !prev.hasFlag(i, F.Wet)) continue;
+        if (prev.hasFlag(i, F.Scorched)) continue;
+        const [x, y] = g.xyOf(i);
+        let flame = false;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const k = prev.kindAt(x + dx, y + dy);
+          if (k === M.Fire || k === M.Lava || k === M.Meteor) flame = true;
+        }
+        if (!flame) memo.dried.add(i);
+      }
+      return [...memo.dried].filter((i) => g.kindOf(i) === M.Wood && g.hasFlag(i, F.Scorched) && !g.hasFlag(i, F.Wet));
+    } },
   { m: "Fire", covers: "fire.thaws", role: "thaws frozen cells", w: 30, h: 26, seed: 82, ticks: 3000,
     paint: (p) => { p(15, 20, 3, M.Stone); p(15, 16, 1, M.Water); },
     act: (p, t) => { if (t === 200) p(15, 17, 1, M.Ice); if (t === 1400) p(15, 16, 2, M.Fire); },
@@ -1016,11 +1045,50 @@ export const CHECKS = [
     paint: (p) => { p(15, 20, 4, M.Wood); p(15, 16, 1, M.Fire); },
     // Ember that is hot NOW. Remembering every ember once hot and counting it while it was
     // ember at all counted cooled char: 97% of its cell-ticks over 32 seeds. This witnesses the
-    // glow only. The painted flame lights the whole log itself, so the clause's other half,
-    // that an ember weakly spreads fire, is not witnessed: review took ember ignition out of a
-    // copy of the sim and this still passed 28 of 32.
+    // glow only: with ember ignition taken out of the sim it still passes 28 of 32, because the
+    // painted flame lights enough of the log itself. The next check witnesses the spread.
     outcome: (g) => g.all(M.Ember).filter((i) => g.energyAt(i) > 150) },
-  { m: "Ember", covers: "ember.quenched", role: "quenches wet under water and washes cold char away", w: 30, h: 26, seed: 110, ticks: 4000,
+  { m: "Ember", covers: "ember.glows", role: "an ember lights the wood beside it", w: 30, h: 26, seed: 135, ticks: 600,
+    // The glow check's own scene. The witness is wood that caught last tick with no flame,
+    // lava or meteor anywhere beside it, so only an ember can have lit it, counted while it is
+    // still a live ember (the sim's COLD_CHAR_ENERGY, 30). Most of the log catches this way, in
+    // under 50 ticks. 32 of 32, 25 cells or more; 0 of 32 with ember ignition taken out of the
+    // JS mirror, where the glow check above still passes 28.
+    paint: (p) => { p(15, 20, 4, M.Wood); p(15, 16, 1, M.Fire); },
+    outcome: (g, before, memo, prev) => {
+      memo.caught ??= new Set();
+      for (let i = 0; i < g.size; i++) {
+        if (g.kindOf(i) !== M.Ember || prev.kindOf(i) !== M.Wood) continue;
+        const [x, y] = g.xyOf(i);
+        let flame = false;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const k = prev.kindAt(x + dx, y + dy);
+          if (k === M.Fire || k === M.Lava || k === M.Meteor) flame = true;
+        }
+        if (!flame) memo.caught.add(i);
+      }
+      return [...memo.caught].filter((i) => g.kindOf(i) === M.Ember && g.energyAt(i) >= 30);
+    } },
+  { m: "Ember", covers: "ember.quenched", role: "running water washes cold char away", w: 30, h: 26, seed: 136, ticks: 900,
+    // A log burnt out, then water poured over its cold char. The whole log is cold char by tick
+    // 150; the pour starts at 200, above the log so the brush paints over none of it. The
+    // witness is a cell that was cold char last tick and is not ember now, counted while it
+    // stays so. Ember never moves and nothing else in a tick removes it, so that is the wash.
+    // Its contrast is against the tick before the first wash, not the painted wood. 32 of 32,
+    // thin by nature (5 cells at the least, 10 at the median: the pour runs off the log), every
+    // counted cell water at the end; 0 of 32 without the pour or with the wash taken out.
+    paint: (p) => { p(15, 20, 4, M.Wood); p(15, 16, 1, M.Fire); },
+    act: (p, t) => { if (t >= 200 && t < 260 && t % 4 === 0) p(15, 8, 3, M.Water); },
+    outcome: (g, before, memo, prev) => {
+      memo.washed ??= new Set();
+      for (let i = 0; i < g.size; i++) {
+        if (prev.kindOf(i) !== M.Ember || prev.energyAt(i) >= 30 || g.kindOf(i) === M.Ember) continue;
+        memo.washed.add(i);
+        memo.against ??= prev;
+      }
+      return [...memo.washed].filter((i) => g.kindOf(i) !== M.Ember);
+    } },
+  { m: "Ember", covers: "ember.quenched", role: "quenches wet under water", w: 30, h: 26, seed: 110, ticks: 4000,
     // Water poured on the log two seconds after it is lit, while it still burns. A log this
     // size catches all at once and is cold char five to seven seconds later, and this used to
     // pour at 75 seconds: it witnessed cold char getting wet, never a quench, and review found
@@ -1032,7 +1100,7 @@ export const CHECKS = [
     // alone with the quench sabotaged. Its contrast is against the tick before the first
     // quench, not the painted wood. 32 of 32 as staged; 0 of 32 with the pour at 75 s, and 0
     // of 32 with the quench sabotaged. The clause's second half, running water washing cold
-    // char away, is not witnessed here.
+    // char away, is the check above.
     paint: (p) => { p(15, 20, 4, M.Wood); p(15, 16, 1, M.Fire); },
     act: (p, t) => { if (t === 40) p(15, 13, 4, M.Water); },
     outcome: (g, before, memo, prev) => {
@@ -1211,12 +1279,25 @@ export const CHECKS = [
     // woke both springs on the first grain: of what it counted over 32 seeds, 128 cell-ticks
     // were sand on a dormant spring and 76,160 sand on one attuned to sand, which pushes its
     // own sand up through the pile. Stone is no source, so the spring stays dormant under it.
-    // The witness is stone resting on a spring that is still dormant now. The clause's other
-    // half, that an attuned spring blocks flow between pours, is not witnessed.
+    // The witness is stone resting on a spring that is still dormant now. The next check is the
+    // clause's other half, an attuned spring between pours.
     paint: (p) => { p(13, 19, 1, M.Wellspring); p(17, 19, 1, M.Wellspring); p(9, 19, 2, M.Wall); p(21, 19, 2, M.Wall); p(15, 8, 4, M.Stone); },
     outcome: (g) => g.all(M.Stone).filter((i) => {
       const [x, y] = g.xyOf(i);
       return g.kindAt(x, y + 1) === M.Wellspring && g.energyAt((y + 1) * g.w + x) === 0;
+    }) },
+  { m: "Wellspring", covers: "wellspring.blocks", role: "blocks flow between pours once attuned", w: 30, h: 26, seed: 137, ticks: 600,
+    // The dormant scene, with a splash of water first: both springs drink it and pour water.
+    // Stone dropped on them sinks through their pool, and a spring pours only into open air
+    // or through its own material, so stone resting on one holds while it pours its other
+    // faces. The witness is stone resting on a spring attuned NOW. 32 of 32, 6 cells; 0 of 32
+    // with the springs painted as Wall, without the water, or with a grain let fall through an
+    // attuned spring in the JS mirror (the dormant check above still passes all 32).
+    paint: (p) => { p(13, 19, 1, M.Wellspring); p(17, 19, 1, M.Wellspring); p(9, 19, 2, M.Wall); p(21, 19, 2, M.Wall); p(15, 16, 1, M.Water); },
+    act: (p, t) => { if (t === 100) p(15, 8, 4, M.Stone); },
+    outcome: (g) => g.all(M.Stone).filter((i) => {
+      const [x, y] = g.xyOf(i);
+      return g.kindAt(x, y + 1) === M.Wellspring && g.energyAt((y + 1) * g.w + x) !== 0;
     }) },
   { m: "Wellspring", covers: "wellspring.stilled", role: "is stilled by nearby ice", w: 30, h: 26, seed: 128, ticks: 3000,
     absent: true,
