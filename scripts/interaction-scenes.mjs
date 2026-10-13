@@ -313,10 +313,10 @@ export const CHECKS = [
     // a clump hanging mid-fall, which a dry grain never does. 32 of 32, thin by nature (46
     // ticks: the fall is 46 rows, a hang on every other tick); 0 of 32 without the water or
     // with wet sand let move every tick.
-    paint: (p) => { for (let x = 9; x <= 17; x++) p(x, 14, 0, M.Wall); p(13, 11, 2, M.Sand); },
+    paint: (p) => { for (let x = 9; x <= 17; x++) p(x, 14, 1, M.Wall); p(13, 11, 2, M.Sand); },
     act: (p, t) => {
       if (t === 20) p(13, 6, 1, M.Water);
-      if (t === 120) for (let x = 9; x <= 17; x++) p(x, 14, 0, M.Empty);
+      if (t === 120) for (let x = 9; x <= 17; x++) p(x, 14, 1, M.Empty);
     },
     outcome: (g, before, memo, prev) => g.all(M.Sand).filter((i) => {
       if (prev.kindOf(i) !== M.Sand || !prev.hasFlag(i, F.Wet)) return false;
@@ -945,6 +945,22 @@ export const CHECKS = [
   { m: "Moss", covers: "moss.colonizes", role: "colonizes damp stone slowly", w: 30, h: 26, seed: 90, ticks: 2500,
     paint: (p) => { p(15, 20, 3, M.Stone); p(15, 16, 2, M.Water); p(10, 20, 1, M.Moss); },
     outcome: (g, before) => g.appeared(M.Moss, before) },
+  { m: "Moss", covers: "moss.colonizes", role: "takes a soaked wall once moonwater has charged it", w: 34, h: 26, seed: 145, ticks: 2500,
+    // Moss on a soil bed beside a wall column, and moonwater poured between them: it charges
+    // the moss and soaks the wall. The witness is wall that became moss, counted while it stays
+    // moss. 32 of 32, 13 cells at the least; 0 of 32 with the pour as plain water, and 0 of 32
+    // with the wall arm taken out of the JS mirror. Plain moss never taking a wall is
+    // `wall.resists`.
+    paint: (p) => {
+      p(8, 20, 3, M.Soil); p(8, 20, 1, M.Moss);
+      for (let y = 14; y < 22; y += 2) p(17, y, 1, M.Wall);
+      p(12, 14, 2, M.Moonwater);
+    },
+    outcome: (g, before, memo, prev) => {
+      memo.took ??= new Set();
+      for (let i = 0; i < g.size; i++) if (g.kindOf(i) === M.Moss && prev.kindOf(i) === M.Wall) memo.took.add(i);
+      return [...memo.took].filter((i) => g.kindOf(i) === M.Moss);
+    } },
   { m: "Moss", covers: "moss.overtaken", role: "is overtaken by fungus when old or wet", w: 30, h: 26, seed: 91, ticks: 3000,
     paint: (p) => { p(15, 20, 4, M.Moss); p(15, 16, 1, M.Fungus); p(15, 13, 2, M.Water); },
     outcome: (g, before) => g.appeared(M.Fungus, before) },
@@ -1117,6 +1133,27 @@ export const CHECKS = [
         if (g.kindOf(i) === M.Fire || g.kindOf(i) === M.Ember) memo.burnt.add(i);
       }
       return [...memo.burnt].filter((i) => g.kindOf(i) === M.Fire || g.kindOf(i) === M.Ember);
+    } },
+  { m: "Stem", covers: "stem.burns", role: "freezes like living growth", w: 60, h: 34, seed: 146, ticks: 3000,
+    // The garden above, with ice swept along the flame's path instead. Ice the brush lays
+    // replaces whatever it covers, so it can paint no frozen stalk. The witness is a stalk cell
+    // that froze, counted while it stays frozen, its contrast against the tick before the first
+    // did. 32 of 32, 6 cells at the least; 0 of 32 without the ice, and 0 of 32 with ice kept
+    // from freezing a stalk in the JS mirror.
+    paint: (p) => {
+      for (let x = 14; x <= 46; x++) p(x, 28, 4, M.Soil, 55);
+      for (let x = 14; x <= 46; x++) p(x, 23, 4, M.Seed, 55);
+      for (let x = 14; x <= 46; x += 2) p(x, 17, 4, M.Water, 55);
+    },
+    act: (p, t) => { if (t === 2500) for (const [x, y] of STEM_FLAMES) p(x, y, 4, M.Ice, 55); },
+    outcome: (g, before, memo, prev) => {
+      memo.froze ??= new Set();
+      for (const i of g.all(M.Stem)) {
+        if (!g.hasFlag(i, F.Frozen) || prev.kindOf(i) !== M.Stem || prev.hasFlag(i, F.Frozen)) continue;
+        memo.froze.add(i);
+        memo.against ??= prev;
+      }
+      return [...memo.froze].filter((i) => g.kindOf(i) === M.Stem && g.hasFlag(i, F.Frozen));
     } },
 
   { m: "Glass", covers: "glass.forms", role: "forms as a pane where strong heat fuses dry sand", w: 30, h: 26, seed: 107, ticks: 900,

@@ -1,6 +1,6 @@
 # Handoff — where the work is, and what to do next
 
-*Rewritten at each handoff, never appended to. Written 2026-10-09, after four clause halves got witnesses.
+*Rewritten at each handoff, never appended to. Written 2026-10-13, after six more clause halves got witnesses and two turned out unreachable.
 See `git log` for the live commit. Check `gh run list` first and only then run
 `npm run deploy:verify`: a red CI run makes Railway skip that commit for good (a rerun does not
 revive it, a new push does).*
@@ -13,7 +13,7 @@ The owner hits usage limits early, so keep each chat lean:
   for the section you need, then read only those lines. `HARNESS.md`, `VISUAL_PIPELINE.md` and
   `MATERIAL_AUDIT.md` are 40-70 KB each.
 - **Measure narrowly.** `npm run audit:drift -- --seeds 32 --per-seed --only <ids>` takes a
-  couple of minutes; all 132 checks at 8 seeds against `main` takes about five.
+  couple of minutes; all 138 checks at 8 seeds against `main` takes about five.
 - **Sabotage with `.tmp/halves/sab.mjs <name> [seeds] [id,id]`.** It applies a find/replace from
   `.tmp/halves/sabotages.mjs` to a copy of `app/src/engine.ts`, compiles it, and plays every
   check (or the listed ids) on the JS mirror and on an unsabotaged copy, counting a seed as
@@ -25,20 +25,14 @@ The owner hits usage limits early, so keep each chat lean:
   `.tmp/lucky/board.mjs <id> <seed k> <ticks>` prints a check's board. `.tmp/witness/audit.mjs`
   runs actor-away and precondition-away variants and tallies what counted cells ARE.
   `.tmp/witness/bytes-compare.mjs` plays uncut gardens on two builds and compares the bytes.
+  `.tmp/halves/try.mjs <module> <seeds> <sabotage,...>` scores candidate checks (a module
+  exporting `CANDIDATES`) on the JS mirror and on sabotaged copies, before they go in the file;
+  `.tmp/halves/proto.mjs` plays a scene on wasm and prints a stat and the board.
 - **Run the full gate (`npm run check`, ~8 minutes) once per batch**, not after every edit.
 
 ## What to do next
 
-1. **Witness the clause halves sabotage found unwitnessed.** With each taken out of the JS
-   mirror, no check fails on any seed: `sand.clumps` "slows when wet", `sand.settles` "through
-   oil", `water.boils` and `ice.freezes` "hot water melts ice" (one rule, two clauses),
-   `ice.freezes` "hot water resists" freezing, `moss.spreads` "bursting to two patches",
-   `moss.colonizes` "a soaked wall when moonwater has charged it", `stem.burns` "freezes like
-   living growth", and `lava.scorches` "thaws". A new witness is a second check under the same
-   id; the four added on 2026-10-09 (`ember.glows`, `ember.quenched`, `wellspring.blocks`,
-   `fire.dries`) show the shape. Already witnessed: lava lighting fuel and lava flowing, and
-   plain moss never taking a wall (`wall.resists`).
-2. **Sabotage the halves not yet tried.** Read but not sabotaged: `flower.pollen` (more often
+1. **Sabotage the halves not yet tried.** Read but not sabotaged: `flower.pollen` (more often
    when cosmic, dulls to grey), `pollen.seeds` (carries the cosmic spark), `seed.germinates`
    (through standing water, taller when cosmic), `meteor.trail` (lights fuses), `rocket.lights`
    (lava, hot ember, meteor), `rocket.bursts` (against a ceiling, chain-lighting),
@@ -47,13 +41,13 @@ The owner hits usage limits early, so keep each chat lean:
    `water.rinses` (wall), `oil.smothers` (strips wet), `wall.hearth` (thaw needs contact),
    `wellspring.stilled` (until the cold is removed), `wellspring.pours` (through its own pool),
    `smoke.rises` (fades), `stone.slumps` (pillars hold), `soil.breathes` (any open face).
-3. **Harden `test:browser` on CI.** It flaked twice in two days, each time making Railway skip
+2. **Harden `test:browser` on CI.** It flaked twice in two days, each time making Railway skip
    a good commit for good: Chrome's debugger never started (2026-10-07, `launchBrowserOnce` in
    `scripts/browser-qa-helpers.mjs`, after its one retry), and no drizzle reached the cleared
    tray in 2,200 ticks on a runner sampling 17 ticks a second (2026-10-08, the weather check in
    `scripts/smoke-browser.mjs`). Both passed on a rerun and locally. Until it is fixed, a red
    CI run on a good commit needs a rerun to confirm the flake and then a new push to deploy.
-4. **Look for other consumers that read "a cell became X" as an event.** Review found two for
+3. **Look for other consumers that read "a cell became X" as an event.** Review found two for
    flowers once flowers could move (the slow world's open-head count and the bloom sound). The
    same reading may exist for other materials that move.
 
@@ -73,6 +67,13 @@ The owner hits usage limits early, so keep each chat lean:
 
 Live, all with the full gate, CI and `deploy:verify` green:
 
+- **Six more clause halves have witnesses**, each a second check under its id, each 0 of 32
+  with its half taken out of the JS mirror: wet sand hanging mid-fall once its shelf is erased
+  (`sand.clumps`), sand under an oil pond (`sand.settles`), ice melted by hot meltwater under a
+  held flame (`water.boils`, 31 of 32 and thin), ice never forming where hot water stood
+  (`ice.freezes`, an absent check on the same slab), moss taking a wall soaked with moonwater
+  (`moss.colonizes`), and garden stalks freezing under an ice sweep (`stem.burns`). Two halves
+  sabotage found unwitnessed cannot be witnessed honestly; see the design questions.
 - **Four clause halves have witnesses**, each a second check under its id, each 0 of 32 with
   its half taken out of the JS mirror: an ember lighting wood with no flame beside it
   (`ember.glows`), running water washing cold char away (`ember.quenched`), stone resting on
@@ -86,14 +87,30 @@ Live, all with the full gate, CI and `deploy:verify` green:
   rule never fires on a standing plant: 48 of 48 uncut garden runs end byte-identical to the
   build before. The slow world's open-head count and the bloom sound now ignore a falling head.
 
-The interaction audit has 132 checks bound to all 118 role ids; all pass on the audit's seed.
-On 32 seeds, seven do not pass every seed, each with its reason at its scene: `fire.thaws`,
-`oil.ignites`, `fungus.fairyring`, `lava.scorches` and `stem.burns` at 31, the stalk check
-of `stem.footing` at 30, and the ember check of `fire.dries` at 29. The char-wash check of
-`ember.quenched` is thin by nature (5 cells at the least). `sand.pours` passes every seed but is thin by nature (34 ticks
-against the floor of 30).
+The interaction audit has 138 checks bound to all 118 role ids; all pass on the audit's seed.
+On 32 seeds, eight do not pass every seed, each with its reason at its scene: `fire.thaws`,
+`oil.ignites`, `fungus.fairyring`, `lava.scorches`, `stem.burns` and the hot-meltwater check
+of `water.boils` at 31, the stalk check of `stem.footing` at 30, and the ember check of
+`fire.dries` at 29. Thin by nature but passing every seed: the char-wash check of
+`ember.quenched` (5 cells at the least), `sand.pours` (34 ticks against the floor of 30) and
+the wet-sand check of `sand.clumps` (46 ticks).
 
 ## Design questions for the owner
+
+- **Moss's burst does nothing a player can see.** `moss.spreads` promises "bursting to two
+  patches at once when well watered". On a watered wood plank moss covers it in 72-78 ticks
+  with the burst and 67-80 without it (8 seeds): wet moss already takes damp wood every tick,
+  and a new patch starts at energy 70, under the 150 a burst needs. No scene tried shows one
+  parent taking two cells in a tick. Make the burst matter, or drop it (lib.rs, engine.ts, the
+  clause).
+- **Lava never thaws anything in play.** Frost exists only beside the ice that made it, so lava
+  meets the ice first and the meltwater quenches it into stone, the same wall `lava.scorches`
+  notes. Painted straight onto a 4-cell frost, lava thaws it on 6 of 8 seeds; poured on an ice
+  layer over wet stone, 1 cell on 1 seed of 8; on the frost-stressed rock, 0 of 8 at three
+  spots. `lava.scorches` "thaws" is unwitnessed for that reason.
+- **Hot water is hot for a few ticks only**: a flame adds 30 a tick, water boils off at 200 and
+  loses 2 a tick on its own. So "hot water melts ice" shows only as meltwater under a flame held
+  nine seconds to an ice slab, which then refreezes it.
 
 - **The daisy's and sunflower's petal at (0, 1) can never open.** It is the cell under the
   crown, where the stalk stands; it only ever opened on a crown hung in the air, in a test.
@@ -135,6 +152,8 @@ All by the owner, after seeing measurements:
   full gate, watch CI, then `npm run deploy:verify`; add `npm run qa:live` when players can see
   the change.
 - **Seconds are ticks over ~20**, never 60.
+- **The brush clamps radius 0 to 1**: `p(x, y, 0, ...)` paints a plus of five cells, three rows
+  tall, in both engines.
 - **Print the board before believing a fixture.** A test fixture that hand-places a state play
   cannot reach (a crown hung in the air) passes for the wrong reason, and a rule that fixes
   play can break it. Give fixtures the support play gives them.
