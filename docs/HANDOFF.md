@@ -1,6 +1,6 @@
 # Handoff — where the work is, and what to do next
 
-*Rewritten at each handoff, never appended to. Written 2026-10-13, after six more clause halves got witnesses and two turned out unreachable.
+*Rewritten at each handoff, never appended to. Written 2026-10-13, after five more clause halves got witnesses and three turned out not to show in play.
 See `git log` for the live commit. Check `gh run list` first and only then run
 `npm run deploy:verify`: a red CI run makes Railway skip that commit for good (a rerun does not
 revive it, a new push does).*
@@ -13,7 +13,7 @@ The owner hits usage limits early, so keep each chat lean:
   for the section you need, then read only those lines. `HARNESS.md`, `VISUAL_PIPELINE.md` and
   `MATERIAL_AUDIT.md` are 40-70 KB each.
 - **Measure narrowly.** `npm run audit:drift -- --seeds 32 --per-seed --only <ids>` takes a
-  couple of minutes; all 138 checks at 8 seeds against `main` takes about five.
+  couple of minutes; all 137 checks at 8 seeds against `main` takes about five.
 - **Sabotage with `.tmp/halves/sab.mjs <name> [seeds] [id,id]`.** It applies a find/replace from
   `.tmp/halves/sabotages.mjs` to a copy of `app/src/engine.ts`, compiles it, and plays every
   check (or the listed ids) on the JS mirror and on an unsabotaged copy, counting a seed as
@@ -67,13 +67,13 @@ The owner hits usage limits early, so keep each chat lean:
 
 Live, all with the full gate, CI and `deploy:verify` green:
 
-- **Six more clause halves have witnesses**, each a second check under its id, each 0 of 32
-  with its half taken out of the JS mirror: wet sand hanging mid-fall once its shelf is erased
-  (`sand.clumps`), sand under an oil pond (`sand.settles`), ice melted by hot meltwater under a
-  held flame (`water.boils`, 31 of 32 and thin), ice never forming where hot water stood
-  (`ice.freezes`, an absent check on the same slab), moss taking a wall soaked with moonwater
-  (`moss.colonizes`), and garden stalks freezing under an ice sweep (`stem.burns`). Two halves
-  sabotage found unwitnessed cannot be witnessed honestly; see the design questions.
+- **Five more clause halves have witnesses**, each a second check under its id, each 0 of 32
+  with its half taken out of the JS mirror: wet sand falling at half pace once its shelf is
+  erased (`sand.clumps`; also 0 of 32 with wet sand never moving), sand under an oil pond
+  (`sand.settles`), ice never forming where hot water stood under a held flame (`ice.freezes`,
+  an absent check), moss taking a wall soaked with moonwater (`moss.colonizes`), and garden
+  stalks freezing under an ice sweep (`stem.burns`). Three halves sabotage found unwitnessed
+  do not show in play; see the design questions.
 - **Four clause halves have witnesses**, each a second check under its id, each 0 of 32 with
   its half taken out of the JS mirror: an ember lighting wood with no flame beside it
   (`ember.glows`), running water washing cold char away (`ember.quenched`), stone resting on
@@ -87,10 +87,9 @@ Live, all with the full gate, CI and `deploy:verify` green:
   rule never fires on a standing plant: 48 of 48 uncut garden runs end byte-identical to the
   build before. The slow world's open-head count and the bloom sound now ignore a falling head.
 
-The interaction audit has 138 checks bound to all 118 role ids; all pass on the audit's seed.
-On 32 seeds, eight do not pass every seed, each with its reason at its scene: `fire.thaws`,
-`oil.ignites`, `fungus.fairyring`, `lava.scorches`, `stem.burns` and the hot-meltwater check
-of `water.boils` at 31, the stalk check of `stem.footing` at 30, and the ember check of
+The interaction audit has 137 checks bound to all 118 role ids; all pass on the audit's seed.
+On 32 seeds, seven do not pass every seed, each with its reason at its scene: `fire.thaws`,
+`oil.ignites`, `fungus.fairyring`, `lava.scorches` and `stem.burns` at 31, the stalk check of `stem.footing` at 30, and the ember check of
 `fire.dries` at 29. Thin by nature but passing every seed: the char-wash check of
 `ember.quenched` (5 cells at the least), `sand.pours` (34 ticks against the floor of 30) and
 the wet-sand check of `sand.clumps` (46 ticks).
@@ -108,9 +107,12 @@ the wet-sand check of `sand.clumps` (46 ticks).
   notes. Painted straight onto a 4-cell frost, lava thaws it on 6 of 8 seeds; poured on an ice
   layer over wet stone, 1 cell on 1 seed of 8; on the frost-stressed rock, 0 of 8 at three
   spots. `lava.scorches` "thaws" is unwitnessed for that reason.
-- **Hot water is hot for a few ticks only**: a flame adds 30 a tick, water boils off at 200 and
-  loses 2 a tick on its own. So "hot water melts ice" shows only as meltwater under a flame held
-  nine seconds to an ice slab, which then refreezes it.
+- **Hot water melting ice barely shows.** Water is hot (over 120) for a few ticks only: a flame
+  adds 30 a tick, water boils off at 200 and loses 2 a tick on its own. The one scene found is a
+  flame held nine seconds to an ice slab: its hot meltwater melts ice the flame is not touching
+  on 32 of 32 seeds, but the slab refreezes it, so it stays visible past the floors on only 25
+  (30 ticks or more). `water.boils` and `ice.freezes` "melts it" are unwitnessed for that
+  reason; that ice never freezes hot water is witnessed.
 
 - **The daisy's and sunflower's petal at (0, 1) can never open.** It is the cell under the
   crown, where the stalk stands; it only ever opened on a crown hung in the air, in a test.

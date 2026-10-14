@@ -257,16 +257,6 @@ const launchFixture = (p) => { p(15, 37, 4, M.Rocket); p(15, 31, 4, M.Fire); };
 // because a stalk the brush painted over did not catch.
 const STEM_FLAMES = Array.from({ length: 9 }, (_, k) => [14 + 4 * k, 14]);
 
-// A slab of ice in a walled basin with a flame held to it for nine seconds, a dab every fourth
-// tick. `water.boils` watches hot meltwater melt the slab; `ice.freezes` that the slab never
-// freezes hot water back.
-const iceSlab = (p) => {
-  for (let x = 6; x <= 24; x++) p(x, 21, 1, M.Wall);
-  for (let y = 12; y <= 21; y++) { p(6, y, 1, M.Wall); p(24, y, 1, M.Wall); }
-  for (let y = 16; y <= 19; y++) for (let x = 9; x <= 21; x++) p(x, y, 1, M.Ice);
-};
-const iceSlabFlameTick = (t) => t >= 20 && t < 200 && t % 4 === 0;
-const iceSlabFlame = (p, t) => { if (iceSlabFlameTick(t)) p(15, 12, 3, M.Fire); };
 
 export const CHECKS = [
   // ---- Hard materials -----------------------------------------------------------------
@@ -309,20 +299,25 @@ export const CHECKS = [
     // The check above sees sand get wet, not slow: with wet sand let move every tick in the
     // JS mirror it still passes. Here a pile on a wall shelf is watered, then the shelf is
     // erased under it. Wet sand falls a cell every other tick and dry sand two cells every
-    // tick, so the witness is a wet grain that held still with air under it before and after:
-    // a clump hanging mid-fall, which a dry grain never does. 32 of 32, thin by nature (46
-    // ticks: the fall is 46 rows, a hang on every other tick); 0 of 32 without the water or
-    // with wet sand let move every tick.
+    // tick, so the witness is a wet grain that fell into its cell last tick and held still this
+    // one with air under it: a clump falling at half pace, which a dry grain never does. Review
+    // found that without the fall, wet sand that never moved at all passed. 32 of 32, thin by
+    // nature (46 ticks: the fall is 46 rows, a hang on every other tick); 0 of 32 without the
+    // water, with wet sand let move every tick, or with it never moving.
     paint: (p) => { for (let x = 9; x <= 17; x++) p(x, 14, 1, M.Wall); p(13, 11, 2, M.Sand); },
     act: (p, t) => {
       if (t === 20) p(13, 6, 1, M.Water);
       if (t === 120) for (let x = 9; x <= 17; x++) p(x, 14, 1, M.Empty);
     },
-    outcome: (g, before, memo, prev) => g.all(M.Sand).filter((i) => {
-      if (prev.kindOf(i) !== M.Sand || !prev.hasFlag(i, F.Wet)) return false;
-      const [x, y] = g.xyOf(i);
-      return prev.kindAt(x, y + 1) === M.Empty && g.kindAt(x, y + 1) === M.Empty;
-    }) },
+    outcome: (g, before, memo, prev) => {
+      const back = memo.back ?? before; // the board two ticks back
+      memo.back = prev;
+      return g.all(M.Sand).filter((i) => {
+        if (prev.kindOf(i) !== M.Sand || !prev.hasFlag(i, F.Wet) || back.kindOf(i) === M.Sand) return false;
+        const [x, y] = g.xyOf(i);
+        return prev.kindAt(x, y + 1) === M.Empty && g.kindAt(x, y + 1) === M.Empty;
+      });
+    } },
   { m: "Sand", covers: "sand.vitrifies", role: "fuses into glass under lava", w: 30, h: 26, seed: 8, ticks: 900,
     paint: (p) => { p(15, 20, 3, M.Sand); p(15, 15, 2, M.Lava); },
     outcome: (g, before) => g.appeared(M.Glass, before) },
@@ -368,33 +363,6 @@ export const CHECKS = [
   { m: "Water", covers: "water.boils", role: "boils away to steam over sustained flame", w: 30, h: 26, seed: 9, ticks: 2000,
     paint: (p) => { p(15, 20, 3, M.Wall); p(15, 16, 3, M.Water); p(15, 21, 2, M.Lava); },
     outcome: thermalSteam },
-  { m: "Water", covers: "water.boils", role: "hot water melts ice", w: 30, h: 26, seed: 141, ticks: 600,
-    // The ice slab with a flame held to it (`iceSlab`). Water's energy is its heat: a flame
-    // adds 30 a tick to water it touches, water boils off at 200 and loses 2 a tick on its own,
-    // so water is hot (over 120) only for a few ticks beside a flame. The flame melts the ice it
-    // touches and heats that meltwater, and the witness is ice that melted with no flame, lava
-    // or meteor beside it last tick: hot meltwater did it. Counted while it stays water; ticks
-    // the brush dabs are skipped, since a flame painted after `prev` was taken melts ice `prev`
-    // cannot see. 31 of 32, thin by nature: the slab refreezes cooled meltwater, and one seed
-    // shows it 22 ticks. 0 of 32 without the flame or with the melt taken out of the JS mirror.
-    // The rule's other half, that ice never freezes hot water, is the `ice.freezes` check that
-    // plays this scene.
-    paint: iceSlab, act: iceSlabFlame,
-    outcome: (g, before, memo, prev) => {
-      memo.t = (memo.t ?? -1) + 1; // called once before the first tick, then once a tick
-      memo.melted ??= new Set();
-      if (!iceSlabFlameTick(memo.t)) for (let i = 0; i < g.size; i++) {
-        if (prev.kindOf(i) !== M.Ice || g.kindOf(i) !== M.Water) continue;
-        const [x, y] = g.xyOf(i);
-        let flame = false;
-        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-          const k = prev.kindAt(x + dx, y + dy);
-          if (k === M.Fire || k === M.Lava || k === M.Meteor) flame = true;
-        }
-        if (!flame) memo.melted.add(i);
-      }
-      return [...memo.melted].filter((i) => g.kindOf(i) === M.Water);
-    } },
   { m: "Water", covers: "water.flows", role: "throws a faint mist where it moves", w: 40, h: 34, seed: 133, ticks: 600,
     // The owner's call for ROADMAP Phase 20 was that the water sink be VISIBLE: moving water
     // throws mist rather than silently vanishing. A pour into a walled basin with no heat
@@ -474,12 +442,20 @@ export const CHECKS = [
     outcome: (g, before) => g.appeared(M.Ice, before) },
   { m: "Ice", covers: "ice.freezes", role: "never freezes hot water", w: 30, h: 26, seed: 141, ticks: 600,
     absent: true,
-    // The `water.boils` ice slab, gesture for gesture, where hot meltwater melts the slab on
-    // every seed, so hot water meets this ice on every run. The witness is ice where hot water
-    // (over 120) stood last tick. It never forms, on 32 of 32; with ice let freeze hot water in
-    // the JS mirror it forms on 32 of 32. That hot water melts the ice is the `water.boils`
-    // check.
-    paint: iceSlab, act: iceSlabFlame,
+    // A slab of ice in a basin, a flame held to it for nine seconds, a dab every fourth tick.
+    // Water's energy is its heat: a flame adds 30 a tick to water it touches, water boils off at
+    // 200 and loses 2 a tick on its own, so it is hot (over 120) only for a few ticks beside a
+    // flame. Here that is the meltwater, and it melts ice the flame is not touching on 32 of 32
+    // seeds, so hot water meets this ice on every run. The witness is ice where hot water stood
+    // last tick. It never forms, on 32 of 32; with ice let freeze hot water in the JS mirror it
+    // forms on 32 of 32. That melt is not a check of its own: it is visible past the floors on
+    // only 25 of 32, because the slab refreezes the meltwater, and it is put to the owner.
+    paint: (p) => {
+      for (let x = 6; x <= 24; x++) p(x, 21, 1, M.Wall);
+      for (let y = 12; y <= 21; y++) { p(6, y, 1, M.Wall); p(24, y, 1, M.Wall); }
+      for (let y = 16; y <= 19; y++) for (let x = 9; x <= 21; x++) p(x, y, 1, M.Ice);
+    },
+    act: (p, t) => { if (t >= 20 && t < 200 && t % 4 === 0) p(15, 12, 3, M.Fire); },
     outcome: (g, before, memo, prev) => g.all(M.Ice).filter((i) => prev.kindOf(i) === M.Water && prev.energyAt(i) > 120) },
   { m: "Ice", covers: "ice.condenses", role: "condenses steam into frost", w: 26, h: 26, seed: 19, ticks: 900,
     paint: (p) => { p(13, 20, 3, M.Water); p(13, 21, 2, M.Lava); p(13, 10, 2, M.Ice); },
