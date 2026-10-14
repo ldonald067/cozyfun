@@ -71,9 +71,10 @@ function measure(engine, renderer, label) {
       const verdict = auditVerdict({ ...check, ...r });
       return {
         seed: check.seed + k * 1000,
-        // An `absent` check succeeds by never firing, so "reached" means what the check means.
-        // A vacuous run is not reached: it measured the painted scene, not the interaction.
-        reached: !r.vacuous && (r.absent ? r.firstTick < 0 : r.firstTick >= 0),
+        // An `absent` check succeeds by never firing on a scene that set its rule up, so
+        // "reached" means what the check means. A vacuous run is not reached: it measured the
+        // painted scene, not the interaction.
+        reached: !r.vacuous && (r.absent ? r.firstTick < 0 && r.exercised : r.firstTick >= 0),
         firstTick: r.firstTick, cells: r.spreadCells ?? 0, shown: r.visibleTicks ?? 0, contrast: Math.round(r.contrast ?? 0),
         verdict: verdict.kind, why: verdict.why,
       };

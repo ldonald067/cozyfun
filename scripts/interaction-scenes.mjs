@@ -167,12 +167,17 @@ function medianContrast(colorForCell, now, before, indices) {
  * `runCheck` result spread over its check (so `ticks` and `absent` are present).
  *
  *   vacuous      the predicate was already true on the painted scene
- *   unreachable  it never happened — or, for an `absent` check, it happened
- *   faint        it happened but missed a visibility floor; `why` names each one missed
+ *   unreachable  it never happened — or, for an `absent` check, it happened, or the state
+ *                its `requires` names never held, so its absence proves nothing
+ *   faint       it happened but missed a visibility floor; `why` names each one missed
  */
 export function auditVerdict(r) {
   if (r.vacuous) return { kind: "vacuous", why: ["true before any tick"] };
-  if (r.absent) return r.firstTick < 0 ? { kind: "pass", why: [] } : { kind: "unreachable", why: [`leaked at tick ${r.firstTick}`] };
+  if (r.absent) {
+    if (r.firstTick >= 0) return { kind: "unreachable", why: [`leaked at tick ${r.firstTick}`] };
+    if (!r.exercised) return { kind: "unreachable", why: ["its precondition never held"] };
+    return { kind: "pass", why: [] };
+  }
   if (r.firstTick < 0) return { kind: "unreachable", why: [`never happened in ${r.ticks} ticks`] };
   const why = [];
   if (r.spreadCells < MIN_CELLS) why.push(`${r.spreadCells} cells < ${MIN_CELLS}`);
@@ -188,7 +193,7 @@ export function auditVerdict(r) {
  * drift comparison) — without a second copy of any scene.
  */
 export function runCheck(check, { engine, colorForCell }) {
-  const { w, h, seed, ticks, paint, act, outcome, absent } = check;
+  const { w, h, seed, ticks, paint, act, outcome, absent, requires } = check;
   const uni = engine.create(w, h, seed);
   const view = () => uni.view();
   const brush = (x, y, r, mat, d = 100) => uni.paint(x, y, r, mat, d);
@@ -210,6 +215,11 @@ export function runCheck(check, { engine, colorForCell }) {
   // soil one cell at a time — is plainly visible over its life while never exceeding one
   // cell at any instant, so peak alone would call it invisible.
   const touched = new Set();
+  // An `absent` check passes by NOT seeing something, so it passes just as well when its scene
+  // never set up the thing it guards. `requires` names that state; it must hold on at least one
+  // tick. Review (2026-10-14): the hearth's absent check passed with its ice, and with its
+  // flame, taken out of the scene.
+  let exercised = !requires;
   // Watched for the check's whole duration, not a fixed window after it first fires. A
   // capped window scored slow rules — stone erosion, a fungus mat reverting — as invisible
   // purely because they were still going when the stopwatch ran out. Each check's `ticks`
@@ -223,6 +233,7 @@ export function runCheck(check, { engine, colorForCell }) {
     // `prev` is last tick, for rules whose outcome is a transition rather than a state:
     // "was glass, is sand now" is exact where "there is sand" is drowned out by the bed.
     const cellsHit = outcome(now, before, memo, prev);
+    if (!exercised && requires(now)) exercised = true;
     prev = grid(view().slice(), w, h);
     if (!cellsHit.length) continue;
     if (firstTick < 0) firstTick = t;
@@ -240,7 +251,7 @@ export function runCheck(check, { engine, colorForCell }) {
   // the player sees is black turning clean.
   const contrast = peakSnapshot ? medianContrast(colorForCell, peakSnapshot, memo.against ?? before, peakIndices) : 0;
   uni.free();
-  return { firstTick, vacuous: false, peakCells, spreadCells: touched.size, visibleTicks, contrast, absent };
+  return { firstTick, vacuous: false, peakCells, spreadCells: touched.size, visibleTicks, contrast, absent, exercised };
 }
 
 // Every scene gets a wall floor four rows off the bottom, painted by runCheck AFTER the
@@ -285,6 +296,22 @@ const driftingStardust = (from, where = () => true) => (g, before, memo, prev) =
   memo.grains = now;
   return [...now.keys()];
 };
+
+// A wall brick warm through the masonry and not touching the flame, as the hearth rule reads it:
+// it touches a brick that touches the flame. Fire is the only flame the scene using it has.
+const AROUND = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
+const touchesFire = (g, x, y) => AROUND.some(([dx, dy]) => g.kindAt(x + dx, y + dy) === M.Fire);
+const warmThroughMasonry = (g, x, y) => g.kindAt(x, y) === M.Wall && !touchesFire(g, x, y) &&
+  AROUND.some(([dx, dy]) => g.kindAt(x + dx, y + dy) === M.Wall && touchesFire(g, x + dx, y + dy));
+
+// The eraser dabs that clear the ice round a wellspring painted at (20, 14) without touching
+// it: every dab in the box around it whose plus misses the spring's own five cells.
+const SPRING_CELLS = [[20, 13], [19, 14], [20, 14], [21, 14], [20, 15]];
+const SPRING_THAW = [];
+for (let y = 10; y <= 18; y++) for (let x = 16; x <= 24; x++) {
+  const dab = [[x, y], [x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]];
+  if (!dab.some(([a, b]) => SPRING_CELLS.some(([c, d]) => a === c && b === d))) SPRING_THAW.push([x, y]);
+}
 
 // Stardust dropped on a fungus mat, with no moonwater anywhere: the only way a fungus cell
 // here turns cosmic. Both `stardust.energizes` and `fungus.cosmic` claim this rule.
@@ -571,6 +598,29 @@ export const CHECKS = [
       for (const i of g.all(M.Stem)) if (prev.kindOf(i) === M.Water) memo.climbed.add(i);
       return [...memo.climbed].filter((i) => g.kindOf(i) === M.Stem);
     } },
+  { m: "Seed", covers: "seed.germinates", role: "grows taller fed cosmic", w: 220, h: 40, seed: 169, ticks: 4000,
+    // A seed row on a soil bed the shipped board's width, watered with moonwater. A sprout's
+    // height is fixed by its variant, and a cosmic one gets a segment more, so only a cosmic
+    // variant-3 seed reaches eight cells. The witness is a column of eight stalk cells or more.
+    // 32 of 32, 8 cells at the least; 0 of 32 with no cosmic segment in the JS mirror, and 0 of
+    // 32 watered with plain water. Only one seed in four is variant 3: 60 cells wide, it passed
+    // 21 of 32.
+    paint: (p) => {
+      for (let x = 8; x <= 212; x++) { p(x, 34, 1, M.Soil); p(x, 31, 0, M.Seed); }
+      for (let x = 14; x <= 212; x += 12) p(x, 24, 2, M.Moonwater);
+    },
+    outcome: (g) => {
+      const tall = [];
+      for (let x = 0; x < g.w; x++) {
+        let run = [];
+        for (let y = 0; y <= g.h; y++) {
+          const i = y * g.w + x;
+          if (y < g.h && g.kindOf(i) === M.Stem) run.push(i);
+          else { if (run.length >= 8) tall.push(...run); run = []; }
+        }
+      }
+      return tall;
+    } },
   { m: "Flower", covers: "flower.opens", role: "opens into a multi-cell head", w: 40, h: 34, seed: 23, ticks: 4000,
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
     outcome: (g) => (g.count(M.Flower) >= 4 ? g.all(M.Flower) : []) },
@@ -669,6 +719,16 @@ export const CHECKS = [
   { m: "Wellspring", covers: "wellspring.pours", role: "drinks a source and then pours it forever", w: 30, h: 26, seed: 38, ticks: 3000,
     paint: (p) => { p(15, 18, 1, M.Wellspring); p(15, 15, 1, M.Water); },
     outcome: (g, before) => g.appeared(M.Water, before) },
+  { m: "Wellspring", covers: "wellspring.pours", role: "pushes up through its own pool", w: 40, h: 34, seed: 162, ticks: 2500,
+    // A spring on the floor of a narrow walled basin, taught water by a dab. Pouring only into a
+    // bare face, it stops once its own pool covers it; feeding through its body, it keeps the
+    // pool rising. The witness is water three rows and more above the spring's top. 32 of 32,
+    // 14 cells at the least; 0 of 32 with the spring pouring only into a bare face in the JS mirror.
+    paint: (p) => {
+      for (let y = 12; y <= 29; y++) { p(15, y, 0, M.Wall); p(25, y, 0, M.Wall); }
+      p(20, 26, 0, M.Water); p(20, 28, 1, M.Wellspring);
+    },
+    outcome: (g) => g.all(M.Water).filter((i) => g.xyOf(i)[1] <= 24) },
   { m: "Glass", covers: "glass.shatters", role: "shatters back to sand under meteor impact", w: 30, h: 34, seed: 39, ticks: 1200,
     // The pane is painted directly here, which is the one composition in this file that a
     // player could not do from the tray. It is deliberate: reaching glass at all is proved
@@ -691,6 +751,18 @@ export const CHECKS = [
   { m: "Smoke", covers: "smoke.rises", role: "rises off open flame", w: 26, h: 30, seed: 41, ticks: 900,
     paint: (p) => { p(13, 24, 3, M.Wood); p(13, 21, 1, M.Fire); },
     outcome: (g, before) => g.appeared(M.Smoke, before) },
+  { m: "Smoke", covers: "smoke.rises", role: "fades once the fire is out", w: 30, h: 30, seed: 163, ticks: 2400,
+    // A log burnt out under the top of the board, where its smoke gathers. Smoke here otherwise
+    // only moves, so a cloud that thins is smoke fading. The witness is the cells the cloud held
+    // at its thickest that are empty now, once it is down to half, scored against that thickest
+    // cloud. 32 of 32, 12 cells at the least; 0 of 32 with smoke never ageing out in the JS mirror.
+    paint: (p) => { p(15, 24, 3, M.Wood); p(15, 21, 1, M.Fire); },
+    outcome: (g, before, memo) => {
+      const smoke = g.count(M.Smoke);
+      if (smoke >= (memo.peak ?? 0)) { memo.peak = smoke; memo.against = grid(g.cells.slice(), g.w, g.h); return []; }
+      if (smoke * 2 > memo.peak) return [];
+      return memo.against.all(M.Smoke).filter((i) => g.kindOf(i) === M.Empty);
+    } },
   // ---- Coverage completion: the remaining documented roles ------------------------------
   // Written against docs/MATERIAL_AUDIT.md clause by clause, so `npm run material:audit`'s
   // matrix and this gate cannot drift apart. Grouped by material, in matrix order.
@@ -737,6 +809,27 @@ export const CHECKS = [
       for (const i of g.all(M.Stone)) if (g.hasFlag(i, F.Wet)) memo.damp.add(i);
       return [...memo.damp].filter((i) => g.kindOf(i) === M.Stone && !g.hasFlag(i, F.Wet) && g.energyAt(i) > 0);
     } },
+  { m: "Wall", covers: "wall.hearth", role: "thaws only against a brick touching the flame", w: 30, h: 26, seed: 166, ticks: 2500,
+    absent: true,
+    // A three-row wall bar, soaked, then a dab of ice on its top over the second and third
+    // columns, then a flame held to its left end. The first column touches the flame, the
+    // second is warm through the first, and frost on the third column touches only the second.
+    // The witness is a brick from the third column on losing its frost. It never does, on 32 of
+    // 32; with every warm brick thawing in the JS mirror it does on 32 of 32. It requires a
+    // frosted brick there beside a brick warm through the wall, so it fails with the ice or the
+    // flame taken out instead of passing on a scene that never set the rule up.
+    paint: (p) => { for (let x = 6; x <= 20; x++) p(x, 16, 0, M.Wall); },
+    act: (p, t) => {
+      if (t === 1) p(10, 11, 3, M.Water, 60);
+      if (t === 60) p(7, 13, 1, M.Ice);
+      if (t >= 120 && t % 20 === 0) p(3, 16, 1, M.Fire);
+    },
+    requires: (g) => g.all(M.Wall).some((i) => {
+      const [x, y] = g.xyOf(i);
+      return x >= 7 && g.hasFlag(i, F.Frozen) && AROUND.some(([dx, dy]) => warmThroughMasonry(g, x + dx, y + dy));
+    }),
+    outcome: (g, before, memo, prev) => g.all(M.Wall).filter((i) =>
+      g.xyOf(i)[0] >= 7 && prev.kindOf(i) === M.Wall && prev.hasFlag(i, F.Frozen) && !g.hasFlag(i, F.Frozen)) },
   { m: "Wall", covers: "wall.crumbles", role: "freeze-thaw stress crumbles it into stone", w: 30, h: 26, seed: 55, ticks: 30000,
     // Stress accrues per cycle and the wall only crumbles once it is carrying a lot of it,
     // so the scene has to keep the masonry DAMP and cycle it: a static ice/fire pairing
@@ -873,6 +966,27 @@ export const CHECKS = [
     // arriving before the soil had a dry spell to break. Now 32 of 32 as staged, and 0 of 32
     // for each of those.
     outcome: (g) => g.all(M.Steam).filter((i) => g.energyAt(i) > MIST_ENERGY) },
+  { m: "Soil", covers: "soil.breathes", role: "vents from a side face under a downpour", w: 30, h: 26, seed: 165, ticks: 2000,
+    // The bed above, watered with a downpour instead of a sprinkle: water landing on a cell's
+    // top closes the face a wisp would rise through. A wisp vented straight up is born over the
+    // soil that breathed it, which took its first water that tick; the witness is a wisp with
+    // anything else under it, counted where it was born while it stays mist (under a pour it
+    // sits in the water). 32 of 32, thin by nature (33 ticks at the least, about a wisp's life);
+    // 0 of 32 with soil venting straight up only in the JS mirror, and 0 of 32 with the bed
+    // painted as stone or watered before its dry spell.
+    paint: (p) => { p(15, 19, 6, M.Soil); },
+    act: (p, t) => { if (t >= 800 && t < 830 && t % 3 === 0) p(15, 11, 5, M.Water); },
+    outcome: (g, before, memo, prev) => {
+      memo.born ??= new Set();
+      for (let i = 0; i < g.size; i++) {
+        const age = g.cells[i * STRIDE + 2] | (g.cells[i * STRIDE + 3] << 8);
+        if (g.kindOf(i) !== M.Steam || age !== 0 || prev.kindOf(i) === M.Steam || g.energyAt(i) <= MIST_ENERGY) continue;
+        const under = i + g.w;
+        if (under < g.size && prev.kindOf(under) === M.Soil && prev.energyAt(under) === 0 && g.energyAt(under) > 0) continue;
+        memo.born.add(i);
+      }
+      return [...memo.born].filter((i) => g.kindOf(i) === M.Steam && g.energyAt(i) > MIST_ENERGY);
+    } },
   { m: "Soil", covers: "soil.roots", role: "roots wet seeds for blooming", w: 30, h: 26, seed: 73, ticks: 900,
     paint: (p) => { p(15, 20, 3, M.Soil); p(15, 17, 1, M.Seed); p(15, 14, 2, M.Water); },
     outcome: (g, before) => g.gained(M.Seed, F.Rooted, before) },
@@ -1462,6 +1576,24 @@ export const CHECKS = [
     // smoke in the JS mirror, and 0 of 32 with a burst's stardust living a single tick.
     paint: (p) => { for (let x = 4; x <= 26; x++) p(x, 22, 1, M.Wall); launchFixture(p); },
     outcome: driftingStardust(M.Rocket, (g, i) => g.xyOf(i)[1] > 22 && g.xyOf(i)[1] <= 26) },
+  { m: "Rocket", covers: "rocket.bursts", role: "chain-lights powder beside a burst", w: 50, h: 80, seed: 172, ticks: 900,
+    // The launch fixture's pile and flame on a tall board, with a powder heap on a ledge to each
+    // side at the height where the volley bursts, out of reach of any climbing grain. The
+    // witness is heap powder gone from the heaps as they had settled by tick 10. 32 of 32, 27
+    // cells at the least; 0 of 32 with neither the shell nor its sparks lighting powder in the
+    // JS mirror, and 0 of 32 without the volley. One heap alone launched on 30 of 32.
+    paint: (p) => {
+      for (const cx of [14, 36]) { p(cx, 41, 3, M.Rocket); for (let x = cx - 6; x <= cx + 6; x++) p(x, 46, 0, M.Wall); }
+      p(25, 72, 4, M.Rocket); p(25, 66, 4, M.Fire);
+    },
+    outcome: (g, before, memo) => {
+      memo.t = (memo.t ?? -1) + 1;
+      if (memo.t <= 10) { memo.against = grid(g.cells.slice(), g.w, g.h); return []; }
+      return g.vanished(M.Rocket, memo.against).filter((i) => {
+        const [x, y] = g.xyOf(i);
+        return y >= 36 && y <= 45 && Math.abs(x - 25) >= 6;
+      });
+    } },
 
   { m: "Spark", covers: "spark.flies", role: "flies outward from a burst then droops and fades", w: 30, h: 44, seed: 125, ticks: 900,
     paint: (p) => launchFixture(p),
@@ -1530,6 +1662,23 @@ export const CHECKS = [
     paint: (p) => { p(15, 19, 1, M.Wellspring); p(15, 16, 1, M.Water); p(11, 19, 2, M.Ice); p(19, 19, 2, M.Ice); },
     act: (p, t) => { if (t % 300 === 0) { p(11, 19, 2, M.Ice); p(19, 19, 2, M.Ice); } },
     outcome: (g, before) => g.appeared(M.Water, before).filter((i) => g.xyOf(i)[1] > 20) },
+  { m: "Wellspring", covers: "wellspring.stilled", role: "pours again once the ice is erased", w: 40, h: 34, seed: 161, ticks: 1500,
+    // A spring taught water by a dab and ringed with ice four ticks later, which also freezes
+    // what it has poured. At tick 500 the eraser clears everything round it but the spring. The
+    // witness is water that was not there when the eraser came, counted only while there is
+    // more water than then. 32 of 32; 0 of 32 with a stilled spring never pouring again in the
+    // JS mirror, and 0 of 32 with the ice left in place.
+    paint: (p) => { p(20, 14, 1, M.Wellspring); p(20, 10, 0, M.Water); },
+    act: (p, t) => {
+      if (t === 4) for (const [x, y] of [[17, 14], [23, 14], [20, 11], [20, 17]]) p(x, y, 1, M.Ice);
+      if (t === 500) for (const [x, y] of SPRING_THAW) p(x, y, 1, M.Empty);
+    },
+    outcome: (g, before, memo) => {
+      memo.t = (memo.t ?? -1) + 1;
+      if (memo.t < 500) { memo.against = grid(g.cells.slice(), g.w, g.h); memo.water = g.count(M.Water); return []; }
+      if (g.count(M.Water) <= memo.water) return [];
+      return g.all(M.Water).filter((i) => memo.against.kindOf(i) !== M.Water);
+    } },
   { m: "Wellspring", covers: "wellspring.reattune", role: "re-drinks a new source while held under that chill", w: 60, h: 40, seed: 129, ticks: 1500,
     // A spring painted at the default brush and taught water, ice set beside it, then sand
     // dropped on top. The witness is spring cells HOLDING sand as a lesson, once they had

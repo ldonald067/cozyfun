@@ -100,7 +100,7 @@ console.log("-".repeat(86));
 for (const r of results) {
   if (r.vacuous) { console.log(`${pad(r.m, 11)} ${pad(r.role, 44)}    VACUOUS (true before any tick)`); continue; }
   if (r.absent) {
-    console.log(`${pad(r.m, 11)} ${pad(r.role, 44)}    ${r.firstTick < 0 ? `prevented for ${r.ticks} ticks` : `LEAKED at tick ${r.firstTick}`}`);
+    console.log(`${pad(r.m, 11)} ${pad(r.role, 44)}    ${r.firstTick >= 0 ? `LEAKED at tick ${r.firstTick}` : r.exercised ? `prevented for ${r.ticks} ticks` : "NEVER SET UP (its precondition never held)"}`);
     continue;
   }
   if (r.firstTick < 0) { console.log(`${pad(r.m, 11)} ${pad(r.role, 44)}    NEVER`); continue; }
@@ -127,7 +127,7 @@ if (unreachable.length) {
   console.error(
     `\nInteraction audit FAILED: ${unreachable.length} documented interaction(s) never happened\n` +
       `from a painted scene:\n` +
-      unreachable.map((r) => `  - ${r.m}: ${r.role} (${r.absent ? `leaked at tick ${r.firstTick}` : `gave up after ${r.ticks} ticks`})`).join("\n") +
+      unreachable.map((r) => `  - ${r.m}: ${r.role} (${r.absent ? auditVerdict(r).why.join(", ") : `gave up after ${r.ticks} ticks`})`).join("\n") +
       `\n\nA rule can pass its unit test and still be unreachable in play: the test hand-places\n` +
       `the state, the player has to get there by painting. Fix the rule's reachability, or if\n` +
       `the scene is genuinely wrong, fix the scene — but do not delete the check.`,
