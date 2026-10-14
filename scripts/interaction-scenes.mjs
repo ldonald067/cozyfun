@@ -257,6 +257,42 @@ const launchFixture = (p) => { p(15, 37, 4, M.Rocket); p(15, 31, 4, M.Fire); };
 // because a stalk the brush painted over did not catch.
 const STEM_FLAMES = Array.from({ length: 9 }, (_, k) => [14 + 4 * k, 14]);
 
+// Stardust that a `from` cell BECAME this tick (where `where` allows), followed as it drifts.
+// Stardust never comes to rest: every other tick it steps down, sideways or up a diagonal, so
+// a witness that counts the cell it appeared in loses it within a few ticks. A grain is
+// followed by identity, not by place: a move carries its bytes, and its age rises by exactly one
+// a tick, so it is the cell beside it holding stardust of its variant one tick older. Following
+// whatever stardust stepped in next door credited other grains: on the meteor scene most of
+// the counted cell-ticks were trail-spark dust (review, 2026-10-14).
+const driftingStardust = (from, where = () => true) => (g, before, memo, prev) => {
+  memo.grains ??= new Map();
+  const variant = (i) => g.cells[i * STRIDE + 1];
+  const age = (i) => g.cells[i * STRIDE + 2] | (g.cells[i * STRIDE + 3] << 8);
+  const now = new Map();
+  for (const [i, grain] of memo.grains) {
+    const [x, y] = g.xyOf(i);
+    for (const [dx, dy] of [[0, 0], [0, 1], [-1, 1], [1, 1], [-1, 0], [1, 0], [-1, -1], [1, -1]]) {
+      const j = (y + dy) * g.w + x + dx;
+      if (g.kindAt(x + dx, y + dy) !== M.Stardust || now.has(j)) continue;
+      if (variant(j) === grain.variant && age(j) === grain.age + 1) { now.set(j, { variant: grain.variant, age: grain.age + 1 }); break; }
+    }
+  }
+  // Born this tick: a cell written this tick reads age 0. A grain that drifted into the cell
+  // `from` just left is older.
+  for (let i = 0; i < g.size; i++) {
+    if (g.kindOf(i) === M.Stardust && prev.kindOf(i) === from && age(i) === 0 && where(g, i)) now.set(i, { variant: variant(i), age: 0 });
+  }
+  memo.grains = now;
+  return [...now.keys()];
+};
+
+// Stardust dropped on a fungus mat, with no moonwater anywhere: the only way a fungus cell
+// here turns cosmic. Both `stardust.energizes` and `fungus.cosmic` claim this rule.
+const STARDUST_ON_FUNGUS = { w: 30, h: 26, ticks: 2000,
+  // 32 of 32, 11 cells at the least; 0 of 32 with stardust kept from charging fungus in the JS mirror.
+  paint: (p) => { p(15, 20, 3, M.Fungus); p(15, 16, 2, M.Stardust); },
+  outcome: (g, before) => g.gained(M.Fungus, F.Cosmic, before) };
+
 
 export const CHECKS = [
   // ---- Hard materials -----------------------------------------------------------------
@@ -268,6 +304,15 @@ export const CHECKS = [
     outcome: (g, before) => g.gained(M.Wall, F.Scorched, before) },
   { m: "Stone", covers: "stone.slumps", role: "falls when left unsupported", w: 24, h: 24, seed: 3, ticks: 120,
     paint: (p) => { p(12, 8, 2, M.Stone); },
+    outcome: (g, before) => g.appeared(M.Stone, before) },
+  { m: "Stone", covers: "stone.slumps", role: "a pillar holds", w: 24, h: 30, seed: 158, ticks: 600,
+    absent: true,
+    // A five-wide stone pillar standing on the floor, painted as a block so every column reaches
+    // the floor (the brush's own disc leaves its edge columns a row short, and those drop). The
+    // witness is stone anywhere it was not painted. It never appears, on 32 of 32; with stone
+    // slipping diagonally like sand in the JS mirror it leaks from the first tick, 70 cells over
+    // the run, on 32 of 32.
+    paint: (p) => { for (let y = 8; y <= 25; y++) for (let x = 11; x <= 13; x++) p(x, y, 1, M.Stone); },
     outcome: (g, before) => g.appeared(M.Stone, before) },
   { m: "Stone", covers: "stone.hosts", role: "hosts moss on damp stone", w: 30, h: 24, seed: 4, ticks: 1200,
     paint: (p) => { p(15, 18, 3, M.Stone); p(15, 14, 2, M.Water); p(10, 18, 1, M.Moss); },
@@ -401,6 +446,20 @@ export const CHECKS = [
       if (!memo.rinsed.size) memo.against = grid(g.cells.slice(), g.w, g.h);
       return [...memo.rinsed].filter((i) => g.kindOf(i) === M.Stone && !g.hasFlag(i, F.Scorched));
     } },
+  { m: "Water", covers: "water.rinses", role: "rinses soot from a scorched wall", w: 40, h: 34, seed: 154, ticks: 2200,
+    // The stone scene above with a wall pillar. The witness is wall that was sooty and is now
+    // clean. 32 of 32, 9 cells at the least; 0 of 32 without the pour, and 0 of 32 with the wall
+    // arm's rinse taken out of the JS mirror.
+    paint: (p) => { for (let y = 25; y >= 12; y--) p(24, y, 4, M.Wall); p(15, 26, 3, M.Wood); p(15, 20, 4, M.Fire, 55); },
+    act: (p, t) => { if (t === 700) p(24, 4, 4, M.Water, 55); },
+    outcome: (g, before, memo) => {
+      memo.sooty ??= new Set();
+      memo.rinsed ??= new Set();
+      for (const i of g.all(M.Wall)) if (g.hasFlag(i, F.Scorched)) memo.sooty.add(i);
+      for (const i of memo.sooty) if (g.kindOf(i) === M.Wall && !g.hasFlag(i, F.Scorched)) memo.rinsed.add(i);
+      if (!memo.rinsed.size) memo.against = grid(g.cells.slice(), g.w, g.h);
+      return [...memo.rinsed].filter((i) => g.kindOf(i) === M.Wall && !g.hasFlag(i, F.Scorched));
+    } },
   { m: "Moonwater", covers: "moonwater.cleans", role: "cleans oil into stardust", w: 30, h: 26, seed: 11, ticks: 900,
     paint: (p) => { p(15, 20, 3, M.Oil); p(15, 15, 3, M.Moonwater); },
     outcome: (g, before) => g.appeared(M.Stardust, before) },
@@ -497,6 +556,21 @@ export const CHECKS = [
   { m: "Seed", covers: "seed.germinates", role: "germinates into a climbing stalk", w: 40, h: 34, seed: 22, ticks: 3000,
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
     outcome: (g, before) => g.appeared(M.Stem, before) },
+  { m: "Seed", covers: "seed.germinates", role: "pushes up through standing water", w: 40, h: 40, seed: 155, ticks: 3000,
+    // A walled planter, soil and a seed row along its floor, flooded deep over the seeds. The
+    // witness is stalk where water stood the tick before. 32 of 32, 8 cells at the least; 0 of
+    // 32 without the water, and 0 of 32 with nothing let grow into water in the JS mirror.
+    paint: (p) => {
+      for (let y = 12; y <= 34; y++) { p(10, y, 1, M.Wall); p(30, y, 1, M.Wall); }
+      for (let x = 12; x <= 28; x++) p(x, 33, 1, M.Soil);
+      for (let x = 12; x <= 28; x++) p(x, 30, 1, M.Seed);
+      for (const x of [14, 20, 26]) p(x, 16, 3, M.Water);
+    },
+    outcome: (g, before, memo, prev) => {
+      memo.climbed ??= new Set();
+      for (const i of g.all(M.Stem)) if (prev.kindOf(i) === M.Water) memo.climbed.add(i);
+      return [...memo.climbed].filter((i) => g.kindOf(i) === M.Stem);
+    } },
   { m: "Flower", covers: "flower.opens", role: "opens into a multi-cell head", w: 40, h: 34, seed: 23, ticks: 4000,
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
     outcome: (g) => (g.count(M.Flower) >= 4 ? g.all(M.Flower) : []) },
@@ -553,6 +627,13 @@ export const CHECKS = [
   { m: "Meteor", covers: "meteor.impacts", role: "impacts into stone and fire", w: 30, h: 34, seed: 33, ticks: 900,
     paint: (p) => { p(15, 28, 3, M.Stone); p(15, 6, 1, M.Meteor); },
     outcome: (g, before) => [...g.appeared(M.Stardust, before), ...g.appeared(M.Fire, before)] },
+  { m: "Meteor", covers: "meteor.impacts", role: "lands as stardust", w: 30, h: 34, seed: 150, ticks: 900,
+    // The scene above with a default-brush meteor; the check above passes on its fire ring alone.
+    // The witness is stardust a meteor became where it stopped, followed as it drifts. 32 of
+    // 32, 83 cells at the least; 0 of 32 with a meteor always landing as stone in the JS mirror,
+    // and 0 of 32 with the stardust it lands as living a single tick.
+    paint: (p) => { p(15, 28, 3, M.Stone); p(15, 8, 3, M.Meteor); },
+    outcome: driftingStardust(M.Meteor) },
   { m: "Meteor", covers: "meteor.trail", role: "sheds a spark trail as it falls", w: 40, h: 140, seed: 34, ticks: 250,
     // The real board's height, and a meteor at the default brush. On a 40-row board the rock
     // hits bottom almost at once, so the trail was on screen 29 ticks on 1 seed of 32, and a
@@ -565,6 +646,22 @@ export const CHECKS = [
     outcome: (g, before) => g.appeared(M.Stardust, before) },
   { m: "Rocket", covers: "rocket.lights", role: "is lit by flame and launches", w: 30, h: 40, seed: 36, ticks: 900,
     paint: (p) => { p(15, 34, 2, M.Rocket); p(15, 32, 1, M.Fire); },
+    outcome: (g) => g.all(M.Spark) },
+  { m: "Rocket", covers: "rocket.lights", role: "is lit by lava", w: 30, h: 40, seed: 159, ticks: 900,
+    // The scene above with a dab of lava for the flame. Only rockets make sparks here. 32 of 32,
+    // thin by nature (35 ticks at the least: a launch is over in under two seconds); 0 of 32 with
+    // lava kept from lighting powder in the JS mirror.
+    paint: (p) => { p(15, 34, 2, M.Rocket); p(15, 31, 1, M.Lava); },
+    outcome: (g) => g.all(M.Spark) },
+  { m: "Rocket", covers: "rocket.lights", role: "is lit by a hot ember", w: 50, h: 40, seed: 160, ticks: 1500,
+    // A plank with powder at its far end and a flame held to its near end for three seconds, a
+    // dab every fourth tick, thirteen cells from the powder. Wood catches as ember, and the ember
+    // creeps along the plank to the powder. 32 of 32, thin by nature (33 ticks at the least);
+    // 0 of 32 without the plank, and 0 of 32 with embers kept from lighting powder in the JS
+    // mirror. A meteor lights powder too, but through the fire ring its impact throws: with its
+    // own lighting taken out of the mirror, a meteor dropped on powder still launched it on 8 of 8.
+    paint: (p) => { for (let x = 28; x <= 40; x++) p(x, 33, 2, M.Wood); p(43, 33, 2, M.Rocket); },
+    act: (p, t) => { if (t <= 60 && t % 4 === 1) p(28, 29, 1, M.Fire); },
     outcome: (g) => g.all(M.Spark) },
   { m: "Spark", covers: "spark.hisses", role: "hisses into steam over water", w: 30, h: 40, seed: 37, ticks: 900,
     paint: (p) => { p(15, 34, 4, M.Water); p(15, 28, 2, M.Rocket); p(15, 26, 1, M.Fire); },
@@ -1017,6 +1114,12 @@ export const CHECKS = [
       return [...memo.low].filter((i) => g.kindOf(i) === M.Pollen);
     } },
   { m: "Pollen", covers: "pollen.seeds", role: "takes root as a seed on damp soil", w: 40, h: 34, seed: 102, ticks: 9000,
+    // NOT A WITNESS of its rule (2026-10-14): it passes 8 of 8 with pollen never rooting in the
+    // JS mirror, because a painted seed that settles is a seed that "appeared". No pollen rooted
+    // in this garden or a wide wet bed, with water or moonwater: watered soil greens to moss, so
+    // pollen settles on moss (1,621 times in a 9,000-tick bed) and never on soil. It does root on
+    // fresh wet soil painted right under a drifting mote (review found one). Kept until the owner
+    // decides; see docs/HANDOFF.md.
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
     outcome: (g, before) => g.appeared(M.Seed, before) },
   { m: "Pollen", covers: "pollen.fades", role: "lives out a full drift before fading", w: 40, h: 34, seed: 103, ticks: 6000,
@@ -1218,9 +1321,20 @@ export const CHECKS = [
   { m: "Fungus", covers: "fungus.digests", role: "digests wood and soil", w: 30, h: 26, seed: 112, ticks: 3000,
     paint: (p) => { p(15, 20, 4, M.Wood); p(15, 16, 1, M.Fungus); p(15, 13, 2, M.Water); },
     outcome: (g, before) => g.appeared(M.Fungus, before) },
+  { m: "Fungus", covers: "fungus.digests", role: "digests soil", w: 30, h: 26, seed: 153, ticks: 3000,
+    // A dab of fungus on a dry soil mound: dry, so no moss grows for the fungus to take instead.
+    // The witness is fungus where soil was the tick before. 32 of 32, 35 cells at the least; 0 of
+    // 32 with soil left undigested in the JS mirror.
+    paint: (p) => { p(15, 20, 4, M.Soil); p(15, 15, 1, M.Fungus); },
+    outcome: (g, before, memo, prev) => {
+      memo.ate ??= new Set();
+      for (const i of g.all(M.Fungus)) if (prev.kindOf(i) === M.Soil) memo.ate.add(i);
+      return [...memo.ate].filter((i) => g.kindOf(i) === M.Fungus);
+    } },
   { m: "Fungus", covers: "fungus.cosmic", role: "charges cosmic near stardust and moonwater", w: 30, h: 26, seed: 113, ticks: 2000,
     paint: (p) => { p(15, 20, 3, M.Fungus); p(15, 16, 2, M.Moonwater); },
     outcome: (g, before) => g.gained(M.Fungus, F.Cosmic, before) },
+  { m: "Fungus", covers: "fungus.cosmic", role: "charges cosmic near stardust", seed: 152, ...STARDUST_ON_FUNGUS },
   { m: "Fungus", covers: "fungus.fairyring", role: "sows a stardust grain as a charged fairy ring", w: 30, h: 26, seed: 114, ticks: 6000,
     // 31 of 32: one seed sows 3 grains in five minutes against a median of 45. The ring is
     // slow by design; at 9000 ticks that seed reaches 4. Lengthening the window would change
@@ -1259,9 +1373,15 @@ export const CHECKS = [
   { m: "Stardust", covers: "stardust.energizes", role: "energizes life and soil with cosmic marks", w: 30, h: 26, seed: 117, ticks: 1200,
     paint: (p) => { p(15, 20, 3, M.Soil); p(15, 16, 2, M.Stardust); },
     outcome: (g, before) => [...g.gained(M.Soil, F.Cosmic, before), ...g.gained(M.Moss, F.Cosmic, before)] },
+  { m: "Stardust", covers: "stardust.energizes", role: "energizes fungus", seed: 152, ...STARDUST_ON_FUNGUS },
   { m: "Stardust", covers: "stardust.etches", role: "etches constellation marks onto stone and wall", w: 30, h: 26, seed: 118, ticks: 1500,
     paint: (p) => { p(15, 19, 3, M.Stone); p(15, 15, 2, M.Stardust); },
     outcome: (g, before) => g.gained(M.Stone, F.Cosmic, before) },
+  { m: "Stardust", covers: "stardust.etches", role: "etches a wall", w: 30, h: 26, seed: 151, ticks: 1500,
+    // The scene above on a wall block; nothing else here marks a wall cosmic. 32 of 32, 24 cells
+    // at the least; 0 of 32 with stardust etching stone only in the JS mirror.
+    paint: (p) => { p(15, 19, 3, M.Wall); p(15, 15, 2, M.Stardust); },
+    outcome: (g, before) => g.gained(M.Wall, F.Cosmic, before) },
 
   { m: "Meteor", covers: "meteor.falls", role: "falls as impact heat", w: 30, h: 64, seed: 119, ticks: 300,
     // A tall sky, because that is where a meteor is seen: in a 34-row scene it is on screen
@@ -1334,6 +1454,14 @@ export const CHECKS = [
   { m: "Rocket", covers: "rocket.bursts", role: "bursts into a firework shell of sparks and stardust", w: 30, h: 44, seed: 124, ticks: 900,
     paint: (p) => launchFixture(p),
     outcome: (g, before) => g.appeared(M.Stardust, before) },
+  { m: "Rocket", covers: "rocket.bursts", role: "bursts against a ceiling", w: 30, h: 44, seed: 157, ticks: 900,
+    // The launch fixture under a wall ceiling eight rows above the pile, which every rocket hits
+    // well before its fuse would burst it. The witness is the stardust a rocket became in the
+    // four rows under the ceiling, followed as it drifts. 32 of 32, 84 cells at the least; 0 of 32
+    // without the ceiling (fuses burst far higher), 0 of 32 with a blocked rocket fizzling to
+    // smoke in the JS mirror, and 0 of 32 with a burst's stardust living a single tick.
+    paint: (p) => { for (let x = 4; x <= 26; x++) p(x, 22, 1, M.Wall); launchFixture(p); },
+    outcome: driftingStardust(M.Rocket, (g, i) => g.xyOf(i)[1] > 22 && g.xyOf(i)[1] <= 26) },
 
   { m: "Spark", covers: "spark.flies", role: "flies outward from a burst then droops and fades", w: 30, h: 44, seed: 125, ticks: 900,
     paint: (p) => launchFixture(p),

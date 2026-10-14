@@ -1,6 +1,6 @@
 # Handoff — where the work is, and what to do next
 
-*Rewritten at each handoff, never appended to. Written 2026-10-13, after five more clause halves got witnesses and three turned out not to show in play.
+*Rewritten at each handoff, never appended to. Written 2026-10-14, after the last untried halves were sabotaged: eleven got witnesses, and pollen turned out never to root at all.
 See `git log` for the live commit. Check `gh run list` first and only then run
 `npm run deploy:verify`: a red CI run makes Railway skip that commit for good (a rerun does not
 revive it, a new push does).*
@@ -13,7 +13,7 @@ The owner hits usage limits early, so keep each chat lean:
   for the section you need, then read only those lines. `HARNESS.md`, `VISUAL_PIPELINE.md` and
   `MATERIAL_AUDIT.md` are 40-70 KB each.
 - **Measure narrowly.** `npm run audit:drift -- --seeds 32 --per-seed --only <ids>` takes a
-  couple of minutes; all 137 checks at 8 seeds against `main` takes about five.
+  couple of minutes; all 148 checks at 8 seeds against `main` takes about five.
 - **Sabotage with `.tmp/halves/sab.mjs <name> [seeds] [id,id]`.** It applies a find/replace from
   `.tmp/halves/sabotages.mjs` to a copy of `app/src/engine.ts`, compiles it, and plays every
   check (or the listed ids) on the JS mirror and on an unsabotaged copy, counting a seed as
@@ -28,19 +28,26 @@ The owner hits usage limits early, so keep each chat lean:
   `.tmp/halves/try.mjs <module> <seeds> <sabotage,...>` scores candidate checks (a module
   exporting `CANDIDATES`) on the JS mirror and on sabotaged copies, before they go in the file;
   `.tmp/halves/proto.mjs` plays a scene on wasm and prints a stat and the board.
+  `.tmp/halves/try-map.mjs <module> <seeds> [label]` is `try.mjs` scoring each candidate only
+  against the sabotages its module's `AGAINST` map names; `.tmp/halves/show.mjs` prints a
+  candidate's board at chosen ticks. Every sabotage named below is already in `sabotages.mjs`.
 - **Run the full gate (`npm run check`, ~8 minutes) once per batch**, not after every edit.
 
 ## What to do next
 
-1. **Sabotage the halves not yet tried.** Read but not sabotaged: `flower.pollen` (more often
-   when cosmic, dulls to grey), `pollen.seeds` (carries the cosmic spark), `seed.germinates`
-   (through standing water, taller when cosmic), `meteor.trail` (lights fuses), `rocket.lights`
-   (lava, hot ember, meteor), `rocket.bursts` (against a ceiling, chain-lighting),
-   `rocket.fuses` (a gap stops it), `stardust.energizes` (fungus), `stardust.etches` (wall),
-   `meteor.impacts` (stardust), `fungus.cosmic` (moonwater), `fungus.digests` (soil),
-   `water.rinses` (wall), `oil.smothers` (strips wet), `wall.hearth` (thaw needs contact),
-   `wellspring.stilled` (until the cold is removed), `wellspring.pours` (through its own pool),
-   `smoke.rises` (fades), `stone.slumps` (pillars hold), `soil.breathes` (any open face).
+1. **Witness the halves that sabotage found unwitnessed.** Each is listed with its sabotage in
+   `.tmp/halves/sabotages.mjs`; none fails its clause's checks on any of 8 seeds.
+   `seed.germinates` "taller when cosmic" (`cosmic-not-taller`: one more 55-energy segment, so
+   only a cosmic variant-3 stalk reaches 8 cells), `meteor.trail` lights fuses
+   (`trail-never-lights`; trail sparks only fly straight down), `rocket.bursts` chain-lighting
+   (`burst-never-chains`), `rocket.fuses` a gap stops it (`fuse-jumps-gap`, an absent check),
+   `oil.smothers` strips wet (`oil-keeps-wet`), `wall.hearth` thaw needs contact
+   (`hearth-thaws-by-conduction`), `wellspring.stilled` until the cold is removed
+   (`spring-stays-stilled`), `wellspring.pours` through its own pool (`spring-bare-face-only`),
+   `smoke.rises` fades (`smoke-never-fades`), `soil.breathes` any open face
+   (`soil-vents-up-only`). Two cannot be reached by an engine sabotage: `flower.pollen` "more
+   often when cosmic" is a rate, which one check cannot see without a comparison, and "dulls
+   toward grey" is in the renderer (`shapeLanguage.ts`), which `sab.mjs` does not copy.
 2. **Harden `test:browser` on CI.** It flaked twice in two days, each time making Railway skip
    a good commit for good: Chrome's debugger never started (2026-10-07, `launchBrowserOnce` in
    `scripts/browser-qa-helpers.mjs`, after its one retry), and no drizzle reached the cleared
@@ -67,35 +74,50 @@ The owner hits usage limits early, so keep each chat lean:
 
 Live, all with the full gate, CI and `deploy:verify` green:
 
-- **Five more clause halves have witnesses**, each a second check under its id, each 0 of 32
-  with its half taken out of the JS mirror: wet sand falling at half pace once its shelf is
-  erased (`sand.clumps`; also 0 of 32 with wet sand never moving), sand under an oil pond
-  (`sand.settles`), ice never forming where hot water stood under a held flame (`ice.freezes`,
-  an absent check), moss taking a wall soaked with moonwater (`moss.colonizes`), and garden
-  stalks freezing under an ice sweep (`stem.burns`). Three halves sabotage found unwitnessed
-  do not show in play; see the design questions.
-- **Four clause halves have witnesses**, each a second check under its id, each 0 of 32 with
-  its half taken out of the JS mirror: an ember lighting wood with no flame beside it
-  (`ember.glows`), running water washing cold char away (`ember.quenched`), stone resting on
-  an attuned spring (`wellspring.blocks`), and an ember drying wet wood (`fire.dries`: with
-  ember drying taken out the old check still passed 10 of 32, because it pools flame and ember).
+- **Eleven more clause halves have witnesses**, each a second check under its id, each 32 of 32
+  and 0 of 32 with its half taken out of the JS mirror: a meteor landing as stardust
+  (`meteor.impacts`), stardust etching a wall (`stardust.etches`) and charging fungus (one scene,
+  bound to both `stardust.energizes` and `fungus.cosmic`), fungus digesting soil
+  (`fungus.digests`), running water rinsing a sooty wall (`water.rinses`), stalks climbing
+  through a flooded planter (`seed.germinates`), a stone pillar holding (`stone.slumps`, an
+  absent check), rockets bursting against a ceiling (`rocket.bursts`), and lava and a hot ember
+  each lighting a fuse (`rocket.lights`). Stardust never rests, so the two stardust witnesses
+  follow each grain as it drifts (`driftingStardust`). Moonwater charging fungus was already
+  witnessed. The other halves sabotage tried are under "What to do next".
+- **Five more clause halves have witnesses** (2026-10-13): wet sand falling at half pace, sand
+  under an oil pond, ice never freezing hot water, moss taking a moonwater-soaked wall, and
+  garden stalks freezing under an ice sweep.
+- **Four clause halves have witnesses** (2026-10-09): ember spread, char wash, an attuned spring
+  blocking stone, and ember drying.
 - **Remembered-cell witness audit finished.** Every check that remembers cells was asked the
-  questions above; 15 failed one and were fixed. The last, `fire.dries`, was a rule gap.
+  questions above; 15 failed one and were fixed.
 - **Embers dry wet fuel before lighting it**, as a flame does (owner's call after a filmstrip).
 - **A bloom stands on its stalk, and a petal hangs from its crown.** Cut the stalk and the head
-  comes down with it; a fallen crown is no longer rooted, so it neither re-opens nor sows. The
-  rule never fires on a standing plant: 48 of 48 uncut garden runs end byte-identical to the
-  build before. The slow world's open-head count and the bloom sound now ignore a falling head.
+  comes down with it. The slow world's open-head count and the bloom sound ignore a falling head.
 
-The interaction audit has 137 checks bound to all 118 role ids; all pass on the audit's seed.
+The interaction audit has 148 checks bound to all 118 role ids; all pass on the audit's seed.
 On 32 seeds, seven do not pass every seed, each with its reason at its scene: `fire.thaws`,
 `oil.ignites`, `fungus.fairyring`, `lava.scorches` and `stem.burns` at 31, the stalk check of `stem.footing` at 30, and the ember check of
 `fire.dries` at 29. Thin by nature but passing every seed: the char-wash check of
-`ember.quenched` (5 cells at the least), `sand.pours` (34 ticks against the floor of 30) and
-the wet-sand check of `sand.clumps` (46 ticks).
+`ember.quenched` (5 cells at the least), `sand.pours` (34 ticks against the floor of 30), the
+wet-sand check of `sand.clumps` (46 ticks), and the lava and ember checks of `rocket.lights`
+(35 and 33 ticks: a launch is over in under two seconds).
 
 ## Design questions for the owner
 
+- **Pollen almost never roots, so `pollen.seeds` has no witness at all.** Pollen roots only on
+  wet soil, and watered soil greens to moss first: on a wide watered bed 90 of 93 soil cells
+  were moss by tick 200, and in 9,000 ticks settled pollen rested on moss 1,621 times and on soil
+  never. No pollen rooted in that bed or in the check's own garden, with water or moonwater
+  (3 seeds each). It can: review painted a ledge of fresh soil and a dab of water right under a
+  mote already drifting, and it rooted in both engines (fresh soil cannot green for its first
+  10 ticks). The check passes 8 of 8 with rooting taken out of the JS mirror, because a painted
+  seed that settles "appeared"; it says so at the scene. So a garden does not reseed itself,
+  and the cosmic spark a seed should carry does not travel. Let pollen root on wet moss, keep
+  claimed soil bare around a plant, or drop the clause.
+- **A meteor's own fuse-lighting never shows.** With it taken out of the JS mirror, a meteor
+  dropped on powder still launched it on 8 of 8: the fire ring its impact throws lights the
+  powder first. Harmless; drop the arm or leave it.
 - **Moss's burst does nothing a player can see.** `moss.spreads` promises "bursting to two
   patches at once when well watered". On a watered wood plank moss covers it in 72-78 ticks
   with the burst and 67-80 without it (8 seeds): wet moss already takes damp wood every tick,
