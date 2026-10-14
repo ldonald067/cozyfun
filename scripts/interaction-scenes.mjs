@@ -216,8 +216,8 @@ export function runCheck(check, { engine, colorForCell }) {
   // cell at any instant, so peak alone would call it invisible.
   const touched = new Set();
   // An `absent` check passes by NOT seeing something, so it passes just as well when its scene
-  // never set up the thing it guards. `requires` names that state; it must hold on at least one
-  // tick. Review (2026-10-14): the hearth's absent check passed with its ice, and with its
+  // never set up the thing it guards. `requires(now, before)` names that state; it must hold on
+  // at least one tick. Review (2026-10-14): the hearth's absent check passed with its ice, and with its
   // flame, taken out of the scene.
   let exercised = !requires;
   // Watched for the check's whole duration, not a fixed window after it first fires. A
@@ -233,7 +233,7 @@ export function runCheck(check, { engine, colorForCell }) {
     // `prev` is last tick, for rules whose outcome is a transition rather than a state:
     // "was glass, is sand now" is exact where "there is sand" is drowned out by the bed.
     const cellsHit = outcome(now, before, memo, prev);
-    if (!exercised && requires(now)) exercised = true;
+    if (!exercised && requires(now, before)) exercised = true;
     prev = grid(view().slice(), w, h);
     if (!cellsHit.length) continue;
     if (firstTick < 0) firstTick = t;
@@ -1565,6 +1565,27 @@ export const CHECKS = [
     // light has to travel along the line to get there, one grain lighting the next.
     paint: (p) => { for (let x = 6; x <= 70; x++) p(x, 24, 1, M.Rocket); p(6, 22, 1, M.Fire); },
     outcome: (g) => g.all(M.Rocket).filter((i) => g.energyAt(i) > 0 && g.xyOf(i)[0] > 30) },
+  { m: "Rocket", covers: "rocket.fuses", role: "a wide gap of air stops it", w: 90, h: 70, seed: 174, ticks: 600,
+    absent: true,
+    // Two lines on a wall ledge in open sky, six cells of air between them, and a flame held to
+    // the left end for three seconds (one dab burnt out without catching on 4 of 64 seeds). The
+    // witness is lit powder past the gap. It requires powder painted at the near line's end to
+    // have left the ledge, which only a lit grain does: a lit grain merely flying through those
+    // columns satisfied an earlier guard with the line cut short of the gap (review). It holds
+    // on 128 of 128; with a lit grain lighting powder eight cells along its row in the JS mirror
+    // it leaks on 32 of 32. Grains never light across a gap, but one bursting low beside it
+    // chain-lights the far side (`rocket.bursts`): in open sky one cell of air was crossed on 11
+    // of 32 seeds, two on 5 of 32, three on 3 of 64, four on 2 of 128; and with a wall two rows
+    // over the line, which makes grains burst there, six cells on 8 of 8 (review). The owner
+    // chose to call the gap wide rather than change that, so no width is promised.
+    paint: (p) => {
+      for (let x = 6; x <= 36; x++) p(x, 58, 1, M.Rocket);
+      for (let x = 45; x <= 78; x++) p(x, 58, 1, M.Rocket);
+      for (let x = 4; x <= 82; x++) p(x, 60, 0, M.Wall);
+    },
+    act: (p, t) => { if (t <= 60 && t % 10 === 1) p(6, 55, 1, M.Fire); },
+    requires: (g, before) => before.all(M.Rocket).some((i) => g.xyOf(i)[0] >= 35 && g.xyOf(i)[0] <= 37 && g.kindOf(i) !== M.Rocket),
+    outcome: (g) => g.all(M.Rocket).filter((i) => g.energyAt(i) > 0 && g.xyOf(i)[0] >= 44) },
   { m: "Rocket", covers: "rocket.bursts", role: "bursts into a firework shell of sparks and stardust", w: 30, h: 44, seed: 124, ticks: 900,
     paint: (p) => launchFixture(p),
     outcome: (g, before) => g.appeared(M.Stardust, before) },

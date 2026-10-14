@@ -1,7 +1,8 @@
 # Handoff — where the work is, and what to do next
 
 *Rewritten at each handoff, never appended to. Written 2026-10-14, after the halves sabotage found
-unwitnessed were worked through: seven got witnesses, and three do nothing a player can see apart.
+unwitnessed were worked through: eight now have witnesses, and two (oil's wet strip, a meteor's
+trail lighting a fuse) do nothing a player can see apart, each with a recommendation to the owner.
 See `git log` for the live commit. Check `gh run list` first and only then run
 `npm run deploy:verify`: a red CI run makes Railway skip that commit for good (a rerun does not
 revive it, a new push does).*
@@ -14,7 +15,7 @@ The owner hits usage limits early, so keep each chat lean:
   for the section you need, then read only those lines. `HARNESS.md`, `VISUAL_PIPELINE.md` and
   `MATERIAL_AUDIT.md` are 40-70 KB each.
 - **Measure narrowly.** `npm run audit:drift -- --seeds 32 --per-seed --only <ids>` takes a
-  couple of minutes; all 155 checks at 8 seeds against `main` takes about five.
+  couple of minutes; all 156 checks at 8 seeds against `main` takes about five.
 - **Sabotage with `.tmp/halves/sab.mjs <name> [seeds] [id,id]`.** It applies a find/replace from
   `.tmp/halves/sabotages.mjs` to a copy of `app/src/engine.ts`, compiles it, and plays every
   check (or the listed ids) on the JS mirror and on an unsabotaged copy, counting a seed as
@@ -51,7 +52,7 @@ The owner hits usage limits early, so keep each chat lean:
 3. **Give the other eleven `absent` checks a `requires`.** An absent check passes by not seeing
    something, so it also passes on a scene that never set its rule up: review found the hearth's
    passing with its ice and with its flame taken out. `requires` (in `runCheck`) names the state
-   that must hold on some tick; only the hearth check declares one so far.
+   that must hold on some tick; only the hearth and wide-gap checks declare one so far.
 4. **The two halves an engine sabotage cannot reach.** `flower.pollen` "more often when cosmic"
    is a rate, which one check cannot see without two gardens compared inside it, and "dulls
    toward grey" is in the renderer (`shapeLanguage.ts`), which `sab.mjs` does not copy. Every
@@ -80,6 +81,10 @@ Live, all with the full gate, CI and `deploy:verify` green:
   fading (`smoke.rises`), frost thawing only against a brick that touches the flame
   (`wall.hearth`, an absent check), soil venting from a side face under a downpour
   (`soil.breathes`), and a burst chain-lighting a powder heap beside it (`rocket.bursts`).
+- **A wide gap of air stops a fuse** (`rocket.fuses`, an absent check): six cells in open sky,
+  held on 128 of 128. A grain bursting low beside a gap chain-lights the far side: in open sky one
+  cell was crossed on 11 of 32 seeds, two on 5 of 32, three on 3 of 64, four on 2 of 128; with a
+  wall two rows over the line, six cells on 8 of 8 (review). So the clause promises no width.
 - **Eleven more clause halves have witnesses** (earlier on 2026-10-14), each a second check under its id, each 32 of 32
   and 0 of 32 with its half taken out of the JS mirror: a meteor landing as stardust
   (`meteor.impacts`), stardust etching a wall (`stardust.etches`) and charging fungus (one scene,
@@ -101,7 +106,7 @@ Live, all with the full gate, CI and `deploy:verify` green:
 - **A bloom stands on its stalk, and a petal hangs from its crown.** Cut the stalk and the head
   comes down with it. The slow world's open-head count and the bloom sound ignore a falling head.
 
-The interaction audit has 155 checks bound to all 118 role ids; all pass on the audit's seed.
+The interaction audit has 156 checks bound to all 118 role ids; all pass on the audit's seed.
 On 32 seeds, seven do not pass every seed, each with its reason at its scene: `fire.thaws`,
 `oil.ignites`, `fungus.fairyring`, `lava.scorches` and `stem.burns` at 31, the stalk check of `stem.footing` at 30, and the ember check of
 `fire.dries` at 29. Thin by nature but passing every seed: the char-wash check of
@@ -112,26 +117,24 @@ wet-sand check of `sand.clumps` (46 ticks), the lava and ember checks of `rocket
 
 ## Design questions for the owner
 
-- **A gap of air often does not stop a fuse.** Two powder lines on a ledge with one cell of air
-  between them, lit at one end: the far line lit on 11 of 32 seeds, with two cells on 5 of 32,
-  with three on 1 of 32. Grains never light across the gap; grains that burst low at the line
-  do, and their shell chain-lights the far side, as `rocket.bursts` promises. It is not the
-  trail sparks of climbing grains: with those kept from lighting powder, still 11 of 32. So
-  `rocket.fuses` "a gap of air stops it" has no witness: an honest one fails a third of the time,
-  and widening the gap until it passes would be tuning the fixture. Keep low bursts from
-  lighting powder, accept it (and say "a wide gap" in the clause), or drop the clause half.
 - **Oil stripping the wet look changes nothing a player sees.** Oil drains a cell 16 a tick for
-  each water cell touching it, and a drained cell loses its wet flag on its own. With the strip
-  taken out of the JS mirror, wet sand under an oil pond and the `oil.smothers` seed bed stayed
-  wet beside oil and water for exactly the same 1-6 ticks, seed for seed (4 seeds each). Drop the strip (lib.rs,
-  engine.ts, the clause) or leave it.
+  each water cell touching it, and a drained cell loses its wet flag on its own. Played in
+  lockstep with and without the strip (`.tmp/halves/lockstep.mjs oil-keeps-wet 8`: wet sand
+  oiled, the `oil.smothers` seed bed, an oil slick on a watered garden, rain on oiled sand and
+  wood, 8 seeds each), the boards were byte-identical but for 4 cells that differed in a flag for
+  one tick each. Recommended to the owner (2026-10-14): delete the strip line from both engines
+  (`next[nidx].flags &= !FLAG_WET` beside the 16 drain in lib.rs, its mirror in engine.ts); the
+  clause stays true, since things under oil still end up dry.
 - **A meteor's trail never lights a fuse on its own.** A trail spark flies straight down the
   column the meteor has just left, so the only powder under one is a grain the meteor slid off.
   Sliding off a heap lands the meteor beside that grain on a 45-degree slope, where straight down
   and the other diagonal (its next tick's) are both powder, so it stops there, and its impact
   lights the grain the same tick the spark reaches it. In a meteor shower on a powder heap no
-  powder lit before the first meteor stopped, on 32 of 32 seeds. Like the meteor's own
-  fuse-lighting below: drop the arm or leave it.
+  powder lit before the first meteor stopped, on 32 of 32 seeds. There is no trail-only code:
+  trail sparks are ordinary sparks, which light powder they fly into, as a burst's do, so keeping
+  them from it would ADD a special case. Recommended to the owner (2026-10-14): leave the code
+  and trim "and can light rocket fuses it passes" from the clause; `rocket.lights` already
+  promises a meteor lights a fuse.
 
 - **Pollen almost never roots, so `pollen.seeds` has no witness at all.** Pollen roots only on
   wet soil, and watered soil greens to moss first: on a wide watered bed 90 of 93 soil cells
@@ -185,6 +188,8 @@ wet-sand check of `sand.clumps` (46 ticks), the lava and ember checks of `rocket
 
 All by the owner, after seeing measurements:
 
+- A fuse stops at a WIDE gap of air; a grain bursting low beside it may relight the far side
+  (2026-10-14). No width is promised: a burst's sparks fly about eight cells.
 - Blooms fall with a cut stalk (2026-10-08); embers dry wet fuel first (2026-10-07).
 - Wellspring re-teaching sticks for the whole spring, and the learned state is shown
   (2026-10-01); two materials offered at opposite ends at once may split a spring.
