@@ -1,11 +1,10 @@
 # Handoff — where the work is, and what to do next
 
 *Rewritten at each handoff, never appended to. Written 2026-10-15, after three new interactions
-the owner chose from filmstrips: a meteor's trail fans out, sparks light oil, and stardust gives oil
-a firework sheen.
-See `git log` for the live commit. Check `gh run list` first and only then run
-`npm run deploy:verify`: a red CI run makes Railway skip that commit for good (a rerun does not
-revive it, a new push does).*
+the owner chose from filmstrips went live (`8c080b0`): a meteor's trail fans out, sparks light
+oil, and stardust gives oil a firework sheen. See `git log` for the live commit. Check
+`gh run list` first and only then run `npm run deploy:verify`: a red CI run makes Railway skip
+that commit for good (a rerun does not revive it, a new push does).*
 
 ## Work within the owner's usage limits
 
@@ -13,30 +12,32 @@ The owner hits usage limits early, so keep each chat lean:
 
 - **Read docs on demand, in ranges.** `CLAUDE.md` names the deep docs as plain paths. `grep -n`
   for the section you need, then read only those lines. `HARNESS.md`, `VISUAL_PIPELINE.md` and
-  `MATERIAL_AUDIT.md` are 40-70 KB each.
+  `MATERIAL_AUDIT.md` are 40-70 KB each; reading a file under `app/src/rendering/` pulls
+  `VISUAL_PIPELINE.md` in whole through that directory's `CLAUDE.md`, so grep there first.
 - **Measure narrowly.** `npm run audit:drift -- --seeds 32 --per-seed --only <ids>` takes a
   couple of minutes; all 160 checks at 8 seeds against `main` takes about five.
-- **Sabotage with `.tmp/halves/sab.mjs <name> [seeds] [id,id]`.** It applies a find/replace from
-  `.tmp/halves/sabotages.mjs` to a copy of `app/src/engine.ts`, compiles it, and plays every
-  check (or the listed ids) on the JS mirror and on an unsabotaged copy, counting a seed as
-  caught only where the baseline passes and the sabotage fails: about 95 s a seed for all
-  checks. No cargo build. Launch parallel runs about 12 s apart: each recompiles the shared `.tmp/audit-renderer`
-  on start, and two at once crash. Keep the dice where you can (leave the `chance()` roll).
-- **Reuse the scratch scripts.** `.tmp/lucky/measure.mjs` exports `find(id, role)` and
-  `measure(label, check)` (pass count, cells, ticks, contrast over 32 seeds).
-  `.tmp/lucky/board.mjs <id> <seed k> <ticks>` prints a check's board. `.tmp/witness/audit.mjs`
-  runs actor-away and precondition-away variants and tallies what counted cells ARE.
-  `.tmp/witness/bytes-compare.mjs` plays uncut gardens on two builds and compares the bytes.
-  `.tmp/halves/try.mjs <module> <seeds> <sabotage,...>` scores candidate checks (a module
-  exporting `CANDIDATES`) on the JS mirror and on sabotaged copies, before they go in the file;
-  `.tmp/halves/proto.mjs` plays a scene on wasm and prints a stat and the board.
-  `.tmp/halves/try-map.mjs <module> <seeds> [label]` is `try.mjs` scoring each candidate only
-  against the sabotages its module's `AGAINST` map names; `.tmp/halves/show.mjs` prints a
-  candidate's board at chosen ticks, and `.tmp/halves/show2.mjs <module> <label> <k> <ticks>
-  [x0 x1 y0 y1]` does the same cropped, with more glyphs and the counted cells highlighted.
-  `.tmp/halves/c-verify4.mjs` pulls checks out of the scenes file by role, so `try-map.mjs`
-  scores them exactly as written. Every sabotage named below is already in `sabotages.mjs`.
 - **Run the full gate (`npm run check`, ~8 minutes) once per batch**, not after every edit.
+
+## Scratch tools (under `.tmp/`, untracked)
+
+- **Sabotage:** `.tmp/halves/sabotages.mjs` holds find/replace edits on `app/src/engine.ts`, one
+  per rule half, both ways where a rule has two sides. Keep the dice (leave the `chance()` roll).
+  `.tmp/halves/try-map.mjs <module> <seeds> [label]` scores a module's `CANDIDATES` on the JS
+  mirror and against the sabotages its `AGAINST` map names; `c-verify4.mjs` and `c-verify5.mjs`
+  pull checks out of the scenes file by role, so they are scored exactly as written.
+  `.tmp/halves/sab.mjs <name> [seeds] [id,id]` plays every check against one sabotage. Launch
+  parallel runs about 12 s apart: each recompiles a shared `.tmp` dir on start, and two at once
+  crash.
+- **Boards:** `.tmp/halves/show2.mjs <module> <label> <k> <ticks> [x0 x1 y0 y1]` prints a
+  candidate's board, cropped, with counted cells highlighted; `SAB=<name>` plays it sabotaged.
+  `.tmp/halves/passes.mjs <module> <label> <seeds>` lists each seed's first tick (also takes
+  `SAB=`); `.tmp/halves/why.mjs` gives each failing seed's reason.
+- **Lockstep:** `.tmp/halves/lockstep.mjs <sabotage> <seeds>` plays scenes on the mirror and a
+  sabotaged copy side by side and diffs every cell: the test for "does this line do anything".
+- **Filmstrips for the owner:** `.tmp/film/film.mjs <scene> [seed]` draws the last commit's
+  build above the working tree through the real renderer, with glow approximated, into
+  `.tmp/film/<scene>.png`; scenes live in `.tmp/film/scenes.mjs`. Snapshot the base with
+  `git archive HEAD app/src | tar -x -C .tmp/film/base` first.
 
 ## What to do next
 
@@ -46,139 +47,96 @@ The owner hits usage limits early, so keep each chat lean:
    tray in 2,200 ticks on a runner sampling 17 ticks a second (2026-10-08, the weather check in
    `scripts/smoke-browser.mjs`). Both passed on a rerun and locally. Until it is fixed, a red
    CI run on a good commit needs a rerun to confirm the flake and then a new push to deploy.
-2. **Look for other consumers that read "a cell became X" as an event.** Review found two for
+2. **Give the other eleven `absent` checks a `requires`.** An absent check passes by not seeing
+   something, so it also passes on a scene that never set its rule up: review found the hearth's
+   passing with its ice and with its flame taken out. `requires(now, before)` (in `runCheck`)
+   names the state that must hold on some tick, or the check fails as never set up. Only the
+   hearth and wide-gap checks declare one.
+3. **Look for other consumers that read "a cell became X" as an event.** Review found two for
    flowers once flowers could move (the slow world's open-head count and the bloom sound). The
    same reading may exist for other materials that move.
-3. **Give the other eleven `absent` checks a `requires`.** An absent check passes by not seeing
-   something, so it also passes on a scene that never set its rule up: review found the hearth's
-   passing with its ice and with its flame taken out. `requires` (in `runCheck`) names the state
-   that must hold on some tick; only the hearth and wide-gap checks declare one so far.
 4. **The two halves an engine sabotage cannot reach.** `flower.pollen` "more often when cosmic"
    is a rate, which one check cannot see without two gardens compared inside it, and "dulls
-   toward grey" is in the renderer (`shapeLanguage.ts`), which `sab.mjs` does not copy. Every
-   other half sabotage found unwitnessed now has a witness or is a design question below.
+   toward grey" is in the renderer (`shapeLanguage.ts`), which the sabotage tools do not copy.
+   Every other half sabotage found unwitnessed has a witness or is a design question below.
 
 ## How a witness gets checked
 
 1. **Take the actor away** (paint it as Wall, or leave it out). It must fail on every seed.
-2. **Take the precondition away**, or check it is not already gone (`ember.quenched` once
-   poured 70 s after the last live ember).
+2. **Take the precondition away**, or check it is not already gone. For an absent check, declare
+   it as `requires`.
 3. **Does it credit the brush?** A gesture painted with `act` lands after `before` is taken.
 4. **Does it credit another clause, or a leftover?** Classify what every counted cell is NOW,
-   and filter on the outcome, not the material.
+   and filter on the outcome, not the material. (A meteor drifting onto a ledge lit the fuse the
+   fanned-trail check is about; that check counts only while no meteor has stopped there.)
 5. **Sabotage the rule in the sim**, both ways where it has two sides (never fires, always
    fires). This catches a witness of the wrong KIND: a position standing in for a speed
    (`sand.pours`), natural cooling standing in for a quench.
 
 ## Where things stand
 
-Live, all with the full gate, CI and `deploy:verify` green:
+Live, with the full gate, CI, `deploy:verify` and `qa:live` green:
 
-- **Three new interactions** (2026-10-15), each chosen by the owner after a filmstrip
-  (`.tmp/film/film.mjs <scene>` draws old above new through the real renderer, glow
-  approximated; scenes in `.tmp/film/scenes.mjs`). A meteor's trail sparks fly down or down and
-  out to either side, so the tail fans and can light a fuse or a slick the meteor passes; sparks
-  light oil (oil asks; Spark stays out of `is_hot`); stardust gives oil a rainbow sheen that
-  spreads through the slick, and a sheened slick burns in firework colours, throwing sparks
-  upward. New role `oil.sheen`. The duplicate wet strip in water's oil branch is gone (the oil
-  arm strips wet itself; the boards were byte-identical without it but for 4 cells for one tick
-  each, over 32 runs). Each has a cargo test pair, a parity scenario, and an audit check that
-  fails 0 of 32 with its rule taken out of the JS mirror. The parity harness gained `act`.
-  Review found a sheened cell lit by a flame processed after it burned plain (the shared
-  ignition helper cleared its flags), so ignition keeps the sheen on every path now; and that
-  the sheen's contrast had been measured only on an open pond, so `renderer:probe` sweeps every
-  contact a slick can make (worst 95, floor 85) and the burning flame (188, floor 170), and the
-  showcase's oil basin has a sheened half.
-- **Seven more clause halves have witnesses**, each 32 of 32 and 0 of 32 with its half taken out
-  of the JS mirror: stalks fed cosmic growing taller (`seed.germinates`, on a garden the shipped
-  board's width: only one seed in four can show it), a spring pushing up through its own pool
-  (`wellspring.pours`) and pouring again once its ice is erased (`wellspring.stilled`), smoke
-  fading (`smoke.rises`), frost thawing only against a brick that touches the flame
-  (`wall.hearth`, an absent check), soil venting from a side face under a downpour
-  (`soil.breathes`), and a burst chain-lighting a powder heap beside it (`rocket.bursts`).
-- **A wide gap of air stops a fuse** (`rocket.fuses`, an absent check): six cells in open sky,
-  held on 128 of 128. A grain bursting low beside a gap chain-lights the far side: in open sky one
-  cell was crossed on 11 of 32 seeds, two on 5 of 32, three on 3 of 64, four on 2 of 128; with a
-  wall two rows over the line, six cells on 8 of 8 (review). So the clause promises no width.
-- **Eleven more clause halves have witnesses** (earlier on 2026-10-14), each a second check under its id, each 32 of 32
-  and 0 of 32 with its half taken out of the JS mirror: a meteor landing as stardust
-  (`meteor.impacts`), stardust etching a wall (`stardust.etches`) and charging fungus (one scene,
-  bound to both `stardust.energizes` and `fungus.cosmic`), fungus digesting soil
-  (`fungus.digests`), running water rinsing a sooty wall (`water.rinses`), stalks climbing
-  through a flooded planter (`seed.germinates`), a stone pillar holding (`stone.slumps`, an
-  absent check), rockets bursting against a ceiling (`rocket.bursts`), and lava and a hot ember
-  each lighting a fuse (`rocket.lights`). Stardust never rests, so the two stardust witnesses
-  follow each grain as it drifts (`driftingStardust`). Moonwater charging fungus was already
-  witnessed.
-- **Five more clause halves have witnesses** (2026-10-13): wet sand falling at half pace, sand
-  under an oil pond, ice never freezing hot water, moss taking a moonwater-soaked wall, and
-  garden stalks freezing under an ice sweep.
-- **Four clause halves have witnesses** (2026-10-09): ember spread, char wash, an attuned spring
-  blocking stone, and ember drying.
-- **Remembered-cell witness audit finished.** Every check that remembers cells was asked the
-  questions above; 15 failed one and were fixed.
-- **Embers dry wet fuel before lighting it**, as a flame does (owner's call after a filmstrip).
-- **A bloom stands on its stalk, and a petal hangs from its crown.** Cut the stalk and the head
-  comes down with it. The slow world's open-head count and the bloom sound ignore a falling head.
+- **Fanned meteor trail, sparks lighting oil, stardust sheen** (2026-10-15, `8c080b0`). A trail
+  spark flies down, down-left or down-right (one more roll in both engines). Oil ignites on a
+  spark as well as on `is_hot`; Spark stays out of `is_hot`. Stardust sets the cosmic flag on
+  oil, lifting it to energy 36 so the age pass keeps it, and the sheen spreads cell to cell
+  (`SHEEN_SPREAD`); a sheened cell burns as cosmic fire and throws a spark upward
+  (`SHEEN_SPARK_DIRS`). `ignited_cell` keeps the sheen on every ignition path (review: a flame
+  processed after the oil burned it plain on 16 of 32 seeds). New role `oil.sheen`. The renderer
+  draws the sheen last of oil's treatments, as rainbow bands, and the flame in the firework hues;
+  `renderer:probe` gates both over every contact (sheen worst 95, floor 85; flame 188, floor
+  170), and the showcase's oil basin has a sheened half. The duplicate wet strip in water's oil
+  branch is gone. The parity harness gained `act`.
+- **A wide gap of air stops a fuse** (`rocket.fuses`, an absent check with `requires`): six cells
+  in open sky, held on 128 of 128. A grain bursting low beside a gap chain-lights the far side
+  (one cell crossed on 11 of 32 seeds; with a wall two rows over the line, six cells on 8 of 8),
+  so the clause promises no width.
+- **The clause-half witness work is done** (2026-10-09 to 10-14): 27 halves sabotage had found
+  unwitnessed got a second check under their id, each 32 of 32 and 0 of 32 with its half taken
+  out of the JS mirror, and every check that remembers cells was asked the questions above. What
+  is left is item 4 above and the design questions below.
+- **Embers dry wet fuel before lighting it**, and **a bloom falls with its cut stalk** (owner's
+  calls after filmstrips).
 
 The interaction audit has 160 checks bound to all 119 role ids; all pass on the audit's seed.
 On 32 seeds, nine do not pass every seed, each with its reason at its scene: `fire.thaws`,
-both `oil.ignites` checks, the fanned-trail check of `meteor.trail`, `fungus.fairyring`, `lava.scorches` and `stem.burns` at 31, the stalk check of `stem.footing` at 30, and the ember check of
-`fire.dries` at 29. Thin by nature but passing every seed: the char-wash check of
+both `oil.ignites` checks, the fanned-trail check of `meteor.trail`, `fungus.fairyring`,
+`lava.scorches` and `stem.burns` at 31, the stalk check of `stem.footing` at 30, and the ember
+check of `fire.dries` at 29. Thin by nature but passing every seed: the char-wash check of
 `ember.quenched` (5 cells at the least), `sand.pours` (34 ticks against the floor of 30), the
-wet-sand check of `sand.clumps` (46 ticks), the lava and ember checks of `rocket.lights`
-(35 and 33 ticks: a launch is over in under two seconds), and the downpour check of
-`soil.breathes` (33 ticks, about the life of one wisp).
+wet-sand check of `sand.clumps` (46 ticks), the lava and ember checks of `rocket.lights` (35 and
+33 ticks), and the downpour check of `soil.breathes` (33 ticks, about the life of one wisp).
 
 ## Design questions for the owner
 
 - **Pollen almost never roots, so `pollen.seeds` has no witness at all.** Pollen roots only on
   wet soil, and watered soil greens to moss first: on a wide watered bed 90 of 93 soil cells
   were moss by tick 200, and in 9,000 ticks settled pollen rested on moss 1,621 times and on soil
-  never. No pollen rooted in that bed or in the check's own garden, with water or moonwater
-  (3 seeds each). It can: review painted a ledge of fresh soil and a dab of water right under a
-  mote already drifting, and it rooted in both engines (fresh soil cannot green for its first
-  10 ticks). The check passes 8 of 8 with rooting taken out of the JS mirror, because a painted
-  seed that settles "appeared"; it says so at the scene. So a garden does not reseed itself,
-  and the cosmic spark a seed should carry does not travel. Let pollen root on wet moss, keep
-  claimed soil bare around a plant, or drop the clause.
+  never. It can root: fresh soil painted with water right under a drifting mote does, in both
+  engines. The check passes with rooting taken out, because a painted seed that settles
+  "appeared"; it says so at the scene. Let pollen root on wet moss, keep claimed soil bare
+  around a plant, or drop the clause.
 - **A meteor's own fuse-lighting never shows.** With it taken out of the JS mirror, a meteor
   dropped on powder still launched it on 8 of 8: the fire ring its impact throws lights the
   powder first. Harmless; drop the arm or leave it.
-- **Moss's burst does nothing a player can see.** `moss.spreads` promises "bursting to two
-  patches at once when well watered". On a watered wood plank moss covers it in 72-78 ticks
-  with the burst and 67-80 without it (8 seeds): wet moss already takes damp wood every tick,
-  and a new patch starts at energy 70, under the 150 a burst needs. No scene tried shows one
-  parent taking two cells in a tick. Make the burst matter, or drop it (lib.rs, engine.ts, the
-  clause).
+- **Moss's burst does nothing a player can see.** On a watered plank moss covers it in 72-78
+  ticks with the burst and 67-80 without (8 seeds): a new patch starts at energy 70, under the
+  150 a burst needs. Make the burst matter, or drop it (lib.rs, engine.ts, the clause).
 - **Lava never thaws anything in play.** Frost exists only beside the ice that made it, so lava
-  meets the ice first and the meltwater quenches it into stone, the same wall `lava.scorches`
-  notes. Painted straight onto a 4-cell frost, lava thaws it on 6 of 8 seeds; poured on an ice
-  layer over wet stone, 1 cell on 1 seed of 8; on the frost-stressed rock, 0 of 8 at three
-  spots. `lava.scorches` "thaws" is unwitnessed for that reason.
-- **Hot water melting ice barely shows.** Water is hot (over 120) for a few ticks only: a flame
-  adds 30 a tick, water boils off at 200 and loses 2 a tick on its own. The one scene found is a
-  flame held nine seconds to an ice slab: its hot meltwater melts ice the flame is not touching
-  on 32 of 32 seeds, but the slab refreezes it, so it stays visible past the floors on only 25
-  (30 ticks or more). `water.boils` and `ice.freezes` "melts it" are unwitnessed for that
-  reason; that ice never freezes hot water is witnessed.
-
-- **The daisy's and sunflower's petal at (0, 1) can never open.** It is the cell under the
-  crown, where the stalk stands; it only ever opened on a crown hung in the air, in a test.
-  Drop it from `BLOOM_SHAPES` (lib.rs, engine.ts, the showcase; `renderer-probe` checks they
-  agree), or leave the shapes a petal short.
-- **A soaked log leaves a few scorched cells unburnt**: wet skin the embers dried but went cold
-  before lighting (2 cells on the audit's seed). Accepted with the ember change; look in play.
-- **A burning log is live for only 5-7 seconds**, so a quench needs a quick douse.
-- **A dormant wellspring only ever blocks non-sources**: it drinks the first sand, water, soil
-  or oil that touches it, so "blocks while dormant" shows only with stone.
-- **A meteor shock's scorch is often brief** (past the floor on 26 of 32 seeds).
-- **The sim runs faster on faster screens.** `App.tsx` sets `lastSimTick = time`: ~20 ticks a
-  second at 60 Hz, about 24 at 120 Hz (only 60 Hz was measured).
-- **One watering grows a minimum plant** (a 4-cell stalk, a 1-5 cell head).
-- **Steam reads as a dotted thread**; the lever is in the sim (emit in small clusters).
-- **Phase 8's listening pass** is the one unfinished item from before Phase 20.
-- **Fixture debt:** the `water.boils` scene is really a quench (lava pokes through its pan).
+  meets the ice first and the meltwater quenches it into stone. `lava.scorches` "thaws" is
+  unwitnessed for that reason.
+- **Hot water melting ice barely shows.** Water is hot (over 120) for a few ticks only, and a
+  slab refreezes the melt: visible past the floors on 25 of 32. `water.boils` and `ice.freezes`
+  "melts it" are unwitnessed for that reason.
+- **The daisy's and sunflower's petal at (0, 1) can never open** (it is under the crown, where
+  the stalk stands). Drop it from `BLOOM_SHAPES` (lib.rs, engine.ts, the showcase) or leave it.
+- Smaller, accepted unless the owner says otherwise: a soaked log leaves a few scorched cells
+  unburnt; a burning log is live for only 5-7 seconds; a dormant wellspring blocks only
+  non-sources; a meteor shock's scorch is often brief (26 of 32); the sim runs about 24 ticks a
+  second at 120 Hz against 20 at 60 Hz (`App.tsx` sets `lastSimTick = time`); one watering grows
+  a minimum plant; steam reads as a dotted thread (the lever is in the sim); Phase 8's listening
+  pass is unfinished; the `water.boils` scene is really a quench (fixture debt).
 
 ## Decisions already made — do not relitigate
 
@@ -206,18 +164,23 @@ All by the owner, after seeing measurements:
 ## How to work
 
 - **Branch until green.** A push to `main` deploys once CI passes. Fast-forward `main` after the
-  full gate, watch CI, then `npm run deploy:verify`; add `npm run qa:live` when players can see
-  the change.
+  full gate, watch CI, then `npm run deploy:verify`; add
+  `COZY_QA_URL=https://pixelfun.littlealbumclub.net npm run qa:live` when players can see the
+  change.
 - **Seconds are ticks over ~20**, never 60.
-- **The brush clamps radius 0 to 1**: `p(x, y, 0, ...)` paints a plus of five cells, three rows
-  tall, in both engines.
-- **Print the board before believing a fixture.** A test fixture that hand-places a state play
-  cannot reach (a crown hung in the air) passes for the wrong reason, and a rule that fixes
-  play can break it. Give fixtures the support play gives them.
+- **The brush clamps radius 0 to 1**: `p(x, y, 0, ...)` paints a plus of five cells in both
+  engines. A meteor painted that way is five meteors that knock each other sideways as they fall.
+- **Liquids jump a one-cell wall** (they side-hop two cells); divide a liquid exhibit or fixture
+  with walls two thick.
+- **Print the board before believing a fixture.** A fixture that hand-places a state play cannot
+  reach passes for the wrong reason, and a rule that fixes play can break it.
 - **Run sim tests the way the gate does** (`npm run test:sim`, a debug build). `cargo test
-  --release` hid an integer overflow in a test that the gate's debug build caught.
+  --release` hid an integer overflow that the gate's debug build caught.
+- **For a design choice, show the owner a rendered picture** (a filmstrip, above) and explain it
+  plainly. They decide from the picture, not from seed counts.
 - **Close each batch with `/adversarial-review`** (Codex). It caught a real problem in every
-  batch of this work. Codex has a usage limit of its own and can stop mid-review: check each
-  reviewer's output exists, and rerun the missing ones rather than landing on a partial
-  review. Review files under `/tmp` do not survive a restart; use the session scratchpad.
-- **For a design choice, show the owner a rendered picture** and explain it plainly.
+  batch. Pick lenses by what the diff touches (Parity for an engine change, Perceptual for the
+  renderer, Drift for a new rule). Codex has its own usage limit and can stop mid-review: check
+  each reviewer's output exists, and rerun the missing ones. Keep review files in the session
+  scratchpad, and build the prompts with a Python script: Claude Code's safety check refuses a
+  `bash -c` script it cannot inspect.
