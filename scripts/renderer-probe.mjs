@@ -788,6 +788,54 @@ function assertFloor(label, floor, worst, detail) {
     `still drifts by column runs: per-cell jitter made the rock less layered than sand.`);
 }
 
+// A SHEENED slick (stardust's cosmic flag on oil) must read apart from plain oil in every
+// contact a slick can make, and its flame apart from plain fire. The first measurement of the
+// sheen, 155 at the least, was taken on an open pond; review found 134 against moss, and this
+// sweep found 30 under the heat, life and frost tints, which were applied after the sheen and
+// washed it out. The sheen goes last now. Floors set from the swept worst cases: 95 and 188.
+{
+  const NEAR = [MATERIAL.Empty, MATERIAL.Oil, MATERIAL.Water, MATERIAL.Moss, MATERIAL.Seed, MATERIAL.Wall, MATERIAL.Fire];
+  const SLOW = [...TIMES, 6300, 9100];
+  let worst = Infinity, at = null;
+  for (const above of NEAR) for (const below of NEAR) for (const side of NEAR) for (const v of [0, 3, 7])
+    for (const e of [36, 120]) for (const frozen of [0, CELL_FLAG.Frozen]) {
+      const slick = (sheen) => board((put) => {
+        for (let x = 8; x <= 16; x++) put(x, 6, MATERIAL.Oil, e, 20, sheen | frozen, v);
+        put(12, 5, above, 60, 20, 0, v);
+        put(12, 7, below, 60, 20, 0, v);
+        put(13, 6, side, 60, 20, side === MATERIAL.Oil ? sheen | frozen : 0, v);
+      });
+      const plain = slick(0), sheened = slick(CELL_FLAG.Cosmic);
+      for (const t of SLOW) {
+        const d = redmean(colourAt(plain, 12, 6, t), colourAt(sheened, 12, 6, t));
+        if (d < worst) { worst = d; at = `above ${above}, below ${below}, side ${side}, variant ${v}, energy ${e}, frozen ${!!frozen}, time ${t}`; }
+      }
+    }
+  assertFloor("a sheened slick vs plain oil, in every contact", 85, Math.round(worst),
+    `worst at ${at}. Stardust's sheen is a discovery a player bumps into; a sheen the slick's ` +
+    `own contact tints wash out is not there to find. Keep it the last treatment oil gets.`);
+
+  // A burning sheen flickers through the four firework hues, and one of them is gold, close to
+  // fire's own colour, so a cell is near plain fire a quarter of the time by design. What must
+  // hold is that every cell shows a colour somewhere in its flicker: the worst cell's best phase.
+  let worstFlame = Infinity, flameAt = null;
+  for (const e of [60, 150, 240]) for (const age of [0, 20, 60]) for (const v of [0, 1, 2, 3, 4, 5, 6, 7])
+    for (const [x, y] of [[12, 6], [5, 9], [19, 3]]) {
+      const flame = (sheen) => board((put) => {
+        for (let i = 0; i < W; i++) put(i, 12, MATERIAL.Wall);
+        put(x, y, MATERIAL.Fire, e, age, sheen, v);
+        put(x, y + 1, MATERIAL.Oil, 36, 0, sheen);
+      });
+      const plain = flame(0), cosmic = flame(CELL_FLAG.Cosmic);
+      let best = 0;
+      for (let t = 0; t < 4000; t += 100) best = Math.max(best, redmean(colourAt(plain, x, y, t), colourAt(cosmic, x, y, t)));
+      if (best < worstFlame) { worstFlame = best; flameAt = `energy ${e}, age ${age}, variant ${v}, at (${x},${y})`; }
+    }
+  assertFloor("a burning sheen's flame vs plain fire, best phase of the worst cell", 170, Math.round(worstFlame),
+    `worst at ${flameAt}. A sheened slick burns "like a firework"; a flame cell that never leaves ` +
+    `fire's own colour is a promise the picture does not keep. Tint it after the white-hot fleck.`);
+}
+
 if (!quiet) {
   console.log("\nRendered state pairs, worst case over a full energy/age/species/time sweep:");
   for (const c of checks) {

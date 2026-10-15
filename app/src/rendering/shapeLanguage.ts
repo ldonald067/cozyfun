@@ -402,7 +402,7 @@ function pollenColor({ color, variant, age, flags, time, x, y }: ShapeContext) {
   return mixRgb([9, 14, 20], out, 0.55 + fade * 0.45);
 }
 
-function fireColor({ color, variant, age, energy, time, cells, width, height, x, y }: ShapeContext) {
+function fireColor({ color, variant, age, energy, flags, time, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
   const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Fire);
   const wetContact = contactInfo(cells, width, height, x, y, COOL_LIQUID_KINDS);
@@ -415,6 +415,10 @@ function fireColor({ color, variant, age, energy, time, cells, width, height, x,
   if (edge.bottom) out = mixRgb(out, [255, 118, 36], 0.4);
   if (wetContact.count > 0) out = mixRgb(out, [196, 231, 255], wetContact.top ? 0.34 : 0.26);
   if (hash % 17 === 0) out = [255, 248, 205];
+  // A slick stardust gave a sheen burns like a firework, in the shell's colours. Keyed on the
+  // cell and drifting with time, so a burning sheen flickers through all four. Applied after the
+  // white-hot fleck, which otherwise left one cell in 17 plain at every phase.
+  if (flags & CELL_FLAG.Cosmic) out = mixRgb(out, FIREWORK_HUES[(hash + Math.floor(time * 0.01)) & 3], 0.7);
   return out;
 }
 
@@ -667,7 +671,7 @@ function wellspringColor({ color, variant, energy, flags, time, cells, width, he
 // Steam, under the 45 floor, which is `material:contrast` earning its keep on a change made
 // for reasons it cannot see; deepening the sky from `#a4c6ff` to `#7fb0ff` puts that pair
 // back at 50 and leaves the roster's closest pair where it was.
-const FIREWORK_HUES: Rgb[] = [
+export const FIREWORK_HUES: Rgb[] = [
   [255, 210, 126],
   [255, 133, 173],
   [127, 230, 189],
@@ -1214,6 +1218,15 @@ function stoneColor({ color, variant, energy, flags, cells, width, height, x, y 
   return out;
 }
 
+const STARDUST_SHEEN: Rgb[] = [
+  [255, 104, 104],
+  [255, 174, 76],
+  [246, 230, 96],
+  [104, 218, 132],
+  [94, 160, 255],
+  [178, 112, 255]
+];
+
 function liquidColor({ kind, color, variant, energy, flags, time, cells, width, height, x, y }: ShapeContext) {
   const top = !sameLiquid(cells, width, height, x, y - 1, kind);
   const left = sameLiquid(cells, width, height, x - 1, y, kind);
@@ -1257,6 +1270,14 @@ function liquidColor({ kind, color, variant, energy, flags, time, cells, width, 
     if (nearHeat) out = mixRgb(out, heatContact.top ? [240, 158, 82] : [95, 49, 30], heatContact.top ? 0.42 : 0.28);
     if (lifeContact.count > 0) out = mixRgb(out, [19, 24, 18], lifeContact.bottom ? 0.38 : 0.24);
     if (frozen) out = mixRgb(out, [158, 190, 190], 0.44);
+    if (flags & CELL_FLAG.Cosmic) {
+      // Stardust's sheen: a rainbow film over the WHOLE slick, not the faint green-violet
+      // banding every slick's top shows, drifting slowly and glinting. Last, so the heat, life
+      // and frost tints above cannot wash it out: under them it fell to 30 from plain oil.
+      const band = Math.floor((x + y * 2 + Math.floor(time * 0.008)) / 2) % STARDUST_SHEEN.length;
+      out = mixRgb(out, STARDUST_SHEEN[band], top ? 0.78 : 0.68);
+      if ((hash + Math.floor(time * 0.02)) % 7 === 0) out = mixRgb(out, [255, 255, 240], 0.55);
+    }
     return out;
   }
 

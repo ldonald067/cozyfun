@@ -45,7 +45,15 @@ const SPARK_DIRS: [(i32, i32); 8] = [
     (-1, -1),
 ];
 
-/// SPARK_DIRS index for straight down, used by trail sparks shed in flight.
+/// The directions a burning sheened slick throws its sparks: up and the two upper diagonals,
+/// so a burning sheen fountains like a firework instead of throwing into its own pool.
+const SHEEN_SPARK_DIRS: [usize; 3] = [7, 0, 1];
+
+/// One unsheened oil cell beside a sheened one takes the sheen in this many ticks, on average.
+const SHEEN_SPREAD: u32 = 16;
+
+/// SPARK_DIRS index for straight down, used by trail sparks shed in flight. A meteor's trail
+/// also flings them one step either side of it (`leave_meteor_trail`).
 const SPARK_DOWN: u8 = 4;
 
 const FLAG_WET: u16 = 1 << 0;
@@ -1095,6 +1103,14 @@ impl Universe {
                             next[nidx].flags |= FLAG_COSMIC;
                             next[nidx].energy = next[nidx].energy.max(36);
                         }
+                        // Stardust settling on a slick leaves a rainbow sheen that burns like a
+                        // firework (see the oil arm). Oil is painted at energy 0, and a cell at 0
+                        // loses its cosmic flag in `age_and_decay`, so the sheen lifts it as the
+                        // etch above does; oil drains nothing, so the sheen stays.
+                        if other.kind == Material::Oil as u8 && self.chance(12) {
+                            next[nidx].flags |= FLAG_COSMIC;
+                            next[nidx].energy = next[nidx].energy.max(36);
+                        }
                     }
                 }
                 x if x == Material::Water as u8 || x == Material::Moonwater as u8 => {
@@ -1167,8 +1183,10 @@ impl Universe {
                             && is_hydratable(other.kind)
                             && self.neighbor_has_kind(old, nidx, Material::Oil as u8)
                         {
+                            // The oil arm itself strips the wet flag from everything it touches,
+                            // every tick; a second strip here changed no byte of a board but for
+                            // four cells for one tick each, over 32 runs (2026-10-14).
                             next[nidx].energy = next[nidx].energy.saturating_sub(16);
-                            next[nidx].flags &= !FLAG_WET;
                             continue;
                         }
                         if other.kind == Material::Seed as u8 {
@@ -1410,9 +1428,43 @@ impl Universe {
                     }
                 }
                 x if x == Material::Oil as u8 => {
-                    if neighbors.iter().any(|&nidx| is_hot(old[nidx].kind)) {
+                    // Heat, or a spark: a firework raining onto a slick, or a meteor's tail
+                    // brushing it, sets it alight. Sparks are kept out of `is_hot` itself, which
+                    // would let every spark light wood and melt ice.
+                    if neighbors
+                        .iter()
+                        .any(|&nidx| is_hot(old[nidx].kind) || old[nidx].kind == Material::Spark as u8)
+                    {
                         next[idx] = Cell::new(Material::Fire as u8, cell.variant, 240);
+                        if cell.flags & FLAG_COSMIC != 0 {
+                            // A slick stardust has given a sheen burns like a firework: its flame
+                            // keeps the cosmic flag (the renderer's coloured fire) and each cell
+                            // throws one spark upward, which can light powder and oil in its path.
+                            next[idx].flags = FLAG_COSMIC;
+                            let dir = SHEEN_SPARK_DIRS[(self.rand() % 3) as usize];
+                            let (dx, dy) = SPARK_DIRS[dir];
+                            // `x` in this arm is the matched kind, not the column.
+                            let (cx, cy) = self.xy(idx);
+                            let (sx, sy) = (cx + dx, cy + dy);
+                            if self.in_bounds(sx, sy) {
+                                let sidx = self.idx(sx as u32, sy as u32);
+                                if old[sidx].is_empty() && next[sidx].is_empty() {
+                                    next[sidx] = Cell::new(Material::Spark as u8, dir as u8, 235);
+                                }
+                            }
+                        }
                         continue;
+                    }
+                    // A sheen spreads through its slick, so stardust settling on the top film
+                    // colours the pool: an unsheened cell beside a sheened one takes it now and then.
+                    if cell.flags & FLAG_COSMIC == 0
+                        && neighbors.iter().any(|&nidx| {
+                            old[nidx].kind == Material::Oil as u8 && old[nidx].flags & FLAG_COSMIC != 0
+                        })
+                        && self.chance(SHEEN_SPREAD)
+                    {
+                        next[idx].flags |= FLAG_COSMIC;
+                        next[idx].energy = next[idx].energy.max(36);
                     }
                     for nidx in neighbors {
                         let other = old[nidx];
@@ -2273,12 +2325,18 @@ impl Universe {
         }
     }
 
-    /// A meteor occasionally sheds a downward spark from the cell it just left, so a
-    /// shower streaks a glittering tail. Trail sparks age out fast and light nothing but
-    /// rocket fuses (Spark is excluded from `is_hot`), and hiss to steam over water.
+    /// A meteor occasionally sheds a spark from the cell it just left, flung straight down or
+    /// down and out to either side, so a shower's tail fans into a glittering cone. Trail
+    /// sparks age out fast, light only rocket fuses and oil (Spark is excluded from `is_hot`),
+    /// and hiss to steam over water.
+    ///
+    /// They used to fly straight down only, into the cell the meteor was about to strike, so
+    /// they met nothing its impact did not light the same tick: no powder lit before a meteor
+    /// stopped, on 32 of 32 seeds. Fanned, they reach a fuse or a slick the meteor only passes.
     fn leave_meteor_trail(&mut self, vacated: usize, next: &mut [Cell]) {
         if next[vacated].is_empty() && self.chance(3) {
-            next[vacated] = Cell::new(Material::Spark as u8, SPARK_DOWN, 90);
+            let dir = SPARK_DOWN - 1 + (self.rand() % 3) as u8;
+            next[vacated] = Cell::new(Material::Spark as u8, dir, 90);
         }
     }
 
@@ -2669,7 +2727,15 @@ fn ignited_cell(fuel: Cell, energy: u16) -> Cell {
         // (energy > 0 marks a lit grain) and it launches skyward instead.
         Cell::new(Material::Rocket as u8, fuel.variant, 220)
     } else {
-        Cell::new(Material::Fire as u8, fuel.variant, energy)
+        // A sheened slick's flame keeps its sheen whichever neighbour lights it. The oil arm
+        // writes cosmic fire itself, but a flame or lava cell processed after it in the same
+        // tick re-lit the cell here as plain fire, so the colour hung on traversal order
+        // (review, 2026-10-15: 16 of 32 seeds with the flame on the oil's right).
+        let mut fire = Cell::new(Material::Fire as u8, fuel.variant, energy);
+        if fuel.kind == Material::Oil as u8 {
+            fire.flags = fuel.flags & FLAG_COSMIC;
+        }
+        fire
     }
 }
 
@@ -5708,6 +5774,143 @@ mod tests {
             }
         }
         assert!(sparked, "a meteor should shed sparks from the cells it falls through");
+    }
+
+    /// The trail fans: shed straight down only, every trail spark fell into the cell the
+    /// meteor was about to strike, so none could reach a fuse it merely passed.
+    #[test]
+    fn a_meteor_trail_fans_down_and_out() {
+        let mut u = Universe::new(32, 140, 7);
+        set_cell(&mut u, 16, 2, Material::Meteor);
+        let mut seen = [false; 8];
+        for _ in 0..120 {
+            u.tick();
+            for c in u.cells.iter().filter(|c| c.kind == Material::Spark as u8 && c.age == 0) {
+                seen[(c.variant & 7) as usize] = true;
+            }
+        }
+        assert!(seen[3] && seen[4] && seen[5], "a trail should fly straight down and to both sides: {seen:?}");
+        assert!(
+            seen.iter().enumerate().all(|(dir, &s)| !s || (3..=5).contains(&dir)),
+            "a trail never flies up or level: {seen:?}"
+        );
+    }
+
+    /// A slick on a wall shelf, held in by walls at either end.
+    fn oil_shelf(u: &mut Universe, flags: u16) {
+        for y in 10..=17 {
+            set_cell(u, 1, y, Material::Wall);
+            set_cell(u, 30, y, Material::Wall);
+        }
+        for x in 2..=29 {
+            set_cell(u, x, 16, Material::Wall);
+            set_cell(u, x, 17, Material::Wall);
+            for y in 13..=15 {
+                set_cell_state(u, x, y, Material::Oil, 0, if flags != 0 { 36 } else { 0 }, flags);
+            }
+        }
+    }
+
+    #[test]
+    fn a_spark_resting_on_oil_sets_it_alight() {
+        let mut u = Universe::new(32, 20, 3);
+        oil_shelf(&mut u, 0);
+        set_cell_state(&mut u, 8, 12, Material::Spark, 10, 150, 0);
+        u.tick();
+        assert!(count_kind(&u, Material::Fire) > 0, "a spark touching oil should light it");
+    }
+
+    /// Oil catches from a spark because oil asks for one; sparks stay out of `is_hot`, so the
+    /// same spark beside a plank lights nothing.
+    #[test]
+    fn a_spark_beside_wood_does_not_light_it() {
+        let mut u = Universe::new(32, 20, 3);
+        for x in 2..=29 {
+            set_cell(&mut u, x, 16, Material::Wall);
+            set_cell(&mut u, x, 15, Material::Wood);
+        }
+        set_cell_state(&mut u, 8, 14, Material::Spark, 10, 150, 0);
+        for _ in 0..6 {
+            u.tick();
+        }
+        assert_eq!(count_kind(&u, Material::Fire), 0);
+        assert_eq!(count_kind(&u, Material::Ember), 0);
+    }
+
+    fn sheened_oil(u: &Universe) -> usize {
+        u.cells.iter().filter(|c| c.kind == Material::Oil as u8 && c.flags & FLAG_COSMIC != 0).count()
+    }
+
+    /// Stardust touches only the top film of a slick; the sheen spreading from cell to cell is
+    /// what colours the pool. It also has to outlast the age pass, which drops the cosmic flag
+    /// from any cell at energy 0, and painted oil is at 0.
+    #[test]
+    fn stardust_leaves_a_sheen_that_spreads_through_the_slick_and_stays() {
+        let mut u = Universe::new(32, 20, 5);
+        oil_shelf(&mut u, 0);
+        set_cell(&mut u, 15, 12, Material::Stardust);
+        for _ in 0..800 {
+            u.tick();
+        }
+        let oil = count_kind(&u, Material::Oil);
+        assert!(sheened_oil(&u) * 4 >= oil * 3, "the sheen should spread through the slick: {} of {oil}", sheened_oil(&u));
+    }
+
+    #[test]
+    fn a_slick_with_no_stardust_stays_plain() {
+        let mut u = Universe::new(32, 20, 5);
+        oil_shelf(&mut u, 0);
+        for _ in 0..800 {
+            u.tick();
+        }
+        assert_eq!(sheened_oil(&u), 0);
+    }
+
+    /// Burns a slick from its left end and reports (cosmic flame seen, sparks seen).
+    fn burn_slick(flags: u16) -> (bool, bool) {
+        let mut u = Universe::new(32, 20, 9);
+        oil_shelf(&mut u, flags);
+        set_cell_state(&mut u, 3, 12, Material::Fire, 0, 240, 0);
+        let (mut cosmic_fire, mut sparks) = (false, false);
+        for _ in 0..40 {
+            u.tick();
+            cosmic_fire |= u.cells.iter().any(|c| c.kind == Material::Fire as u8 && c.flags & FLAG_COSMIC != 0);
+            sparks |= count_kind(&u, Material::Spark) > 0;
+        }
+        (cosmic_fire, sparks)
+    }
+
+    #[test]
+    fn a_sheened_slick_burns_like_a_firework() {
+        let (cosmic_fire, sparks) = burn_slick(FLAG_COSMIC);
+        assert!(cosmic_fire, "a sheened slick's flame should carry the cosmic flag");
+        assert!(sparks, "a sheened slick should throw sparks as it catches");
+    }
+
+    /// Whichever side the flame is on, and whichever cell the tick reaches first, a sheened
+    /// cell burns cosmic: lit through `ignited_cell` by a later flame it used to burn plain.
+    #[test]
+    fn a_sheened_cell_burns_cosmic_whichever_side_lights_it() {
+        for (flame_x, heat) in [(7, Material::Fire), (9, Material::Fire), (7, Material::Lava), (9, Material::Lava)] {
+            for seed in 0..16 {
+                let mut u = Universe::new(16, 16, seed);
+                for x in 5..=11 {
+                    set_cell(&mut u, x, 9, Material::Wall);
+                }
+                set_cell_state(&mut u, 8, 8, Material::Oil, 0, 36, FLAG_COSMIC);
+                set_cell_state(&mut u, flame_x, 8, heat, 0, 240, 0);
+                u.tick();
+                assert!(
+                    u.cells.iter().any(|c| c.kind == Material::Fire as u8 && c.flags & FLAG_COSMIC != 0),
+                    "seed {seed}: a sheened cell lit by {heat:?} at x={flame_x} burned plain"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_plain_slick_burns_plain_and_throws_nothing() {
+        assert_eq!(burn_slick(0), (false, false));
     }
 
     fn count_kind(u: &Universe, material: Material) -> usize {

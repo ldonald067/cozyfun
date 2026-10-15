@@ -304,6 +304,13 @@ const touchesFire = (g, x, y) => AROUND.some(([dx, dy]) => g.kindAt(x + dx, y + 
 const warmThroughMasonry = (g, x, y) => g.kindAt(x, y) === M.Wall && !touchesFire(g, x, y) &&
   AROUND.some(([dx, dy]) => g.kindAt(x + dx, y + dy) === M.Wall && touchesFire(g, x + dx, y + dy));
 
+// An oil slick three rows deep on a walled pond, for the sheen checks.
+const OIL_POND = (p) => {
+  for (let y = 32; y <= 46; y++) { p(6, y, 0, M.Wall); p(58, y, 0, M.Wall); }
+  for (let x = 8; x <= 56; x++) for (let y = 41; y <= 45; y++) p(x, y, 0, M.Water);
+  for (let x = 8; x <= 56; x++) p(x, 38, 0, M.Oil);
+};
+
 // The eraser dabs that clear the ice round a wellspring painted at (20, 14) without touching
 // it: every dab in the box around it whose plus misses the spring's own five cells.
 const SPRING_CELLS = [[20, 13], [19, 14], [20, 14], [21, 14], [20, 15]];
@@ -691,6 +698,34 @@ export const CHECKS = [
     // tray it trails for at least 129 ticks on all 32. Only a meteor makes sparks here.
     paint: (p) => { p(20, 6, 4, M.Meteor, 55); },
     outcome: (g) => g.all(M.Spark) },
+  { m: "Meteor", covers: "meteor.trail", role: "its fanned trail lights a fuse it passes", w: 48, h: 140, seed: 175, ticks: 1020,
+    // A fuse on a wall ledge, six cells from where meteors fall past it, one dropped every 30
+    // ticks for 24 drops: a shower dragged down one column. The trail fans down and out, and a
+    // spark that reaches the fuse lights it. The witness is fuse powder gone from the ledge
+    // against the line as it settled, and only while no meteor has yet STOPPED beside the ledge
+    // (turned to stone or stardust there): a meteor knocked sideways by earlier debris can land
+    // on the ledge's end and light the fuse with its impact, which is not a trail passing. The
+    // real board's height keeps the debris pile far below the ledge. 31 of 32; on the other a
+    // meteor landed on the ledge first. 0 of 32 with trail sparks flying straight down only in
+    // the JS mirror. One meteor alone lights it on 2 of 32 at this distance.
+    paint: (p) => { for (let x = 26; x <= 38; x++) p(x, 60, 1, M.Rocket); for (let x = 24; x <= 40; x++) p(x, 62, 0, M.Wall); },
+    act: (p, t) => { if (t % 30 === 1 && t <= 720) p(19, 8, 0, M.Meteor); },
+    outcome: (g, before, memo, prev) => {
+      memo.t = (memo.t ?? -1) + 1;
+      if (memo.t <= 5) { memo.against = grid(g.cells.slice(), g.w, g.h); return []; }
+      const gone = g.vanished(M.Rocket, memo.against).filter((i) => {
+        const [x, y] = g.xyOf(i);
+        return x >= 23 && y >= 57 && y <= 61;
+      });
+      if (!memo.lit) {
+        for (let i = 0; i < g.size; i++) {
+          const [x, y] = g.xyOf(i);
+          if (x >= 21 && y >= 50 && y <= 63 && prev.kindOf(i) === M.Meteor && (g.kindOf(i) === M.Stone || g.kindOf(i) === M.Stardust)) memo.landed = true;
+        }
+        if (gone.length) memo.lit = true;
+      }
+      return memo.landed ? [] : gone;
+    } },
   { m: "Meteor", covers: "meteor.bursts", role: "bursts into stardust against moonwater", w: 30, h: 34, seed: 35, ticks: 900,
     paint: (p) => { p(15, 28, 4, M.Moonwater); p(15, 6, 1, M.Meteor); },
     outcome: (g, before) => g.appeared(M.Stardust, before) },
@@ -1483,6 +1518,35 @@ export const CHECKS = [
   { m: "Oil", covers: "oil.cleaned", role: "is cleaned into stardust by moonwater", w: 30, h: 26, seed: 116, ticks: 900,
     paint: (p) => { p(15, 20, 3, M.Oil); p(15, 15, 3, M.Moonwater); },
     outcome: (g, before) => g.appeared(M.Stardust, before) },
+  { m: "Oil", covers: "oil.ignites", role: "is set alight by falling sparks", w: 64, h: 64, seed: 176, ticks: 400,
+    // Fireworks under a wall ceiling beside an oil slick on a pond, lit by a flame held to the
+    // pile for three seconds, eleven cells from the oil. Their shells burst against the ceiling
+    // and the sparks rain onto the slick. The witness is fire on the pond. 31 of 32; on the
+    // other no spark reached the slick. 0 of 32 with sparks unable to light oil in the JS mirror,
+    // and 0 of 32 with no fireworks.
+    paint: (p) => {
+      for (let x = 4; x <= 60; x++) p(x, 41, 0, M.Wall);
+      for (let y = 51; y <= 60; y++) { p(26, y, 0, M.Wall); p(60, y, 0, M.Wall); }
+      for (let x = 28; x <= 58; x++) for (let y = 55; y <= 59; y++) p(x, y, 0, M.Water);
+      for (let x = 28; x <= 58; x++) p(x, 52, 0, M.Oil);
+      p(17, 56, 3, M.Rocket);
+    },
+    act: (p, t) => { if (t <= 60 && t % 10 === 1) p(17, 54, 0, M.Fire); },
+    outcome: (g) => g.all(M.Fire).filter((i) => g.xyOf(i)[0] >= 27 && g.xyOf(i)[1] >= 48) },
+  { m: "Oil", covers: "oil.sheen", role: "takes a rainbow sheen from stardust", w: 64, h: 50, seed: 177, ticks: 300,
+    // Four dabs of stardust dropped over a slick on a pond. Stardust touches only the top film;
+    // the sheen spreads through the rest. The witness is oil that gained the cosmic flag, which
+    // the renderer draws as rainbow bands. 32 of 32, 149 cells at the least; 0 of 32 with
+    // stardust leaving oil plain in the JS mirror.
+    paint: (p) => { OIL_POND(p); for (const x of [16, 28, 40, 50]) p(x, 26, 1, M.Stardust); },
+    outcome: (g, before) => g.gained(M.Oil, F.Cosmic, before) },
+  { m: "Oil", covers: "oil.sheen", role: "a sheened slick burns like a firework", w: 64, h: 50, seed: 178, ticks: 420,
+    // The sheen above, then a flame at one end at ten seconds. Nothing here is a rocket, so every
+    // spark is one the burning sheen threw. 32 of 32; 0 of 32 with a sheened slick burning plain
+    // in the JS mirror, and 0 of 32 with no stardust (a plain slick burning).
+    paint: (p) => { OIL_POND(p); for (const x of [16, 28, 40, 50]) p(x, 26, 1, M.Stardust); },
+    act: (p, t) => { if (t >= 300 && t <= 303) p(9, 35, 0, M.Fire); },
+    outcome: (g) => g.all(M.Spark) },
 
   { m: "Stardust", covers: "stardust.energizes", role: "energizes life and soil with cosmic marks", w: 30, h: 26, seed: 117, ticks: 1200,
     paint: (p) => { p(15, 20, 3, M.Soil); p(15, 16, 2, M.Stardust); },

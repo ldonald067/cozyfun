@@ -1,6 +1,6 @@
 import { CELL_FLAG, GLOW_MATERIALS, MATERIAL, MATERIAL_BY_ID, type MaterialId } from "../materials";
 import { clampColor, hexToRgb, type Rgb } from "./color";
-import { applyShapeLanguage, emptyCellColor, WELLSPRING_TINTS } from "./shapeLanguage";
+import { applyShapeLanguage, emptyCellColor, FIREWORK_HUES, WELLSPRING_TINTS } from "./shapeLanguage";
 
 export function colorForCell(options: {
   kind: number;
@@ -117,6 +117,8 @@ export function glowColorFor(kind: number, flags: number, energy: number, age: n
   // The rune glow takes the hue of the remembered material, so attunement reads at night.
   if (kind === MATERIAL.Wellspring) return WELLSPRING_TINTS[energy & 255];
   if (kind === MATERIAL.Rocket) return [255, 223, 154];
+  // A burning sheen lights the air in the shell's colours, stepping through them as it burns.
+  if (kind === MATERIAL.Fire && (flags & CELL_FLAG.Cosmic) !== 0) return FIREWORK_HUES[(age >> 2) & 3];
   // Vitrify amber cooling into the pane's own mint as the flash fades.
   if (kind === MATERIAL.Glass) {
     const cool = Math.min(1, age / 70);

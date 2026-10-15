@@ -53,8 +53,15 @@ export function materialShowcaseScript() {
       setCell(66, y, material.Wall, 0, 0, y);
     }
     rect(28, 60, 96, 103, material.Water, 80, 24);
-    rect(30, 58, 90, 95, material.Oil, 70, 28);
-    line(34, 53, 89, material.Oil, 90, 44);
+    // The right half carries stardust's sheen (the cosmic flag on oil), walled off so the sheen,
+    // which spreads cell to cell through a slick, cannot creep into the plain half before the
+    // shutter. Plain beside sheened is the comparison a player makes.
+    // Two thick: liquids side-hop two cells and jump a one-cell wall.
+    for (let y = 88; y <= 95; y++) { setCell(44, y, material.Wall, 0, 0, y); setCell(45, y, material.Wall, 0, 0, y); }
+    rect(30, 43, 90, 95, material.Oil, 70, 28);
+    line(34, 43, 89, material.Oil, 90, 44);
+    rect(46, 58, 90, 95, material.Oil, 70, 28, flag.Cosmic);
+    line(46, 53, 89, material.Oil, 90, 44, flag.Cosmic);
 
     // Sand states: loose pile, wet clump, dried edge, and scorched/frozen variants.
     for (let x = 72; x <= 106; x++) {

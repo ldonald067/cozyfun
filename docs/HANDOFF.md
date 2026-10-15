@@ -1,8 +1,8 @@
 # Handoff — where the work is, and what to do next
 
-*Rewritten at each handoff, never appended to. Written 2026-10-14, after the halves sabotage found
-unwitnessed were worked through: eight now have witnesses, and two (oil's wet strip, a meteor's
-trail lighting a fuse) do nothing a player can see apart, each with a recommendation to the owner.
+*Rewritten at each handoff, never appended to. Written 2026-10-15, after three new interactions
+the owner chose from filmstrips: a meteor's trail fans out, sparks light oil, and stardust gives oil
+a firework sheen.
 See `git log` for the live commit. Check `gh run list` first and only then run
 `npm run deploy:verify`: a red CI run makes Railway skip that commit for good (a rerun does not
 revive it, a new push does).*
@@ -15,7 +15,7 @@ The owner hits usage limits early, so keep each chat lean:
   for the section you need, then read only those lines. `HARNESS.md`, `VISUAL_PIPELINE.md` and
   `MATERIAL_AUDIT.md` are 40-70 KB each.
 - **Measure narrowly.** `npm run audit:drift -- --seeds 32 --per-seed --only <ids>` takes a
-  couple of minutes; all 156 checks at 8 seeds against `main` takes about five.
+  couple of minutes; all 160 checks at 8 seeds against `main` takes about five.
 - **Sabotage with `.tmp/halves/sab.mjs <name> [seeds] [id,id]`.** It applies a find/replace from
   `.tmp/halves/sabotages.mjs` to a copy of `app/src/engine.ts`, compiles it, and plays every
   check (or the listed ids) on the JS mirror and on an unsabotaged copy, counting a seed as
@@ -74,6 +74,21 @@ The owner hits usage limits early, so keep each chat lean:
 
 Live, all with the full gate, CI and `deploy:verify` green:
 
+- **Three new interactions** (2026-10-15), each chosen by the owner after a filmstrip
+  (`.tmp/film/film.mjs <scene>` draws old above new through the real renderer, glow
+  approximated; scenes in `.tmp/film/scenes.mjs`). A meteor's trail sparks fly down or down and
+  out to either side, so the tail fans and can light a fuse or a slick the meteor passes; sparks
+  light oil (oil asks; Spark stays out of `is_hot`); stardust gives oil a rainbow sheen that
+  spreads through the slick, and a sheened slick burns in firework colours, throwing sparks
+  upward. New role `oil.sheen`. The duplicate wet strip in water's oil branch is gone (the oil
+  arm strips wet itself; the boards were byte-identical without it but for 4 cells for one tick
+  each, over 32 runs). Each has a cargo test pair, a parity scenario, and an audit check that
+  fails 0 of 32 with its rule taken out of the JS mirror. The parity harness gained `act`.
+  Review found a sheened cell lit by a flame processed after it burned plain (the shared
+  ignition helper cleared its flags), so ignition keeps the sheen on every path now; and that
+  the sheen's contrast had been measured only on an open pond, so `renderer:probe` sweeps every
+  contact a slick can make (worst 95, floor 85) and the burning flame (188, floor 170), and the
+  showcase's oil basin has a sheened half.
 - **Seven more clause halves have witnesses**, each 32 of 32 and 0 of 32 with its half taken out
   of the JS mirror: stalks fed cosmic growing taller (`seed.germinates`, on a garden the shipped
   board's width: only one seed in four can show it), a spring pushing up through its own pool
@@ -106,9 +121,9 @@ Live, all with the full gate, CI and `deploy:verify` green:
 - **A bloom stands on its stalk, and a petal hangs from its crown.** Cut the stalk and the head
   comes down with it. The slow world's open-head count and the bloom sound ignore a falling head.
 
-The interaction audit has 156 checks bound to all 118 role ids; all pass on the audit's seed.
-On 32 seeds, seven do not pass every seed, each with its reason at its scene: `fire.thaws`,
-`oil.ignites`, `fungus.fairyring`, `lava.scorches` and `stem.burns` at 31, the stalk check of `stem.footing` at 30, and the ember check of
+The interaction audit has 160 checks bound to all 119 role ids; all pass on the audit's seed.
+On 32 seeds, nine do not pass every seed, each with its reason at its scene: `fire.thaws`,
+both `oil.ignites` checks, the fanned-trail check of `meteor.trail`, `fungus.fairyring`, `lava.scorches` and `stem.burns` at 31, the stalk check of `stem.footing` at 30, and the ember check of
 `fire.dries` at 29. Thin by nature but passing every seed: the char-wash check of
 `ember.quenched` (5 cells at the least), `sand.pours` (34 ticks against the floor of 30), the
 wet-sand check of `sand.clumps` (46 ticks), the lava and ember checks of `rocket.lights`
@@ -116,25 +131,6 @@ wet-sand check of `sand.clumps` (46 ticks), the lava and ember checks of `rocket
 `soil.breathes` (33 ticks, about the life of one wisp).
 
 ## Design questions for the owner
-
-- **Oil stripping the wet look changes nothing a player sees.** Oil drains a cell 16 a tick for
-  each water cell touching it, and a drained cell loses its wet flag on its own. Played in
-  lockstep with and without the strip (`.tmp/halves/lockstep.mjs oil-keeps-wet 8`: wet sand
-  oiled, the `oil.smothers` seed bed, an oil slick on a watered garden, rain on oiled sand and
-  wood, 8 seeds each), the boards were byte-identical but for 4 cells that differed in a flag for
-  one tick each. Recommended to the owner (2026-10-14): delete the strip line from both engines
-  (`next[nidx].flags &= !FLAG_WET` beside the 16 drain in lib.rs, its mirror in engine.ts); the
-  clause stays true, since things under oil still end up dry.
-- **A meteor's trail never lights a fuse on its own.** A trail spark flies straight down the
-  column the meteor has just left, so the only powder under one is a grain the meteor slid off.
-  Sliding off a heap lands the meteor beside that grain on a 45-degree slope, where straight down
-  and the other diagonal (its next tick's) are both powder, so it stops there, and its impact
-  lights the grain the same tick the spark reaches it. In a meteor shower on a powder heap no
-  powder lit before the first meteor stopped, on 32 of 32 seeds. There is no trail-only code:
-  trail sparks are ordinary sparks, which light powder they fly into, as a burst's do, so keeping
-  them from it would ADD a special case. Recommended to the owner (2026-10-14): leave the code
-  and trim "and can light rocket fuses it passes" from the clause; `rocket.lights` already
-  promises a meteor lights a fuse.
 
 - **Pollen almost never roots, so `pollen.seeds` has no witness at all.** Pollen roots only on
   wet soil, and watered soil greens to moss first: on a wide watered bed 90 of 93 soil cells
@@ -188,6 +184,10 @@ wet-sand check of `sand.clumps` (46 ticks), the lava and ember checks of `rocket
 
 All by the owner, after seeing measurements:
 
+- A meteor's trail fans out and can light what it passes; sparks light oil; stardust gives oil a
+  firework sheen, made stronger after the first filmstrip; the fanned tail's sky, gold and rose
+  sparks were kept (2026-10-15). A single meteor passing six cells from a fuse lights it on 2 of
+  32 seeds, two or three cells away about 1 in 4: a chance, not a certainty.
 - A fuse stops at a WIDE gap of air; a grain bursting low beside it may relight the far side
   (2026-10-14). No width is promised: a burst's sparks fly about eight cells.
 - Blooms fall with a cut stalk (2026-10-08); embers dry wet fuel first (2026-10-07).

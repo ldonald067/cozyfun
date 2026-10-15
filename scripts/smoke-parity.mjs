@@ -40,7 +40,7 @@ function wasmCells(uni) {
   return new Uint8Array(wasm.memory.buffer, ptr, len).slice();
 }
 
-function runScenario({ name, w, h, seed, ticks, cells, paint, observe, expect, slowSteps = [] }) {
+function runScenario({ name, w, h, seed, ticks, cells, paint, act, observe, expect, slowSteps = [] }) {
   const js = createFallbackEngine(w, h, seed);
   const uni = wasm.universe_new(w, h, seed);
   // `cells` starts both engines from exact bytes, through the same load path a player's
@@ -56,8 +56,11 @@ function runScenario({ name, w, h, seed, ticks, cells, paint, observe, expect, s
     wasm.dealloc(at, bytes.length);
     if (!ok) throw new Error(`[${name}] the wasm engine refused the starting cells`);
   }
-  paint((x, y, r, mat, d = 100) => js.paint(x, y, r, mat, d));
-  paint((x, y, r, mat, d = 100) => wasm.universe_paint(uni, x, y, r, mat, d));
+  const brushes = [
+    (x, y, r, mat, d = 100) => js.paint(x, y, r, mat, d),
+    (x, y, r, mat, d = 100) => wasm.universe_paint(uni, x, y, r, mat, d),
+  ];
+  for (const brush of brushes) paint(brush);
 
   // Byte-equality alone cannot tell a scenario that exercises a rule from one that never
   // reaches it — delete a feature from BOTH engines and parity still passes. `observe`
@@ -99,6 +102,8 @@ function runScenario({ name, w, h, seed, ticks, cells, paint, observe, expect, s
   compare(0);
   takeSlowSteps(0);
   for (let t = 1; t <= ticks; t++) {
+    // `act` is a gesture mid-run, painted into both engines before tick t, as in the audit.
+    if (act) for (const brush of brushes) act(brush, t);
     js.tick();
     wasm.universe_tick(uni);
     compare(t);
@@ -1296,6 +1301,88 @@ const scenarios = [
       if (seen.cutHeadRooted) return "the cut cornflower still has a rooted crown, so it never lost its footing";
       if (seen.lavenderMoved) return "the lavender on its whole stalk moved";
       return null;
+    },
+  },
+  {
+    // A meteor falls past a fuse laid on a ledge two cells from its path. Its trail fans: each
+    // spark is thrown down, down-left or down-right by a roll both engines must take in step,
+    // and on this seed one reaches the fuse and lights it, far above where the meteor lands.
+    name: "a meteor's fanned trail lights a fuse it passes",
+    w: 48, h: 96, seed: 5003, ticks: 120,
+    paint(p) {
+      for (let x = 23; x <= 38; x++) p(x, 60, 1, M.Rocket);
+      for (let x = 22; x <= 40; x++) p(x, 62, 0, M.Wall);
+      for (let x = 1; x < 48; x += 3) p(x, 92, 1, M.Wall);
+      p(19, 8, 0, M.Meteor);
+    },
+    observe(seen, cells, w, h) {
+      seen.trailDirs ??= {};
+      seen.fuseLit ??= 0;
+      for (let i = 0; i < w * h; i++) {
+        const o = i * STRIDE;
+        const age = cells[o + 2] | (cells[o + 3] << 8), energy = cells[o + 4] | (cells[o + 5] << 8);
+        if (cells[o] === M.Spark && age === 0 && energy === 90) seen.trailDirs[cells[o + 1]] = (seen.trailDirs[cells[o + 1]] ?? 0) + 1;
+        if (cells[o] === M.Rocket && energy > 0 && Math.floor(i / w) <= 61 && i % w >= 22) seen.fuseLit++;
+      }
+    },
+    expect(seen) {
+      const dirs = Object.keys(seen.trailDirs).map(Number).sort();
+      if (dirs.join() !== "3,4,5") return `trail sparks flew in directions ${dirs.join()}, not down and to both sides`;
+      return seen.fuseLit ? null : "no grain of the fuse on the ledge was lit";
+    },
+  },
+  {
+    // Fireworks burst under a ceiling beside an oil slick on a pond, their flame far from the
+    // oil. Only their sparks can reach it, so any fire on the pond is a spark lighting oil.
+    name: "fireworks raining sparks on a slick set it alight",
+    w: 64, h: 64, seed: 5, ticks: 80,
+    paint(p) {
+      for (let x = 4; x <= 60; x++) p(x, 41, 0, M.Wall);
+      for (let y = 51; y <= 60; y++) { p(26, y, 0, M.Wall); p(60, y, 0, M.Wall); }
+      for (let x = 28; x <= 58; x++) for (let y = 55; y <= 59; y++) p(x, y, 0, M.Water);
+      for (let x = 28; x <= 58; x++) p(x, 52, 0, M.Oil);
+      for (let x = 1; x < 64; x += 3) p(x, 60, 1, M.Wall);
+      p(17, 56, 3, M.Rocket);
+      p(17, 54, 0, M.Fire);
+    },
+    observe(seen, cells, w) {
+      seen.pondFire ??= 0;
+      for (let i = 0; i < cells.length / STRIDE; i++) {
+        if (cells[i * STRIDE] === M.Fire && i % w >= 27 && Math.floor(i / w) >= 49) seen.pondFire++;
+      }
+    },
+    expect: (seen) => (seen.pondFire >= 20 ? null : `only ${seen.pondFire} fire cell-ticks on the slick (floor 20)`),
+  },
+  {
+    // Stardust dropped on a slick on a pond leaves a sheen that spreads through it; a flame at
+    // one end then burns it as a firework, cosmic fire throwing sparks, with no rocket in the
+    // scene to make any.
+    name: "stardust sheens a slick and it burns like a firework",
+    w: 64, h: 50, seed: 7, ticks: 340,
+    paint(p) {
+      for (let y = 32; y <= 46; y++) { p(6, y, 0, M.Wall); p(58, y, 0, M.Wall); }
+      for (let x = 8; x <= 56; x++) for (let y = 41; y <= 45; y++) p(x, y, 0, M.Water);
+      for (let x = 8; x <= 56; x++) p(x, 38, 0, M.Oil);
+      for (let x = 1; x < 64; x += 3) p(x, 46, 1, M.Wall);
+      for (const x of [16, 28, 40, 50]) p(x, 26, 1, M.Stardust);
+    },
+    act(p, t) { if (t >= 300 && t <= 303) p(9, 35, 0, M.Fire); },
+    observe(seen, cells) {
+      let sheen = 0;
+      seen.cosmicFire ??= 0;
+      seen.sparks ??= 0;
+      for (let o = 0; o < cells.length; o += STRIDE) {
+        const cosmic = (cells[o + 6] | (cells[o + 7] << 8)) & CELL_FLAG.Cosmic;
+        if (cells[o] === M.Oil && cosmic) sheen++;
+        if (cells[o] === M.Fire && cosmic) seen.cosmicFire++;
+        if (cells[o] === M.Spark) seen.sparks++;
+      }
+      seen.sheenPeak = Math.max(seen.sheenPeak ?? 0, sheen);
+    },
+    expect(seen) {
+      if (seen.sheenPeak < 100) return `only ${seen.sheenPeak} sheened oil cells at the peak (floor 100)`;
+      if (!seen.cosmicFire) return "the sheened slick never burned with a cosmic flame";
+      return seen.sparks ? null : "the burning sheen threw no sparks";
     },
   },
 ];

@@ -552,7 +552,7 @@ class JsSandboxEngine implements SandboxEngine {
             continue;
           }
           if (flammable(other) && this.chance(burnChance(other))) {
-            writeIgnitedCell(next, nidx, other, old[nidx + 1], 220);
+            writeIgnitedCell(next, nidx, other, old[nidx + 1], 220, readU16(old, nidx + 6));
           }
         }
         if (kind === MATERIAL.Lava) {
@@ -573,7 +573,7 @@ class JsSandboxEngine implements SandboxEngine {
             continue;
           }
           if (flammable(other) && this.chance(3)) {
-            writeIgnitedCell(next, nidx, other, old[nidx + 1], 240);
+            writeIgnitedCell(next, nidx, other, old[nidx + 1], 240, readU16(old, nidx + 6));
           }
         }
         if (kind === MATERIAL.Stardust && (other === MATERIAL.Seed || other === MATERIAL.Moss || other === MATERIAL.Flower) && this.chance(12)) {
@@ -591,6 +591,11 @@ class JsSandboxEngine implements SandboxEngine {
           writeCellBytes(next, nidx, MATERIAL.Stardust, old[nidx + 1], 140, 0, CELL_FLAG.Cosmic);
         }
         if (kind === MATERIAL.Stardust && (other === MATERIAL.Stone || other === MATERIAL.Wall) && this.chance(12)) {
+          writeU16(next, nidx + 4, Math.max(36, readU16(next, nidx + 4)));
+          writeU16(next, nidx + 6, readU16(next, nidx + 6) | CELL_FLAG.Cosmic);
+        }
+        // Stardust on a slick: a rainbow sheen that burns like a firework. See lib.rs.
+        if (kind === MATERIAL.Stardust && other === MATERIAL.Oil && this.chance(12)) {
           writeU16(next, nidx + 4, Math.max(36, readU16(next, nidx + 4)));
           writeU16(next, nidx + 6, readU16(next, nidx + 6) | CELL_FLAG.Cosmic);
         }
@@ -625,8 +630,8 @@ class JsSandboxEngine implements SandboxEngine {
             continue;
           }
           if (kind !== MATERIAL.Moonwater && hydratable(other) && this.neighborHasKind(old, nidx, MATERIAL.Oil)) {
+            // The oil arm strips the wet flag itself; see the note in lib.rs.
             writeU16(next, nidx + 4, Math.max(0, readU16(next, nidx + 4) - 16));
-            writeU16(next, nidx + 6, readU16(next, nidx + 6) & ~CELL_FLAG.Wet);
             continue;
           }
           if (other === MATERIAL.Seed) {
@@ -715,7 +720,7 @@ class JsSandboxEngine implements SandboxEngine {
               writeU16(next, nidx + 4, Math.max(0, readU16(next, nidx + 4) - 42));
               continue;
             }
-            writeIgnitedCell(next, nidx, other, old[nidx + 1], 210);
+            writeIgnitedCell(next, nidx, other, old[nidx + 1], 210, readU16(old, nidx + 6));
           }
         }
         if (kind === MATERIAL.Smoke && sootable(other)) {
@@ -931,16 +936,17 @@ class JsSandboxEngine implements SandboxEngine {
           if (old[cracked] === MATERIAL.Glass) writeCellBytes(next, cracked, MATERIAL.Sand, old[cracked + 1]);
         }
       } else if (flammable(old[nidx])) {
-        writeIgnitedCell(next, nidx, old[nidx], old[nidx + 1], 230);
+        writeIgnitedCell(next, nidx, old[nidx], old[nidx + 1], 230, readU16(old, nidx + 6));
       }
     }
   }
 
-  // A meteor occasionally sheds a downward spark from the cell it just left, so a
-  // shower streaks a glittering tail. Trail sparks age out fast and hiss over water.
+  // A meteor occasionally sheds a spark from the cell it just left, flung straight down or
+  // down and out to either side, so a shower's tail fans into a glittering cone that can
+  // reach a fuse or a slick the meteor only passes. Mirrors leave_meteor_trail in lib.rs.
   private leaveMeteorTrail(vacated: number, next: Uint8Array) {
     if (next[vacated] === MATERIAL.Empty && this.chance(3)) {
-      writeCellBytes(next, vacated, MATERIAL.Spark, SPARK_DOWN, 90);
+      writeCellBytes(next, vacated, MATERIAL.Spark, SPARK_DOWN - 1 + (this.rand() % 3), 90);
     }
   }
 
@@ -1118,10 +1124,30 @@ class JsSandboxEngine implements SandboxEngine {
 
   private oilReact(idx: number, x: number, y: number, old: Uint8Array, next: Uint8Array) {
     const neighbors = this.neighbors(x, y);
-    // Whole-arm ignition: any hot neighbor sets the whole slick alight before it dehydrates anything.
-    if (neighbors.some((nidx) => HOT_MATERIALS.includes(old[nidx] as (typeof HOT_MATERIALS)[number]))) {
+    // Whole-arm ignition: any hot neighbor, or any spark, sets the whole slick alight before it
+    // dehydrates anything. Sparks stay out of HOT_MATERIALS itself; see the oil arm in lib.rs.
+    if (neighbors.some((nidx) => HOT_MATERIALS.includes(old[nidx] as (typeof HOT_MATERIALS)[number]) || old[nidx] === MATERIAL.Spark)) {
       writeCellBytes(next, idx, MATERIAL.Fire, old[idx + 1], 240);
+      if (readU16(old, idx + 6) & CELL_FLAG.Cosmic) {
+        // A sheened slick burns like a firework: a cosmic flame, and one spark thrown upward per cell.
+        writeU16(next, idx + 6, CELL_FLAG.Cosmic);
+        const dir = SHEEN_SPARK_DIRS[this.rand() % 3];
+        const [dx, dy] = SPARK_DIRS[dir];
+        if (this.inBounds(x + dx, y + dy)) {
+          const sidx = this.index(x + dx, y + dy);
+          if (old[sidx] === MATERIAL.Empty && next[sidx] === MATERIAL.Empty) writeCellBytes(next, sidx, MATERIAL.Spark, dir, 235);
+        }
+      }
       return;
+    }
+    // A sheen spreads through its slick; see the oil arm in lib.rs.
+    if (
+      !(readU16(old, idx + 6) & CELL_FLAG.Cosmic) &&
+      neighbors.some((nidx) => old[nidx] === MATERIAL.Oil && readU16(old, nidx + 6) & CELL_FLAG.Cosmic) &&
+      this.chance(SHEEN_SPREAD)
+    ) {
+      writeU16(next, idx + 6, readU16(next, idx + 6) | CELL_FLAG.Cosmic);
+      writeU16(next, idx + 4, Math.max(36, readU16(next, idx + 4)));
     }
     for (const nidx of neighbors) {
       if (hydratable(old[nidx])) {
@@ -1227,7 +1253,7 @@ class JsSandboxEngine implements SandboxEngine {
         if (other === MATERIAL.Empty && next[nidx] === MATERIAL.Empty) {
           writeCellBytes(next, nidx, MATERIAL.Spark, dir, dist === 1 ? 235 : 215);
         } else if (dist === 1 && flammable(other) && this.chance(3)) {
-          writeIgnitedCell(next, nidx, other, old[nidx + 1], 200);
+          writeIgnitedCell(next, nidx, other, old[nidx + 1], 200, readU16(old, nidx + 6));
         }
       }
     }
@@ -1696,6 +1722,11 @@ const SPARK_DIRS: ReadonlyArray<readonly [number, number]> = [
   [-1, -1]
 ];
 
+// Where a burning sheened slick throws its sparks (up and the upper diagonals), and how often a
+// sheen spreads to a neighbouring oil cell. Mirrors lib.rs.
+const SHEEN_SPARK_DIRS = [7, 0, 1] as const;
+const SHEEN_SPREAD = 16;
+
 // SPARK_DIRS index for straight down, used by trail sparks shed in flight.
 const SPARK_DOWN = 4;
 
@@ -1816,14 +1847,15 @@ function writeU16(bytes: Uint8Array, offset: number, value: number) {
   bytes[offset + 1] = (value >> 8) & 255;
 }
 
-function writeIgnitedCell(next: Uint8Array, idx: number, fuelKind: number, variant: number, energy: number) {
+function writeIgnitedCell(next: Uint8Array, idx: number, fuelKind: number, variant: number, energy: number, fuelFlags: number) {
   if (fuelKind === MATERIAL.Wood) {
     writeCellBytes(next, idx, MATERIAL.Ember, variant, 230);
   } else if (fuelKind === MATERIAL.Rocket) {
     // Lighting rocket powder starts its fuse (energy > 0) rather than burning it in place.
     writeCellBytes(next, idx, MATERIAL.Rocket, variant, 220);
   } else {
-    writeCellBytes(next, idx, MATERIAL.Fire, variant, energy);
+    // A sheened slick's flame keeps its sheen whichever neighbour lights it; see ignited_cell.
+    writeCellBytes(next, idx, MATERIAL.Fire, variant, energy, 0, fuelKind === MATERIAL.Oil ? fuelFlags & CELL_FLAG.Cosmic : 0);
   }
 }
 
