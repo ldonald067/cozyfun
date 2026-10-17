@@ -462,6 +462,7 @@ export function App() {
   function handleClear() {
     if (!engine) return;
     engine.clear();
+    weatherRef.current?.restart();
     setStatus("tray cleared");
   }
 

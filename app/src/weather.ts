@@ -116,6 +116,18 @@ export class RoomWeather {
   }
 
   /**
+   * The tray was cleared, which restarts the engine's tick count at 0. Every schedule here
+   * is an absolute tick, so without this the next drop and the census both waited for the
+   * count to climb back: a clear after twenty minutes of play left the window dry for
+   * twenty more. A cleared tray is a new tray: first sight again, and a fresh census.
+   * The date's temperament and swell phase stay, since it is still the same night.
+   */
+  restart() {
+    this.nextDropAt.clear();
+    this.censusAt = -Infinity;
+  }
+
+  /**
    * Called once per sim tick while the window is open. Returns at most one drop.
    * `sampleCells` is only invoked on the rare ticks that actually need a census or a
    * surface, so the steady-state cost is a map lookup and a comparison.

@@ -1,4 +1,4 @@
-import type { AudioMood } from "./audio";
+import type { AudioMood } from "./audio/types";
 
 export type SceneEnvironmentId = "rain-desk" | "moonwater-garden" | "stardust-hearth" | "cozy-fireplace" | "forest-hut" | "snow-window";
 

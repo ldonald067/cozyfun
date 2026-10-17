@@ -2,7 +2,8 @@
 
 *Rewritten at each handoff, never appended to. Written 2026-10-15, after three new interactions
 the owner chose from filmstrips went live (`8c080b0`): a meteor's trail fans out, sparks light
-oil, and stardust gives oil a firework sheen. See `git log` for the live commit. Check
+oil, and stardust gives oil a firework sheen. Item 1 and the weather restart were updated
+2026-10-16. See `git log` for the live commit. Check
 `gh run list` first and only then run `npm run deploy:verify`: a red CI run makes Railway skip
 that commit for good (a rerun does not revive it, a new push does).*
 
@@ -41,12 +42,12 @@ The owner hits usage limits early, so keep each chat lean:
 
 ## What to do next
 
-1. **Harden `test:browser` on CI.** It flaked twice in two days, each time making Railway skip
-   a good commit for good: Chrome's debugger never started (2026-10-07, `launchBrowserOnce` in
-   `scripts/browser-qa-helpers.mjs`, after its one retry), and no drizzle reached the cleared
-   tray in 2,200 ticks on a runner sampling 17 ticks a second (2026-10-08, the weather check in
-   `scripts/smoke-browser.mjs`). Both passed on a rerun and locally. Until it is fixed, a red
-   CI run on a good commit needs a rerun to confirm the flake and then a new push to deploy.
+1. **If Chrome's launch flakes on CI again, read its stderr first.** On 2026-10-07 the debugger
+   missed a 10 s window twice in a row on a runner whose other stages ran at their usual pace;
+   nothing was captured to say why. `launchBrowserOnce` now waits 30 s and appends Chrome's
+   stderr to the error. That makes it diagnosable, not fixed. The other flake (2026-10-08, no
+   drizzle in 2,200 ticks) is addressed, see below. A red CI run on a good commit still needs a
+   rerun to confirm the flake and then a new push to deploy.
 2. **Give the other eleven `absent` checks a `requires`.** An absent check passes by not seeing
    something, so it also passes on a scene that never set its rule up: review found the hearth's
    passing with its ice and with its flame taken out. `requires(now, before)` (in `runCheck`)
@@ -76,6 +77,15 @@ The owner hits usage limits early, so keep each chat lean:
 ## Where things stand
 
 Live, with the full gate, CI, `deploy:verify` and `qa:live` green:
+
+- **A clear restarts the weather** (2026-10-16). `engine.clear()` resets the tick count to 0
+  and `RoomWeather` scheduled at absolute ticks, so a clear left an open window dry for as long
+  as the tray had already run. `handleClear` now calls `RoomWeather.restart()`. Inferring the
+  clear from a backwards tick missed a clear made with the window shut (review). The new
+  `npm run test:weather` witnesses both halves (schedule, census). The browser weather check's
+  budget went from 2,200 to 3,500 ticks because 29% of drops paint nothing (five cells at
+  density 22), which the old budget ignored: a run with no visible drop went from 0.16% to
+  0.008% (Node model over 2026-27). The 10-08 timeout fits that model but was not reproduced.
 
 - **Fanned meteor trail, sparks lighting oil, stardust sheen** (2026-10-15, `8c080b0`). A trail
   spark flies down, down-left or down-right (one more roll in both engines). Oil ignites on a

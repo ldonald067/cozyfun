@@ -528,10 +528,8 @@ async function main() {
     const before = await canvasSignature(cdp);
 
     // The budget is in SIM TICKS, converted to wall-clock using the rate this machine
-    // actually achieves. Clearing the tray can land just after a drop and leave a full
-    // interval to wait out, and Rain Desk's worst case is 340 ticks between drops
-    // divided by the calmest intensity tier (0.55) times the per-drop jitter (1.4) —
-    // about 866 ticks.
+    // actually achieves. Rain Desk's worst case between drops is 340 ticks divided by the
+    // calmest intensity tier (0.55) times the per-drop jitter (1.4) — about 866 ticks.
     //
     // A budget whose unit is ticks cannot be written as a constant number of seconds:
     // 866 ticks is ~43s on a machine sustaining the 20 ticks/second a 60 Hz display gets,
@@ -552,17 +550,20 @@ async function main() {
       await click(cdp, '[data-testid="save-scene"]');
       return evaluate(cdp, `JSON.parse(localStorage.getItem("cozy-pixel-sandbox:scene:v1") || "{}").tick ?? 0`);
     };
-    // One interval is at most 866 ticks, but two things can swallow an interval whole,
-    // and both were missed the first time this budget was computed:
-    //   - `drop()` advances `nextDropAt` BEFORE the cell-count cap check, so a
-    //     suppressed drop costs a full interval and returns nothing.
-    //   - the census behind that cap only recounts every 300 ticks, so a stale count
-    //     from a busier moment can suppress drops for a while after the tray is cleared.
-    // 2200 covers a swallowed interval, a real one, and the census lag, with headroom.
+    // A clear restarts the weather's schedule and census (`npm run test:weather`), so the
+    // opening drop lands within ~153 ticks and the rest follow one interval apart. But a
+    // drop is five cells painted at density 22, so it paints NOTHING 0.78^5 = 29% of the
+    // time, and the old 2200 never counted that. Played over every day of 2026-27 with
+    // the drop schedule this check sees, no visible drop within 2200 ticks came to 0.16%
+    // of runs (2.4% on the worst day); within 3500, 0.008% (0.2% on the worst day). 3500
+    // ticks is 206s at the 17 ticks/s a loaded runner managed, inside the ceiling below.
+    // The 2026-10-08 timeout here is consistent with this plus the clear bug (before the
+    // fix, 2.4% that day), but its pre-clear tick count was never logged, so that is a
+    // model and not a reproduction.
     //
-    // This is a CEILING, not an expected wait: an ordinary day drops every ~340 ticks
-    // and the check returns the moment the canvas moves, so the common case is seconds.
-    const TICK_BUDGET = 2200;
+    // This is a CEILING, not an expected wait: the check returns the moment the canvas
+    // moves, so the common case is seconds.
+    const TICK_BUDGET = 3500;
     const sampleMs = 2000;
     const firstTick = await tickCount();
     await sleep(sampleMs);

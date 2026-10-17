@@ -191,6 +191,9 @@ export async function startBrowser(options = {}) {
   } catch (error) {
     // Headless startup occasionally times out on CI runners; one clean retry
     // covers the transient case without masking real launch failures.
+    // On 2026-10-07 the debugger missed a 10s window twice in a row on a runner whose
+    // other stages ran at their usual pace, with nothing captured to say why. Hence the
+    // longer window below, and Chrome's own stderr carried in the error.
     console.warn(`Browser launch failed (${error.message}); retrying once.`);
     return launchBrowserOnce(options);
   }
@@ -201,7 +204,7 @@ async function launchBrowserOnce({
   downloadPrefix,
   extraArgs = [],
   windowSize,
-  debuggerTimeout = 10_000
+  debuggerTimeout = 30_000
 } = {}) {
   const executable = await findBrowserExecutable();
   const debugPort = await freePort();
@@ -241,6 +244,8 @@ async function launchBrowserOnce({
       removeTempDir(userDataDir),
       downloadDir ? removeTempDir(downloadDir) : Promise.resolve()
     ]);
+    const tail = stderr.trim().split("\n").slice(-12).join("\n");
+    if (tail && !error.message.includes(tail)) error.message += `\nBrowser stderr (last lines):\n${tail}`;
     throw error;
   }
 
