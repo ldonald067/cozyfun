@@ -3,7 +3,7 @@
 *Rewritten at each handoff, never appended to. Written 2026-10-15, after three new interactions
 the owner chose from filmstrips went live (`8c080b0`): a meteor's trail fans out, sparks light
 oil, and stardust gives oil a firework sheen. Item 1 and the weather restart were updated
-2026-10-16. See `git log` for the live commit. Check
+2026-10-16, the absent checks 2026-10-17. See `git log` for the live commit. Check
 `gh run list` first and only then run `npm run deploy:verify`: a red CI run makes Railway skip
 that commit for good (a rerun does not revive it, a new push does).*
 
@@ -48,15 +48,10 @@ The owner hits usage limits early, so keep each chat lean:
    stderr to the error. That makes it diagnosable, not fixed. The other flake (2026-10-08, no
    drizzle in 2,200 ticks) is addressed, see below. A red CI run on a good commit still needs a
    rerun to confirm the flake and then a new push to deploy.
-2. **Give the other eleven `absent` checks a `requires`.** An absent check passes by not seeing
-   something, so it also passes on a scene that never set its rule up: review found the hearth's
-   passing with its ice and with its flame taken out. `requires(now, before)` (in `runCheck`)
-   names the state that must hold on some tick, or the check fails as never set up. Only the
-   hearth and wide-gap checks declare one.
-3. **Look for other consumers that read "a cell became X" as an event.** Review found two for
+2. **Look for other consumers that read "a cell became X" as an event.** Review found two for
    flowers once flowers could move (the slow world's open-head count and the bloom sound). The
    same reading may exist for other materials that move.
-4. **The two halves an engine sabotage cannot reach.** `flower.pollen` "more often when cosmic"
+3. **The two halves an engine sabotage cannot reach.** `flower.pollen` "more often when cosmic"
    is a rate, which one check cannot see without two gardens compared inside it, and "dulls
    toward grey" is in the renderer (`shapeLanguage.ts`), which the sabotage tools do not copy.
    Every other half sabotage found unwitnessed has a witness or is a design question below.
@@ -78,6 +73,17 @@ The owner hits usage limits early, so keep each chat lean:
 
 Live, with the full gate, CI, `deploy:verify` and `qa:live` green:
 
+- **Every absent check names its precondition** (2026-10-17). All thirteen `absent` checks
+  declare a `requires`; each of the eleven new ones holds on 32 of 32 as written, fails as never
+  set up on 32 of 32 with its precondition taken out, and leaks on 32 of 32 with its rule
+  sabotaged in the JS mirror (`.tmp/halves/c-req-final.mjs`). Two were proving nothing.
+  `wall.resists`: water pooled between the moss and the wall, so moss never touched it; the bed
+  now runs up to the wall and the witness is a brick of it turning to moss. `water.oilblocked`
+  counted soil turning cosmic, which plain water never does; it is now the oil-on-a-seed scene,
+  and its own half is thin (below). Oil's smothering is two rules, and the seed checks are
+  carried by oil drying what it touches, not by water refusing to feed it. Review found two
+  preconditions still loose (an oiled seed with no ground under it, a spring taught sand when
+  the witness counts water); both now fail as never set up.
 - **A clear restarts the weather** (2026-10-16). `engine.clear()` resets the tick count to 0
   and `RoomWeather` scheduled at absolute ticks, so a clear left an open window dry for as long
   as the tray had already run. `handleClear` now calls `RoomWeather.restart()`. Inferring the
@@ -133,6 +139,11 @@ wet-sand check of `sand.clumps` (46 ticks), the lava and ember checks of `rocket
 - **Moss's burst does nothing a player can see.** On a watered plank moss covers it in 72-78
   ticks with the burst and 67-80 without (8 seeds): a new patch starts at energy 70, under the
   150 a burst needs. Make the burst matter, or drop it (lib.rs, engine.ts, the clause).
+- **Water's refusal to feed an oiled cell barely shows.** Oil drying everything it touches (28
+  a tick, and the wet flag) does the smothering: with that taken out an oiled seed sprouts on 32
+  of 32, with only water's refusal taken out on 7 of 32. `water.oilblocked` is witnessed by the
+  seed staying unsprouted, which mostly credits oil. Leave it, or fold the clause into
+  `oil.smothers`.
 - **Lava never thaws anything in play.** Frost exists only beside the ice that made it, so lava
   meets the ice first and the meltwater quenches it into stone. `lava.scorches` "thaws" is
   unwitnessed for that reason.

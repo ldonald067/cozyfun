@@ -33,9 +33,14 @@ export const M = current.materials.MATERIAL;
 // quenching must count only the hot kind, or moving water alone satisfies it — review turned
 // off every thermal steam source and water.boils and fire.softens still passed on mist. Read
 // from the engine rather than copied, and loudly, so a rename cannot quietly zero the filter.
-const mistEnergy = readFileSync(resolve(repoRoot, "app/src/engine.ts"), "utf8").match(/^const MIST_ENERGY = (\d+);$/m);
+const engineSource = readFileSync(resolve(repoRoot, "app/src/engine.ts"), "utf8");
+const mistEnergy = engineSource.match(/^const MIST_ENERGY = (\d+);$/m);
 if (!mistEnergy) throw new Error("interaction-scenes: MIST_ENERGY not found in app/src/engine.ts; the thermal-steam checks need it");
 export const MIST_ENERGY = Number(mistEnergy[1]);
+// How far a seed looks for another plant before it will germinate, read the same way.
+const plantSpacing = engineSource.match(/^const PLANT_SPACING = (\d+);$/m);
+if (!plantSpacing) throw new Error("interaction-scenes: PLANT_SPACING not found in app/src/engine.ts; the crowding check needs it");
+const PLANT_SPACING = Number(plantSpacing[1]);
 const thermalSteam = (g, before) => g.appeared(M.Steam, before).filter((i) => g.energyAt(i) > MIST_ENERGY);
 export const F = current.materials.CELL_FLAG;
 // On a wellspring, a lesson learned under ice and held until the ice is gone.
@@ -304,6 +309,32 @@ const touchesFire = (g, x, y) => AROUND.some(([dx, dy]) => g.kindAt(x + dx, y + 
 const warmThroughMasonry = (g, x, y) => g.kindAt(x, y) === M.Wall && !touchesFire(g, x, y) &&
   AROUND.some(([dx, dy]) => g.kindAt(x + dx, y + dy) === M.Wall && touchesFire(g, x + dx, y + dy));
 
+// Whether any of the eight cells around `i` (the engine's neighbour scan) satisfies
+// `pred(kind, index)`.
+const touching = (g, i, pred) => {
+  const [x, y] = g.xyOf(i);
+  return AROUND.some(([dx, dy]) => { const k = g.kindAt(x + dx, y + dy); return k >= 0 && pred(k, (y + dy) * g.w + x + dx); });
+};
+// What a seed's sky may hold for it to germinate (`isGrowable` in the engine).
+const growable = (k) => k === M.Empty || k === M.Water || k === M.Moonwater;
+// A seed that could sprout, grounded and open above, that water and oil both touch: the state
+// the three oil-on-a-seed checks guard. Grounded is on soil or on a rooted seed, as germination
+// reads it; without that the seed cannot sprout whatever the oil does (review: all three passed
+// with the soil painted as wall).
+const WATERED_OILED_SEED = (g) => g.all(M.Seed).some((i) => {
+  const [x, y] = g.xyOf(i);
+  const below = (y + 1) * g.w + x;
+  const grounded = g.kindAt(x, y + 1) === M.Soil || (g.kindAt(x, y + 1) === M.Seed && g.hasFlag(below, F.Rooted));
+  return grounded && growable(g.kindAt(x, y - 1)) && touching(g, i, (k) => k === M.Water) && touching(g, i, (k) => k === M.Oil);
+});
+// The wall column `wall.resists` paints at x = 17, above the floor bricks.
+const inWallColumn = (g, i) => { const [x, y] = g.xyOf(i); return x >= 16 && x <= 18 && y <= 20; };
+// A frozen seed that would germinate if it thawed: on soil, open above, and damp.
+const FROZEN_READY_SEED = (g) => g.all(M.Seed).some((i) => {
+  const [x, y] = g.xyOf(i);
+  return g.hasFlag(i, F.Frozen) && g.kindAt(x, y + 1) === M.Soil && growable(g.kindAt(x, y - 1)) && g.energyAt(i) > 70;
+});
+
 // An oil slick three rows deep on a walled pond, for the sheen checks.
 const OIL_POND = (p) => {
   for (let y = 32; y <= 46; y++) { p(6, y, 0, M.Wall); p(58, y, 0, M.Wall); }
@@ -345,8 +376,13 @@ export const CHECKS = [
     // the floor (the brush's own disc leaves its edge columns a row short, and those drop). The
     // witness is stone anywhere it was not painted. It never appears, on 32 of 32; with stone
     // slipping diagonally like sand in the JS mirror it leaks from the first tick, 70 cells over
-    // the run, on 32 of 32.
+    // the run, on 32 of 32. It requires stone resting on something with open air diagonally
+    // below it, where a grain would slip, so it fails with the pillar painted as wall.
     paint: (p) => { for (let y = 8; y <= 25; y++) for (let x = 11; x <= 13; x++) p(x, y, 1, M.Stone); },
+    requires: (g) => g.all(M.Stone).some((i) => {
+      const [x, y] = g.xyOf(i);
+      return g.kindAt(x, y + 1) !== M.Empty && (g.kindAt(x - 1, y + 1) === M.Empty || g.kindAt(x + 1, y + 1) === M.Empty);
+    }),
     outcome: (g, before) => g.appeared(M.Stone, before) },
   { m: "Stone", covers: "stone.hosts", role: "hosts moss on damp stone", w: 30, h: 24, seed: 4, ticks: 1200,
     paint: (p) => { p(15, 18, 3, M.Stone); p(15, 14, 2, M.Water); p(10, 18, 1, M.Moss); },
@@ -543,12 +579,14 @@ export const CHECKS = [
     // last tick. It never forms, on 32 of 32; with ice let freeze hot water in the JS mirror it
     // forms on 32 of 32. That melt is not a check of its own: it is visible past the floors on
     // only 25 of 32, because the slab refreezes the meltwater, and it is put to the owner.
+    // It requires hot water touching ice, so it fails with the flame taken out.
     paint: (p) => {
       for (let x = 6; x <= 24; x++) p(x, 21, 1, M.Wall);
       for (let y = 12; y <= 21; y++) { p(6, y, 1, M.Wall); p(24, y, 1, M.Wall); }
       for (let y = 16; y <= 19; y++) for (let x = 9; x <= 21; x++) p(x, y, 1, M.Ice);
     },
     act: (p, t) => { if (t >= 20 && t < 200 && t % 4 === 0) p(15, 12, 3, M.Fire); },
+    requires: (g) => g.all(M.Water).some((i) => g.energyAt(i) > 120 && touching(g, i, (k) => k === M.Ice)),
     outcome: (g, before, memo, prev) => g.all(M.Ice).filter((i) => prev.kindOf(i) === M.Water && prev.energyAt(i) > 120) },
   { m: "Ice", covers: "ice.condenses", role: "condenses steam into frost", w: 26, h: 26, seed: 19, ticks: 900,
     paint: (p) => { p(13, 20, 3, M.Water); p(13, 21, 2, M.Lava); p(13, 10, 2, M.Ice); },
@@ -579,8 +617,13 @@ export const CHECKS = [
     absent: true,
     // The scene above, gesture for gesture, without the pour — so it cannot pass merely because
     // the ice never reached anything. The ice touches the rock and the dry floor bricks under it.
+    // It requires ice touching masonry the rule reads as dry (no wet flag, energy 40 or less), so
+    // it fails with the ice taken out; with dry masonry let frost in the JS mirror it frosts on 32
+    // of 32 the tick the ice lands.
     paint: (p) => { p(20, 21, 4, M.Stone); },
     act: (p, t) => { if (t === 60) p(13, 21, 4, M.Ice); },
+    requires: (g) => g.all(M.Ice).some((i) => touching(g, i, (k, j) =>
+      (k === M.Stone || k === M.Wall) && !g.hasFlag(j, F.Wet) && g.energyAt(j) <= 40)),
     outcome: (g, before) => [...g.gained(M.Stone, F.Frozen, before), ...g.gained(M.Wall, F.Frozen, before)] },
 
   // ---- Life ---------------------------------------------------------------------------
@@ -671,7 +714,12 @@ export const CHECKS = [
     outcome: (g, before) => g.appeared(M.Soil, before) },
   { m: "Oil", covers: "oil.smothers", role: "smothers hydration so seeds cannot sprout", w: 30, h: 26, seed: 30, ticks: 2000,
     absent: true,
+    // A seed on soil under oil, watered from above. It requires WATERED_OILED_SEED, so it fails
+    // with the water taken out or the soil painted as wall. It never sprouts, on 32 of 32; with
+    // oil kept from drying what it touches in the JS mirror it sprouts on 32 of 32. Water's own
+    // refusal to feed an oiled seed barely shows here: taken out alone, the seed sprouts on 5 of 32.
     paint: (p) => { p(15, 20, 3, M.Soil); p(15, 17, 1, M.Seed); p(15, 15, 2, M.Oil); p(15, 12, 3, M.Water); },
+    requires: WATERED_OILED_SEED,
     outcome: (g, before) => g.appeared(M.Stem, before) },
 
   // ---- Cosmic and festival ------------------------------------------------------------
@@ -817,10 +865,18 @@ export const CHECKS = [
     }) },
   { m: "Wall", covers: "wall.resists", role: "resists casual moss crossing", w: 34, h: 26, seed: 52, ticks: 2500,
     absent: true,
-    // Moss and its water on the left, a sealed wall down the middle. Nothing should appear
-    // on the far side; moss crosses damp stone happily, which is the contrast being drawn.
-    paint: (p) => { p(8, 20, 3, M.Soil); p(8, 16, 2, M.Water); p(8, 20, 1, M.Moss); for (let y = 14; y < 22; y += 2) p(17, y, 1, M.Wall); p(24, 20, 3, M.Soil); },
-    outcome: (g) => g.all(M.Moss).filter((i) => g.xyOf(i)[0] > 18) },
+    // A watered soil bed with moss on it, running up to a wall column. The bed used to stop short
+    // of the wall with water pooled in the gap, and moss never touched the wall on 8 of 8, so the
+    // check passed with no crossing possible. Counting moss past the column also credited soil
+    // there greening by itself once water hopped it, so the far bed is gone and the witness is a
+    // brick of the column turning to moss. It requires plain moss over 150 touching a damp brick of
+    // the column, all the rule asks but the cosmic charge, so it fails with the water taken out.
+    // Never on 32 of 32; with plain moss let take a wall in the JS mirror it takes the column on 32
+    // of 32. The charged twin is under `moss.colonizes`.
+    paint: (p) => { p(8, 20, 3, M.Soil); p(13, 20, 3, M.Soil); p(10, 15, 2, M.Water); p(8, 20, 1, M.Moss); for (let y = 14; y < 22; y += 2) p(17, y, 1, M.Wall); },
+    requires: (g) => g.all(M.Moss).some((i) => g.energyAt(i) > 150 && !g.hasFlag(i, F.Cosmic) && touching(g, i, (k, j) =>
+      k === M.Wall && inWallColumn(g, j) && (g.hasFlag(j, F.Wet) || g.energyAt(j) > 40))),
+    outcome: (g, before, memo, prev) => g.all(M.Moss).filter((i) => prev.kindOf(i) === M.Wall && inWallColumn(g, i)) },
   { m: "Wall", covers: "wall.stains", role: "takes damp and frost stains", w: 30, h: 26, seed: 53, ticks: 1500,
     paint: (p) => { p(15, 19, 3, M.Wall); p(15, 15, 2, M.Water); p(19, 15, 1, M.Ice); },
     outcome: (g, before) => [...g.gained(M.Wall, F.Wet, before), ...g.gained(M.Wall, F.Frozen, before)] },
@@ -937,8 +993,15 @@ export const CHECKS = [
     outcome: (g) => g.all(M.Stone).filter((i) => g.hasFlag(i, F.Scorched)) },
   { m: "Water", covers: "water.oilblocked", role: "is blocked from feeding life by oil", w: 30, h: 26, seed: 63, ticks: 2000,
     absent: true,
+    // This counted soil turning cosmic, which plain water never makes it, so it could not fail: it
+    // passed on 8 of 8 with water's refusal taken out of the JS mirror. It is the `oil.smothers`
+    // scene now, witnessed by the seed never sprouting. With water's refusal to feed an oiled seed
+    // and oil's drying both taken out it sprouts on 32 of 32; with only water's refusal out, on 7
+    // of 32. Oil drying what it touches does nearly all the smothering, so this clause's own half
+    // is thin; it is put to the owner.
     paint: (p) => { p(15, 20, 3, M.Soil); p(15, 17, 1, M.Seed); p(15, 15, 2, M.Oil); p(15, 12, 3, M.Water); },
-    outcome: (g, before) => g.gained(M.Soil, F.Cosmic, before) },
+    requires: WATERED_OILED_SEED,
+    outcome: (g, before) => g.appeared(M.Stem, before) },
 
   { m: "Moonwater", covers: "moonwater.moves", role: "supercharges growth like water", w: 40, h: 34, seed: 64, ticks: 3000,
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Moonwater); },
@@ -1158,7 +1221,11 @@ export const CHECKS = [
     absent: true,
     // Ice set right on the seed bed. Perched two cells up it never chilled the seed, which
     // germinated on schedule and made this read as a leak rather than a scene fault.
+    // It requires a frozen seed that would sprout if it thawed: on soil, open above, and damp, so
+    // it fails with the soil painted as wall. It never sprouts, on 32 of 32; with a frozen seed let grow in the JS mirror it sprouts on 32
+    // of 32, even with the water taken out, since freezing leaves a seed damp.
     paint: (p) => { p(15, 20, 3, M.Soil); p(15, 17, 1, M.Seed); p(15, 15, 1, M.Water); p(15, 16, 1, M.Ice); },
+    requires: FROZEN_READY_SEED,
     outcome: (g, before) => g.appeared(M.Stem, before) },
   { m: "Ice", covers: "ice.melts", role: "melts back to water near heat", w: 26, h: 26, seed: 89, ticks: 1200,
     paint: (p) => { p(13, 19, 3, M.Ice); p(13, 15, 2, M.Fire); },
@@ -1218,7 +1285,18 @@ export const CHECKS = [
     // cell, which is exactly what germination produces, so crowding shows up here and
     // nowhere else. (This predicate used to end in `.slice(0, 0)` and could never fire —
     // a check that always passes, in the one file whose whole purpose is catching those.)
+    // It requires a rooted seed with open sky within PLANT_SPACING of a stalk, the state the
+    // spacing rule refuses, so it fails with the water taken out. Never on 32 of 32; with the
+    // spacing rule taken out of the JS mirror two bases stand together on 32 of 32.
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
+    requires: (g) => {
+      const plants = [...g.all(M.Stem), ...g.all(M.Flower)].map((j) => g.xyOf(j));
+      return g.all(M.Seed).some((i) => {
+        const [x, y] = g.xyOf(i);
+        return g.hasFlag(i, F.Rooted) && growable(g.kindAt(x, y - 1)) &&
+          plants.some(([px, py]) => Math.abs(px - x) <= PLANT_SPACING && Math.abs(py - y) <= PLANT_SPACING);
+      });
+    },
     outcome: (g) => {
       const bases = g.all(M.Stem).filter((i) => g.hasFlag(i, F.Rooted));
       return bases.filter((i) => {
@@ -1238,11 +1316,15 @@ export const CHECKS = [
     outcome: (g, before) => g.appeared(M.Fungus, before) },
   { m: "Seed", covers: "seed.dormant", role: "waits dormant when frozen", w: 30, h: 26, seed: 97, ticks: 2500,
     absent: true,
+    // The `ice.pauses` scene on other dice.
     paint: (p) => { p(15, 20, 3, M.Soil); p(15, 17, 1, M.Seed); p(15, 15, 1, M.Water); p(15, 16, 1, M.Ice); },
+    requires: FROZEN_READY_SEED,
     outcome: (g, before) => g.appeared(M.Stem, before) },
   { m: "Seed", covers: "seed.smothered", role: "is smothered by an oil coating", w: 30, h: 26, seed: 98, ticks: 2000,
     absent: true,
+    // The `oil.smothers` scene on other dice; 31 of 32 sprout with oil's drying taken out.
     paint: (p) => { p(15, 20, 3, M.Soil); p(15, 17, 1, M.Seed); p(15, 15, 2, M.Oil); p(15, 12, 3, M.Water); },
+    requires: WATERED_OILED_SEED,
     outcome: (g, before) => g.appeared(M.Stem, before) },
 
   { m: "Flower", covers: "flower.pollen", role: "puffs pollen from the head's open rim", w: 40, h: 34, seed: 99, ticks: 5000,
@@ -1744,8 +1826,12 @@ export const CHECKS = [
     }) },
   { m: "Wellspring", covers: "wellspring.stilled", role: "is stilled by nearby ice", w: 30, h: 26, seed: 128, ticks: 3000,
     absent: true,
+    // It requires a spring that learned water touching ice, so it fails with the dab taken out or
+    // painted as sand (the witness counts only water). Never on 32 of 32; with ice kept from
+    // stilling a spring in the JS mirror it pours on 32 of 32.
     paint: (p) => { p(15, 19, 1, M.Wellspring); p(15, 16, 1, M.Water); p(11, 19, 2, M.Ice); p(19, 19, 2, M.Ice); },
     act: (p, t) => { if (t % 300 === 0) { p(11, 19, 2, M.Ice); p(19, 19, 2, M.Ice); } },
+    requires: (g) => g.all(M.Wellspring).some((i) => g.energyAt(i) === M.Water && touching(g, i, (k) => k === M.Ice)),
     outcome: (g, before) => g.appeared(M.Water, before).filter((i) => g.xyOf(i)[1] > 20) },
   { m: "Wellspring", covers: "wellspring.stilled", role: "pours again once the ice is erased", w: 40, h: 34, seed: 161, ticks: 1500,
     // A spring taught water by a dab and ringed with ice four ticks later, which also freezes
