@@ -25,34 +25,44 @@ const COSMIC_MARK_KINDS = new Set<number>([MATERIAL.Seed, MATERIAL.Moss, MATERIA
 export function detectReactionCues(before: Uint8Array, after: Uint8Array): ReactionCue[] {
   const found = new Set<ReactionCue>();
   const len = Math.min(before.byteLength, after.byteLength);
-  // A bloom adds flower cells. A head falling with its cut stalk only moves them, and every
-  // cell it lands in reads as Empty -> Flower, so the bloom cue needs the count to have grown.
-  let flowerGain = 0;
+  // A cell that became something is not an event when the thing only moved there. A head
+  // falling with its cut stalk lands Empty -> Flower in every cell it reaches, the stalk
+  // Empty -> Stem; a stone grain sinking through a pond leaves Stone -> Water behind it, a
+  // bubble rising through water reads Water -> Steam, two liquids mixing Water -> Moonwater,
+  // and a cosmic soil grain settling where a plain one was reads as soil charging. A move keeps every
+  // count, so each cue whose cells can move also needs the census to have changed the way
+  // the cue claims: more of what it makes, or less of what it uses up.
+  const gain = new Int32Array(256);
+  const wetGain = new Int32Array(256);
+  const cosmicGain = new Int32Array(256);
   for (let idx = 0; idx + CELL_STRIDE <= len; idx += CELL_STRIDE) {
-    if (after[idx] === MATERIAL.Flower) flowerGain++;
-    if (before[idx] === MATERIAL.Flower) flowerGain--;
+    gain[after[idx]]++;
+    gain[before[idx]]--;
+    if (readU16(after, idx + 6) & CELL_FLAG.Wet) wetGain[after[idx]]++;
+    if (readU16(before, idx + 6) & CELL_FLAG.Wet) wetGain[before[idx]]--;
+    if (readU16(after, idx + 6) & CELL_FLAG.Cosmic) cosmicGain[after[idx]]++;
+    if (readU16(before, idx + 6) & CELL_FLAG.Cosmic) cosmicGain[before[idx]]--;
   }
 
   for (let idx = 0; idx + CELL_STRIDE <= len; idx += CELL_STRIDE) {
     const beforeKind = before[idx];
     const afterKind = after[idx];
 
-    if (beforeKind === MATERIAL.Meteor && (afterKind === MATERIAL.Stone || afterKind === MATERIAL.Stardust)) {
+    // A meteor also turns the moonwater it lands in to stardust, but only at an impact, where
+    // its own cell rings this. Moonwater -> Stardust on its own is stardust sinking through it.
+    if (beforeKind === MATERIAL.Meteor && (afterKind === MATERIAL.Stone || afterKind === MATERIAL.Stardust) && gain[MATERIAL.Meteor] < 0) {
       found.add("impact-burst");
     }
-    if (beforeKind === MATERIAL.Moonwater && afterKind === MATERIAL.Stardust) {
+    if (beforeKind === MATERIAL.Rocket && afterKind === MATERIAL.Stardust && gain[MATERIAL.Rocket] < 0) {
       found.add("impact-burst");
     }
-    if (beforeKind === MATERIAL.Rocket && afterKind === MATERIAL.Stardust) {
-      found.add("impact-burst");
-    }
-    if (beforeKind === MATERIAL.Oil && afterKind === MATERIAL.Stardust) {
+    if (beforeKind === MATERIAL.Oil && afterKind === MATERIAL.Stardust && gain[MATERIAL.Oil] < 0) {
       found.add("cleanse");
     }
-    if (beforeKind === MATERIAL.Water && afterKind === MATERIAL.Moonwater) {
+    if (beforeKind === MATERIAL.Water && afterKind === MATERIAL.Moonwater && gain[MATERIAL.Moonwater] > 0) {
       found.add("cosmic-charge");
     }
-    if (beforeKind === afterKind && COSMIC_MARK_KINDS.has(afterKind) && gainedFlag(before, after, idx, CELL_FLAG.Cosmic)) {
+    if (beforeKind === afterKind && COSMIC_MARK_KINDS.has(afterKind) && gainedFlag(before, after, idx, CELL_FLAG.Cosmic) && cosmicGain[afterKind] > 0) {
       found.add("cosmic-charge");
     }
     if (
@@ -65,13 +75,13 @@ export function detectReactionCues(before: Uint8Array, after: Uint8Array): React
     }
     // A stalk blooms by writing a Flower into the empty cell above its tip, so the
     // real transition is Empty->Flower; also covers any in-place Seed/Stem->Flower.
-    if (flowerGain > 0 && afterKind === MATERIAL.Flower && beforeKind !== MATERIAL.Flower) {
+    if (afterKind === MATERIAL.Flower && beforeKind !== MATERIAL.Flower && gain[MATERIAL.Flower] > 0) {
       found.add("bloom");
     }
-    if (beforeKind === MATERIAL.Empty && afterKind === MATERIAL.Stem) {
+    if (beforeKind === MATERIAL.Empty && afterKind === MATERIAL.Stem && gain[MATERIAL.Stem] > 0) {
       found.add("sprout");
     }
-    if (afterKind === MATERIAL.Steam && beforeKind !== MATERIAL.Steam && isSteamFlashSource(beforeKind)) {
+    if (afterKind === MATERIAL.Steam && beforeKind !== MATERIAL.Steam && isSteamFlashSource(beforeKind) && gain[MATERIAL.Steam] > 0) {
       found.add("steam-flash");
     }
     if (afterKind === MATERIAL.Glass && beforeKind !== MATERIAL.Glass) {
@@ -85,10 +95,10 @@ export function detectReactionCues(before: Uint8Array, after: Uint8Array): React
     // water was. Stone -> liquid is the unambiguous half. The other half, liquid -> Sand, is
     // not usable here — a sand grain sinking through a pond produces exactly that swap, and
     // the cue would fire on every settling grain.
-    if (beforeKind === MATERIAL.Stone && (afterKind === MATERIAL.Water || afterKind === MATERIAL.Moonwater)) {
+    if (beforeKind === MATERIAL.Stone && (afterKind === MATERIAL.Water || afterKind === MATERIAL.Moonwater) && gain[MATERIAL.Stone] < 0) {
       found.add("erode");
     }
-    if (beforeKind === MATERIAL.Fire && afterKind === MATERIAL.Stardust) {
+    if (beforeKind === MATERIAL.Fire && afterKind === MATERIAL.Stardust && gain[MATERIAL.Stardust] > 0) {
       found.add("starfire");
     }
     if (beforeKind === MATERIAL.Wood && afterKind === MATERIAL.Ember) {
@@ -106,7 +116,8 @@ export function detectReactionCues(before: Uint8Array, after: Uint8Array): React
     if (
       beforeKind === afterKind &&
       (afterKind === MATERIAL.Moss || afterKind === MATERIAL.Soil || afterKind === MATERIAL.Seed) &&
-      gainedFlag(before, after, idx, CELL_FLAG.Wet)
+      gainedFlag(before, after, idx, CELL_FLAG.Wet) &&
+      wetGain[afterKind] > 0
     ) {
       found.add("dew");
     }

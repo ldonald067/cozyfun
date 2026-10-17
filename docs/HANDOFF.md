@@ -3,7 +3,7 @@
 *Rewritten at each handoff, never appended to. Written 2026-10-15, after three new interactions
 the owner chose from filmstrips went live (`8c080b0`): a meteor's trail fans out, sparks light
 oil, and stardust gives oil a firework sheen. Item 1 and the weather restart were updated
-2026-10-16, the absent checks 2026-10-17. See `git log` for the live commit. Check
+2026-10-16, the absent checks and the reaction cues 2026-10-17. See `git log` for the live commit. Check
 `gh run list` first and only then run `npm run deploy:verify`: a red CI run makes Railway skip
 that commit for good (a rerun does not revive it, a new push does).*
 
@@ -35,6 +35,12 @@ The owner hits usage limits early, so keep each chat lean:
   `SAB=`); `.tmp/halves/why.mjs` gives each failing seed's reason.
 - **Lockstep:** `.tmp/halves/lockstep.mjs <sabotage> <seeds>` plays scenes on the mirror and a
   sabotaged copy side by side and diffs every cell: the test for "does this line do anything".
+- **Reaction cues:** `.tmp/cues/probe.mjs [seeds] [filter]` plays movement-only and real scenes
+  through the detector and a model of the controller (priority, 0.28 s, cooldowns), printing
+  firings/heard plays per cue; `BASE=1` uses the snapshot in `.tmp/cues/base` (refresh it with
+  `git archive HEAD app/src | tar -x -C .tmp/cues/base`). `.tmp/cues/truth.mjs` scores one cue
+  against the engine's own conversions, logged by an instrumented copy in `.tmp/cues/instr`
+  (`CUE=… TARGET=… SOURCES=…`, default steam-flash).
 - **Filmstrips for the owner:** `.tmp/film/film.mjs <scene> [seed]` draws the last commit's
   build above the working tree through the real renderer, with glow approximated, into
   `.tmp/film/<scene>.png`; scenes live in `.tmp/film/scenes.mjs`. Snapshot the base with
@@ -48,10 +54,7 @@ The owner hits usage limits early, so keep each chat lean:
    stderr to the error. That makes it diagnosable, not fixed. The other flake (2026-10-08, no
    drizzle in 2,200 ticks) is addressed, see below. A red CI run on a good commit still needs a
    rerun to confirm the flake and then a new push to deploy.
-2. **Look for other consumers that read "a cell became X" as an event.** Review found two for
-   flowers once flowers could move (the slow world's open-head count and the bloom sound). The
-   same reading may exist for other materials that move.
-3. **The two halves an engine sabotage cannot reach.** `flower.pollen` "more often when cosmic"
+2. **The two halves an engine sabotage cannot reach.** `flower.pollen` "more often when cosmic"
    is a rate, which one check cannot see without two gardens compared inside it, and "dulls
    toward grey" is in the renderer (`shapeLanguage.ts`), which the sabotage tools do not copy.
    Every other half sabotage found unwitnessed has a witness or is a design question below.
@@ -73,6 +76,20 @@ The owner hits usage limits early, so keep each chat lean:
 
 Live, with the full gate, CI, `deploy:verify` and `qa:live` green:
 
+- **A reaction sound no longer rings when a material only moves** (2026-10-17). The detector
+  read "a cell became X" as an event, as the bloom cue once did: a falling stalk rang sprout,
+  water and moonwater mixing cosmic-charge, stone sinking through a pond erode, a bubble rising
+  steam-flash, stardust sinking through moonwater impact-burst, settling grains dew, and
+  (review) a cosmic soil grain falling cosmic-charge. A move keeps every count, so each cue
+  whose cells can move also needs the census to change the way it claims. Moonwater ->
+  Stardust is no longer a clause: only a meteor impact makes it, and the meteor's own cell
+  rings. Heard through the controller model, 8 seeds: a falling stalk 16 plays to 0, mixing 13
+  to 0, stardust poured into water 66 impact-bursts to 0, stone in a pond 30 erodes to 7 (real
+  erosion). Against the engine's own conversions, steam-flash and cosmic-charge land within 2
+  plays of a perfect detector in every scene (the old one was up to 11 over). The steam gate
+  misses about a quarter of real steam ticks while boiling, but nothing audible: the cue is
+  already at its cooldown. Field notes count kinds and the slow world was fixed for flowers, so
+  no frame-diffing consumer is left reading a move as an event.
 - **Every absent check names its precondition** (2026-10-17). All thirteen `absent` checks
   declare a `requires`; each of the eleven new ones holds on 32 of 32 as written, fails as never
   set up on 32 of 32 with its precondition taken out, and leaks on 32 of 32 with its rule
@@ -111,7 +128,7 @@ Live, with the full gate, CI, `deploy:verify` and `qa:live` green:
 - **The clause-half witness work is done** (2026-10-09 to 10-14): 27 halves sabotage had found
   unwitnessed got a second check under their id, each 32 of 32 and 0 of 32 with its half taken
   out of the JS mirror, and every check that remembers cells was asked the questions above. What
-  is left is item 4 above and the design questions below.
+  is left is item 2 above and the design questions below.
 - **Embers dry wet fuel before lighting it**, and **a bloom falls with its cut stalk** (owner's
   calls after filmstrips).
 
