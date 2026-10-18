@@ -9,12 +9,16 @@ export const CELL_FLAG = {
   // Stone laid down as sediment rather than cooled from lava. It is in the mask below for
   // the same reason FLAG_BEDDED is in the sim's: whatever the mask drops is stripped on
   // every load, and a reload is exactly when the slow world runs.
-  Bedded: 1 << 5
+  Bedded: 1 << 5,
+  // A seed a flower set from pollen, still gliding away on the breeze, and which way. See
+  // FLAG_WINDBORNE in sim/src/lib.rs. In the mask so a seed saved mid-glide keeps gliding.
+  Windborne: 1 << 6,
+  DriftEast: 1 << 7
 } as const;
 
 export const CELL_FLAG_MASK =
   CELL_FLAG.Wet | CELL_FLAG.Rooted | CELL_FLAG.Cosmic | CELL_FLAG.Frozen | CELL_FLAG.Scorched
-  | CELL_FLAG.Bedded;
+  | CELL_FLAG.Bedded | CELL_FLAG.Windborne | CELL_FLAG.DriftEast;
 
 // On a wellspring, the rooted flag means a lesson learned under the current chill, held until
 // the ice is gone. One name for the engine and the renderer; `FLAG_TAUGHT` in sim/src/lib.rs

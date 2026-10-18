@@ -1385,6 +1385,101 @@ const scenarios = [
       return seen.sparks ? null : "the burning sheen threw no sparks";
     },
   },
+  {
+    // Pollen is not a seed. Motes of a daisy's own kind fall down the side of a column of its
+    // petals; one that brushes it is taken in, and the flower sets a seed (a roll both engines
+    // must take in step; the glide itself rolls nothing).
+    // The seed glides east, away from the flower, lands on the moss bed, and once the bed is
+    // watered it roots in the moss and sprouts.
+    name: "a mote sets a seed that glides off and sprouts in watered moss",
+    w: 40, h: 30, seed: 7171, ticks: 700,
+    cells(w, h) {
+      const bytes = new Uint8Array(w * h * STRIDE);
+      const put = (x, y, kind, variant = 0, energy = 0, flags = 0, age = 30) => {
+        const o = (y * w + x) * STRIDE;
+        bytes[o] = kind; bytes[o + 1] = variant; bytes[o + 2] = age;
+        bytes[o + 4] = energy & 255; bytes[o + 5] = energy >> 8; bytes[o + 6] = flags & 255; bytes[o + 7] = flags >> 8;
+      };
+      for (let x = 0; x < w; x++) { put(x, 28, M.Wall); put(x, 29, M.Wall); }
+      for (let x = 12; x < w; x++) put(x, 27, M.Moss, 0, 60);
+      put(10, 21, M.Wall);
+      // Spent petals (under the pollen reserve), so the only motes are the ones placed here.
+      for (let y = 2; y < 21; y++) put(10, y, M.Flower, 2, 30);
+      for (let y = 2; y < 8; y++) put(11, y, M.Pollen, 2, 150);
+      return bytes;
+    },
+    paint() {},
+    act(p, t) { if (t === 250) for (let x = 14; x < 40; x += 2) p(x, 22, 0, M.Water); },
+    observe(seen, cells, w, h, tick) {
+      const flags = (i) => cells[i * STRIDE + 6] | (cells[i * STRIDE + 7] << 8);
+      const isSeed = (i) => cells[i * STRIDE] === M.Seed;
+      seen.setAt ??= -1;
+      seen.landedAt ??= -1;
+      seen.sprouted ??= false;
+      for (let i = 0; i < w * h; i++) {
+        if (isSeed(i) && flags(i) & CELL_FLAG.Windborne && seen.setAt < 0) seen.setAt = i % w;
+        if (isSeed(i) && !(flags(i) & CELL_FLAG.Windborne) && cells[(i + w) * STRIDE] === M.Moss) seen.landedAt = Math.max(seen.landedAt, i % w);
+        if (cells[i * STRIDE] === M.Stem && i % w > 11) seen.sprouted = true;
+      }
+    },
+    expect(seen) {
+      if (seen.setAt < 0) return "no mote set a seed";
+      if (seen.landedAt < seen.setAt + 6) return `seeds were set from x=${seen.setAt} but none landed well east of it (farthest x=${seen.landedAt})`;
+      if (!seen.sprouted) return "the landed seed never sprouted in the watered moss";
+      return null;
+    },
+  },
+  {
+    // The glide's other branches, which the garden above never reaches. A: a seed sailing west
+    // into the side of a stalk turns and sails east. B: a seed on top of a flat head rolls
+    // along it and drops off the end. C: a seed boxed in among petals stays put, turning.
+    name: "a gliding seed turns off a stalk, rolls off a head, and waits when boxed in",
+    w: 56, h: 20, seed: 7272, ticks: 60,
+    cells(w, h) {
+      const bytes = new Uint8Array(w * h * STRIDE);
+      const put = (x, y, kind, variant = 0, energy = 0, flags = 0) => {
+        const o = (y * w + x) * STRIDE;
+        bytes[o] = kind; bytes[o + 1] = variant; bytes[o + 2] = 30;
+        bytes[o + 4] = energy & 255; bytes[o + 5] = energy >> 8; bytes[o + 6] = flags & 255; bytes[o + 7] = flags >> 8;
+      };
+      const glide = CELL_FLAG.Windborne;
+      for (let x = 0; x < w; x++) { put(x, 18, M.Wall); put(x, 19, M.Wall); }
+      for (let y = 8; y <= 17; y++) put(6, y, M.Stem, 2, 20);
+      put(7, 10, M.Seed, 2, 40, glide);
+      for (let x = 30; x <= 36; x++) { put(x, 13, M.Wall); put(x, 12, M.Flower, 2, 30); }
+      put(31, 11, M.Seed, 2, 40, glide | CELL_FLAG.DriftEast);
+      for (const [x, y] of [[49, 11], [51, 11], [49, 12], [50, 12], [51, 12]]) put(x, y, M.Flower, 2, 30);
+      for (let x = 48; x <= 52; x++) put(x, 13, M.Wall);
+      put(50, 11, M.Seed, 2, 40, glide | CELL_FLAG.DriftEast);
+      return bytes;
+    },
+    paint() {},
+    observe(seen, cells, w, h) {
+      const flagsAt = (x, y) => cells[(y * w + x) * STRIDE + 6] | (cells[(y * w + x) * STRIDE + 7] << 8);
+      const seedAt = (x, y) => cells[(y * w + x) * STRIDE] === M.Seed;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        if (!seedAt(x, y)) continue;
+        const f = flagsAt(x, y);
+        if (x < 12 && f & CELL_FLAG.Windborne && f & CELL_FLAG.DriftEast) seen.turned = true;
+        if (x > 8 && x < 29 && y === 17 && !(f & CELL_FLAG.Windborne)) seen.landedEastOfStalk = true;
+        if (x >= 33 && x <= 36 && y === 11 && f & CELL_FLAG.Windborne) seen.rolled = true;
+        if (x >= 37 && x <= 46 && y > 12) seen.droppedOff = true;
+      }
+      const boxed = flagsAt(50, 11);
+      seen.boxedFlips ??= 0;
+      if (seedAt(50, 11) && seen.boxedLast !== undefined && (boxed & CELL_FLAG.DriftEast) !== seen.boxedLast) seen.boxedFlips++;
+      Object.defineProperty(seen, "boxedLast", { value: boxed & CELL_FLAG.DriftEast, writable: true, enumerable: false, configurable: true });
+      seen.boxedStayed = seedAt(50, 11);
+    },
+    expect(seen) {
+      if (!seen.turned) return "the seed sailing into the stalk never turned east";
+      if (!seen.landedEastOfStalk) return "the turned seed never landed east of the stalk";
+      if (!seen.rolled) return "the seed on the head never rolled along it";
+      if (!seen.droppedOff) return "the rolling seed never dropped off the end of the head";
+      if (!seen.boxedStayed || seen.boxedFlips < 2) return `the boxed-in seed moved, or turned only ${seen.boxedFlips} times`;
+      return null;
+    },
+  },
 ];
 
 // BLOOM_SHAPES 0 (cornflower) and 5 (lavender) from sim/src/lib.rs, for the cut-bloom scenario.

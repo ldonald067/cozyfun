@@ -887,13 +887,20 @@ class JsSandboxEngine implements SandboxEngine {
 
   private pollen(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
     if (next[idx] !== MATERIAL.Pollen) return;
-    if (this.inBounds(x, y + 1)) {
-      const below = this.index(x, y + 1);
-      const belowWet = Boolean(readU16(old, below + 6) & CELL_FLAG.Wet) || readU16(old, below + 4) > 60;
-      if (old[below] === MATERIAL.Soil && belowWet && this.chance(8)) {
-        // Cosmic pollen roots into a cosmic seed, so moonlit gardens breed true.
-        writeCellBytes(next, idx, MATERIAL.Seed, cell[1], 40, 0, readU16(cell, 6) & CELL_FLAG.Cosmic);
-        return;
+    // Pollination: a mote brushing the side of a flower of its own kind is taken in, and the
+    // flower sets a seed that glides off on the breeze, away from it. See update_pollen in lib.rs.
+    if (readU16(cell, 2) > POLLINATE_AGE) {
+      for (const dx of [-1, 1]) {
+        if (!this.inBounds(x + dx, y) || !this.inBounds(x - dx, y + 1)) continue;
+        const flower = this.index(x + dx, y);
+        if (old[flower] !== MATERIAL.Flower || (old[flower + 1] & 7) !== (cell[1] & 7)) continue;
+        if (old[this.index(x - dx, y + 1)] !== MATERIAL.Empty) continue;
+        if (this.chance(POLLINATE_ODDS)) {
+          writeCellBytes(next, idx, MATERIAL.Seed, old[flower + 1], SET_SEED_ENERGY, 0,
+            ((readU16(cell, 6) | readU16(old, flower + 6)) & CELL_FLAG.Cosmic) | CELL_FLAG.Windborne | (dx < 0 ? CELL_FLAG.DriftEast : 0));
+          return;
+        }
+        break;
       }
     }
     if (this.ticks % 3 !== 0) return;
@@ -1320,6 +1327,11 @@ class JsSandboxEngine implements SandboxEngine {
   }
 
   private seed(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
+    // A frozen seed stops gliding and falls like any other until it thaws. See update_seed.
+    if (readU16(cell, 6) & CELL_FLAG.Windborne && !(readU16(next, idx + 6) & CELL_FLAG.Frozen)) {
+      this.glideSeed(idx, x, y, cell, old, next);
+      return;
+    }
     if (!this.inBounds(x, y + 1)) return;
     const below = old[this.index(x, y + 1)];
     // Over open air or a liquid a seed is still falling, and does nothing else until it lands.
@@ -1359,6 +1371,7 @@ class JsSandboxEngine implements SandboxEngine {
     // seed, so a bed is rooted as a whole and sprouts from its surface.
     const grounded =
       below === MATERIAL.Soil ||
+      below === MATERIAL.Moss ||
       (below === MATERIAL.Seed && Boolean(readU16(old, this.index(x, y + 1) + 6) & CELL_FLAG.Rooted));
     if (grounded && wet) {
       writeU16(next, idx + 6, readU16(next, idx + 6) | CELL_FLAG.Rooted);
@@ -1377,6 +1390,36 @@ class JsSandboxEngine implements SandboxEngine {
     if (below === MATERIAL.Moss && wet && energy > 110 && this.chance(12)) {
       writeCellBytes(next, idx, MATERIAL.Moss, cell[1], 100, 0, CELL_FLAG.Wet);
     }
+  }
+
+  // A seed a flower set glides down and away from it, rolling off the head it was set on, and
+  // lands on the first ground it meets. Only the flight bits are written. See glide_seed.
+  private glideSeed(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
+    if (this.ticks % 2 !== 0) return;
+    let dir = readU16(cell, 6) & CELL_FLAG.DriftEast ? 1 : -1;
+    const onPlant = this.inBounds(x, y + 1) && isPlant(old[this.index(x, y + 1)]);
+    if (onPlant) {
+      if (this.glideInto(idx, x + dir, y + 1, cell, old, next) || this.glideInto(idx, x + dir, y, cell, old, next)) return;
+      writeU16(next, idx + 6, readU16(next, idx + 6) ^ CELL_FLAG.DriftEast);
+      return;
+    }
+    // Every other step sails level, so a seed travels twice as far as it drops.
+    const dy = (this.ticks >> 1) % 2 === 0 ? 0 : 1;
+    if (this.inBounds(x + dir, y + dy) && isPlant(old[this.index(x + dir, y + dy)])) {
+      dir = -dir;
+      writeU16(next, idx + 6, readU16(next, idx + 6) ^ CELL_FLAG.DriftEast);
+    }
+    if (this.glideInto(idx, x + dir, y + dy, cell, old, next) || this.glideInto(idx, x, y + 1, cell, old, next)) return;
+    writeU16(next, idx + 6, readU16(next, idx + 6) & ~(CELL_FLAG.Windborne | CELL_FLAG.DriftEast));
+  }
+
+  // Mirrors glide_into: only into open air (empty or gas at both ends of the tick), so a
+  // gliding seed never deletes water that flowed in first.
+  private glideInto(idx: number, nx: number, ny: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
+    if (!this.inBounds(nx, ny)) return false;
+    const target = this.index(nx, ny);
+    const open = (kind: number) => kind === MATERIAL.Empty || isGas(kind);
+    return open(old[target]) && open(next[target]) && this.move(idx, nx, ny, cell, old, next);
   }
 
   private stem(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
@@ -1792,9 +1835,9 @@ export const BLOOM_SHAPES: ReadonlyArray<ReadonlyArray<readonly [number, number]
   // 1 Poppy -- see sim/src/lib.rs for the shape reasoning.
   [[-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0], [-3, 1], [-2, 1], [2, 1], [3, 1]],
   // 2 Daisy -- see sim/src/lib.rs for the shape reasoning.
-  [[0, -2], [-2, -1], [0, -1], [2, -1], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0], [-2, 1], [0, 1], [2, 1]],
+  [[0, -2], [-2, -1], [0, -1], [2, -1], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0], [-2, 1], [2, 1]],
   // 3 Sunflower -- see sim/src/lib.rs for the shape reasoning.
-  [[0, -3], [-2, -2], [-1, -2], [0, -2], [1, -2], [2, -2], [-3, -1], [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [3, -1], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0], [0, 1]],
+  [[0, -3], [-2, -2], [-1, -2], [0, -2], [1, -2], [2, -2], [-3, -1], [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [3, -1], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0], [-1, 1], [1, 1]],
   // 4 Tulip -- see sim/src/lib.rs for the shape reasoning.
   [[-3, -2], [-1, -2], [1, -2], [3, -2], [-3, -1], [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [3, -1], [-2, 0], [-1, 0], [1, 0], [2, 0]],
   // 5 Lavender -- see sim/src/lib.rs for the shape reasoning.
@@ -1814,6 +1857,11 @@ function petalSiteFree(kind: number) {
   return kind === MATERIAL.Empty || kind === MATERIAL.Pollen;
 }
 
+// What a gliding seed rolls along rather than landing on: the plant that set it.
+function isPlant(kind: number) {
+  return kind === MATERIAL.Flower || kind === MATERIAL.Stem;
+}
+
 function isGrowable(kind: number) {
   return kind === MATERIAL.Empty || kind === MATERIAL.Water || kind === MATERIAL.Moonwater;
 }
@@ -1826,10 +1874,14 @@ const BLOOM_ENERGY = 200;
 const BLOOM_ENERGY_COSMIC = 250;
 const CROWN_RESERVE = 100;
 const PETAL_ENERGY = 150;
-const PETAL_COST = 3;
+const PETAL_COST = 2;
 const POLLEN_RESERVE = 40;
 const POLLEN_COST = 15;
 const PETAL_SHED_AGE = 1200;
+// Pollination. See the constants of the same names in sim/src/lib.rs.
+const POLLINATE_AGE = 20;
+const POLLINATE_ODDS = 30;
+const SET_SEED_ENERGY = 40;
 
 function range(start: number, endExclusive: number) {
   const out: number[] = [];

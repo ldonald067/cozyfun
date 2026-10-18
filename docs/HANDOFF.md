@@ -48,6 +48,12 @@ The owner hits usage limits early, so keep each chat lean:
 
 ## What to do next
 
+0. **The owner's answers of 2026-10-17, in progress.** Batch A is live (below). Still to do,
+   each so it SHOWS in play, with a filmstrip after: B, moss's burst crosses a narrow gap that
+   plain damp moss cannot, and a meteor lights fireworks as star rockets whose shells rain
+   stardust; C, lava thaws frozen cells a couple of cells off before its meltwater reaches it,
+   and hot water's melt carries its heat so it bores into ice instead of refreezing. The
+   owner's bar: "only meaningful changes that shows".
 1. **If Chrome's launch flakes on CI again, read its stderr first.** On 2026-10-07 the debugger
    missed a 10 s window twice in a row on a runner whose other stages ran at their usual pace;
    nothing was captured to say why. `launchBrowserOnce` now waits 30 s and appends Chrome's
@@ -75,6 +81,18 @@ The owner hits usage limits early, so keep each chat lean:
 ## Where things stand
 
 Live, with the full gate, CI, `deploy:verify` and `qa:live` green:
+
+- **Pollen pollinates, and a garden sows itself** (2026-10-17, the owner's logic: pollen is not
+  a seed). A mote older than `POLLINATE_AGE` brushing the side of a flower of its own kind is
+  taken in (1 in `POLLINATE_ODDS` a tick) and the flower sets a seed, `FLAG_WINDBORNE` with
+  `FLAG_DRIFT_EAST`, which sails off two across for one down, rolls off a head, turns away from
+  a plant it heads into, and lands on the first ground; seeds now root in moss as on soil, and
+  a set seed waits for water. `pollen.seeds` 30 of 32 (0 on the old build). Review: a gliding
+  seed deleted water that flowed in first (now only into open air: empty or gas at both ends of
+  the tick) and stale flags undid a same-tick freeze. The sunflower's petal under its crown
+  became two hugging the stalk, the daisy's dead one went, and `PETAL_COST` 3 -> 2 so heads can
+  afford their shapes in play (sunflower rim 15 -> 22 of 24, bottom pair 11/6 -> 22/19,
+  cornflower outers 16/12 -> 20/19). `water.oilblocked` folded into `oil.smothers`.
 
 - **A reaction sound no longer rings when a material only moves** (2026-10-17). The detector
   read "a cell became X" as an event, as the bloom cue once did: a falling stalk rang sprout,
@@ -143,32 +161,18 @@ wet-sand check of `sand.clumps` (46 ticks), the lava and ember checks of `rocket
 
 ## Design questions for the owner
 
-- **Pollen almost never roots, so `pollen.seeds` has no witness at all.** Pollen roots only on
-  wet soil, and watered soil greens to moss first: on a wide watered bed 90 of 93 soil cells
-  were moss by tick 200, and in 9,000 ticks settled pollen rested on moss 1,621 times and on soil
-  never. It can root: fresh soil painted with water right under a drifting mote does, in both
-  engines. The check passes with rooting taken out, because a painted seed that settles
-  "appeared"; it says so at the scene. Let pollen root on wet moss, keep claimed soil bare
-  around a plant, or drop the clause.
 - **A meteor's own fuse-lighting never shows.** With it taken out of the JS mirror, a meteor
   dropped on powder still launched it on 8 of 8: the fire ring its impact throws lights the
   powder first. Harmless; drop the arm or leave it.
 - **Moss's burst does nothing a player can see.** On a watered plank moss covers it in 72-78
   ticks with the burst and 67-80 without (8 seeds): a new patch starts at energy 70, under the
   150 a burst needs. Make the burst matter, or drop it (lib.rs, engine.ts, the clause).
-- **Water's refusal to feed an oiled cell barely shows.** Oil drying everything it touches (28
-  a tick, and the wet flag) does the smothering: with that taken out an oiled seed sprouts on 32
-  of 32, with only water's refusal taken out on 7 of 32. `water.oilblocked` is witnessed by the
-  seed staying unsprouted, which mostly credits oil. Leave it, or fold the clause into
-  `oil.smothers`.
 - **Lava never thaws anything in play.** Frost exists only beside the ice that made it, so lava
   meets the ice first and the meltwater quenches it into stone. `lava.scorches` "thaws" is
   unwitnessed for that reason.
 - **Hot water melting ice barely shows.** Water is hot (over 120) for a few ticks only, and a
   slab refreezes the melt: visible past the floors on 25 of 32. `water.boils` and `ice.freezes`
   "melts it" are unwitnessed for that reason.
-- **The daisy's and sunflower's petal at (0, 1) can never open** (it is under the crown, where
-  the stalk stands). Drop it from `BLOOM_SHAPES` (lib.rs, engine.ts, the showcase) or leave it.
 - Smaller, accepted unless the owner says otherwise: a soaked log leaves a few scorched cells
   unburnt; a burning log is live for only 5-7 seconds; a dormant wellspring blocks only
   non-sources; a meteor shock's scorch is often brief (26 of 32); the sim runs about 24 ticks a

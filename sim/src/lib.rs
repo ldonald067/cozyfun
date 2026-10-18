@@ -66,8 +66,19 @@ const FLAG_SCORCHED: u16 = 1 << 4;
 /// `load_cells` keeps, and a flag missing from it is silently stripped on every reload —
 /// which is exactly when the slow world runs.
 const FLAG_BEDDED: u16 = 1 << 5;
-const FLAG_MASK: u16 =
-    FLAG_WET | FLAG_ROOTED | FLAG_COSMIC | FLAG_FROZEN | FLAG_SCORCHED | FLAG_BEDDED;
+/// A seed a flower set from pollen, still gliding away from it on the breeze
+/// (`glide_seed`), and the way it is gliding. Kept by `FLAG_MASK`, so a seed saved mid-glide
+/// keeps gliding instead of dropping where it hung.
+const FLAG_WINDBORNE: u16 = 1 << 6;
+const FLAG_DRIFT_EAST: u16 = 1 << 7;
+const FLAG_MASK: u16 = FLAG_WET
+    | FLAG_ROOTED
+    | FLAG_COSMIC
+    | FLAG_FROZEN
+    | FLAG_SCORCHED
+    | FLAG_BEDDED
+    | FLAG_WINDBORNE
+    | FLAG_DRIFT_EAST;
 
 /// Canonical face order around a cell, walked identically by petal opening and
 /// pollen release in both engines. **Cardinals first, then diagonals**: a head that
@@ -117,11 +128,14 @@ const BLOOM_SHAPES: [&[(i32, i32)]; 8] = [
     // out each side. The crest stays rounded -- a filled top row reads as a bar.
     &[(-2, -1), (-1, -1), (0, -1), (1, -1), (2, -1), (-3, 0), (-2, 0), (-1, 0), (1, 0), (2, 0), (3, 0), (-3, 1), (-2, 1), (2, 1), (3, 1)],
     // 2 Daisy: the same span opened out into a star, so the gaps do the work. Widening it kept
-    // the alternating rhythm rather than filling in, or it becomes a second sunflower.
-    &[(0, -2), (-2, -1), (0, -1), (2, -1), (-3, 0), (-2, 0), (-1, 0), (1, 0), (2, 0), (3, 0), (-2, 1), (0, 1), (2, 1)],
+    // the alternating rhythm rather than filling in, or it becomes a second sunflower. Its
+    // bottom spoke is the stalk itself: (0, 1) is where the stalk stands, so no head opens there.
+    &[(0, -2), (-2, -1), (0, -1), (2, -1), (-3, 0), (-2, 0), (-1, 0), (1, 0), (2, 0), (3, 0), (-2, 1), (2, 1)],
     // 3 Sunflower: the biggest head in the set and deliberately so: a full disc under a crown of rays,
-    // seven wide and five tall.
-    &[(0, -3), (-2, -2), (-1, -2), (0, -2), (1, -2), (2, -2), (-3, -1), (-2, -1), (-1, -1), (0, -1), (1, -1), (2, -1), (3, -1), (-3, 0), (-2, 0), (-1, 0), (1, 0), (2, 0), (3, 0), (0, 1)],
+    // seven wide and five tall. The bottom row is two petals hugging the stalk. It used to be one
+    // at (0, 1), where the stalk stands, so in play the disc was only ever four tall. A leaf at
+    // the stalk's tip takes one of the two on about half of plants.
+    &[(0, -3), (-2, -2), (-1, -2), (0, -2), (1, -2), (2, -2), (-3, -1), (-2, -1), (-1, -1), (0, -1), (1, -1), (2, -1), (3, -1), (-3, 0), (-2, 0), (-1, 0), (1, 0), (2, 0), (3, 0), (-1, 1), (1, 1)],
     // 4 Tulip: a CUP: a pronged rim over a full shoulder, tapering to a narrow base. The taper
     // is what separates it from the cornflower's rounded body -- see the note there.
     &[(-3, -2), (-1, -2), (1, -2), (3, -2), (-3, -1), (-2, -1), (-1, -1), (0, -1), (1, -1), (2, -1), (3, -1), (-2, 0), (-1, 0), (1, 0), (2, 0)],
@@ -149,15 +163,32 @@ const BLOOM_ENERGY: u16 = 200;
 const BLOOM_ENERGY_COSMIC: u16 = 250;
 /// The crown only unfurls petals down to this reserve, so a head is bounded by
 /// budget as well as by its silhouette. The cost must leave room for the largest shape
-/// (17 petals) *plus* the energy the crown drains while it is opening, or the biggest
-/// blooms stall half-open.
+/// (the sunflower's 21 petals) *plus* the energy the crown drains while it is opening
+/// (one every `BLOOM_CLOCK` ticks, and a petal opens about every 12) and any pollen it puffs
+/// meanwhile, or the biggest blooms stall half-open. At a cost of 3 they did, in play: on a
+/// stalk over 24 seeds the sunflower's outer rim opened on 15 and its bottom pair on 11 and
+/// 6, and the cornflower's drooping outers on 16 and 12. At 2: 22, 22 and 19, 20 and 19.
 const CROWN_RESERVE: u16 = 100;
 const PETAL_ENERGY: u16 = 150;
-const PETAL_COST: u16 = 3;
+const PETAL_COST: u16 = 2;
 /// Below this a bloom is spent: no more pollen, and petals may start to let go.
 const POLLEN_RESERVE: u16 = 40;
 const POLLEN_COST: u16 = 15;
 const PETAL_SHED_AGE: u16 = 1200;
+/// Pollination. Pollen is not a seed: a mote that brushes the side of a flower of its own
+/// kind is taken in, and that flower sets a seed, which glides off on the breeze away from it
+/// (`glide_seed`) and grows only where it lands on soil or moss and is watered. Before this,
+/// pollen rooted straight into wet soil, and a garden's soil is moss by the time it blooms, so
+/// no player saw it happen.
+///
+/// A mote must have drifted a while first (`POLLINATE_AGE`): it leaves its crown from a face
+/// beside it, and without the wait every mote would be a seed before it was seen as pollen.
+/// It pollinates only from the side, with open air to glide into, because a seed set on top
+/// of a head lodges between its petals and the next ones pile up on it.
+const POLLINATE_AGE: u16 = 20;
+const POLLINATE_ODDS: u32 = 30;
+/// Below the 70 that counts as wet: a set seed waits for water before it can sprout.
+const SET_SEED_ENERGY: u16 = 40;
 
 /// One open face in this many pours per tick. Tuned against a measurement, not taste:
 /// at 26 an attuned spring held a permanent 3-4 cells of standing water, because the water
@@ -1783,6 +1814,11 @@ impl Universe {
     }
 
     fn update_seed(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
+        // A frozen seed stops gliding and falls like any other until it thaws.
+        if cell.flags & FLAG_WINDBORNE != 0 && next[idx].flags & FLAG_FROZEN == 0 {
+            self.glide_seed(idx, cell, old, next);
+            return;
+        }
         let (x, y) = self.xy(idx);
         if y + 1 < self.height as i32 {
             let below = old[self.idx(x as u32, (y + 1) as u32)];
@@ -1827,9 +1863,12 @@ impl Universe {
                     }
                 }
             }
-            // A wet seed is grounded either by soil directly under it or by another
-            // grounded seed, so a bed is rooted as a whole and sprouts from its surface.
+            // A wet seed is grounded by soil directly under it, by the moss carpet that soil
+            // greens into, or by another grounded seed, so a bed is rooted as a whole and
+            // sprouts from its surface. Moss counts because a garden's soil is moss by the
+            // time it blooms, and the seeds its flowers set land there.
             let grounded = below.kind == Material::Soil as u8
+                || below.kind == Material::Moss as u8
                 || (below.kind == Material::Seed as u8 && below.flags & FLAG_ROOTED != 0);
             if grounded && wet {
                 next[idx].flags |= FLAG_ROOTED;
@@ -1861,6 +1900,62 @@ impl Universe {
                 next[idx].flags = FLAG_WET;
             }
         }
+    }
+
+    /// A seed a flower set glides down and away from it, every other tick, and lands on the
+    /// first ground it meets. On the plant it was set on, it drops off the edge of the head or
+    /// rolls along it, turning where it is boxed in. In the air it sails two across for one
+    /// down, turning away from a plant it is heading into. Landed, it is an ordinary seed: it
+    /// falls through water, and roots where it lies if it is watered.
+    ///
+    /// Only the flight bits are written, onto the cell as it stands in `next`: a stale copy of
+    /// the flags would undo whatever a reaction did to the seed earlier this tick.
+    fn glide_seed(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
+        if self.tick_count % 2 != 0 {
+            return;
+        }
+        let (x, y) = self.xy(idx);
+        let mut dir = if cell.flags & FLAG_DRIFT_EAST != 0 { 1 } else { -1 };
+        let on_plant = self.in_bounds(x, y + 1) && is_plant(old[self.idx(x as u32, (y + 1) as u32)].kind);
+        if on_plant {
+            if self.glide_into(idx, x + dir, y + 1, cell, old, next)
+                || self.glide_into(idx, x + dir, y, cell, old, next)
+            {
+                return;
+            }
+            next[idx].flags ^= FLAG_DRIFT_EAST;
+            return;
+        }
+        // Every other step sails level, so a seed travels twice as far as it drops. At one
+        // across for one down it landed inside its parent's shadow (`PLANT_SPACING` counts
+        // the petals, three cells out from the stalk) and sowed a plant on 3 of 16 gardens;
+        // at two across, on 14 of 16.
+        let dy = if (self.tick_count >> 1) % 2 == 0 { 0 } else { 1 };
+        if self.in_bounds(x + dir, y + dy) && is_plant(old[self.idx((x + dir) as u32, (y + dy) as u32)].kind) {
+            dir = -dir;
+            next[idx].flags ^= FLAG_DRIFT_EAST;
+        }
+        if self.glide_into(idx, x + dir, y + dy, cell, old, next)
+            || self.glide_into(idx, x, y + 1, cell, old, next)
+        {
+            return;
+        }
+        next[idx].flags &= !(FLAG_WINDBORNE | FLAG_DRIFT_EAST);
+    }
+
+    /// A gliding seed moves only into open air: a cell that is empty or gas at both ends of
+    /// the tick. `try_move` counts a cell free if it was empty in `old`, and water that flowed
+    /// in first would be deleted under it, the way `try_fall` already guards against for a
+    /// falling grain (`a_gliding_seed_never_deletes_water_that_just_flowed_under_it`). Gas
+    /// stays passable, as it is for a drifting mote: refusing it grounded seeds in the mist a
+    /// watering throws, and sowing fell from 14 of 16 gardens to 9.
+    fn glide_into(&self, idx: usize, nx: i32, ny: i32, cell: Cell, old: &[Cell], next: &mut [Cell]) -> bool {
+        if !self.in_bounds(nx, ny) {
+            return false;
+        }
+        let target = self.idx(nx as u32, ny as u32);
+        let open = |c: Cell| c.is_empty() || is_gas(c.kind);
+        open(old[target]) && open(next[target]) && self.try_move(idx, nx, ny, cell, old, next, true)
     }
 
     fn update_stem(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
@@ -2249,16 +2344,27 @@ impl Universe {
             return;
         }
         let (x, y) = self.xy(idx);
-        if y + 1 < self.height as i32 {
-            let below = old[self.idx(x as u32, (y + 1) as u32)];
-            if below.kind == Material::Soil as u8
-                && (below.flags & FLAG_WET != 0 || below.energy > 60)
-                && self.chance(8)
-            {
-                next[idx] = Cell::new(Material::Seed as u8, cell.variant, 40);
-                // Cosmic pollen roots into a cosmic seed, so moonlit gardens breed true.
-                next[idx].flags = cell.flags & FLAG_COSMIC;
-                return;
+        if cell.age > POLLINATE_AGE {
+            for dx in [-1, 1] {
+                if !self.in_bounds(x + dx, y) || !self.in_bounds(x - dx, y + 1) {
+                    continue;
+                }
+                let flower = old[self.idx((x + dx) as u32, y as u32)];
+                if flower.kind != Material::Flower as u8 || flower.variant & 7 != cell.variant & 7 {
+                    continue;
+                }
+                if !old[self.idx((x - dx) as u32, (y + 1) as u32)].is_empty() {
+                    continue;
+                }
+                if self.chance(POLLINATE_ODDS) {
+                    next[idx] = Cell::new(Material::Seed as u8, flower.variant, SET_SEED_ENERGY);
+                    // A moonlit flower, or its pollen, sets a cosmic seed, so its garden breeds true.
+                    next[idx].flags = ((cell.flags | flower.flags) & FLAG_COSMIC)
+                        | FLAG_WINDBORNE
+                        | if dx < 0 { FLAG_DRIFT_EAST } else { 0 };
+                    return;
+                }
+                break;
             }
         }
         if self.tick_count % 3 != 0 {
@@ -2886,6 +2992,11 @@ fn petal_site_free(cell: Cell) -> bool {
     cell.is_empty() || cell.kind == Material::Pollen as u8
 }
 
+/// What a gliding seed rolls along rather than landing on: the plant that set it.
+fn is_plant(kind: u8) -> bool {
+    kind == Material::Flower as u8 || kind == Material::Stem as u8
+}
+
 fn is_growable(kind: u8) -> bool {
     kind == Material::Empty as u8
         || kind == Material::Water as u8
@@ -3092,6 +3203,28 @@ mod tests {
                 u.tick();
                 assert_eq!(count_kind(&u, Material::Water), 1, "the water was deleted (start {start})");
                 assert_eq!(count_kind(&u, Material::Sand), 1, "the sand was deleted (start {start})");
+            }
+        }
+    }
+
+    /// The same race for a seed gliding off a flower: it moves on its own path, not
+    /// `try_fall`, and every gesture that waters a garden puts water under seeds in the air.
+    #[test]
+    fn a_gliding_seed_never_deletes_water_that_just_flowed_under_it() {
+        for start in 0..6 {
+            let mut u = Universe::new(12, 12, 7);
+            for x in 0..12 {
+                set_cell(&mut u, x, 7, Material::Wall);
+            }
+            set_cell(&mut u, 4, 6, Material::Wall);
+            set_cell(&mut u, 7, 6, Material::Wall);
+            set_cell(&mut u, 6, 6, Material::Water);
+            set_cell_state(&mut u, 4, 5, Material::Seed, 0, SET_SEED_ENERGY, FLAG_WINDBORNE | FLAG_DRIFT_EAST);
+            u.tick_count = start;
+            for _ in 0..12 {
+                u.tick();
+                assert_eq!(count_kind(&u, Material::Water), 1, "the water was deleted (start {start})");
+                assert_eq!(count_kind(&u, Material::Seed), 1, "the seed was deleted (start {start})");
             }
         }
     }
@@ -4119,9 +4252,7 @@ mod tests {
             peak
         };
         for variant in 0..8u8 {
-            // (0, 1) is where the stalk stands, so no head can open a petal there. The daisy
-            // and the sunflower list one; it was only ever reached by a crown hung in the air.
-            let full = 1 + BLOOM_SHAPES[usize::from(variant)].iter().filter(|&&o| o != (0, 1)).count();
+            let full = 1 + BLOOM_SHAPES[usize::from(variant)].len();
             let peak = peak_of(variant);
             assert!(
                 peak + 1 >= full,
@@ -4600,6 +4731,67 @@ mod tests {
         );
     }
 
+    /// A column of petals of species `variant` standing on a wall, with motes of species
+    /// `mote_variant` falling down its east side, over a wall floor. The petals are spent
+    /// (energy under `POLLEN_RESERVE`), or they would puff pollen of their own kind and
+    /// pollinate themselves.
+    fn pollen_beside_a_flower(variant: u8, mote_variant: u8, flower_flags: u16) -> Universe {
+        let mut u = Universe::new(40, 30, 7);
+        for x in 0..40 {
+            set_cell(&mut u, x, 28, Material::Wall);
+            set_cell(&mut u, x, 29, Material::Wall);
+        }
+        set_cell(&mut u, 10, 21, Material::Wall);
+        for y in 2..21 {
+            set_cell_state(&mut u, 10, y, Material::Flower, 30, POLLEN_RESERVE - 10, flower_flags);
+            let idx = u.idx(10, y);
+            u.cells[idx].variant = variant;
+        }
+        for y in 2..8 {
+            set_cell_state(&mut u, 11, y, Material::Pollen, POLLINATE_AGE + 10, 150, 0);
+            let idx = u.idx(11, y);
+            u.cells[idx].variant = mote_variant;
+        }
+        u
+    }
+
+    #[test]
+    fn pollen_brushing_a_flower_of_its_kind_sets_a_seed_that_glides_away() {
+        let mut u = pollen_beside_a_flower(2, 2, 0);
+        let mut set_at: Option<u32> = None;
+        for _ in 0..300 {
+            u.tick();
+            if set_at.is_none() {
+                set_at = (0..40u32).find(|&x| {
+                    (0..28u32).any(|y| kind_at(&u, x, y) == Material::Seed as u8 && flags_at(&u, x, y) & FLAG_WINDBORNE != 0)
+                });
+            }
+        }
+        let set_at = set_at.expect("a mote brushing a flower of its own kind should set a seed");
+        // The flower is west of the motes, so the seed glides east, and lands on the floor as
+        // an ordinary seed, well clear of where it was set.
+        let landed: Vec<u32> = (0..40u32)
+            .filter(|&x| kind_at(&u, x, 27) == Material::Seed as u8 && flags_at(&u, x, 27) & FLAG_WINDBORNE == 0)
+            .collect();
+        assert!(!landed.is_empty(), "the set seed should land on the floor and stop gliding");
+        assert!(
+            landed.iter().any(|&x| x >= set_at + 8),
+            "a seed set at x={set_at} should glide well east before landing, landed at {landed:?}"
+        );
+    }
+
+    #[test]
+    fn pollen_beside_a_flower_of_another_kind_sets_nothing() {
+        let mut u = pollen_beside_a_flower(2, 3, 0);
+        for _ in 0..300 {
+            u.tick();
+            assert!(
+                !u.cells.iter().any(|cell| cell.kind == Material::Seed as u8),
+                "pollen is not a seed: it sets one only on a flower of its own kind"
+            );
+        }
+    }
+
     #[test]
     fn cosmic_flower_pollen_breeds_a_cosmic_seed() {
         let mut u = Universe::new(16, 16, 7);
@@ -4621,46 +4813,46 @@ mod tests {
         }
         assert!(cosmic_mote, "a cosmic flower's pollen should carry the cosmic flag");
 
-        // And a cosmic mote rooting on damp soil produces a cosmic seed.
-        let mut u = Universe::new(16, 16, 7);
-        set_cell_state(&mut u, 8, 8, Material::Pollen, 10, 150, FLAG_COSMIC);
-        set_cell_state(&mut u, 8, 9, Material::Soil, 10, 120, FLAG_WET);
-        for (x, y) in [(7, 9), (9, 9), (7, 10), (8, 10), (9, 10)] {
-            set_cell(&mut u, x, y, Material::Wall);
-        }
-        let mut rooted_cosmic = false;
-        for _ in 0..200 {
+        // And a moonlit flower sets a cosmic seed, so its garden breeds true.
+        let mut u = pollen_beside_a_flower(4, 4, FLAG_COSMIC);
+        let mut cosmic_seed = false;
+        for _ in 0..300 {
             u.tick();
-            if u
-                .cells
-                .iter()
-                .any(|cell| cell.kind == Material::Seed as u8 && cell.flags & FLAG_COSMIC != 0)
-            {
-                rooted_cosmic = true;
+            if u.cells.iter().any(|cell| cell.kind == Material::Seed as u8 && cell.flags & FLAG_COSMIC != 0) {
+                cosmic_seed = true;
                 break;
             }
         }
-        assert!(rooted_cosmic, "cosmic pollen should root into a cosmic seed");
+        assert!(cosmic_seed, "a cosmic flower should set a cosmic seed");
+    }
+
+    /// A seed lying on moss, in a walled cup, watered or not. The moss stands on a wall floor.
+    fn seed_on_moss(watered: bool) -> Universe {
+        let mut u = Universe::new(24, 24, 7);
+        for x in 2..22 {
+            set_cell(&mut u, x, 22, Material::Wall);
+            set_cell(&mut u, x, 23, Material::Wall);
+            set_cell_state(&mut u, x, 21, Material::Moss, 10, 60, 0);
+        }
+        set_cell_state(&mut u, 12, 20, Material::Seed, 40, SET_SEED_ENERGY, 0);
+        if watered {
+            set_cell(&mut u, 12, 19, Material::Water);
+        }
+        u
     }
 
     #[test]
-    fn pollen_seeds_wet_soil() {
-        let mut u = Universe::new(16, 16, 7);
-        set_cell(&mut u, 8, 8, Material::Pollen);
-        set_cell_state(&mut u, 8, 9, Material::Soil, 12, 90, FLAG_WET);
-        for (x, y) in [(7, 9), (9, 9), (7, 10), (8, 10), (9, 10)] {
-            set_cell(&mut u, x, y, Material::Wall);
-        }
-        let mut seeded = false;
-        for _ in 0..120 {
-            u.tick();
-            if u.cells.iter().any(|cell| cell.kind == Material::Seed as u8 || cell.kind == Material::Flower as u8) {
-                seeded = true;
-                break;
-            }
-        }
-        assert!(seeded, "pollen resting on wet soil should take root as a seed");
+    fn a_set_seed_waits_for_water_then_roots_in_moss() {
+        let sprouted = |mut u: Universe| {
+            (0..400).any(|_| {
+                u.tick();
+                u.cells.iter().any(|cell| cell.kind == Material::Stem as u8)
+            })
+        };
+        assert!(!sprouted(seed_on_moss(false)), "a dry seed on moss should wait for water");
+        assert!(sprouted(seed_on_moss(true)), "a watered seed on moss should root and sprout");
     }
+
 
     /// The other half of the wash: a hearth doused under still water keeps its char — in a
     /// shallow open pond, where no water cell has anywhere to go, so none of it is running.
@@ -6081,6 +6273,24 @@ mod tests {
         let flags = reloaded.cells[reloaded.idx(3, 3)].flags;
         assert_ne!(flags & FLAG_BEDDED, 0, "a reload stripped the bedded flag — it is missing from FLAG_MASK");
         assert_ne!(flags & FLAG_WET, 0, "and it must not take the other flags with it");
+        // A seed saved mid-glide keeps gliding, the same way.
+        let mut u = Universe::new(8, 8, 7);
+        set_cell_state(&mut u, 3, 3, Material::Seed, 0, SET_SEED_ENERGY, FLAG_WINDBORNE | FLAG_DRIFT_EAST);
+        let bytes: Vec<u8> = u
+            .cells
+            .iter()
+            .flat_map(|c| {
+                let mut b = vec![c.kind, c.variant];
+                b.extend_from_slice(&c.age.to_le_bytes());
+                b.extend_from_slice(&c.energy.to_le_bytes());
+                b.extend_from_slice(&c.flags.to_le_bytes());
+                b
+            })
+            .collect();
+        let mut reloaded = Universe::new(8, 8, 7);
+        assert!(reloaded.load_cells(&bytes), "the saved board should load");
+        let flags = reloaded.cells[reloaded.idx(3, 3)].flags;
+        assert_eq!(flags & (FLAG_WINDBORNE | FLAG_DRIFT_EAST), FLAG_WINDBORNE | FLAG_DRIFT_EAST, "a reload stripped a gliding seed's flags");
     }
 
     #[test]

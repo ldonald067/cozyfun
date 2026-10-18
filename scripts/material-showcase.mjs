@@ -182,8 +182,8 @@ export function materialShowcaseScript() {
     const BLOOM_SHAPES = [
       [[-2,-2],[-1,-2],[1,-2],[2,-2],[-3,-1],[-2,-1],[-1,-1],[0,-1],[1,-1],[2,-1],[3,-1],[-3,0],[-2,0],[-1,0],[1,0],[2,0],[3,0],[-2,1],[2,1]], // 0 cornflower
       [[-2,-1],[-1,-1],[0,-1],[1,-1],[2,-1],[-3,0],[-2,0],[-1,0],[1,0],[2,0],[3,0],[-3,1],[-2,1],[2,1],[3,1]], // 1 poppy
-      [[0,-2],[-2,-1],[0,-1],[2,-1],[-3,0],[-2,0],[-1,0],[1,0],[2,0],[3,0],[-2,1],[0,1],[2,1]], // 2 daisy
-      [[0,-3],[-2,-2],[-1,-2],[0,-2],[1,-2],[2,-2],[-3,-1],[-2,-1],[-1,-1],[0,-1],[1,-1],[2,-1],[3,-1],[-3,0],[-2,0],[-1,0],[1,0],[2,0],[3,0],[0,1]], // 3 sunflower
+      [[0,-2],[-2,-1],[0,-1],[2,-1],[-3,0],[-2,0],[-1,0],[1,0],[2,0],[3,0],[-2,1],[2,1]], // 2 daisy
+      [[0,-3],[-2,-2],[-1,-2],[0,-2],[1,-2],[2,-2],[-3,-1],[-2,-1],[-1,-1],[0,-1],[1,-1],[2,-1],[3,-1],[-3,0],[-2,0],[-1,0],[1,0],[2,0],[3,0],[-1,1],[1,1]], // 3 sunflower
       [[-3,-2],[-1,-2],[1,-2],[3,-2],[-3,-1],[-2,-1],[-1,-1],[0,-1],[1,-1],[2,-1],[3,-1],[-2,0],[-1,0],[1,0],[2,0]], // 4 tulip
       [[0,-1],[-1,-2],[1,-2],[0,-3],[-1,-4],[1,-4],[0,-5]], // 5 lavender
       [[0,-1],[0,-2],[-1,-1],[1,-2],[-2,0],[2,-1],[-3,1],[3,0]], // 6 bluebell
@@ -245,6 +245,9 @@ export function materialShowcaseScript() {
     // floor of 45 and hold — measured on a real garden, a head runs its budget to zero
     // by ~1200 ticks but almost always keeps a stubborn petal or two hanging on.
     bloom(68, 134, 7, 5, [[1, 2], [-1, 4]], 20, 1300, 2);    // cosmos, spent and shedding
+    // A seed the sunflower set from pollen, sailing east off it on the breeze: it reads as a
+    // plain seed, and the flags are what make it glide.
+    setCell(40, 130, material.Seed, 40, 0, flag.Windborne | flag.DriftEast, 3);
 
     // The two rocks, side by side on one shelf: sandstone on the left, the stone lava cools
     // into on the right. Sandstone is what the slow world makes when a flooded sand bed

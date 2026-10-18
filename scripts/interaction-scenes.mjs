@@ -716,8 +716,10 @@ export const CHECKS = [
     absent: true,
     // A seed on soil under oil, watered from above. It requires WATERED_OILED_SEED, so it fails
     // with the water taken out or the soil painted as wall. It never sprouts, on 32 of 32; with
-    // oil kept from drying what it touches in the JS mirror it sprouts on 32 of 32. Water's own
-    // refusal to feed an oiled seed barely shows here: taken out alone, the seed sprouts on 5 of 32.
+    // oil kept from drying what it touches in the JS mirror it sprouts on 32 of 32. Smothering is
+    // two rules, and the clause names both: oil drying what it touches does nearly all of it,
+    // and water refusing to feed an oiled cell (once `water.oilblocked`, folded in here by the
+    // owner, 2026-10-17) sprouts the seed on 5 to 7 of 32 when taken out alone.
     paint: (p) => { p(15, 20, 3, M.Soil); p(15, 17, 1, M.Seed); p(15, 15, 2, M.Oil); p(15, 12, 3, M.Water); },
     requires: WATERED_OILED_SEED,
     outcome: (g, before) => g.appeared(M.Stem, before) },
@@ -991,18 +993,6 @@ export const CHECKS = [
   { m: "Water", covers: "water.quenches", role: "quenches lava into scorched stone", w: 30, h: 26, seed: 62, ticks: 900,
     paint: (p) => { p(15, 20, 3, M.Lava); p(15, 14, 4, M.Water); },
     outcome: (g) => g.all(M.Stone).filter((i) => g.hasFlag(i, F.Scorched)) },
-  { m: "Water", covers: "water.oilblocked", role: "is blocked from feeding life by oil", w: 30, h: 26, seed: 63, ticks: 2000,
-    absent: true,
-    // This counted soil turning cosmic, which plain water never makes it, so it could not fail: it
-    // passed on 8 of 8 with water's refusal taken out of the JS mirror. It is the `oil.smothers`
-    // scene now, witnessed by the seed never sprouting. With water's refusal to feed an oiled seed
-    // and oil's drying both taken out it sprouts on 32 of 32; with only water's refusal out, on 7
-    // of 32. Oil drying what it touches does nearly all the smothering, so this clause's own half
-    // is thin; it is put to the owner.
-    paint: (p) => { p(15, 20, 3, M.Soil); p(15, 17, 1, M.Seed); p(15, 15, 2, M.Oil); p(15, 12, 3, M.Water); },
-    requires: WATERED_OILED_SEED,
-    outcome: (g, before) => g.appeared(M.Stem, before) },
-
   { m: "Moonwater", covers: "moonwater.moves", role: "supercharges growth like water", w: 40, h: 34, seed: 64, ticks: 3000,
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Moonwater); },
     outcome: (g, before) => g.appeared(M.Stem, before) },
@@ -1344,15 +1334,52 @@ export const CHECKS = [
       for (const i of g.all(M.Pollen)) if (g.xyOf(i)[1] > 26) memo.low.add(i);
       return [...memo.low].filter((i) => g.kindOf(i) === M.Pollen);
     } },
-  { m: "Pollen", covers: "pollen.seeds", role: "takes root as a seed on damp soil", w: 40, h: 34, seed: 102, ticks: 9000,
-    // NOT A WITNESS of its rule (2026-10-14): it passes 8 of 8 with pollen never rooting in the
-    // JS mirror, because a painted seed that settles is a seed that "appeared". No pollen rooted
-    // in this garden or a wide wet bed, with water or moonwater: watered soil greens to moss, so
-    // pollen settles on moss (1,621 times in a 9,000-tick bed) and never on soil. It does root on
-    // fresh wet soil painted right under a drifting mote (review found one). Kept until the owner
-    // decides; see docs/HANDOFF.md.
-    paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
-    outcome: (g, before) => g.appeared(M.Seed, before) },
+  { m: "Pollen", covers: "pollen.seeds", role: "pollinates a flower of its kind, whose seed glides off and sows a new plant", w: 80, h: 40, seed: 102, ticks: 6000,
+    // One plant on a wide bed, watered now and then like rain. Pollen is not a seed: the
+    // witness is a stalk sprouting from a seed that came down after GLIDING (it carried the
+    // windborne flag in the frame before it landed), followed down if it sinks through a puddle,
+    // so a painted seed, which never glides, is never credited, and with pollination taken out
+    // there is nothing to count. Until
+    // 2026-10-17 pollen rooted straight into wet soil, and a garden's soil is moss by the time
+    // it blooms, so this clause had no witness at all (0 of 32 on that build). 30 of 32 now;
+    // on the other two no seed came down clear of a plant's shade within the 6,000 ticks.
+    paint: (p) => {
+      for (let x = 4; x <= 76; x++) p(x, 36, 3, M.Soil, 55);
+      p(40, 31, 1, M.Seed);
+      p(40, 26, 3, M.Water);
+    },
+    act: (p, t) => { if (t % 400 === 200) for (let x = 6; x <= 74; x += 3) p(x, 20, 1, M.Water, 30); },
+    outcome: (g, before, memo, prev) => {
+      memo.landed ??= new Set();
+      memo.sown ??= new Set();
+      if (prev) {
+        // Follow each landed seed down: one that comes down on a puddle sinks through it and
+        // sprouts on the bed beneath, a cell or more from where it landed.
+        for (const i of [...memo.landed]) {
+          if (g.kindOf(i) === M.Seed) continue;
+          memo.landed.delete(i);
+          if (g.kindOf(i) === M.Stem) { memo.sown.add(i); continue; }
+          const [x] = g.xyOf(i);
+          for (const j of [i + g.w, i + g.w - 1, i + g.w + 1]) {
+            if (j >= g.size || Math.abs(g.xyOf(j)[0] - x) > 1) continue;
+            if (g.kindOf(j) === M.Seed && prev.kindOf(j) !== M.Seed) { memo.landed.add(j); break; }
+          }
+        }
+        for (let i = 0; i < g.size; i++) {
+          if (prev.kindOf(i) === M.Seed && g.kindOf(i) === M.Seed && prev.hasFlag(i, F.Windborne) && !g.hasFlag(i, F.Windborne)) memo.landed.add(i);
+        }
+      }
+      // The sown plant, stalk and bloom: no other plant stands within PLANT_SPACING of it.
+      const out = [];
+      for (const s of memo.sown) {
+        const [sx, sy] = g.xyOf(s);
+        for (let y = Math.max(0, sy - 16); y <= sy; y++) for (let x = sx - 3; x <= sx + 3; x++) {
+          const k = g.kindAt(x, y);
+          if (k === M.Stem || k === M.Flower) out.push(y * g.w + x);
+        }
+      }
+      return out;
+    } },
   { m: "Pollen", covers: "pollen.fades", role: "lives out a full drift before fading", w: 40, h: 34, seed: 103, ticks: 6000,
     // Measured as the aged mote still on screen, not the hole it leaves: an empty cell has
     // no colour to compare against an empty baseline, so a disappearance always scores zero
