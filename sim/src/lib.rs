@@ -175,6 +175,17 @@ const PETAL_COST: u16 = 2;
 const POLLEN_RESERVE: u16 = 40;
 const POLLEN_COST: u16 = 15;
 const PETAL_SHED_AGE: u16 = 1200;
+/// How many ticks a shell's sparks fly outward before they droop, plain and star. A star
+/// shell (a rocket a meteor lit) flies longer and so blooms half as wide again.
+const SHELL_FLIGHT: u16 = 6;
+const STAR_SHELL_FLIGHT: u16 = 10;
+/// Moss's burst. Well-watered moss (energy over 150) with nothing left to take beside it
+/// throws a patch across a narrow gap, one cell of open air, gas or water, onto soil or wood
+/// two cells off, which damp moss can never cross. Its old burst was a second adjacent patch
+/// in the same tick, and a creeping edge has only one cell to take: moss covered a watered
+/// plank in 72-78 ticks with it and 67-80 without.
+const SPORE_ODDS: u32 = 6;
+const SPORE_JUMPS: [(i32, i32); 8] = [(2, 0), (-2, 0), (2, 2), (-2, 2), (0, 2), (2, -2), (-2, -2), (0, -2)];
 /// Pollination. Pollen is not a seed: a mote that brushes the side of a flower of its own
 /// kind is taken in, and that flower sets a seed, which glides off on the breeze away from it
 /// (`glide_seed`) and grows only where it lands on soil or moss and is watered. Before this,
@@ -2260,6 +2271,27 @@ impl Universe {
                 }
             }
         }
+        if cell.energy > 150 && self.chance(SPORE_ODDS) {
+            for (dx, dy) in SPORE_JUMPS {
+                let (tx, ty) = (x + dx, y + dy);
+                if !self.in_bounds(tx, ty) {
+                    continue;
+                }
+                if !is_spore_gap(old[self.idx((x + dx / 2) as u32, (y + dy / 2) as u32)].kind) {
+                    continue;
+                }
+                let target = self.idx(tx as u32, ty as u32);
+                let other = old[target];
+                let soft = (other.kind == Material::Soil as u8 && !self.soil_is_claimed(tx, ty, old))
+                    || other.kind == Material::Wood as u8;
+                if !soft || next[target].kind != other.kind {
+                    continue;
+                }
+                next[target] = Cell::new(Material::Moss as u8, other.variant, 70);
+                next[target].flags = if wet { FLAG_WET } else { 0 };
+                return;
+            }
+        }
     }
 
     fn update_fungus(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
@@ -2425,6 +2457,14 @@ impl Universe {
                         next[cracked] = Cell::new(Material::Sand as u8, old[cracked].variant, 0);
                     }
                 }
+            } else if old[nidx].kind == Material::Rocket as u8 {
+                // A meteor lights the powder it lands on as a star rocket (FLAG_COSMIC): it
+                // passes the star through its volley (`light_touching_powder`), and its shell
+                // blooms wider and burns out into stardust (`update_spark`). Lit as any flame
+                // lights it, the meteor's own lighting never showed: its fire ring lit the
+                // powder too, and a meteor-lit charge looked exactly like a fire-lit one.
+                next[nidx] = Cell::new(Material::Rocket as u8, old[nidx].variant, 220);
+                next[nidx].flags = FLAG_COSMIC;
             } else if is_flammable(old[nidx].kind) {
                 next[nidx] = ignited_cell(old[nidx], 230);
             }
@@ -2456,7 +2496,7 @@ impl Universe {
             self.burst_rocket(idx, x, y, cell, old, next);
             return;
         }
-        self.light_touching_powder(x, y, old, next);
+        self.light_touching_powder(x, y, old, next, cell.flags & FLAG_COSMIC != 0);
         let sway = if self.chance(3) {
             if self.tick_count % 2 == 0 { 1 } else { -1 }
         } else {
@@ -2498,7 +2538,10 @@ impl Universe {
     /// the lit end left and the rest of the line sat there. This relays the light directly
     /// instead, so a whole charge goes up and a line burns its length as a wave of launches:
     /// 16 of 16. Four neighbours, no roll; the same 220 fuse a flame or a spark lights.
-    fn light_touching_powder(&self, x: i32, y: i32, old: &[Cell], next: &mut [Cell]) {
+    /// A star rocket passes its star to every grain it touches, lit or not, so the star runs
+    /// through the whole volley. Lighting only the unlit ones left it racing the meteor's own
+    /// fire ring for the charge, and about one spark in five was a star.
+    fn light_touching_powder(&self, x: i32, y: i32, old: &[Cell], next: &mut [Cell], star: bool) {
         for (dx, dy) in [(0, -1), (0, 1), (-1, 0), (1, 0)] {
             let (nx, ny) = (x + dx, y + dy);
             if !self.in_bounds(nx, ny) {
@@ -2508,6 +2551,9 @@ impl Universe {
             let unlit = |c: Cell| c.kind == Material::Rocket as u8 && c.energy == 0;
             if unlit(old[n]) && unlit(next[n]) {
                 next[n].energy = 220;
+            }
+            if star && next[n].kind == Material::Rocket as u8 && next[n].energy > 0 {
+                next[n].flags |= FLAG_COSMIC;
             }
         }
     }
@@ -2539,6 +2585,9 @@ impl Universe {
     }
 
     fn burst_rocket(&mut self, idx: usize, x: i32, y: i32, cell: Cell, old: &[Cell], next: &mut [Cell]) {
+        // The star as the rocket stands now: a grain handed the star this tick by the volley
+        // beside it bursts as a star shell (review: reading `cell` threw a plain one).
+        let star = next[idx].flags & FLAG_COSMIC;
         next[idx] = Cell::new(Material::Stardust as u8, cell.variant, 200);
         for (dir, (dx, dy)) in SPARK_DIRS.iter().enumerate() {
             for dist in 1..=2 {
@@ -2551,6 +2600,7 @@ impl Universe {
                 if other.is_empty() && next[nidx].is_empty() {
                     next[nidx] =
                         Cell::new(Material::Spark as u8, dir as u8, if dist == 1 { 235 } else { 215 });
+                    next[nidx].flags = star;
                 } else if dist == 1 && is_flammable(other.kind) && self.chance(3) {
                     next[nidx] = ignited_cell(other, 200);
                 }
@@ -2564,7 +2614,8 @@ impl Universe {
         }
         next[idx].energy = next[idx].energy.saturating_sub(10);
         if next[idx].energy < COLD_CHAR_ENERGY {
-            next[idx] = if self.chance(6) {
+            // A star shell's sparks all burn out into stardust, so it rains glitter.
+            next[idx] = if cell.flags & FLAG_COSMIC != 0 || self.chance(6) {
                 Cell::new(Material::Stardust as u8, cell.variant, 120)
             } else {
                 Cell::empty()
@@ -2583,7 +2634,8 @@ impl Universe {
             return;
         }
         let flying = next[idx];
-        if cell.age < 6 {
+        // A star shell's sparks fly out longer, so it blooms half as wide again.
+        if cell.age < if cell.flags & FLAG_COSMIC != 0 { STAR_SHELL_FLIGHT } else { SHELL_FLIGHT } {
             // Shell expansion: the spark keeps flying along its birth direction.
             let (dx, dy) = SPARK_DIRS[(cell.variant & 7) as usize];
             if !self.try_move(idx, x + dx, y + dy, flying, old, next, true) {
@@ -2990,6 +3042,11 @@ fn is_flammable(kind: u8) -> bool {
 /// generously actually sees.
 fn petal_site_free(cell: Cell) -> bool {
     cell.is_empty() || cell.kind == Material::Pollen as u8
+}
+
+/// What a moss spore crosses (`SPORE_JUMPS`): open air, gas or water, never a wall or rock.
+fn is_spore_gap(kind: u8) -> bool {
+    kind == Material::Empty as u8 || is_gas(kind) || is_water_like(kind)
 }
 
 /// What a gliding seed rolls along rather than landing on: the plant that set it.
@@ -4138,6 +4195,130 @@ mod tests {
         assert!(greened, "a spent seed should release the ground it claimed");
     }
 
+    /// Two wood planks on wall posts with a one-cell gap between them, moss on the end of the
+    /// left one at `energy`, and `gap` painted into the gap cell. True if moss reaches the right
+    /// plank in 400 ticks.
+    fn moss_crosses_gap(energy: u16, gap: Material) -> bool {
+        let mut u = Universe::new(24, 16, 7);
+        for x in 0..24 {
+            set_cell(&mut u, x, 14, Material::Wall);
+        }
+        for x in 2..=9 {
+            set_cell(&mut u, x, 10, Material::Wood);
+        }
+        for x in 11..=20 {
+            set_cell(&mut u, x, 10, Material::Wood);
+        }
+        for x in [2, 9, 11, 20] {
+            for y in 11..14 {
+                set_cell(&mut u, x, y, Material::Wall);
+            }
+        }
+        if gap != Material::Empty {
+            set_cell(&mut u, 10, 10, gap);
+            // Held in place, so the gap is still `gap` when the moss crosses it (review: loose
+            // water drained out on the first tick and the test proved an air crossing).
+            set_cell(&mut u, 10, 11, Material::Wall);
+        }
+        set_cell_state(&mut u, 9, 10, Material::Moss, 10, energy, FLAG_WET);
+        (0..400).any(|_| {
+            // Keep it fed, as a pond beside it would: the energy is the claim under test.
+            let idx = u.idx(9, 10);
+            if u.cells[idx].kind == Material::Moss as u8 {
+                u.cells[idx].energy = energy;
+            }
+            let held = kind_at(&u, 10, 10) == gap as u8;
+            u.tick();
+            held && (11..=20).any(|x| kind_at(&u, x, 10) == Material::Moss as u8)
+        })
+    }
+
+    #[test]
+    fn well_watered_moss_bursts_across_a_narrow_gap() {
+        assert!(moss_crosses_gap(200, Material::Empty), "well-watered moss should burst across a one-cell gap");
+        assert!(moss_crosses_gap(200, Material::Water), "and across a cell of water");
+    }
+
+    #[test]
+    fn damp_moss_never_crosses_a_gap_and_no_moss_crosses_a_wall() {
+        assert!(!moss_crosses_gap(120, Material::Empty), "moss that is only damp should stop at a gap");
+        assert!(!moss_crosses_gap(200, Material::Wall), "a spore crosses open air or water, never a wall");
+    }
+
+    /// A pile of rocket powder on a wall floor, lit by a meteor dropped onto it or by a flame
+    /// beside it. Returns (star sparks seen, stardust born from sparks, widest shell span).
+    fn firework_pile(by_meteor: bool) -> (usize, usize, i32) {
+        let mut u = Universe::new(48, 80, 3);
+        for x in 0..48 {
+            set_cell(&mut u, x, 76, Material::Wall);
+        }
+        for x in 18..=30 {
+            for y in 72..=75 {
+                set_cell(&mut u, x, y, Material::Rocket);
+            }
+        }
+        if by_meteor {
+            set_cell(&mut u, 24, 66, Material::Meteor);
+        } else {
+            set_cell(&mut u, 24, 71, Material::Fire);
+        }
+        let (mut star, mut rained, mut span) = (0usize, 0usize, 0i32);
+        for _ in 0..400 {
+            let before = u.cells.clone();
+            u.tick();
+            let sparks: Vec<i32> = (0..u.cells.len())
+                .filter(|&i| u.cells[i].kind == Material::Spark as u8)
+                .map(|i| (i % 48) as i32)
+                .collect();
+            if let (Some(lo), Some(hi)) = (sparks.iter().min(), sparks.iter().max()) {
+                span = span.max(hi - lo);
+            }
+            for i in 0..u.cells.len() {
+                if u.cells[i].kind == Material::Spark as u8 && u.cells[i].flags & FLAG_COSMIC != 0 {
+                    star += 1;
+                }
+                if before[i].kind == Material::Spark as u8 && u.cells[i].kind == Material::Stardust as u8 {
+                    rained += 1;
+                }
+            }
+        }
+        (star, rained, span)
+    }
+
+    #[test]
+    fn a_meteor_lights_fireworks_as_star_shells_that_rain_stardust() {
+        let (star, meteor_rain, _) = firework_pile(true);
+        let (fire_star, fire_rain, _) = firework_pile(false);
+        assert!(star > 0, "a meteor should light the powder it lands on as star rockets");
+        assert_eq!(fire_star, 0, "a flame lights plain rockets");
+        assert!(
+            meteor_rain >= fire_rain * 2,
+            "a meteor-lit charge should rain at least twice the stardust a fire-lit one does ({meteor_rain} vs {fire_rain})"
+        );
+    }
+
+    #[test]
+    fn a_star_shell_blooms_wider_than_a_plain_one() {
+        let shell = |flags: u16| {
+            let mut u = Universe::new(64, 64, 3);
+            set_cell_state(&mut u, 32, 32, Material::Rocket, 0, 100, flags);
+            let mut span = 0;
+            for _ in 0..30 {
+                u.tick();
+                let xs: Vec<i32> = (0..u.cells.len())
+                    .filter(|&i| u.cells[i].kind == Material::Spark as u8)
+                    .map(|i| (i % 64) as i32)
+                    .collect();
+                if let (Some(lo), Some(hi)) = (xs.iter().min(), xs.iter().max()) {
+                    span = span.max(hi - lo);
+                }
+            }
+            span
+        };
+        let (plain, star) = (shell(0), shell(FLAG_COSMIC));
+        assert!(star >= plain + 6, "a star shell should bloom wider: {star} cells against {plain}");
+    }
+
     #[test]
     fn moss_cannot_spread_into_claimed_ground() {
         let mut u = Universe::new(16, 16, 13);
@@ -4147,11 +4328,15 @@ mod tests {
         set_cell_state(&mut u, 7, 9, Material::Moss, 40, 200, FLAG_WET);
         set_cell_state(&mut u, 8, 9, Material::Soil, 16, 250, FLAG_WET);
         set_cell_state(&mut u, 8, 8, Material::Seed, 40, 200, FLAG_WET | FLAG_ROOTED);
-        // Capped so the seed stays a seed and keeps holding the claim for the whole run.
+        // Capped so the seed stays a seed and keeps holding the claim for the whole run. The
+        // run is shorter than the claim: the seed drains a point a tick and lets go of the
+        // ground near tick 200, as a spent seed should. At 300 ticks this passed only while
+        // the dice left the moss too dry to take the released soil in time.
         set_cell(&mut u, 8, 7, Material::Wall);
-        for _ in 0..300 {
+        for _ in 0..190 {
             u.tick();
         }
+        assert!(u.soil_is_claimed(8, 9, &u.cells), "the seed should still hold its claim at the end of the run");
         assert_ne!(
             kind_at(&u, 8, 9),
             Material::Moss as u8,

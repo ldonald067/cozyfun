@@ -1480,6 +1480,50 @@ const scenarios = [
       return null;
     },
   },
+  {
+    // Moss's burst across a gap (one roll a tick both engines must take in step, after the
+    // ordinary spread), and a meteor lighting a charge as star rockets: the star passes through
+    // the volley, a star shell flies out longer, and every star spark burns out into stardust.
+    name: "watered moss bursts across a gap and a meteor lights star shells",
+    w: 48, h: 80, seed: 7373, ticks: 400,
+    cells(w, h) {
+      const bytes = new Uint8Array(w * h * STRIDE);
+      const put = (x, y, kind, energy = 0, flags = 0) => {
+        const o = (y * w + x) * STRIDE;
+        bytes[o] = kind; bytes[o + 2] = 10;
+        bytes[o + 4] = energy & 255; bytes[o + 5] = energy >> 8; bytes[o + 6] = flags & 255; bytes[o + 7] = flags >> 8;
+      };
+      for (let x = 0; x < w; x++) { put(x, 76, M.Wall); put(x, 77, M.Wall); }
+      // Moss on the end of a plank, a one-cell gap, then a second plank; a pool feeds the moss.
+      for (let x = 2; x <= 8; x++) put(x, 20, M.Wood, 20);
+      put(9, 20, M.Moss, 200, CELL_FLAG.Wet);
+      for (let x = 11; x <= 20; x++) put(x, 20, M.Wood, 20);
+      for (const x of [2, 9, 11, 20]) for (let y = 21; y < 26; y++) put(x, y, M.Wall);
+      for (let x = 3; x <= 8; x++) put(x, 19, M.Water, 60);
+      put(2, 19, M.Wall);
+      put(9, 19, M.Wall);
+      // A charge on the floor and a meteor above it.
+      for (let x = 22; x <= 34; x++) for (let y = 72; y <= 75; y++) put(x, y, M.Rocket);
+      put(28, 60, M.Meteor, 255);
+      return bytes;
+    },
+    paint() {},
+    observe(seen, cells, w, h) {
+      const flags = (i) => cells[i * STRIDE + 6] | (cells[i * STRIDE + 7] << 8);
+      for (let x = 11; x <= 20; x++) if (cells[(19 * w + x) * STRIDE] === M.Moss || cells[(20 * w + x) * STRIDE] === M.Moss) seen.mossCrossed = true;
+      seen.starSparks ??= 0;
+      seen.plainSparks ??= 0;
+      for (let i = 0; i < w * h; i++) {
+        if (cells[i * STRIDE] !== M.Spark) continue;
+        if (flags(i) & CELL_FLAG.Cosmic) seen.starSparks++; else seen.plainSparks++;
+      }
+    },
+    expect(seen) {
+      if (!seen.mossCrossed) return "the watered moss never crossed the gap";
+      if (!seen.starSparks) return "the meteor lit no star rockets";
+      return null;
+    },
+  },
 ];
 
 // BLOOM_SHAPES 0 (cornflower) and 5 (lavender) from sim/src/lib.rs, for the cut-bloom scenario.

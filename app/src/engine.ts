@@ -942,6 +942,9 @@ class JsSandboxEngine implements SandboxEngine {
         for (const cracked of this.neighbors(ncell % this.w, Math.floor(ncell / this.w))) {
           if (old[cracked] === MATERIAL.Glass) writeCellBytes(next, cracked, MATERIAL.Sand, old[cracked + 1]);
         }
+      } else if (old[nidx] === MATERIAL.Rocket) {
+        // A meteor lights the powder it lands on as a star rocket. See update_meteor.
+        writeCellBytes(next, nidx, MATERIAL.Rocket, old[nidx + 1], 220, 0, CELL_FLAG.Cosmic);
       } else if (flammable(old[nidx])) {
         writeIgnitedCell(next, nidx, old[nidx], old[nidx + 1], 230, readU16(old, nidx + 6));
       }
@@ -1200,7 +1203,7 @@ class JsSandboxEngine implements SandboxEngine {
       this.burstRocket(idx, x, y, cell, old, next);
       return;
     }
-    this.lightTouchingPowder(x, y, old, next);
+    this.lightTouchingPowder(x, y, old, next, (readU16(cell, 6) & CELL_FLAG.Cosmic) !== 0);
     const sway = this.chance(3) ? (this.ticks % 2 === 0 ? 1 : -1) : 0;
     let moved = false;
     let nx = x;
@@ -1225,13 +1228,16 @@ class JsSandboxEngine implements SandboxEngine {
     }
   }
 
-  // Mirrors Universe::light_touching_powder: a lit grain lights the unlit powder it touches.
-  private lightTouchingPowder(x: number, y: number, old: Uint8Array, next: Uint8Array) {
+  // Mirrors Universe::light_touching_powder: a lit grain lights the unlit powder it touches,
+  // and a star rocket passes its star to every grain it touches, lit or not, so the star runs
+  // through the whole volley rather than racing the meteor's own fire ring for it.
+  private lightTouchingPowder(x: number, y: number, old: Uint8Array, next: Uint8Array, star: boolean) {
     for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
       if (!this.inBounds(x + dx, y + dy)) continue;
       const n = this.index(x + dx, y + dy);
       const unlit = (cells: Uint8Array) => cells[n] === MATERIAL.Rocket && readU16(cells, n + 4) === 0;
       if (unlit(old) && unlit(next)) writeU16(next, n + 4, 220);
+      if (star && next[n] === MATERIAL.Rocket && readU16(next, n + 4) > 0) writeU16(next, n + 6, readU16(next, n + 6) | CELL_FLAG.Cosmic);
     }
   }
 
@@ -1248,6 +1254,8 @@ class JsSandboxEngine implements SandboxEngine {
   }
 
   private burstRocket(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
+    // The star as the rocket stands now; see burst_rocket.
+    const star = readU16(next, idx + 6) & CELL_FLAG.Cosmic;
     writeCellBytes(next, idx, MATERIAL.Stardust, cell[1], 200);
     for (let dir = 0; dir < SPARK_DIRS.length; dir++) {
       const [dx, dy] = SPARK_DIRS[dir];
@@ -1258,7 +1266,7 @@ class JsSandboxEngine implements SandboxEngine {
         const nidx = this.index(nx, ny);
         const other = old[nidx];
         if (other === MATERIAL.Empty && next[nidx] === MATERIAL.Empty) {
-          writeCellBytes(next, nidx, MATERIAL.Spark, dir, dist === 1 ? 235 : 215);
+          writeCellBytes(next, nidx, MATERIAL.Spark, dir, dist === 1 ? 235 : 215, 0, star);
         } else if (dist === 1 && flammable(other) && this.chance(3)) {
           writeIgnitedCell(next, nidx, other, old[nidx + 1], 200, readU16(old, nidx + 6));
         }
@@ -1270,7 +1278,8 @@ class JsSandboxEngine implements SandboxEngine {
     if (next[idx] !== MATERIAL.Spark) return;
     writeU16(next, idx + 4, Math.max(0, readU16(next, idx + 4) - 10));
     if (readU16(next, idx + 4) < 30) {
-      if (this.chance(6)) writeCellBytes(next, idx, MATERIAL.Stardust, cell[1], 120);
+      // A star shell's sparks all burn out into stardust, so it rains glitter. See update_spark.
+      if (readU16(cell, 6) & CELL_FLAG.Cosmic || this.chance(6)) writeCellBytes(next, idx, MATERIAL.Stardust, cell[1], 120);
       else next.fill(0, idx, idx + CELL_STRIDE);
       return;
     }
@@ -1281,7 +1290,8 @@ class JsSandboxEngine implements SandboxEngine {
       return;
     }
     const age = readU16(cell, 2);
-    if (age < 6) {
+    // A star shell's sparks fly out longer, so it blooms half as wide again. See update_spark.
+    if (age < (readU16(cell, 6) & CELL_FLAG.Cosmic ? STAR_SHELL_FLIGHT : SHELL_FLIGHT)) {
       // Shell expansion: the spark keeps flying along its birth direction.
       const [dx, dy] = SPARK_DIRS[cell[1] & 7];
       if (!this.move(idx, x + dx, y + dy, cell, old, next)) {
@@ -1632,6 +1642,22 @@ class JsSandboxEngine implements SandboxEngine {
         if (spreadsLeft === 0) return;
       }
     }
+    // The burst: well-watered moss with nothing left to take beside it throws a patch across a
+    // narrow gap, which damp moss can never cross. See update_moss in lib.rs.
+    if (oldEnergy > 150 && this.chance(SPORE_ODDS)) {
+      for (const [dx, dy] of SPORE_JUMPS) {
+        const tx = x + dx;
+        const ty = y + dy;
+        if (!this.inBounds(tx, ty)) continue;
+        if (!sporeGap(old[this.index(x + dx / 2, y + dy / 2)])) continue;
+        const target = this.index(tx, ty);
+        const other = old[target];
+        const soft = (other === MATERIAL.Soil && !this.soilIsClaimed(tx, ty, old)) || other === MATERIAL.Wood;
+        if (!soft || next[target] !== other) continue;
+        writeCellBytes(next, target, MATERIAL.Moss, old[target + 1], 70, 0, wet ? CELL_FLAG.Wet : 0);
+        return;
+      }
+    }
   }
 
   private fungus(x: number, y: number, old: Uint8Array, next: Uint8Array) {
@@ -1857,6 +1883,11 @@ function petalSiteFree(kind: number) {
   return kind === MATERIAL.Empty || kind === MATERIAL.Pollen;
 }
 
+// What a moss spore crosses: open air, gas or water, never a wall or rock. See SPORE_JUMPS.
+function sporeGap(kind: number) {
+  return kind === MATERIAL.Empty || isGas(kind) || waterLike(kind);
+}
+
 // What a gliding seed rolls along rather than landing on: the plant that set it.
 function isPlant(kind: number) {
   return kind === MATERIAL.Flower || kind === MATERIAL.Stem;
@@ -1878,6 +1909,12 @@ const PETAL_COST = 2;
 const POLLEN_RESERVE = 40;
 const POLLEN_COST = 15;
 const PETAL_SHED_AGE = 1200;
+// How many ticks a shell's sparks fly outward, plain and star. See lib.rs.
+const SHELL_FLIGHT = 6;
+const STAR_SHELL_FLIGHT = 10;
+// Moss's burst across a gap. See the constants of the same names in sim/src/lib.rs.
+const SPORE_ODDS = 6;
+const SPORE_JUMPS: ReadonlyArray<readonly [number, number]> = [[2, 0], [-2, 0], [2, 2], [-2, 2], [0, 2], [2, -2], [-2, -2], [0, -2]];
 // Pollination. See the constants of the same names in sim/src/lib.rs.
 const POLLINATE_AGE = 20;
 const POLLINATE_ODDS = 30;

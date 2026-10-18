@@ -48,12 +48,12 @@ The owner hits usage limits early, so keep each chat lean:
 
 ## What to do next
 
-0. **The owner's answers of 2026-10-17, in progress.** Batch A is live (below). Still to do,
-   each so it SHOWS in play, with a filmstrip after: B, moss's burst crosses a narrow gap that
-   plain damp moss cannot, and a meteor lights fireworks as star rockets whose shells rain
-   stardust; C, lava thaws frozen cells a couple of cells off before its meltwater reaches it,
-   and hot water's melt carries its heat so it bores into ice instead of refreezing. The
-   owner's bar: "only meaningful changes that shows".
+0. **The owner's answers of 2026-10-17, in progress.** Batches A and B are live (below). Still
+   to do, so it SHOWS in play, with a filmstrip after: C, lava thaws frozen cells a couple of
+   cells off before its meltwater reaches it, and hot water's melt carries its heat so it bores
+   into ice instead of refreezing. The owner's bar: "only meaningful changes that shows". Star
+   shells look like plain ones in flight (a wider bloom and a stardust rain are the difference);
+   a colour of their own would be renderer work, put to the owner with the filmstrip.
 1. **If Chrome's launch flakes on CI again, read its stderr first.** On 2026-10-07 the debugger
    missed a 10 s window twice in a row on a runner whose other stages ran at their usual pace;
    nothing was captured to say why. `launchBrowserOnce` now waits 30 s and appends Chrome's
@@ -81,6 +81,17 @@ The owner hits usage limits early, so keep each chat lean:
 ## Where things stand
 
 Live, with the full gate, CI, `deploy:verify` and `qa:live` green:
+
+- **Moss bursts across a gap; a meteor lights star rockets** (2026-10-17). Moss over 150 energy
+  with nothing beside it to take throws a patch two cells off across a gap of air, gas or water
+  (`SPORE_ODDS`, `SPORE_JUMPS`): 32 of 32, 0 on the old build. A meteor lights the powder it lands
+  on with `FLAG_COSMIC`; a star grain passes the star to every lit grain it touches; a star
+  shell's sparks fly 10 ticks instead of 6 and all burn out into stardust (2-3x a fire-lit
+  pile's): 32 of 32, 0 on the old build. Review: a grain starred in the tick it burst threw a
+  plain shell (now read from `next`); the audit passed with star sparks burning out 1 in 6, so
+  it now requires 9 in 10 to leave stardust; the water-gap test never held its water. Sabotage
+  tool entries `star-sparks-plain-burnout`, `meteor-lights-plain`, `moss-no-spore`: each caught
+  8 of 8. `moss_cannot_spread_into_claimed_ground` outlived its seed's claim; it runs 190 ticks.
 
 - **Pollen pollinates, and a garden sows itself** (2026-10-17, the owner's logic: pollen is not
   a seed). A mote older than `POLLINATE_AGE` brushing the side of a flower of its own kind is
@@ -153,7 +164,7 @@ Live, with the full gate, CI, `deploy:verify` and `qa:live` green:
 The interaction audit has 160 checks bound to all 119 role ids; all pass on the audit's seed.
 On 32 seeds, nine do not pass every seed, each with its reason at its scene: `fire.thaws`,
 both `oil.ignites` checks, the fanned-trail check of `meteor.trail`, `fungus.fairyring`,
-`lava.scorches` and `stem.burns` at 31, the stalk check of `stem.footing` at 30, and the ember
+`lava.scorches` and `stem.burns` at 31, the stalk check of `stem.footing` at 27, and the ember
 check of `fire.dries` at 29. Thin by nature but passing every seed: the char-wash check of
 `ember.quenched` (5 cells at the least), `sand.pours` (34 ticks against the floor of 30), the
 wet-sand check of `sand.clumps` (46 ticks), the lava and ember checks of `rocket.lights` (35 and
@@ -161,12 +172,6 @@ wet-sand check of `sand.clumps` (46 ticks), the lava and ember checks of `rocket
 
 ## Design questions for the owner
 
-- **A meteor's own fuse-lighting never shows.** With it taken out of the JS mirror, a meteor
-  dropped on powder still launched it on 8 of 8: the fire ring its impact throws lights the
-  powder first. Harmless; drop the arm or leave it.
-- **Moss's burst does nothing a player can see.** On a watered plank moss covers it in 72-78
-  ticks with the burst and 67-80 without (8 seeds): a new patch starts at energy 70, under the
-  150 a burst needs. Make the burst matter, or drop it (lib.rs, engine.ts, the clause).
 - **Lava never thaws anything in play.** Frost exists only beside the ice that made it, so lava
   meets the ice first and the meltwater quenches it into stone. `lava.scorches` "thaws" is
   unwitnessed for that reason.

@@ -700,6 +700,19 @@ export const CHECKS = [
       const [x, y] = g.xyOf(i);
       return g.kindAt(x - 1, y) === M.Stem || g.kindAt(x + 1, y) === M.Stem;
     }) },
+  { m: "Moss", covers: "moss.spreads", role: "bursts across a narrow gap when well watered", w: 40, h: 30, seed: 162, ticks: 1500,
+    // Two wood planks with a one-cell gap (the brush paints a plus, so the left plank's centres
+    // stop at x=8 and the right's start at x=12), moss on the left, watered. The witness is moss
+    // on the right plank: nothing but a spore bridges the gap, so it fails with the burst taken
+    // out. Until 2026-10-17 the burst was a second patch beside the first in the same tick, and
+    // a creeping edge has only one cell to take, so it never showed.
+    paint: (p) => {
+      for (let x = 2; x <= 8; x++) p(x, 18, 0, M.Wood);
+      for (let x = 12; x <= 30; x++) p(x, 18, 0, M.Wood);
+      p(3, 16, 0, M.Moss);
+    },
+    act: (p, t) => { if (t < 300 && t % 12 === 0) p(5, 10, 0, M.Water); },
+    outcome: (g, before) => g.appeared(M.Moss, before).filter((i) => g.xyOf(i)[0] >= 12) },
   { m: "Moss", covers: "moss.spreads", role: "spreads across damp wood", w: 30, h: 26, seed: 26, ticks: 1500,
     paint: (p) => { p(15, 20, 4, M.Wood); p(15, 15, 3, M.Water); p(9, 20, 1, M.Moss); },
     outcome: (g, before) => g.appeared(M.Moss, before) },
@@ -782,6 +795,49 @@ export const CHECKS = [
   { m: "Rocket", covers: "rocket.lights", role: "is lit by flame and launches", w: 30, h: 40, seed: 36, ticks: 900,
     paint: (p) => { p(15, 34, 2, M.Rocket); p(15, 32, 1, M.Fire); },
     outcome: (g) => g.all(M.Spark) },
+  { m: "Rocket", covers: "rocket.lights", role: "a meteor lights it as star rockets whose shells rain stardust", w: 48, h: 80, seed: 161, ticks: 600,
+    // A meteor dropped on a charge. The witness is a STAR spark (a cosmic one), and the stardust
+    // each one burns out into, followed as it falls: only a rocket a meteor lit, or one a star
+    // rocket passed its star to, throws them, so a flame-lit charge, the meteor's own fire ring
+    // and the 1 in 6 plain sparks that leave stardust are never credited. The sparks alone are
+    // a volley under two seconds long, and were shown 25-28 ticks on 10 of 32 seeds. It also
+    // requires the rain itself, 9 in 10 star burnouts leaving stardust (below). Until
+    // 2026-10-17 a meteor lit powder exactly as a flame does, and its fire ring lit it anyway.
+    paint: (p) => {
+      for (let x = 4; x <= 44; x++) p(x, 76, 0, M.Wall);
+      for (let x = 18; x <= 30; x += 2) for (let y = 72; y <= 74; y += 2) p(x, y, 0, M.Rocket);
+      p(24, 40, 0, M.Meteor);
+    },
+    outcome: (g, before, memo, prev) => {
+      memo.dust ??= new Set();
+      memo.burnouts ??= 0;
+      memo.rained ??= 0;
+      if (prev) {
+        // A star spark about to burn out (it loses 10 a tick and dies under 30) that is gone
+        // from its cell: did it leave stardust? Plain sparks do 1 in 6; a star spark always.
+        for (let i = 0; i < g.size; i++) {
+          if (prev.kindOf(i) !== M.Spark || !prev.hasFlag(i, F.Cosmic) || prev.energyAt(i) >= 40 || g.kindOf(i) === M.Spark) continue;
+          memo.burnouts++;
+          if (g.kindOf(i) === M.Stardust) memo.rained++;
+        }
+        for (const i of [...memo.dust]) {
+          if (g.kindOf(i) === M.Stardust) continue;
+          memo.dust.delete(i);
+          const [x] = g.xyOf(i);
+          for (const j of [i + g.w, i + g.w - 1, i + g.w + 1, i - 1, i + 1]) {
+            if (j < 0 || j >= g.size || Math.abs(g.xyOf(j)[0] - x) > 1) continue;
+            if (g.kindOf(j) === M.Stardust && prev.kindOf(j) !== M.Stardust) { memo.dust.add(j); break; }
+          }
+        }
+        for (let i = 0; i < g.size; i++) {
+          if (prev.kindOf(i) === M.Spark && prev.hasFlag(i, F.Cosmic) && g.kindOf(i) === M.Stardust) memo.dust.add(i);
+        }
+      }
+      // Review: with star sparks burning out 1 in 6 like plain ones, the shell and its scant
+      // dust still passed. So nothing counts unless they rain: 9 in 10 burnouts leave stardust.
+      if (memo.burnouts < 6 || memo.rained < memo.burnouts * 0.9) return [];
+      return [...g.all(M.Spark).filter((i) => g.hasFlag(i, F.Cosmic)), ...memo.dust];
+    } },
   { m: "Rocket", covers: "rocket.lights", role: "is lit by lava", w: 30, h: 40, seed: 159, ticks: 900,
     // The scene above with a dab of lava for the flame. Only rockets make sparks here. 32 of 32,
     // thin by nature (35 ticks at the least: a launch is over in under two seconds); 0 of 32 with
@@ -1403,7 +1459,9 @@ export const CHECKS = [
     // so it measured the plant growing, and passed 32 of 32 with the cut left out. Now 0 of 32
     // without the cut and 30 of 32 with it: on two seeds the stalk grows from the soil beside
     // the seed pile and stands wholly below the cut, which takes its tip and leaves nothing
-    // above to fall.
+    // above to fall. 27 of 32 since moss's spore roll (2026-10-17) reshuffled the dice: the
+    // same failure on five other seeds (2105 and 7105 inspected: a plant sprouted on the moss
+    // beside the pile, its crown at the cut row).
     outcome: (g, before, memo, prev) => {
       memo.fallen ??= new Set();
       for (const i of g.all(M.Stem)) if (i >= g.w && prev.kindOf(i) !== M.Stem && prev.kindOf(i - g.w) === M.Stem) memo.fallen.add(i);
