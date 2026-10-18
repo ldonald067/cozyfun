@@ -489,7 +489,7 @@
               if (!d[o + 3]) continue;
               const lum = (d[o] * 0.3 + d[o + 1] * 0.59 + d[o + 2] * 0.11) / 255;
               const t = lerp(tooth, tw, x / cell, y / cell) * 0.45 + lerp(grit, fw, x / fine, y / fine) * 0.35 + rand() * 0.2 - 0.5;
-              const f = 1 + t * (0.18 + 0.22 * (1 - lum)) + (lerp(blots, bw, x / big, y / big) - 0.5) * 0.12;
+              const f = 1 + t * (0.22 + 0.26 * (1 - lum)) + (lerp(blots, bw, x / big, y / big) - 0.5) * 0.14;
               d[o] *= f;
               d[o + 1] *= f;
               d[o + 2] *= f;
@@ -506,30 +506,60 @@
           c.fillStyle = g;
           c.fillRect(0, 0, W, H);
           // Wet into wet: big overlapping washes of Payne's grey, ultramarine, violet and a
-          // little turquoise, none with an edge to speak of.
-          wash(c, blob(0.5 * W, -0.08 * H, 0.8 * W, 0.34 * H), "10, 12, 26", 36, 0.035, { spread: 0.14 });
-          wash(c, blob(0.22 * W, 0.34 * H, 0.34 * W, 0.26 * H), "44, 60, 128", 30, 0.028, { spread: 0.14 });
-          wash(c, blob(0.8 * W, 0.24 * H, 0.3 * W, 0.22 * H), "40, 54, 120", 28, 0.028, { spread: 0.14 });
-          wash(c, blob(0.56 * W, 0.52 * H, 0.32 * W, 0.22 * H), "76, 54, 122", 30, 0.026, { spread: 0.14 });
-          wash(c, blob(0.96 * W, 0.66 * H, 0.2 * W, 0.26 * H), "82, 56, 118", 24, 0.026, { spread: 0.12 });
-          wash(c, blob(0.06 * W, 0.62 * H, 0.2 * W, 0.24 * H), "30, 84, 104", 24, 0.028, { spread: 0.12 });
+          // little turquoise, each dropped into the last before it dried, so they bleed far
+          // into one another and none has an edge to speak of. Two small charges of deep
+          // indigo and rose were dropped in last.
+          const wet = { spread: 0.2, k: 0.42 };
+          wash(c, blob(0.5 * W, -0.08 * H, 0.8 * W, 0.34 * H), "10, 12, 26", 36, 0.035, wet);
+          wash(c, blob(0.22 * W, 0.34 * H, 0.34 * W, 0.26 * H), "44, 60, 128", 30, 0.028, wet);
+          wash(c, blob(0.8 * W, 0.24 * H, 0.3 * W, 0.22 * H), "40, 54, 120", 28, 0.028, wet);
+          wash(c, blob(0.56 * W, 0.52 * H, 0.32 * W, 0.22 * H), "76, 54, 122", 30, 0.026, wet);
+          wash(c, blob(0.96 * W, 0.66 * H, 0.2 * W, 0.26 * H), "82, 56, 118", 24, 0.026, wet);
+          wash(c, blob(0.06 * W, 0.62 * H, 0.2 * W, 0.24 * H), "30, 84, 104", 24, 0.028, wet);
+          wash(c, blob(0.34 * W, 0.2 * H, 0.16 * W, 0.12 * H), "18, 22, 64", 20, 0.04, wet);
+          wash(c, blob(0.76 * W, 0.46 * H, 0.14 * W, 0.12 * H), "130, 64, 104", 20, 0.03, wet);
           // A band of cloud lifted out with a damp brush.
-          wash(c, blob(0.42 * W, 0.15 * H, 0.36 * W, 0.07 * H), "120, 128, 184", 24, 0.016, { spread: 0.1 });
+          wash(c, blob(0.42 * W, 0.15 * H, 0.36 * W, 0.07 * H), "120, 128, 184", 24, 0.016, { spread: 0.16 });
+          // The frame's dark paint touched the sky while it was wet and bled into it.
+          wash(c, blob(0, 0.45 * H, 0.05 * W, 0.6 * H), "40, 24, 24", 14, 0.05, { spread: 0.25 });
+          wash(c, blob(W, 0.45 * H, 0.05 * W, 0.6 * H), "40, 24, 24", 14, 0.05, { spread: 0.25 });
           // Lamplight on the glass, low and to the left: it lightens what is there rather
           // than covering it, so it goes on as screen.
           c.globalCompositeOperation = "screen";
           wash(c, blob(0.28 * W, 1.0 * H, 0.42 * W, 0.26 * H), "150, 82, 36", 18, 0.022, { spread: 0.14 });
           wash(c, blob(0.28 * W, 0.97 * H, 0.2 * W, 0.12 * H), "210, 140, 70", 14, 0.024, { spread: 0.14 });
           // Backruns: where wet paint crept back into a drying wash, leaving a pale
-          // cauliflower inside a dark tide line.
-          for (const [x, y, r] of [[0.14, 0.22, 0.05], [0.68, 0.38, 0.04], [0.88, 0.1, 0.034]]) {
-            const b = blob(x * W, y * H, r * W * 1.4, r * W * 1.1, 1.3);
+          // cauliflower inside a dark, frilled tide line.
+          for (const [x, y, r] of [[0.15, 0.24, 0.075], [0.86, 0.13, 0.055], [0.66, 0.36, 0.04]]) {
+            const b = blob(x * W, y * H, r * W, r * W * 0.75, 1.5);
             c.globalCompositeOperation = "screen";
-            wash(c, b, "80, 90, 150", 6, 0.022, { spread: 0.05 });
+            wash(c, b, "70, 80, 140", 4, 0.035, { k: 0.18 });
             c.globalCompositeOperation = "source-over";
-            wash(c, b, "0, 0, 0", 4, 0, { rim: "8, 10, 24", rimAlpha: 0.06 });
+            wash(c, b, "0, 0, 0", 3, 0, { k: 0.5, rim: "6, 8, 22", rimAlpha: 0.14 });
           }
           c.globalCompositeOperation = "source-over";
+          // Runs: the board was tipped while the sky was still wet, and paint crept down in
+          // threads that each end in a bead. Kept off the middle, where the type sits.
+          c.lineCap = "round";
+          for (let i = 0; i < 10; i++) {
+            const dark = i < 6;
+            let x = (rand() < 0.5 ? 0.05 + rand() * 0.2 : 0.75 + rand() * 0.2) * W;
+            const y = (dark ? 0.1 + rand() * 0.18 : 0.3 + rand() * 0.3) * H;
+            const len = (30 + rand() * 110) * S, w = (0.7 + rand() * 1.3) * S;
+            const a = dark ? 0.16 + rand() * 0.14 : 0.06 + rand() * 0.06;
+            c.strokeStyle = c.fillStyle = dark ? "rgba(10, 12, 34, " + a + ")" : "rgba(170, 178, 230, " + a + ")";
+            c.lineWidth = w;
+            c.beginPath();
+            c.moveTo(x, y);
+            for (let d = 6 * S; d < len; d += 6 * S) {
+              x += gauss() * 0.5 * S;
+              c.lineTo(x, y + d);
+            }
+            c.stroke();
+            c.beginPath();
+            c.arc(x, y + len, w * 1.4, 0, 6.2832);
+            c.fill();
+          }
           spatter(c, W, 0.86 * H, 110);
           paper(c, W, H, 0);
         }
@@ -538,16 +568,17 @@
         // rather than a speck; everywhere wider it is simply the frame's scale.
         function terrarium(c, W, H, desk) {
           const frame = S;
-          S = Math.max(S, 0.6 * H / 620);
+          S = Math.max(S, 0.5 * H / 620);
           const top = jar(c, W, H, desk);
           S = frame;
           return top;
         }
         function jar(c, W, H, desk) {
-          const jw = 108 * S, jh = 148 * S, r = jw * 0.2;
-          const cx = W - Math.max(jw * 0.9, 0.17 * W), base = desk + 0.045 * H;
+          const jw = 146 * S, jh = 200 * S, r = jw * 0.2;
+          const cx = W - Math.max(jw * 0.85, 0.17 * W), base = desk + 0.045 * H;
           const L = cx - jw / 2, R = cx + jw / 2, T = base - jh;
-          const neck = jw * 0.3, nh = jh * 0.08, sh = jh * 0.2;
+          const neck = jw * 0.3, nh = jh * 0.07, sh = jh * 0.18;
+          const soil = base - jh * 0.27, sand = base - jh * 0.17;
           function body() {
             c.beginPath();
             c.moveTo(L + r, base);
@@ -563,26 +594,66 @@
             c.quadraticCurveTo(L, base, L + r, base);
             c.closePath();
           }
-          function leaf(x, y, angle, rgb) {
+          // One dab of the brush, its base at (x, y), pointing along `angle`.
+          function leaf(x, y, angle, len, wid, rgb, rim) {
             c.save();
             c.translate(x, y);
             c.rotate(angle);
-            wash(c, blob(4 * S, 0, 5 * S, 2.2 * S), rgb, 6, 0.22, { k: 0.2 });
+            wash(c, blob(len / 2, 0, len / 2, wid / 2), rgb, 5, 0.26, { k: 0.25, rim, rimAlpha: 0.14 });
             c.restore();
           }
-          function stem(x0, y0, x1, y1, bend) {
-            for (let i = 0; i < 3; i++) {
+          // A stem is a quadratic from root to tip, laid twice, loosely. It returns a
+          // function giving a point along it and its heading there, to hang leaves from.
+          function stem(x0, y0, bx, by, x1, y1, w, rgb) {
+            for (let i = 0; i < 2; i++) {
               c.beginPath();
               c.moveTo(x0 + gauss() * 0.4 * S, y0);
-              c.quadraticCurveTo((x0 + x1) / 2 + bend, (y0 + y1) / 2, x1 + gauss() * 0.4 * S, y1);
-              c.strokeStyle = "rgba(104, 148, 78, 0.45)";
-              c.lineWidth = 1.3 * S;
+              c.quadraticCurveTo(bx, by, x1 + gauss() * 0.4 * S, y1);
+              c.strokeStyle = "rgba(" + rgb + ", 0.5)";
+              c.lineWidth = w * S;
               c.stroke();
+            }
+            return (t) => {
+              const u = 1 - t;
+              return {
+                x: u * u * x0 + 2 * u * t * bx + t * t * x1,
+                y: u * u * y0 + 2 * u * t * by + t * t * y1,
+                a: Math.atan2(2 * u * (by - y0) + 2 * t * (y1 - by), 2 * u * (bx - x0) + 2 * t * (x1 - bx)),
+              };
+            };
+          }
+          function frond(x0, y0, bx, by, x1, y1, size, rgb) {
+            const at = stem(x0, y0, bx, by, x1, y1, 1, rgb);
+            for (let t = 0.14; t < 0.98; t += 0.075) {
+              const p = at(t), l = size * S * (1 - t * 0.7);
+              leaf(p.x, p.y, p.a - 1.05, l, l * 0.42, rgb);
+              leaf(p.x, p.y, p.a + 1.05, l, l * 0.42, rgb);
+            }
+          }
+          function bloom(x, y, petals, len, wid, rgb, rim, eye, eyeR) {
+            for (let i = 0; i < petals; i++) {
+              const a = (i / petals) * 6.2832 + rand() * 0.2;
+              c.save();
+              c.translate(x, y);
+              c.rotate(a);
+              wash(c, blob(len * 0.55, 0, len * 0.5, wid / 2), rgb, 5, 0.26, { k: 0.25, rim, rimAlpha: 0.14 });
+              c.restore();
+            }
+            wash(c, blob(x, y, eyeR, eyeR), eye, 6, 0.4, { k: 0.2 });
+          }
+          function mushroom(x, y, h, w) {
+            wash(c, blob(x, y - h / 2, w * 0.2, h / 2), "226, 214, 196", 5, 0.32, { k: 0.2 });
+            wash(c, blob(x, y - h, w / 2, w * 0.3), "190, 66, 52", 7, 0.3, { k: 0.25, rim: "96, 30, 26", rimAlpha: 0.2 });
+            c.fillStyle = "rgba(246, 236, 220, 0.7)";
+            for (let i = 0; i < 3; i++) {
+              c.beginPath();
+              c.arc(x + (rand() - 0.5) * w * 0.6, y - h - w * 0.06 + (rand() - 0.5) * w * 0.14, (0.4 + rand() * 0.4) * S, 0, 6.2832);
+              c.fill();
             }
           }
 
           // Its shadow on the desk, thrown away from the lamp.
-          wash(c, blob(cx + 0.2 * jw, base + 2 * S, jw * 0.66, 6 * S), "10, 6, 10", 14, 0.08, { k: 0.2 });
+          wash(c, blob(cx + 0.2 * jw, base + 2 * S, jw * 0.66, 7 * S), "10, 6, 10", 14, 0.08, { k: 0.2 });
 
           c.save();
           body();
@@ -590,45 +661,70 @@
           // Glass tints what is behind it.
           c.fillStyle = "rgba(30, 48, 66, 0.4)";
           c.fillRect(L - 2, T - 2, jw + 4, jh + 4);
-          // The sandbox's own strata: sand, soil, then a moss bed.
-          const soil = base - jh * 0.34, sand = base - jh * 0.22;
+          // The sandbox's own strata: sand with a few stones in it, then soil.
           wash(c, band(L - 6 * S, R + 6 * S, sand, base + 6 * S), "196, 152, 86", 14, 0.11, { rim: "120, 84, 40" });
-          wash(c, band(L - 6 * S, R + 6 * S, soil, sand + 2 * S), "78, 50, 34", 14, 0.13, { rim: "30, 18, 14" });
-          for (let i = 0; i < 5; i++) {
-            const x = L + jw * (0.1 + i * 0.2 + gauss() * 0.03), w = (9 + rand() * 6) * S;
-            wash(c, blob(x, soil, w, (5 + rand() * 3) * S), "70, 118, 56", 12, 0.14, { rim: "26, 50, 30" });
-            wash(c, blob(x - w * 0.3, soil - 2 * S, w * 0.5, 2.5 * S), "136, 176, 92", 6, 0.1);
+          for (const f of [0.18, 0.47, 0.8]) {
+            wash(c, blob(L + f * jw, sand + (7 + rand() * 12) * S, 3.4 * S, 2.4 * S), "120, 116, 120", 5, 0.3, { k: 0.2, rim: "50, 46, 52", rimAlpha: 0.2 });
           }
-          // A moonlit flower on a tall stem, and a rose one on a short stem.
-          const fx = cx - 0.06 * jw, fy = T + jh * 0.34;
-          stem(cx - 0.14 * jw, soil, fx, fy, -6 * S);
-          leaf(cx - 0.12 * jw, soil - jh * 0.12, -2.4, "96, 146, 74");
-          leaf(cx - 0.1 * jw, soil - jh * 0.22, -0.6, "96, 146, 74");
+          wash(c, band(L - 6 * S, R + 6 * S, soil, sand + 2 * S), "78, 50, 34", 14, 0.13, { rim: "30, 18, 14" });
+
+          // What grows, back to front: a vine up the far wall, two fern fronds arching
+          // out, then a sunflower and a moonlit flower standing tallest.
+          const vine = stem(R - 0.08 * jw, soil, R + 0.04 * jw, soil - 0.5 * jh, R - 0.13 * jw, T + nh + sh * 0.8, 0.9, "84, 128, 62");
+          for (let t = 0.1, side = 1; t < 0.98; t += 0.09, side = -side) {
+            const p = vine(t);
+            leaf(p.x, p.y, p.a + side * 0.9, 5 * S, 3.6 * S, "86, 140, 70");
+          }
+          frond(L + 0.3 * jw, soil, L + 0.08 * jw, soil - 0.55 * jh, L + 0.06 * jw, soil - 0.3 * jh, 7, "66, 122, 62");
+          frond(R - 0.32 * jw, soil, R - 0.12 * jw, soil - 0.36 * jh, R - 0.05 * jw, soil - 0.16 * jh, 6, "78, 132, 64");
+          const sx = cx + 0.18 * jw, sy = T + jh * 0.26;
+          const sun = stem(cx + 0.14 * jw, soil, cx + 0.1 * jw, (soil + sy) / 2, sx, sy, 1.5, "96, 140, 70");
+          leaf(sun(0.35).x, sun(0.35).y, -0.5, 10 * S, 5 * S, "88, 136, 66", "40, 70, 36");
+          leaf(sun(0.55).x, sun(0.55).y, -2.7, 9 * S, 4.5 * S, "88, 136, 66", "40, 70, 36");
+          bloom(sx, sy, 13, 8 * S, 3.2 * S, "238, 186, 62", "170, 110, 30", "96, 58, 30", 3.6 * S);
+          const fx = cx - 0.12 * jw, fy = T + jh * 0.34;
+          const moon = stem(cx - 0.06 * jw, soil, cx - 0.16 * jw, (soil + fy) / 2, fx, fy, 1.2, "104, 148, 78");
+          leaf(moon(0.3).x, moon(0.3).y, -2.5, 7 * S, 3.4 * S, "96, 146, 74");
+          leaf(moon(0.5).x, moon(0.5).y, -0.6, 6.5 * S, 3 * S, "96, 146, 74");
           // Its glow is the one smooth thing in the painting, on purpose: light, not pigment.
-          const glow = c.createRadialGradient(fx, fy, 0, fx, fy, 26 * S);
+          const glow = c.createRadialGradient(fx, fy, 0, fx, fy, 30 * S);
           glow.addColorStop(0, "rgba(150, 170, 255, 0.34)");
           glow.addColorStop(0.4, "rgba(130, 150, 255, 0.12)");
           glow.addColorStop(1, "rgba(130, 150, 255, 0)");
           c.globalCompositeOperation = "screen";
           c.fillStyle = glow;
-          c.fillRect(fx - 26 * S, fy - 26 * S, 52 * S, 52 * S);
+          c.fillRect(fx - 30 * S, fy - 30 * S, 60 * S, 60 * S);
           c.globalCompositeOperation = "source-over";
-          for (let i = 0; i < 5; i++) {
-            const a = (i / 5) * 6.2832 - 1.57;
-            c.save();
-            c.translate(fx + Math.cos(a) * 3.6 * S, fy + Math.sin(a) * 3.6 * S);
-            c.rotate(a);
-            wash(c, blob(0, 0, 3.6 * S, 2.6 * S), "214, 224, 255", 6, 0.24, { k: 0.2 });
-            c.restore();
+          bloom(fx, fy, 5, 4.6 * S, 3.4 * S, "214, 224, 255", "140, 150, 210", "250, 236, 180", 1.6 * S);
+          // In front: a daisy, a cornflower and two sprouts.
+          const daisy = stem(cx + 0.02 * jw, soil, cx + 0.05 * jw, soil - 0.1 * jh, cx, soil - 0.19 * jh, 1, "104, 148, 78");
+          bloom(daisy(1).x, daisy(1).y, 11, 5 * S, 1.7 * S, "240, 236, 226", "150, 150, 170", "236, 190, 70", 1.7 * S);
+          const corn = stem(L + 0.2 * jw, soil, L + 0.15 * jw, soil - 0.08 * jh, L + 0.19 * jw, soil - 0.16 * jh, 1, "104, 148, 78");
+          bloom(corn(1).x, corn(1).y, 8, 4.4 * S, 2.6 * S, "84, 116, 216", "40, 60, 140", "40, 40, 100", 1.4 * S);
+          for (const f of [0.42, 0.62]) {
+            const sprout = stem(L + f * jw, soil, L + f * jw, soil - 4 * S, L + f * jw + S, soil - 8 * S, 0.8, "120, 170, 90");
+            leaf(sprout(1).x, sprout(1).y, -2.4, 3.6 * S, 2 * S, "130, 180, 96");
+            leaf(sprout(1).x, sprout(1).y, -0.7, 3.6 * S, 2 * S, "130, 180, 96");
           }
-          c.fillStyle = "rgba(250, 236, 180, 0.7)";
-          c.beginPath();
-          c.arc(fx, fy, 1.6 * S, 0, 6.2832);
-          c.fill();
-          const rx = cx + 0.22 * jw, ry = soil - jh * 0.14;
-          stem(cx + 0.2 * jw, soil, rx, ry, 3 * S);
-          leaf(cx + 0.21 * jw, soil - jh * 0.06, -0.5, "96, 146, 74");
-          wash(c, blob(rx, ry, 3.8 * S, 3.4 * S), "222, 116, 146", 8, 0.2, { k: 0.25, rim: "130, 50, 80" });
+          // Moss over every root, and mushrooms at its edge.
+          for (let i = 0; i < 8; i++) {
+            const x = L + jw * (0.04 + i * 0.13 + gauss() * 0.02), w = (7 + rand() * 6) * S;
+            wash(c, blob(x, soil, w, (4.5 + rand() * 3) * S), "70, 118, 56", 10, 0.15, { rim: "26, 50, 30" });
+            wash(c, blob(x - w * 0.3, soil - 2 * S, w * 0.5, 2.5 * S), "136, 176, 92", 5, 0.11);
+          }
+          mushroom(R - 0.34 * jw, soil + S, 10 * S, 9 * S);
+          mushroom(R - 0.25 * jw, soil + 1.5 * S, 7 * S, 6.5 * S);
+          mushroom(R - 0.19 * jw, soil + 2 * S, 4.5 * S, 4.5 * S);
+          // Pollen adrift in the jar's still air.
+          for (let i = 0; i < 8; i++) {
+            const x = cx + (rand() - 0.5) * jw * 0.7, y = T + jh * (0.2 + rand() * 0.32);
+            const mote = c.createRadialGradient(x, y, 0, x, y, 3 * S);
+            mote.addColorStop(0, "rgba(255, 226, 150, 0.8)");
+            mote.addColorStop(0.3, "rgba(255, 226, 150, 0.25)");
+            mote.addColorStop(1, "rgba(255, 226, 150, 0)");
+            c.fillStyle = mote;
+            c.fillRect(x - 3 * S, y - 3 * S, 6 * S, 6 * S);
+          }
           // The lamp warms the near side of the glass; the far side falls into shadow.
           const warm = c.createLinearGradient(L, 0, cx, 0);
           warm.addColorStop(0, "rgba(240, 180, 110, 0.16)");
@@ -643,34 +739,47 @@
           c.moveTo(R, T + nh + sh * 0.6);
           c.lineTo(R, base);
           c.stroke();
+          // A sealed jar has its own weather: condensation beaded on the inside of the
+          // glass, each bead a pale core in a darker ring, as on the window.
+          c.lineWidth = 0.5 * S;
+          for (let i = 0; i < 20; i++) {
+            const x = L + jw * (0.06 + rand() * 0.88), y = T + nh + sh * 0.4 + rand() * (soil - 0.3 * jh - T - nh);
+            c.beginPath();
+            c.arc(x, y, (0.6 + Math.pow(rand(), 2) * 1.6) * S, 0, 6.2832);
+            c.fillStyle = "rgba(236, 240, 255, 0.26)";
+            c.fill();
+            c.strokeStyle = "rgba(10, 14, 30, 0.34)";
+            c.stroke();
+          }
           c.restore();
 
-          // The glass itself: an outline laid twice, slightly off register as by hand, and
-          // a highlight lifted out down the near side.
-          c.lineWidth = 1.4 * S;
-          c.strokeStyle = "rgba(214, 226, 246, 0.24)";
-          body();
-          c.stroke();
-          c.save();
-          c.translate(0.8 * S, 0.5 * S);
-          c.strokeStyle = "rgba(214, 226, 246, 0.12)";
-          body();
-          c.stroke();
-          c.restore();
+          // The glass itself, drawn loosely: three outlines, each slightly off register
+          // and broken where the brush lifted, and a highlight lifted down the near side.
           c.lineCap = "round";
+          for (let i = 0; i < 3; i++) {
+            c.save();
+            c.translate(gauss() * 0.9 * S, gauss() * 0.7 * S);
+            c.setLineDash([(30 + rand() * 50) * S, (2 + rand() * 6) * S, (10 + rand() * 30) * S, (1 + rand() * 4) * S]);
+            c.lineDashOffset = rand() * 100 * S;
+            c.strokeStyle = "rgba(214, 226, 246, " + (0.12 + rand() * 0.12) + ")";
+            c.lineWidth = (0.9 + rand() * 1.2) * S;
+            body();
+            c.stroke();
+            c.restore();
+          }
           c.strokeStyle = "rgba(255, 240, 214, 0.42)";
           c.lineWidth = 2.6 * S;
           c.beginPath();
-          c.moveTo(L + 0.14 * jw, T + nh + sh * 0.9);
-          c.quadraticCurveTo(L + 0.08 * jw, base - jh * 0.45, L + 0.12 * jw, base - r * 1.2);
+          c.moveTo(L + 0.12 * jw, T + nh + sh * 0.9);
+          c.quadraticCurveTo(L + 0.07 * jw, base - jh * 0.45, L + 0.1 * jw, base - r * 1.2);
           c.stroke();
           c.lineWidth = 1.6 * S;
           c.beginPath();
-          c.moveTo(L + 0.26 * jw, T + nh + sh * 0.35);
-          c.lineTo(L + 0.32 * jw, T + nh + sh * 0.2);
+          c.moveTo(L + 0.24 * jw, T + nh + sh * 0.35);
+          c.lineTo(L + 0.3 * jw, T + nh + sh * 0.2);
           c.stroke();
           // A cork, with the lamp catching its top.
-          const cw = neck * 1.1, ct = T - jh * 0.085;
+          const cw = neck * 1.1, ct = T - jh * 0.075;
           wash(c, band(cx - cw, cx + cw, ct, T + 2 * S), "150, 98, 58", 10, 0.22, { k: 0.2, rim: "60, 36, 24" });
           c.strokeStyle = "rgba(246, 200, 140, 0.4)";
           c.lineWidth = 1.2 * S;
@@ -726,7 +835,7 @@
             trace(c, jamb);
             c.fillStyle = "#1a1316";
             c.fill();
-            wash(c, jamb, "52, 34, 28", 8, 0.12, { k: 0.15, rim: "6, 4, 8", rimAlpha: 0.2 });
+            wash(c, jamb, "52, 34, 28", 8, 0.12, { k: 0.32, rim: "6, 4, 8", rimAlpha: 0.2 });
           }
           const lit = c.createLinearGradient(0, desk, 0, 0.3 * H);
           lit.addColorStop(0, "rgba(236, 176, 112, 0.34)");
@@ -738,10 +847,15 @@
           c.lineTo(0.973 * W, 0.3 * H);
           c.stroke();
           // Shadow where the desk meets the wall, and the lamp catching the sill above it.
-          trace(c, top);
-          c.strokeStyle = "rgba(10, 6, 12, 0.55)";
-          c.lineWidth = 2.4 * S;
-          c.stroke();
+          for (let i = 0; i < 2; i++) {
+            c.save();
+            c.translate(gauss() * 2 * S, gauss() * 0.8 * S);
+            trace(c, top);
+            c.strokeStyle = "rgba(10, 6, 12, " + (0.3 + i * 0.12) + ")";
+            c.lineWidth = (1.6 + i * 1.2) * S;
+            c.stroke();
+            c.restore();
+          }
           c.save();
           c.translate(0, -2.4 * S);
           trace(c, top);
@@ -758,6 +872,53 @@
           wash(c, blob(0.5 * W, -0.12 * H, 0.62 * W, 0.56 * H), "196, 190, 255", 26, 0.03, { spread: 0.15 });
           wash(c, blob(0.14 * W, 0.02 * H, 0.24 * W, 0.34 * H), "214, 206, 255", 18, 0.03, { spread: 0.12 });
           wash(c, blob(0.88 * W, 0.04 * H, 0.24 * W, 0.32 * H), "214, 206, 255", 18, 0.03, { spread: 0.12 });
+        }
+
+        // Rain, as brushwork. Each sheet keeps its CSS dots as the fallback, and its
+        // whole-tile drift; only the tile's picture changes, to a few short strokes of pale
+        // wash that pool into a bead at the lower end, the way a loaded brush leaves a
+        // mark. They lean along the drift, so each falls the way it points. A drop near
+        // the tile's edge is drawn again one tile over, so the seam never cuts a stroke.
+        const SHEETS = [
+          ["rain--far", 51, 96, 4, 5, 1.0, "190, 196, 232", 0.26],
+          ["rain--mid", 66, 124, 4, 8, 1.3, "210, 214, 246", 0.3],
+          ["rain--near", 85, 158, 3, 11, 1.8, "236, 236, 252", 0.34],
+        ];
+        function drop(c, x, y, len, wid, rgb, alpha) {
+          const ux = 0.257, uy = 0.966, nx = uy, ny = -ux;
+          const tx = x - ux * len, ty = y - uy * len, mx = x - ux * len * 0.4, my = y - uy * len * 0.4;
+          c.fillStyle = "rgba(" + rgb + ", " + alpha * 0.3 + ")";
+          for (let i = 0; i < 3; i++) {
+            const w = wid * (0.4 + rand() * 0.25), j = gauss() * 0.3;
+            c.beginPath();
+            c.moveTo(tx + nx * j, ty + ny * j);
+            c.quadraticCurveTo(mx + nx * w, my + ny * w, x + nx * w * 0.8, y + ny * w * 0.8);
+            c.lineTo(x - nx * w * 0.8, y - ny * w * 0.8);
+            c.quadraticCurveTo(mx - nx * w, my - ny * w, tx + nx * j, ty + ny * j);
+            c.fill();
+          }
+          c.beginPath();
+          c.arc(x, y, wid * 0.62, 0, 6.2832);
+          c.fillStyle = "rgba(" + rgb + ", " + alpha * 0.45 + ")";
+          c.fill();
+          c.strokeStyle = "rgba(" + rgb + ", " + alpha * 0.8 + ")";
+          c.lineWidth = 0.45;
+          c.stroke();
+        }
+        function paintRain(scale) {
+          for (const [name, tw, th, n, len, wid, rgb, alpha] of SHEETS) {
+            const tile = document.createElement("canvas");
+            tile.width = Math.round(tw * scale);
+            tile.height = Math.round(th * scale);
+            const c = tile.getContext("2d");
+            c.scale(tile.width / tw, tile.height / th);
+            for (let i = 0; i < n; i++) {
+              // One drop to each band down the tile, so no two crowd together.
+              const x = rand() * tw, y = ((i + 0.2 + rand() * 0.6) / n) * th, l = len * (0.8 + rand() * 0.4);
+              for (const ox of [-tw, 0, tw]) for (const oy of [-th, 0, th]) drop(c, x + ox, y + oy, l, wid, rgb, alpha);
+            }
+            document.querySelector("." + name).style.backgroundImage = "url(" + tile.toDataURL() + ")";
+          }
         }
 
         function fit(canvas, scale) {
@@ -778,6 +939,8 @@
           // The flash is nothing but soft wash, so half resolution loses nothing.
           reseed(13);
           paintFlash(...fit(flash, dpr / 2));
+          reseed(17);
+          paintRain(dpr);
         }
         let again = 0;
         window.addEventListener("resize", () => {
