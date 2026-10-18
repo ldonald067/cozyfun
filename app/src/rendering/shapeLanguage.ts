@@ -691,8 +691,9 @@ export const FIREWORK_HUES: Rgb[] = [
 // twinkles out. One hue for the WHOLE shell would be truer still, but the shell's identity
 // has nowhere to live — `variant` is a 3-bit field by contract (`load_cells` masks imported
 // bytes to `& 7`) and it is already spent on direction.
-function sparkColor({ variant, age, energy, time, x, y }: ShapeContext) {
+function sparkColor({ variant, age, energy, flags, time, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
+  if (flags & CELL_FLAG.Cosmic) return starSparkColor(hash, variant, age, energy, time);
   const hue = FIREWORK_HUES[variant & 3];
   if (age < 3) return mixRgb([255, 250, 230], hue, 0.25);
   const life = Math.min(1, energy / 235);
@@ -700,6 +701,31 @@ function sparkColor({ variant, age, energy, time, x, y }: ShapeContext) {
   const blink = (hash + age + Math.floor(time * 0.02)) % 5 === 0;
   if (blink) out = mixRgb(out, [255, 255, 240], 0.55);
   return out;
+}
+
+// A star shell's sparks: the shell of a rocket a meteor lit. Violet starlight in four tints,
+// keyed on direction like the firework hues so the shell keeps its four-fold symmetry,
+// twinkling as it flies and fading toward the violet of the stardust each one burns out into
+// instead of to ember red. The owner asked for a colour of their own (2026-10-18): in the
+// firework hues a meteor-lit volley looked like a flame-lit one until it had landed.
+//
+// Violet because no plain spark ever passes through it. The first try was silver, and it read
+// apart at its best moment (190) but not at its worst: a plain spark blinks toward white, and
+// a silver one came within 17 of it. These hold 81 apart at the worst moment (probe gate 11).
+export const STAR_HUES: Rgb[] = [
+  [160, 108, 255],
+  [190, 132, 255],
+  [142, 96, 236],
+  [208, 150, 255]
+];
+
+function starSparkColor(hash: number, variant: number, age: number, energy: number, time: number) {
+  const hue = STAR_HUES[variant & 3];
+  if (age < 3) return mixRgb([255, 255, 255], hue, 0.4);
+  const life = Math.min(1, energy / 235);
+  const out = mixRgb([78, 60, 156], hue, 0.3 + life * 0.7);
+  const twinkle = (hash + age + Math.floor(time * 0.03)) % 2 === 0;
+  return twinkle ? adjustRgb(out, 30) : out;
 }
 
 function rocketColor({ color, variant, energy, time, x, y }: ShapeContext) {

@@ -48,25 +48,26 @@ The owner hits usage limits early, so keep each chat lean:
 
 ## What to do next
 
-0. **Batch C of the owner's 2026-10-17 answers is parked, waiting on the owner.** "Lava should
-   thaw" and "hot water melting ice: change so it shows". Tried, measured, not shipped (the
-   owner's bar is "only meaningful changes that shows"); the work is in
+0. **Items 6 and 7 of the owner's 2026-10-17 answers are this chat's job** (the owner, 2026-10-18:
+   "6,7 should be for the next chat"). The owner's words: "6. lava should thaw" and "7. change
+   so it shows" (hot water melting ice), under the bar "only meaningful changes that shows,
+   because if not then whats the point". A first attempt was measured and not shipped; it is in
    `.tmp/cues/batch-c-wip.patch` (lava's radiant heat, `RADIANT_REACH`/`RADIANT_ODDS`; the melt
-   carrying heat, `MELT_COST`; two audit scenes).
+   carrying heat, `MELT_COST`; two audit scenes), with the probe `.tmp/cues/slab.mjs` and the
+   filmstrip scenes `lava-thaw` and `hot-melt` in `.tmp/film/scenes.mjs`. What it found:
    - Ice re-frosts the wet or freezable cells beside it every tick (masonry) or 1 in 4 (life),
      so no thaw lasts while the ice is there: lava "thaws" in play only by getting rid of the
      ice. Radiant heat two cells out melts ice through a gap or a one-cell wall, but only the
-     first column; on a moss bed the lava sets the moss alight and the fire dominates. The
-     audit scene passed 8 of 32 against 4 on the old build.
+     first column; on a moss bed the lava sets the moss alight and the fire dominates (a bad
+     scene: use masonry or bare ground). The audit scene passed 8 of 32 against 4.
    - Hot water: a melt that carries the heat on less `MELT_COST` makes heat from nothing (each
      melt passes nearly all of it on). At 15 the basin slab lost about 16 of 86 cells against
-     10 (`.tmp/cues/slab.mjs`); at 10, 8 or 5 it runs away and melts the whole slab on some
-     seeds and not others. With heat conserved, a splash of hot water cannot melt much ice.
-   - What would show: heat spreading through water (a pool warmed by a flame warms its edges
-     and melts the ice round it) and a wider lava heat. Both are physics changes with wide drift
-     (boiling, steam, mist). The owner was asked to choose.
-   Star shells look like plain ones in flight (a wider bloom and a stardust rain are the
-   difference); a colour of their own would be renderer work, also put to the owner.
+     10; at 10, 8 or 5 it runs away and melts the whole slab on some seeds and not others.
+     With heat conserved, a splash of hot water cannot melt much ice.
+   - What would show: heat that spreads through water (a pool a flame warms warms its edges and
+     melts the ice round it) and a wider lava heat. Both are physics changes with wide drift
+     (boiling, steam, mist, `water:budget`): run `audit:drift` on every check, and show the
+     owner a filmstrip of each before shipping, since the owner decides from pictures.
 1. **If Chrome's launch flakes on CI again, read its stderr first.** On 2026-10-07 the debugger
    missed a 10 s window twice in a row on a runner whose other stages ran at their usual pace;
    nothing was captured to say why. `launchBrowserOnce` now waits 30 s and appends Chrome's
@@ -94,6 +95,12 @@ The owner hits usage limits early, so keep each chat lean:
 ## Where things stand
 
 Live, with the full gate, CI, `deploy:verify` and `qa:live` green:
+
+- **Star shells have a colour of their own** (2026-10-18, the owner's call): a star spark is drawn
+  in `STAR_HUES`, violet starlight that twinkles and fades to stardust violet, with a violet
+  glow. `renderer:probe` gate 11: 81 from every plain spark at the worst moment past the birth
+  flash (floor 70); a silver palette passed at its best moment and failed at its worst (17).
+  About half a meteor-lit volley is star; the meteor's fire ring lights the rest plainly.
 
 - **Moss bursts across a gap; a meteor lights star rockets** (2026-10-17). Moss over 150 energy
   with nothing beside it to take throws a patch two cells off across a gap of air, gas or water

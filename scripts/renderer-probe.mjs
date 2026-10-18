@@ -546,9 +546,9 @@ function assertFloor(label, floor, worst, detail) {
     for (let i = 0; i < W; i++) put(i, 8, MATERIAL.Wall);
     for (let i = 10; i <= 14; i++) { put(i, 7, MATERIAL.Wood, 0, 40); put(i, 6, MATERIAL.Fire, energy, age, 0, i); }
   });
-  const lone = (kind, x, y, energy, age, variant) => board((put) => {
+  const lone = (kind, x, y, energy, age, variant, flags = 0) => board((put) => {
     for (let i = 0; i < W; i++) put(i, H - 1, MATERIAL.Wall);
-    put(x, y, kind, energy, age, 0, variant);
+    put(x, y, kind, energy, age, flags, variant);
     if (kind === MATERIAL.Stardust) put(x + 2, y - 2, kind, energy, age, 0, variant);
   });
 
@@ -574,6 +574,10 @@ function assertFloor(label, floor, worst, detail) {
   for (const [x, y] of CELLS) for (const e of [40, 60, 90, 120, 190, 255]) for (const a of [0, 4, 8, 15, 20])
     for (const v of [0, 1, 2, 3]) for (const t of TIMES)
       rivals.push({ name: `spark v${v} e${e}`, c: colourAt(lone(MATERIAL.Spark, x, y, e, a, v), x, y, t) });
+  // A star shell's sparks are thrown over the meteor that lit them, so they are rivals too.
+  for (const [x, y] of CELLS) for (const e of [40, 60, 120, 190, 255]) for (const a of [0, 4, 8, 15, 20])
+    for (const v of [0, 1, 2, 3]) for (const t of TIMES)
+      rivals.push({ name: `star spark v${v} e${e}`, c: colourAt(lone(MATERIAL.Spark, x, y, e, a, v, CELL_FLAG.Cosmic), x, y, t) });
   for (const [x, y] of CELLS) for (const e of [0, 60, 120]) for (const a of [0, 40, 200])
     for (const v of [0, 1, 2, 3]) for (const t of TIMES)
       rivals.push({ name: "stardust", c: colourAt(lone(MATERIAL.Stardust, x, y, e, a, v), x, y, t) });
@@ -834,6 +838,29 @@ function assertFloor(label, floor, worst, detail) {
   assertFloor("a burning sheen's flame vs plain fire, best phase of the worst cell", 170, Math.round(worstFlame),
     `worst at ${flameAt}. A sheened slick burns "like a firework"; a flame cell that never leaves ` +
     `fire's own colour is a promise the picture does not keep. Tint it after the white-hot fleck.`);
+}
+
+// 11. A STAR SPARK MUST READ APART FROM A PLAIN ONE. A rocket a meteor lit throws a star shell
+//     (FLAG_COSMIC on its sparks), which the owner asked to have a colour of its own: in the
+//     firework hues a meteor-lit volley looked like a flame-lit one until it landed. Judged past
+//     the birth flash (age 3 and over), where both are white-hot by design, and at the WORST
+//     moment of each pair, swept every 10 ms. Both twinkle, and a gate at the best moment
+//     passed a silver palette at 190 that came within 17 of a blinking plain spark (review).
+{
+  let worst = Infinity, at = null;
+  for (const e of [40, 90, 155, 235]) for (const a of [3, 6, 10, 15]) for (const sv of [0, 1, 2, 3]) {
+    const star = board((put) => put(12, 4, MATERIAL.Spark, e, a, CELL_FLAG.Cosmic, sv));
+    for (const pe of [40, 155, 235]) for (const pa of [3, 10]) for (const pv of [0, 1, 2, 3]) {
+      const plain = board((put) => put(12, 4, MATERIAL.Spark, pe, pa, 0, pv));
+      for (let t = 0; t < 1000; t += 10) {
+        const d = redmean(colourAt(star, 12, 4, t), colourAt(plain, 12, 4, t));
+        if (d < worst) { worst = d; at = `star e${e} a${a} v${sv} vs plain e${pe} a${pa} v${pv}, t${t}`; }
+      }
+    }
+  }
+  assertFloor("a star shell's spark vs every plain spark, past the birth flash, worst moment", 70, Math.round(worst),
+    `worst at ${at}. A meteor-lit shell must not read as a flame-lit one in the air at any moment: ` +
+    `keep the star palette off white and off gold, rose, mint and sky, which a plain spark blinks between.`);
 }
 
 if (!quiet) {

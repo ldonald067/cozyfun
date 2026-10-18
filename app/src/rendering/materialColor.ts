@@ -117,6 +117,8 @@ export function glowColorFor(kind: number, flags: number, energy: number, age: n
   // The rune glow takes the hue of the remembered material, so attunement reads at night.
   if (kind === MATERIAL.Wellspring) return WELLSPRING_TINTS[energy & 255];
   if (kind === MATERIAL.Rocket) return [255, 223, 154];
+  // A star shell lights the air violet, not the plain spark's rose.
+  if (kind === MATERIAL.Spark && (flags & CELL_FLAG.Cosmic) !== 0) return [184, 146, 255];
   // A burning sheen lights the air in the shell's colours, stepping through them as it burns.
   if (kind === MATERIAL.Fire && (flags & CELL_FLAG.Cosmic) !== 0) return FIREWORK_HUES[(age >> 2) & 3];
   // Vitrify amber cooling into the pane's own mint as the flash fades.
