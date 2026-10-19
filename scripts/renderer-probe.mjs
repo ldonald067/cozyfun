@@ -467,26 +467,28 @@ function assertFloor(label, floor, worst, detail) {
 //    that happening again by accident. Measured on PETAL CELLS, not on a box around the head:
 //    a box is mostly night sky and compresses every pair toward zero.
 {
-  const BLOOM_SHAPES = [
-    [[0,-1],[-1,0],[1,0],[-1,-1],[1,-1],[-2,0],[2,0],[-2,-1],[2,-1],[-1,-2],[1,-2],[-1,1],[1,1]],
-    [[0,-1],[-1,0],[1,0],[-1,-1],[1,-1],[-2,0],[2,0],[-2,1],[2,1]],
-    [[0,-1],[-1,0],[1,0],[-1,-1],[1,-1],[-2,0],[2,0],[0,-2],[-1,1],[1,1]],
-    [[0,-1],[-1,0],[1,0],[-1,-1],[1,-1],[-2,0],[2,0],[-2,-1],[2,-1],[0,-2],[-1,-2],[1,-2],[-1,1],[1,1],[-2,-2],[2,-2],[0,-3]],
-    [[0,-1],[-1,0],[1,0],[-1,-1],[1,-1],[-2,-1],[2,-1],[-2,-2],[0,-2],[2,-2]],
-    [[0,-1],[-1,-2],[1,-2],[0,-3],[-1,-4],[1,-4],[0,-5]],
-    [[0,-1],[0,-2],[-1,-1],[1,-2],[-2,0],[2,-1]],
-    [[0,-1],[-1,0],[1,0],[-1,-1],[1,-1]],
-  ];
-  const headMean = (variant, time) => {
+  // The heads the sim actually grows, read out of the engine (the first check above holds
+  // the engine to the sim). This was a hand-kept copy of the old five-wide heads and went
+  // stale when they widened to seven, so the gate measured flowers nobody can grow; once
+  // petals are drawn by where they sit in a head, a stale shape is a wrong answer.
+  const engineText = await readFile(resolve(root, "app/src/engine.ts"), "utf8");
+  const declAt = engineText.indexOf("const BLOOM_SHAPES");
+  const shapeBlock = engineText.slice(engineText.indexOf("= [", declAt) + 3, engineText.indexOf("\n];", declAt));
+  const BLOOM_SHAPES = [...shapeBlock.matchAll(/^\s*\[((?:\s*\[-?\d+,\s*-?\d+\],?)+)\],\s*$/gm)]
+    .map((m) => [...m[1].matchAll(/\[\s*(-?\d+)\s*,\s*(-?\d+)\s*\]/g)].map((q) => [Number(q[1]), Number(q[2])]));
+  if (BLOOM_SHAPES.length !== 8) failures.push(`bloom species: read ${BLOOM_SHAPES.length} shapes from app/src/engine.ts, expected 8.`);
+  // `flags` go on every cell of the head, crown included, the way a state lands on a whole
+  // plant; `pick` chooses which petals to average, by their offset from the crown.
+  const headMean = (variant, time, flags = 0, pick = () => true) => {
     const petals = [];
     const cells = board((put) => {
       for (let x = 0; x < W; x++) put(x, 12, MATERIAL.Wall, 0, 40, 0, x);
       put(13, 11, MATERIAL.Soil, 120, 40, CELL_FLAG.Wet);
       for (let i = 2; i <= 5; i++) put(13, 12 - i, MATERIAL.Stem, 20, 50, i === 2 ? CELL_FLAG.Rooted : 0, variant);
-      put(13, 6, MATERIAL.Flower, 95, 200, CELL_FLAG.Rooted, variant);
+      put(13, 6, MATERIAL.Flower, 95, 200, CELL_FLAG.Rooted | flags, variant);
       for (const [dx, dy] of BLOOM_SHAPES[variant]) {
-        put(13 + dx, 6 + dy, MATERIAL.Flower, 90, 180, 0, variant);
-        petals.push([13 + dx, 6 + dy]);
+        put(13 + dx, 6 + dy, MATERIAL.Flower, 90, 180, flags, variant);
+        if (pick(dx, dy)) petals.push([13 + dx, 6 + dy]);
       }
     });
     const cols = petals.map(([x, y]) => colourAt(cells, x, y, time));
@@ -494,13 +496,57 @@ function assertFloor(label, floor, worst, detail) {
       .map((v) => Math.round(v / cols.length));
   };
   const NAMES = ["cornflower", "poppy", "daisy", "sunflower", "tulip", "lavender", "bluebell", "cosmos"];
-  let worst = Infinity, at = null;
-  for (let a = 0; a < 8; a++) for (let b = a + 1; b < 8; b++) for (const t of TIMES) {
-    const d = redmean(headMean(a, t), headMean(b, t));
-    if (d < worst) { worst = d; at = `${NAMES[a]} vs ${NAMES[b]}, time ${t}`; }
+  const speciesPairs = (label, floor, flags, why) => {
+    let worst = Infinity, at = null;
+    for (let a = 0; a < 8; a++) for (let b = a + 1; b < 8; b++) for (const t of TIMES) {
+      const d = redmean(headMean(a, t, flags), headMean(b, t, flags));
+      if (d < worst) { worst = d; at = `${NAMES[a]} vs ${NAMES[b]}, time ${t}`; }
+    }
+    assertFloor(label, floor, worst, `worst at ${at}. ${why}`);
+  };
+  speciesPairs("bloom species, worst of all 28 pairs", 60, 0,
+    "Two species a player cannot tell apart is variety that is not there.");
+
+  // 6b. What each species is known by, and what weather does to a head (the owner's flower
+  //     batch, 2026-10-18). A petal is now drawn by where it sits, so a head has a HEART —
+  //     the ring round its crown — that has to read against the rest of its petals: a
+  //     poppy's black blotch, a sunflower's seed disc, a daisy's wide gold eye, a
+  //     cornflower's violet, a cosmos's deep magenta. Only those five carry a heart; a
+  //     tulip, lavender and bluebell hold their petals above the crown.
+  {
+    const ring1 = (dx, dy) => Math.max(Math.abs(dx), Math.abs(dy)) === 1;
+    let worst = Infinity, at = null;
+    for (const v of [0, 1, 2, 3, 7]) for (const t of TIMES) {
+      const d = redmean(headMean(v, t, 0, ring1), headMean(v, t, 0, (dx, dy) => !ring1(dx, dy)));
+      if (d < worst) { worst = d; at = `${NAMES[v]}, time ${t}`; }
+    }
+    assertFloor("a bloom's heart vs the rest of its petals", 120, worst,
+      `worst at ${at}. The heart is the mark each species is known by; flattened, the head is a blob.`);
   }
-  assertFloor("bloom species, worst of all 28 pairs", 60, worst,
-    `worst at ${at}. Two species a player cannot tell apart is variety that is not there.`);
+  //     Each state is drawn as what it is — dew on the rim, frost in from the edges, char
+  //     with an ember line, moonlight silvering the plant's own colours — and each has to
+  //     stay well clear of the same head without it, in every species. Measured before and
+  //     after the batch (worst species, whole-head petal mean): heart 6 -> 159, wet 20 -> 28,
+  //     frozen 31 -> 69, scorched 179 -> 128, moonlit 105 -> 60. Scorched and moonlit fell on
+  //     purpose: each used to turn the whole head one colour, which a mean rewards, and now
+  //     each is drawn at the rim over a head that keeps its species. Wet is small by nature —
+  //     a few bright beads of dew over a slightly deepened head — and a mean understates it.
+  //     Floors are ratchets just under today's values.
+  for (const [label, flag, floor] of [["wet", CELL_FLAG.Wet, 25], ["frozen", CELL_FLAG.Frozen, 60],
+    ["scorched", CELL_FLAG.Scorched, 110], ["moonlit", CELL_FLAG.Cosmic, 55]]) {
+    let worst = Infinity, at = null;
+    for (let v = 0; v < 8; v++) for (const t of TIMES) {
+      const d = redmean(headMean(v, t), headMean(v, t, flag));
+      if (d < worst) { worst = d; at = `${NAMES[v]}, time ${t}`; }
+    }
+    assertFloor(`a ${label} head vs the same head without it`, floor, worst,
+      `worst at ${at}. A state a player cannot see on the flower is a state the flower does not have.`);
+  }
+  //     Moonlight used to swap every species for one lilac palette, so all eight moonlit
+  //     heads were the same flower (worst pair 0). It silvers the plant's own colours now,
+  //     and a moonlit garden has to keep its variety: worst pair 40, cornflower and bluebell.
+  speciesPairs("moonlit bloom species, worst of all 28 pairs", 35, CELL_FLAG.Cosmic,
+    "Moonlight that makes every species the same flower erases the garden.");
 }
 
 // 8. A METEOR IN FLIGHT must not read as the fire it creates, as the sparks it sheds, or as
