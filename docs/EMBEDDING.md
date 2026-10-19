@@ -118,7 +118,7 @@ confirm the status line reads **"wasm sim online"**.
 
 ## The embed snippet
 
-`embed.html` ships next to `index.html`. It is a ~45 KB poster that loads nothing until the
+`embed.html` ships next to `index.html`. It is a ~80 KB poster that loads nothing until the
 visitor clicks, then swaps itself for the app. Point the iframe at it rather than at
 `index.html` directly — the full build is about 7 MB, and without the poster every visitor
 who scrolls past pays for it.
@@ -196,33 +196,46 @@ top of that, so the visible owner is the only writer.
 
 ### What the poster draws
 
-A watercolour of a rainy night seen from a desk: a wet-into-wet sky between two window
-jambs, a wooden desk lit from the lower left, and a corked terrarium jar holding the
-sandbox's own strata (sand, soil, moss) with a moonlit flower and a rose one. Rain falls in
-three sheets, condensation beads the glass in front of it and a few beads run down to the
-sill, and lightning (a masked, paper-white line) strikes three times a cycle with the sky
-blooming behind it.
+A loose, wet watercolour of a rainy night seen from a desk: a wet-into-wet sky between two
+window jambs, with backruns and paint runs, and a dry-brushed wooden desk lit from the lower
+left. Two jars stand on it. On the right, a corked jar holds the sandbox's own strata (sand,
+soil, moss) and a garden: a vine, fern fronds, a sunflower, a moonlit flower, a daisy, a
+cornflower and mushrooms. On the left, a tin-lidded bug jar holds a twig, a broad leaf, grass
+and a dandelion clock, and its residents: a caterpillar, a beetle, a ladybug, a butterfly, a
+snail, a spider and fireflies. Rain falls in three sheets of brushstrokes, condensation beads
+the window and the inside of each jar, a few beads run down to the sill, and lightning
+strikes three times a cycle: bare paper, as if masked out, with the sky's pigment pooled dark
+along its edges and a lavender bleed round it.
 
-The painting is drawn by the page's own script into two canvases, once on load and again on
-resize: the sky behind the weather and the desk in front of it, so the rain never crosses the
-jar. Washes use Tyler Hobbs' layered-polygon method, then a paper-grain pass. It is seeded,
-so every load paints the same picture, and it runs in about 135 ms at 960x620 on a 2x screen
-in headless Chrome with no GPU, about 90 ms at phone size. Everything that moves is a CSS
-transform or opacity, so after that one paint the poster costs only compositing. There are
-still no image files and no sub-resource requests; the rain technique is borrowed from a
-CodePen that reaches a similar look with about 440 KB of hotlinked PNGs, and the notes in
-`embed.html` record what was taken and what was deliberately not. If the script never runs,
-the poster's own gradient stands in, and the type is legible on it.
+Both jars are alive. What grows in them sways very slightly from the soil line, the two out
+of step. In the bug jar, fireflies drift and blink, the ladybug works up and down the twig,
+the butterfly opens and closes its wings, the snail crosses the loam, and the spider lowers
+itself from the lid and climbs back. In the garden jar, a bee works round the sunflower,
+pollen drifts up off the heads, and the moonlit flower's glow breathes.
+
+The page's own script paints all of it, once on load and again on resize, into canvases: the
+sky behind the weather, the desk and the jars' backs in front of it (so the rain never
+crosses a jar), each jar's living layer and its glass, each moving creature, the rain's tiles
+and each lightning placement. Washes use Tyler Hobbs' layered-polygon method, then a
+paper-grain pass. It is seeded, so every load paints the same picture, and it runs in about
+240 ms at 960x620 on a 2x screen in headless Chrome with no GPU, about 180 ms at phone size.
+Everything that moves is a CSS transform or opacity, so after that one paint the poster costs
+only compositing: 60 fps with no layouts, measured. There are still no image files and no
+sub-resource requests; the rain's whole-tile drift is borrowed from a CodePen that reaches a
+similar look with about 440 KB of hotlinked PNGs, and the notes in `embed.html` record what
+was taken and what was deliberately not. If the script never runs, the poster's own gradient
+stands in, the rain falls as plain CSS dots, and the type is legible on it.
 
 The type is checked against the painting, not assumed: with the text hidden, the 95th
 percentile of the background behind each line, across five moments including two strikes,
-gives the paragraph 7.3:1 at 960x620 and 4.4:1 at a 375x700 phone at the worst strike
-(the rain-and-gradient poster before it: 9.3:1 and 4.5:1). A phone needs its own scrim for
-that; see the note at `.scrim`.
+gives the paragraph 7.0:1 at 960x620 and 6.3:1 at a 375x700 phone (the rain-and-gradient
+poster before it: 9.3:1 and 4.5:1 at its worst strike). A phone needs its own scrim for that;
+see the note at `.scrim`.
 
 Under `prefers-reduced-motion` the storm and the running drips are removed outright — the
 lightning and its sky flashes go to zero opacity rather than merely stilling, since a frozen
-bolt reads as a graphic artifact. The rain and the beads stay as static texture.
+bolt reads as a graphic artifact. The rain and the beads stay as static texture, and the
+jars hold still with every creature where it was painted.
 
 ## What the gate covers
 
