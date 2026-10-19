@@ -254,14 +254,14 @@
          that moves is a transform or an opacity. What grows sways a little from the soil
          line, the two jars out of step; the creatures ride along with it. */
       .jar { position: absolute; pointer-events: none; }
-      .jar canvas, .jar-sway, .jar-critters { position: absolute; inset: 0; width: 100%; height: 100%; }
+      .jar-life, .jar-glass, .jar-sway, .jar-critters { position: absolute; inset: 0; width: 100%; height: 100%; }
       .jar-sway { animation: sway 9s ease-in-out infinite; }
       .jar--bugs .jar-sway { animation-duration: 11s; animation-delay: -5s; }
       @keyframes sway {
         0%, 100% { transform: skewX(-0.7deg); }
         50%      { transform: skewX(0.7deg); }
       }
-      .jar .critter { position: absolute; inset: auto; }
+      .critter { position: absolute; }
       .glint { position: absolute; border-radius: 50%; }
 
       /* A ladybug works up the twig in fits and starts, turns, and comes back down. */
@@ -731,7 +731,7 @@
             box = document.createElement("div");
             box.className = "jar jar--" + kind;
             box.setAttribute("aria-hidden", "true");
-            box.innerHTML = '<div class="jar-sway"><canvas></canvas><div class="jar-critters"></div></div><canvas></canvas>';
+            box.innerHTML = '<div class="jar-sway"><canvas class="jar-life"></canvas><div class="jar-critters"></div></div><canvas class="jar-glass"></canvas>';
             poster.insertBefore(box, poster.querySelector(".scrim"));
           }
           const x0 = Math.floor(g.L - 10 * S), y0 = Math.floor(g.T - g.lid - 8 * S);
@@ -740,7 +740,8 @@
           // --u is CSS pixels per design unit, so the creatures' motion scales with the jar.
           box.style.setProperty("--u", S / px);
           box.firstChild.style.transformOrigin = "50% " + ((g.soil - y0) / (y1 - y0)) * 100 + "%";
-          const [life, glass] = [...box.querySelectorAll("canvas")].map((canvas) => {
+          // By name: after the first paint the creatures are canvases in here too.
+          const [life, glass] = [box.querySelector(".jar-life"), box.querySelector(".jar-glass")].map((canvas) => {
             canvas.width = x1 - x0;
             canvas.height = y1 - y0;
             const c = canvas.getContext("2d");
@@ -1322,10 +1323,12 @@
         // wash that pool into a bead at the lower end, the way a loaded brush leaves a
         // mark. They lean along the drift, so each falls the way it points. A drop near
         // the tile's edge is drawn again one tile over, so the seam never cuts a stroke.
+        // The tile's size is read from the sheet's own background-size, which the drift
+        // keyframes are whole multiples of, so the CSS stays the one place it is set.
         const SHEETS = [
-          ["rain--far", 51, 96, 4, 5, 1.0, "190, 196, 232", 0.26],
-          ["rain--mid", 66, 124, 4, 8, 1.3, "210, 214, 246", 0.3],
-          ["rain--near", 85, 158, 3, 11, 1.8, "236, 236, 252", 0.34],
+          ["rain--far", 4, 5, 1.0, "190, 196, 232", 0.26],
+          ["rain--mid", 4, 8, 1.3, "210, 214, 246", 0.3],
+          ["rain--near", 3, 11, 1.8, "236, 236, 252", 0.34],
         ];
         function drop(c, x, y, len, wid, rgb, alpha) {
           const ux = 0.257, uy = 0.966, nx = uy, ny = -ux;
@@ -1349,7 +1352,9 @@
           c.stroke();
         }
         function paintRain(scale) {
-          for (const [name, tw, th, n, len, wid, rgb, alpha] of SHEETS) {
+          for (const [name, n, len, wid, rgb, alpha] of SHEETS) {
+            const sheet = document.querySelector("." + name);
+            const [tw, th] = getComputedStyle(sheet).backgroundSize.split(" ").map(parseFloat);
             const tile = document.createElement("canvas");
             tile.width = Math.round(tw * scale);
             tile.height = Math.round(th * scale);
@@ -1360,7 +1365,7 @@
               const x = rand() * tw, y = ((i + 0.2 + rand() * 0.6) / n) * th, l = len * (0.8 + rand() * 0.4);
               for (const ox of [-tw, 0, tw]) for (const oy of [-th, 0, th]) drop(c, x + ox, y + oy, l, wid, rgb, alpha);
             }
-            document.querySelector("." + name).style.backgroundImage = "url(" + tile.toDataURL() + ")";
+            sheet.style.backgroundImage = "url(" + tile.toDataURL() + ")";
           }
         }
 
@@ -1456,6 +1461,9 @@
           // poster back rather than leaving a dead frame the visitor cannot retry from.
           const giveUp = setTimeout(() => {
             document.body.replaceChildren(poster);
+            // The frame may have changed size while the poster was away, and the jars'
+            // layers are placed in pixels, so repaint it to fit.
+            window.dispatchEvent(new Event("resize"));
             document.getElementById("hint").textContent = "That did not load — click to try again";
             document.getElementById("poster").addEventListener("click", enter, { once: true });
           }, 20000);

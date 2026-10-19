@@ -219,8 +219,9 @@ crosses a jar), each jar's living layer and its glass, each moving creature, the
 and each lightning placement. Washes use Tyler Hobbs' layered-polygon method, then a
 paper-grain pass. It is seeded, so every load paints the same picture, and it runs in about
 240 ms at 960x620 on a 2x screen in headless Chrome with no GPU, about 180 ms at phone size.
-Everything that moves is a CSS transform or opacity, so after that one paint the poster costs
-only compositing: 60 fps with no layouts, measured. There are still no image files and no
+Everything that moves is a CSS transform or opacity, and nothing repaints a canvas after
+that one paint; measured over 4 s, it holds 60 fps with no layouts. (That probe counts frames
+and layouts, not raster work, so it does not by itself prove there is no repainting.) There are still no image files and no
 sub-resource requests; the rain's whole-tile drift is borrowed from a CodePen that reaches a
 similar look with about 440 KB of hotlinked PNGs, and the notes in `embed.html` record what
 was taken and what was deliberately not. If the script never runs, the poster's own gradient
