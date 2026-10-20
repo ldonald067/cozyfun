@@ -175,6 +175,35 @@ const PETAL_COST: u16 = 2;
 const POLLEN_RESERVE: u16 = 40;
 const POLLEN_COST: u16 = 15;
 const PETAL_SHED_AGE: u16 = 1200;
+/// Heat that shows (the owner's items 6 and 7, 2026-10-20). Water's energy is its temperature
+/// and, since this batch, ice's energy is its warmth. Before it, a flame could not warm a pool
+/// (water lost 2 a tick, everywhere), ice froze any water under 120 within a second, and only
+/// water over 120 melted ice, on a coin flip, into a melt the slab took straight back: a flame
+/// held ten seconds to the audit's slab left 78 of 86 cells of ice. Now 17 (8 seeds). Each rule
+/// below, and steam's heat in the ice arm, was measured out against the others; lava radiating
+/// heat across a gap was built too and left out, because poured lava thins to a film and it
+/// moved nothing (85 cells of an ice wall left against 84).
+///
+/// What a water cell takes from each water neighbour each tick, `(theirs - its) / HEAT_SHARE`,
+/// in `share_heat`, so the flows cancel and heat is conserved. 8 is the fastest that cannot
+/// overshoot with eight neighbours; 16 halved the spread and the slab kept 56. Without it, 70.
+const HEAT_SHARE: i32 = 8;
+/// Water cools one tick in `WATER_CHILL`, so a warmed pool stays warm for a while; cooling every
+/// tick, the slab keeps 42. On the global clock, not cell age (see `age_and_decay`). Boiling
+/// barely moves: three pot sizes held under a flame for 40 s keep 18, 39 and 80 cells against
+/// 17, 41 and 75 before, and now simmer, 9-11 cells over 120 at 10 s where there were none.
+const WATER_CHILL: u32 = 16;
+/// Ice's temperature. Water no warmer freezes against ice; warmer water gives the ice
+/// `(energy - ICE_TEMP) / MELT_SHARE` a tick instead and spends as much; giving nothing, the
+/// slab keeps 68. The line used to be 120 for freezing; set at 60, a flame-warmed puddle (50-80
+/// at its edges) froze anyway.
+const ICE_TEMP: u16 = 40;
+const MELT_SHARE: u16 = 8;
+/// Ice that has taken this much warmth melts, into water at 60. Ice above `ICE_COLD` re-chills
+/// one a tick, so a block the heat has left recovers; moonwater's ice is made at 110 and keeps
+/// its mark, which a fall to 0 energy would strip.
+const ICE_MELT: u16 = 180;
+const ICE_COLD: u16 = 110;
 /// How many ticks a shell's sparks fly outward before they droop, plain and star. A star
 /// shell (a rocket a meteor lit) flies longer and so blooms half as wide again.
 const SHELL_FLIGHT: u16 = 6;
@@ -443,7 +472,40 @@ impl Universe {
             }
         }
 
+        self.share_heat(&mut next);
         self.cells = next;
+    }
+
+    /// Heat spreads through water (`HEAT_SHARE`), as the tick's last step: each water cell
+    /// takes `(theirs - its) / HEAT_SHARE` from every water neighbour, all read from the tick's
+    /// final energies, so what one cell takes another gives, exactly, and nothing else spends
+    /// that heat at the same time. It first ran inside the reaction pass, reading `old` while a
+    /// vent or the chill debited `next`, so a lone hot cell gave away heat it had already spent
+    /// and the clamp at zero kept it: 255 vented to 215, and its neighbours ended with 248.
+    fn share_heat(&self, cells: &mut [Cell]) {
+        let water = Material::Water as u8;
+        let energy: Vec<u16> = cells.iter().map(|cell| cell.energy).collect();
+        for idx in 0..cells.len() {
+            if cells[idx].kind != water {
+                continue;
+            }
+            let (x, y) = self.xy(idx);
+            let own = energy[idx] as i32;
+            let mut flow = 0;
+            for dy in -1..=1 {
+                for dx in -1..=1 {
+                    if (dx != 0 || dy != 0) && self.in_bounds(x + dx, y + dy) {
+                        let nidx = self.idx((x + dx) as u32, (y + dy) as u32);
+                        if cells[nidx].kind == water {
+                            flow += (energy[nidx] as i32 - own) / HEAT_SHARE;
+                        }
+                    }
+                }
+            }
+            if flow != 0 {
+                cells[idx].energy = (own + flow).clamp(0, 255) as u16;
+            }
+        }
     }
 
     /// One step of the slow world: the changes a terrarium makes while nobody is
@@ -830,6 +892,14 @@ impl Universe {
             } else {
                 drain
             };
+            // Water holds its heat (`WATER_CHILL`). On the global clock, not the cell's age:
+            // age saturates at 65535 here and wraps in the JS mirror, so an hour-old pond
+            // keyed on age would stop cooling in one engine and not the other.
+            let drain = if cell.kind == Material::Water as u8 && self.tick_count % WATER_CHILL != 0 {
+                0
+            } else {
+                drain
+            };
             cell.energy = cell.energy.saturating_sub(drain);
             if cell.energy == 0 {
                 if cell.flags & FLAG_FROZEN != 0 {
@@ -1182,8 +1252,14 @@ impl Universe {
                     }
                     for nidx in neighbors {
                         let other = old[nidx];
-                        if !is_moonwater && other.kind == Material::Ice as u8 && cell.energy > 120 && self.chance(2) {
-                            next[nidx] = Cell::new(Material::Water as u8, other.variant, 40);
+                        // Water warmer than ice gives the ice its heat (`ICE_TEMP`); the ice
+                        // melts once it has taken enough, in its own arm.
+                        if !is_moonwater && other.kind == Material::Ice as u8 && cell.energy > ICE_TEMP {
+                            let given = (cell.energy - ICE_TEMP) / MELT_SHARE;
+                            if next[nidx].kind == Material::Ice as u8 {
+                                next[nidx].energy = next[nidx].energy.saturating_add(given).min(255);
+                            }
+                            next[idx].energy = next[idx].energy.saturating_sub(given);
                             continue;
                         }
                         if is_moonwater && other.kind == Material::Oil as u8 && self.chance(4) {
@@ -1356,14 +1432,34 @@ impl Universe {
                         next[idx] = Cell::new(Material::Water as u8, cell.variant, 70);
                         continue;
                     }
+                    // Ice's energy is its warmth, given it by warmer water. Enough, and it
+                    // melts (`ICE_MELT`); a little, and it re-chills a point a tick.
+                    if cell.energy >= ICE_MELT {
+                        next[idx] = Cell::new(Material::Water as u8, cell.variant, 60);
+                        continue;
+                    }
+                    if cell.energy > ICE_COLD {
+                        next[idx].energy = next[idx].energy.saturating_sub(1);
+                    }
                     for nidx in neighbors {
                         let other = old[nidx];
-                        if other.kind == Material::Water as u8 && other.energy < 120 && self.chance(5) {
+                        if other.kind == Material::Water as u8 && other.energy <= ICE_TEMP && self.chance(5) {
                             next[nidx] = Cell::new(Material::Ice as u8, other.variant, 90);
                         } else if other.kind == Material::Moonwater as u8 && self.chance(10) {
                             next[nidx] = Cell::new(Material::Ice as u8, other.variant, 110);
                             next[nidx].flags = FLAG_COSMIC;
                         } else if other.kind == Material::Steam as u8 && self.chance(4) {
+                            // Frost from steam brings the steam's heat into the ice, all of it
+                            // above ICE_TEMP: a wisp frosts it, a flood of quench steam beside
+                            // lava melts it. Steam used to freeze for nothing, so lava poured by
+                            // an ice block grew it from 52 cells to 68 by 20 s; now it holds at
+                            // 53 (8 seeds). A gate keeping hot steam from freezing at all took
+                            // the frost out of `ice.condenses` and `steam.frosts` (8 seeds of 8
+                            // to 0 and 1). Only the first ice to catch a cell takes its heat,
+                            // so none is doubled.
+                            if next[nidx].kind == Material::Steam as u8 {
+                                next[idx].energy = next[idx].energy.saturating_add(other.energy.saturating_sub(ICE_TEMP)).min(255);
+                            }
                             next[nidx] = Cell::new(Material::Ice as u8, other.variant, 70);
                         } else if other.kind == Material::Stone as u8 || other.kind == Material::Wall as u8 {
                             // Frost gets into masonry only through the water it holds, so a
@@ -3132,6 +3228,21 @@ mod tests {
             }
         }
         set_cell(u, x, bottom + 1, Material::Wall);
+    }
+
+    /// Seals the listed cells in Wall two thick on every side (liquids hop a one-cell wall),
+    /// so nothing placed in them can move.
+    fn pocket(u: &mut Universe, cells: &[(u32, u32)]) {
+        for &(x, y) in cells {
+            for dy in -2i32..=2 {
+                for dx in -2i32..=2 {
+                    let (nx, ny) = ((x as i32 + dx) as u32, (y as i32 + dy) as u32);
+                    if !cells.contains(&(nx, ny)) {
+                        set_cell(u, nx, ny, Material::Wall);
+                    }
+                }
+            }
+        }
     }
 
     /// Steam under water bubbles up through it; mist does not. One shaft each, so straight down
@@ -5522,22 +5633,182 @@ mod tests {
     }
 
     #[test]
-    fn hot_water_melts_ice_and_resists_freezing() {
+    fn warm_water_gives_ice_its_heat_until_it_melts() {
         let mut u = Universe::new(16, 16, 7);
-        set_cell_state(&mut u, 7, 8, Material::Water, 4, 220, 0);
-        set_cell(&mut u, 8, 8, Material::Ice);
-        for (x, y) in [(6, 8), (5, 8), (6, 9), (7, 9), (8, 9)] {
-            set_cell(&mut u, x, y, Material::Stone);
+        let cells: Vec<(u32, u32)> = (7..=9).flat_map(|x| (7..=9).map(move |y| (x, y))).collect();
+        pocket(&mut u, &cells);
+        for &(x, y) in &cells {
+            set_cell_state(&mut u, x, y, Material::Water, 4, 200, 0);
         }
+        set_cell(&mut u, 8, 8, Material::Ice);
+        u.tick();
+        assert_eq!(kind_at(&u, 8, 8), Material::Ice as u8);
+        assert!(energy_at(&u, 8, 8) > 0, "ice should take the water's warmth before it melts");
         let mut melted = false;
-        for _ in 0..40 {
+        for _ in 0..30 {
             u.tick();
             if kind_at(&u, 8, 8) == Material::Water as u8 {
                 melted = true;
                 break;
             }
         }
-        assert!(melted, "hot water should melt adjacent ice instead of freezing");
+        assert!(melted, "ice ringed by hot water should take enough heat to melt");
+    }
+
+    #[test]
+    fn one_cell_of_hot_water_cannot_melt_a_block_of_ice() {
+        // Heat is conserved: one cell at 200 has 160 above ICE_TEMP to give, short of ICE_MELT.
+        let mut u = Universe::new(16, 16, 7);
+        pocket(&mut u, &[(7, 8), (8, 8)]);
+        set_cell_state(&mut u, 7, 8, Material::Water, 4, 200, 0);
+        set_cell(&mut u, 8, 8, Material::Ice);
+        for _ in 0..300 {
+            u.tick();
+            assert_eq!(kind_at(&u, 8, 8), Material::Ice as u8, "one splash should not melt a block");
+        }
+    }
+
+    #[test]
+    fn ice_freezes_water_only_once_it_is_as_cold_as_the_ice() {
+        let mut u = Universe::new(16, 16, 7);
+        pocket(&mut u, &[(7, 8), (8, 8)]);
+        set_cell_state(&mut u, 7, 8, Material::Water, 4, 100, 0);
+        set_cell(&mut u, 8, 8, Material::Ice);
+        for _ in 0..10 {
+            u.tick();
+            assert_eq!(kind_at(&u, 7, 8), Material::Water as u8, "water warmer than ice should not freeze");
+        }
+        let mut frozen = false;
+        for _ in 0..300 {
+            u.tick();
+            if kind_at(&u, 7, 8) == Material::Ice as u8 {
+                frozen = true;
+                break;
+            }
+        }
+        assert!(frozen, "water that has cooled to the ice's temperature should freeze");
+
+        let mut u = Universe::new(16, 16, 7);
+        pocket(&mut u, &[(7, 8), (8, 8)]);
+        set_cell(&mut u, 7, 8, Material::Water);
+        set_cell(&mut u, 8, 8, Material::Ice);
+        let mut frozen = false;
+        for _ in 0..40 {
+            u.tick();
+            if kind_at(&u, 7, 8) == Material::Ice as u8 {
+                frozen = true;
+                break;
+            }
+        }
+        assert!(frozen, "cold water beside ice should freeze");
+    }
+
+    #[test]
+    fn steam_frost_brings_its_heat_into_the_ice() {
+        // Steam ringed by ice. Hot steam's heat, all of it above ICE_TEMP, goes to the ice that
+        // frosts it, and quench-hot steam carries ICE_MELT and more, so that ice melts. Which
+        // cell freezes the steam is a roll (the steam can freeze itself, giving nothing), so it
+        // is asked of most seeds, not one. A cold wisp frosts the ring and warms none of it.
+        let ring: Vec<(u32, u32)> = (7..=9).flat_map(|x| (7..=9).map(move |y| (x, y))).collect();
+        let ringed = |seed: u32, energy: u16| {
+            let mut u = Universe::new(16, 16, seed);
+            pocket(&mut u, &ring);
+            for &(x, y) in &ring {
+                set_cell(&mut u, x, y, Material::Ice);
+            }
+            set_cell_state(&mut u, 8, 8, Material::Steam, 0, energy, 0);
+            u
+        };
+        let mut melted = 0;
+        for seed in 1..=8 {
+            let mut u = ringed(seed, 220);
+            for _ in 0..30 {
+                u.tick();
+                if ring.iter().any(|&(x, y)| kind_at(&u, x, y) == Material::Water as u8) {
+                    melted += 1;
+                    break;
+                }
+            }
+        }
+        assert!(melted >= 4, "ice that frosts hot steam should take its heat and melt (melted on {melted} of 8)");
+        for seed in 1..=8 {
+            let mut u = ringed(seed, MIST_ENERGY);
+            for _ in 0..40 {
+                u.tick();
+            }
+            assert_eq!(kind_at(&u, 8, 8), Material::Ice as u8, "a cold wisp should frost onto ice");
+            for &(x, y) in ring.iter().filter(|&&c| c != (8, 8)) {
+                assert_eq!(energy_at(&u, x, y), 0, "a cold wisp should give the ice no heat");
+            }
+        }
+    }
+
+    #[test]
+    fn heat_spreads_through_water_and_is_conserved() {
+        let mut u = Universe::new(16, 16, 7);
+        let row: Vec<(u32, u32)> = (4..=9).map(|x| (x, 8)).collect();
+        pocket(&mut u, &row);
+        for &(x, y) in &row {
+            set_cell(&mut u, x, y, Material::Water);
+        }
+        // 150, not over it: water over 150 vents and spends heat.
+        set_cell_state(&mut u, 4, 8, Material::Water, 4, 150, 0);
+        // No water drains before tick WATER_CHILL, so until then every unit is accounted for.
+        for _ in 0..(WATER_CHILL - 1) {
+            u.tick();
+        }
+        let total: u32 = row.iter().map(|&(x, y)| energy_at(&u, x, y) as u32).sum();
+        assert_eq!(total, 150, "heat should move through the water, none made or lost");
+        assert!(energy_at(&u, 4, 8) < 150, "the hot end should have given heat away");
+        assert!(energy_at(&u, 6, 8) > 0, "the heat should have reached two cells along");
+    }
+
+    #[test]
+    fn sharing_heat_never_keeps_heat_another_rule_spent() {
+        // A lone hot cell among eight cold ones gives away nearly all it has. Review found that
+        // inside the reaction pass it gave heat the chill or a vent had already spent, and the
+        // clamp kept it; as the tick's last step it can only share what is left.
+        let ring: Vec<(u32, u32)> = (7..=9).flat_map(|x| (7..=9).map(move |y| (x, y))).collect();
+        let lone = |seed: u32, energy: u16| {
+            let mut u = Universe::new(16, 16, seed);
+            pocket(&mut u, &ring);
+            for &(x, y) in &ring {
+                set_cell(&mut u, x, y, Material::Water);
+            }
+            set_cell_state(&mut u, 8, 8, Material::Water, 4, energy, 0);
+            u
+        };
+        let total = |u: &Universe| ring.iter().map(|&(x, y)| energy_at(u, x, y) as u32).sum::<u32>();
+        // The chill tick takes 2 from the only warm cell.
+        let mut u = lone(7, 144);
+        u.tick_count = WATER_CHILL - 1;
+        u.tick();
+        assert_eq!(total(&u), 142, "the chill's 2 should be spent, not shared");
+        // A vent takes 40, on a roll; either it vented or it did not, and nothing else.
+        let mut vented = 0;
+        for seed in 1..=40 {
+            let mut u = lone(seed, 255);
+            u.tick();
+            let after = total(&u);
+            assert!(after == 255 || after == 215, "seed {seed}: 255 should end 255 or 215, not {after}");
+            if after == 215 {
+                vented += 1;
+            }
+        }
+        assert!(vented > 0, "some seed should have vented");
+    }
+
+    #[test]
+    fn water_holds_its_heat_between_chill_ticks() {
+        let mut u = Universe::new(16, 16, 7);
+        pocket(&mut u, &[(8, 8)]);
+        set_cell_state(&mut u, 8, 8, Material::Water, 4, 100, 0);
+        for _ in 0..(WATER_CHILL - 1) {
+            u.tick();
+        }
+        assert_eq!(energy_at(&u, 8, 8), 100, "water should hold its heat between chill ticks");
+        u.tick();
+        assert_eq!(energy_at(&u, 8, 8), 98, "and lose 2 on the chill tick");
     }
 
     #[test]

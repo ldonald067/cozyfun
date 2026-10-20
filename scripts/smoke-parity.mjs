@@ -178,6 +178,87 @@ const scenarios = [
       p(12, 21, 2, M.Wall); p(28, 21, 2, M.Stone);
     },
   },
+  (() => {
+    // Heat that shows (2026-10-20). A flame held over a puddle between two ice banks: heat
+    // spreads through the water (HEAT_SHARE) and the water holds it (WATER_CHILL); water warmer
+    // than the ice gives the ice its heat (ICE_TEMP) instead of freezing, and ice that has taken
+    // enough melts (ICE_MELT). The witnesses: warm water beside ice, and ice that melts with no
+    // flame, lava or meteor touching it, which only the warmth rule can do.
+    let prev = null;
+    const HOT = [M.Fire, M.Lava, M.Meteor];
+    return {
+      name: "a flame warms a puddle and the puddle eats its ice",
+      w: 40, h: 30, seed: 700, ticks: 260,
+      paint(p) {
+        for (let x = 8; x <= 31; x++) { p(x, 25, 0, M.Wall); p(x, 26, 0, M.Wall); }
+        for (let y = 18; y <= 26; y++) for (const x of [8, 9, 30, 31]) p(x, y, 0, M.Wall);
+        for (let y = 22; y <= 24; y++) for (let x = 10; x <= 29; x++) p(x, y, 0, M.Water);
+        for (let y = 21; y <= 24; y++) for (let x = 10; x <= 12; x++) { p(x, y, 0, M.Ice); p(x + 17, y, 0, M.Ice); }
+      },
+      act(p, t) { if (t < 200 && t % 4 === 0) p(20, 19, 2, M.Fire); },
+      observe(seen, cells, w, h) {
+        seen.warmBesideIce ??= 0;
+        seen.warmthMelts ??= 0;
+        const kind = (c, x, y) => (x < 0 || y < 0 || x >= w || y >= h ? M.Empty : c[(y * w + x) * STRIDE]);
+        const energy = (c, x, y) => c[(y * w + x) * STRIDE + 4] | (c[(y * w + x) * STRIDE + 5] << 8);
+        const touches = (c, x, y, kinds) => {
+          for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && kinds.includes(kind(c, x + dx, y + dy))) return true;
+          return false;
+        };
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            if (kind(cells, x, y) === M.Water && energy(cells, x, y) > 40 && touches(cells, x, y, [M.Ice])) seen.warmBesideIce++;
+            if (prev && kind(prev, x, y) === M.Ice && kind(cells, x, y) === M.Water && !touches(prev, x, y, HOT)) seen.warmthMelts++;
+          }
+        }
+        prev = cells.slice();
+      },
+      expect: (seen) => (seen.warmBesideIce >= 1100 && seen.warmthMelts >= 29
+        ? null : `warm water beside ice ${seen.warmBesideIce} (floor 1100), ice melted by warmth ${seen.warmthMelts} (floor 29)`),
+    };
+  })(),
+  (() => {
+    // Frost from steam brings the steam's heat into the ice. Lava poured by an ice block
+    // quenches into steam beside it; the witnesses are ice that warms while hot steam touches
+    // it and no warm water does, and ice that melts with no flame, lava or meteor touching it.
+    let prev = null;
+    const HOT = [M.Fire, M.Lava, M.Meteor];
+    return {
+      name: "lava's steam beside ice gives the ice its heat",
+      w: 50, h: 30, seed: 500, ticks: 420,
+      paint(p) {
+        for (let x = 4; x <= 46; x++) { p(x, 25, 0, M.Wall); p(x, 26, 0, M.Wall); }
+        for (let x = 6; x <= 44; x++) { p(x, 23, 0, M.Soil); p(x, 24, 0, M.Soil); }
+        for (let y = 18; y <= 22; y++) for (let x = 27; x <= 32; x++) p(x, y, 0, M.Ice);
+      },
+      act(p, t) { if (t >= 300 && t < 340 && t % 4 === 0) p(20, 17, 1, M.Lava, 60); },
+      observe(seen, cells, w, h) {
+        seen.steamWarmed ??= 0;
+        seen.meltedUntouched ??= 0;
+        const kind = (c, x, y) => (x < 0 || y < 0 || x >= w || y >= h ? M.Empty : c[(y * w + x) * STRIDE]);
+        const energy = (c, x, y) => c[(y * w + x) * STRIDE + 4] | (c[(y * w + x) * STRIDE + 5] << 8);
+        const touches = (c, x, y, test) => {
+          for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && test(x + dx, y + dy)) return true;
+          return false;
+        };
+        if (prev) {
+          for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+              if (kind(prev, x, y) !== M.Ice) continue;
+              if (kind(cells, x, y) === M.Ice && energy(cells, x, y) > energy(prev, x, y)
+                && touches(prev, x, y, (a, b) => kind(prev, a, b) === M.Steam && energy(prev, a, b) > 120)
+                && !touches(prev, x, y, (a, b) => kind(prev, a, b) === M.Water && energy(prev, a, b) > 40)) seen.steamWarmed++;
+              if (kind(cells, x, y) === M.Water && !touches(prev, x, y, (a, b) => HOT.includes(kind(prev, a, b)))
+                && !touches(cells, x, y, (a, b) => HOT.includes(kind(cells, a, b)))) seen.meltedUntouched++;
+            }
+          }
+        }
+        prev = cells.slice();
+      },
+      expect: (seen) => (seen.steamWarmed >= 8 && seen.meltedUntouched >= 8
+        ? null : `ice warmed by hot steam ${seen.steamWarmed} (floor 8), ice melted untouched by heat ${seen.meltedUntouched} (floor 8)`),
+    };
+  })(),
   {
     name: "oil sheet meeting fire and life",
     w: 40, h: 32, seed: 7, ticks: 150,

@@ -40,8 +40,12 @@ mirrored in `app/src/engine.ts` and behave byte-for-byte identically — see the
   flow. Erosion keeps that looser test on purpose, so a pond's waterline wears. If a rule
   says flow, test flow — and a sealed test fixture will not tell you whether it does.
 - **Order matters inside a tick.** `age_and_decay` runs, then `apply_reactions`, then the
-  bottom-up pass, then the top-down pass. Rules read `old` and write `next`; reading `next`
-  means you see whatever earlier cells in the same tick already did.
+  bottom-up pass, then the top-down pass, then `share_heat`. Rules read `old` and write `next`;
+  reading `next` means you see whatever earlier cells in the same tick already did.
+- **A rule that MOVES a quantity between cells cannot share a pass with rules that spend it.**
+  Conduction computed from `old` and debited from `next` gave away heat a vent or the chill had
+  already spent there, and the clamp at zero kept it (review, 2026-10-20). That is why heat
+  spreads in `share_heat`, after everything else, from the tick's final energies.
 
 ## Adding a rule
 

@@ -217,7 +217,28 @@ class JsSandboxEngine implements SandboxEngine {
       }
     }
 
+    this.shareHeat(next);
     this.cells.set(next);
+  }
+
+  // Heat spreads through water as the tick's last step, from its final energies. See share_heat.
+  private shareHeat(next: Uint8Array) {
+    const energy = new Uint16Array(this.w * this.h);
+    for (let c = 0; c < energy.length; c++) energy[c] = readU16(next, c * CELL_STRIDE + 4);
+    for (let c = 0; c < energy.length; c++) {
+      if (next[c * CELL_STRIDE] !== MATERIAL.Water) continue;
+      const x = c % this.w;
+      const y = Math.floor(c / this.w);
+      let flow = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if ((!dx && !dy) || !this.inBounds(x + dx, y + dy)) continue;
+          const n = (y + dy) * this.w + x + dx;
+          if (next[n * CELL_STRIDE] === MATERIAL.Water) flow += Math.trunc((energy[n] - energy[c]) / HEAT_SHARE);
+        }
+      }
+      if (flow) writeU16(next, c * CELL_STRIDE + 4, Math.max(0, Math.min(255, energy[c] + flow)));
+    }
   }
 
   /**
@@ -454,7 +475,8 @@ class JsSandboxEngine implements SandboxEngine {
       // saved with the scene; the tick count is not restored on load, so a global phase
       // would silently shift a loaded bloom's arc. The environmental drains ride the same
       // slow clock deliberately — see the note in sim/src/lib.rs.
-      const slowed = kind === MATERIAL.Flower && age % BLOOM_CLOCK !== 0;
+      // Water holds its heat: it cools on the global clock, one tick in WATER_CHILL. See lib.rs.
+      const slowed = (kind === MATERIAL.Flower && age % BLOOM_CLOCK !== 0) || (kind === MATERIAL.Water && this.ticks % WATER_CHILL !== 0);
       const energy = slowed
         ? readU16(next, idx + 4)
         : Math.max(0, readU16(next, idx + 4) - drain - (flags & CELL_FLAG.Frozen ? 1 : 0) - (flags & CELL_FLAG.Wet && absorbent(kind) ? 1 : 0));
@@ -601,8 +623,11 @@ class JsSandboxEngine implements SandboxEngine {
         }
         if (kind === MATERIAL.Water || kind === MATERIAL.Moonwater) {
           const vigor = kind === MATERIAL.Moonwater ? 96 : 56;
-          if (kind === MATERIAL.Water && other === MATERIAL.Ice && readU16(old, idx + 4) > 120 && this.chance(2)) {
-            writeCellBytes(next, nidx, MATERIAL.Water, old[nidx + 1], 40);
+          // Water warmer than ice gives the ice its heat. See ICE_TEMP in lib.rs.
+          if (kind === MATERIAL.Water && other === MATERIAL.Ice && readU16(old, idx + 4) > ICE_TEMP) {
+            const given = Math.trunc((readU16(old, idx + 4) - ICE_TEMP) / MELT_SHARE);
+            if (next[nidx] === MATERIAL.Ice) writeU16(next, nidx + 4, Math.min(255, readU16(next, nidx + 4) + given));
+            writeU16(next, idx + 4, Math.max(0, readU16(next, idx + 4) - given));
             continue;
           }
           if (kind === MATERIAL.Moonwater && other === MATERIAL.Oil && this.chance(4)) {
@@ -1174,13 +1199,22 @@ class JsSandboxEngine implements SandboxEngine {
       writeCellBytes(next, idx, MATERIAL.Water, old[idx + 1], 70);
       return;
     }
+    // Ice's energy is its warmth: enough and it melts; a little, and it re-chills. See ICE_MELT.
+    const warmth = readU16(old, idx + 4);
+    if (warmth >= ICE_MELT) {
+      writeCellBytes(next, idx, MATERIAL.Water, old[idx + 1], 60);
+      return;
+    }
+    if (warmth > ICE_COLD) writeU16(next, idx + 4, Math.max(0, readU16(next, idx + 4) - 1));
     for (const nidx of neighbors) {
       const other = old[nidx];
-      if (other === MATERIAL.Water && readU16(old, nidx + 4) < 120 && this.chance(5)) {
+      if (other === MATERIAL.Water && readU16(old, nidx + 4) <= ICE_TEMP && this.chance(5)) {
         writeCellBytes(next, nidx, MATERIAL.Ice, old[nidx + 1], 90);
       } else if (other === MATERIAL.Moonwater && this.chance(10)) {
         writeCellBytes(next, nidx, MATERIAL.Ice, old[nidx + 1], 110, 0, CELL_FLAG.Cosmic);
       } else if (other === MATERIAL.Steam && this.chance(4)) {
+        // Frost from steam brings the steam's heat into the ice. See the ice arm in lib.rs.
+        if (next[nidx] === MATERIAL.Steam) writeU16(next, idx + 4, Math.min(255, readU16(next, idx + 4) + Math.max(0, readU16(old, nidx + 4) - ICE_TEMP)));
         writeCellBytes(next, nidx, MATERIAL.Ice, old[nidx + 1], 70);
       } else if (other === MATERIAL.Stone || other === MATERIAL.Wall) {
         // Frost gets into masonry only through the water it holds; dry masonry must not fall
@@ -1909,6 +1943,13 @@ const PETAL_COST = 2;
 const POLLEN_RESERVE = 40;
 const POLLEN_COST = 15;
 const PETAL_SHED_AGE = 1200;
+// Heat: water holds and shares it, and ice has a temperature. See lib.rs.
+const HEAT_SHARE = 8;
+const WATER_CHILL = 16;
+const ICE_TEMP = 40;
+const MELT_SHARE = 8;
+const ICE_MELT = 180;
+const ICE_COLD = 110;
 // How many ticks a shell's sparks fly outward, plain and star. See lib.rs.
 const SHELL_FLIGHT = 6;
 const STAR_SHELL_FLIGHT = 10;

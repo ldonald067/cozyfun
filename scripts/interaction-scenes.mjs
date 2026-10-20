@@ -311,6 +311,7 @@ const warmThroughMasonry = (g, x, y) => g.kindAt(x, y) === M.Wall && !touchesFir
 
 // Whether any of the eight cells around `i` (the engine's neighbour scan) satisfies
 // `pred(kind, index)`.
+const HEAT = (k) => k === M.Fire || k === M.Lava || k === M.Meteor;
 const touching = (g, i, pred) => {
   const [x, y] = g.xyOf(i);
   return AROUND.some(([dx, dy]) => { const k = g.kindAt(x + dx, y + dy); return k >= 0 && pred(k, (y + dy) * g.w + x + dx); });
@@ -569,28 +570,72 @@ export const CHECKS = [
   { m: "Ice", covers: "ice.freezes", role: "freezes nearby water", w: 26, h: 24, seed: 18, ticks: 600,
     paint: (p) => { p(13, 18, 3, M.Water); p(13, 15, 2, M.Ice); },
     outcome: (g, before) => g.appeared(M.Ice, before) },
-  { m: "Ice", covers: "ice.freezes", role: "never freezes hot water", w: 30, h: 26, seed: 141, ticks: 600,
+  { m: "Ice", covers: "ice.freezes", role: "never freezes water warmer than itself", w: 30, h: 26, seed: 141, ticks: 600,
     absent: true,
     // A slab of ice in a basin, a flame held to it for nine seconds, a dab every fourth tick.
-    // Water's energy is its heat: a flame adds 30 a tick to water it touches, water boils off at
-    // 200 and loses 2 a tick on its own, so it is hot (over 120) only for a few ticks beside a
-    // flame. Here that is the meltwater, and it melts ice the flame is not touching on 32 of 32
-    // seeds, so hot water meets this ice on every run. The witness is ice where hot water stood
-    // last tick. It never forms, on 32 of 32; with ice let freeze hot water in the JS mirror it
-    // forms on 32 of 32. That melt is not a check of its own: it is visible past the floors on
-    // only 25 of 32, because the slab refreezes the meltwater, and it is put to the owner.
-    // It requires hot water touching ice, so it fails with the flame taken out.
+    // Water's energy is its heat, and since 2026-10-20 ice's energy is its warmth: water no
+    // warmer than the ice (ICE_TEMP, 40) freezes against it, and warmer water gives the ice its
+    // heat instead. Until then the line was 120, so the flame's meltwater, the warm water here,
+    // froze straight back. The witness is ice where water over ICE_TEMP stood last tick.
+    // It requires warm water touching ice, so it fails with the flame taken out.
     paint: (p) => {
       for (let x = 6; x <= 24; x++) p(x, 21, 1, M.Wall);
       for (let y = 12; y <= 21; y++) { p(6, y, 1, M.Wall); p(24, y, 1, M.Wall); }
       for (let y = 16; y <= 19; y++) for (let x = 9; x <= 21; x++) p(x, y, 1, M.Ice);
     },
     act: (p, t) => { if (t >= 20 && t < 200 && t % 4 === 0) p(15, 12, 3, M.Fire); },
-    requires: (g) => g.all(M.Water).some((i) => g.energyAt(i) > 120 && touching(g, i, (k) => k === M.Ice)),
-    outcome: (g, before, memo, prev) => g.all(M.Ice).filter((i) => prev.kindOf(i) === M.Water && prev.energyAt(i) > 120) },
+    requires: (g) => g.all(M.Water).some((i) => g.energyAt(i) > 40 && touching(g, i, (k) => k === M.Ice)),
+    outcome: (g, before, memo, prev) => g.all(M.Ice).filter((i) => prev.kindOf(i) === M.Water && prev.energyAt(i) > 40) },
+  { m: "Ice", covers: "ice.freezes", role: "warm water melts it from within, and the melt stays melted", w: 30, h: 26, seed: 164, ticks: 600,
+    // The same basin: a flame held to a slab for nine seconds. The flame melts what it touches;
+    // the meltwater it warms spreads its heat through the pool (HEAT_SHARE) and gives it to the
+    // ice around it, which melts once it has taken enough (ICE_MELT). The witness is ice that
+    // turned to water with no flame, lava or meteor touching it last tick or now, which only
+    // that warmth can do, counted while it stays water. "Now" is not a nicety: the brush lands
+    // after last tick's view is taken, so a dab of flame beside the slab melts ice that view
+    // shows untouched, and without it the check passed with warmth never melting anything.
+    // Nor is skipping any cell steam has ever touched: frost from steam brings its heat too,
+    // and counting it, the check passed with warm water giving the ice nothing. Before 2026-10-20 this was the owner's item
+    // 7: hot water melted ice on a coin flip into a melt the slab took straight back, and the
+    // flame left 78 of 86 cells of ice.
+    paint: (p) => {
+      for (let x = 6; x <= 24; x++) p(x, 21, 1, M.Wall);
+      for (let y = 12; y <= 21; y++) { p(6, y, 1, M.Wall); p(24, y, 1, M.Wall); }
+      for (let y = 16; y <= 19; y++) for (let x = 9; x <= 21; x++) p(x, y, 1, M.Ice);
+    },
+    act: (p, t) => { if (t >= 20 && t < 200 && t % 4 === 0) p(15, 12, 3, M.Fire); },
+    outcome: (g, before, memo, prev) => {
+      memo.melted ??= new Set();
+      memo.steamed ??= new Set();
+      for (let i = 0; i < g.size; i++) {
+        if (touching(prev, i, (k) => k === M.Steam)) memo.steamed.add(i);
+        if (prev.kindOf(i) === M.Ice && g.kindOf(i) === M.Water && !memo.steamed.has(i) && !touching(prev, i, HEAT) && !touching(g, i, HEAT)) memo.melted.add(i);
+      }
+      return [...memo.melted].filter((i) => g.kindOf(i) === M.Water);
+    } },
   { m: "Ice", covers: "ice.condenses", role: "condenses steam into frost", w: 26, h: 26, seed: 19, ticks: 900,
     paint: (p) => { p(13, 20, 3, M.Water); p(13, 21, 2, M.Lava); p(13, 10, 2, M.Ice); },
     outcome: (g, before) => g.appeared(M.Ice, before) },
+  { m: "Ice", covers: "ice.condenses", role: "takes the steam's heat, so lava's steam melts it rather than growing it", w: 50, h: 30, seed: 165, ticks: 900,
+    // An ice block on a soil bed and lava poured four cells off: it runs to the ice and quenches
+    // into steam beside it. Frost from steam brings the steam's heat into the ice that catches
+    // it, so the flood melts the block. Until 2026-10-20 steam froze for nothing and lava grew
+    // the block toward itself, 52 cells to 68 by 20 s (the owner's item 6). The witness is ice
+    // that turned to water with no flame, lava or meteor touching it last tick or now, counted
+    // while it stays water.
+    paint: (p) => {
+      for (let x = 4; x <= 46; x++) { p(x, 25, 0, M.Wall); p(x, 26, 0, M.Wall); }
+      for (let x = 6; x <= 44; x++) { p(x, 23, 0, M.Soil); p(x, 24, 0, M.Soil); }
+      for (let y = 18; y <= 22; y++) for (let x = 27; x <= 32; x++) p(x, y, 0, M.Ice);
+    },
+    act: (p, t) => { if (t >= 300 && t < 340 && t % 4 === 0) p(20, 17, 1, M.Lava, 60); },
+    outcome: (g, before, memo, prev) => {
+      memo.melted ??= new Set();
+      for (let i = 0; i < g.size; i++) {
+        if (prev.kindOf(i) === M.Ice && g.kindOf(i) === M.Water && !touching(prev, i, HEAT) && !touching(g, i, HEAT)) memo.melted.add(i);
+      }
+      return [...memo.melted].filter((i) => g.kindOf(i) === M.Water);
+    } },
   { m: "Ice", covers: "ice.stresses", role: "frost-stresses damp hard materials", w: 40, h: 30, seed: 20, ticks: 1500,
     // A rock, a pour over it, then ice against its flank — one gesture after another, at the
     // default brush and the app's own water density, the way a player switches materials.
@@ -1262,7 +1307,6 @@ export const CHECKS = [
     paint: (p) => { p(25, 25, 4, M.Wall); },
     act: (p, t) => { if (t === 20) p(25, 16, 4, M.Water, 55); if (t === 100) p(16, 25, 4, M.Lava, 55); },
     outcome: (g, before) => g.gained(M.Wall, F.Scorched, before).filter((i) => before.kindOf(i) === M.Wall) },
-
   { m: "Ice", covers: "ice.pauses", role: "pauses life in frozen dormancy", w: 30, h: 26, seed: 88, ticks: 2500,
     absent: true,
     // Ice set right on the seed bed. Perched two cells up it never chilled the seed, which
