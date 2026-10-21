@@ -1,8 +1,9 @@
 # Handoff — where the work is, and what to do next
 
-*Rewritten at each handoff, never appended to. Written 2026-10-21, after poured lava stopped
-deleting itself (it pools now, and sets into stone), the day after the heat batch (the owner's
-items 6 and 7). See `git log` for the live commit. Check `gh run list` first
+*Rewritten at each handoff, never appended to. Written 2026-10-21. **The lava fix (`24d5075`,
+poured lava pools and sets into stone) is pushed to `main` with the full gate and CI green, but
+it is NOT deployed**: Railway paused builds platform-wide in an outage that afternoon, so the live
+site is still the heat batch (`04fa6e2`). Deploying it is item 0 below. Check `gh run list` first
 and only then run `npm run deploy:verify`: a red CI run makes Railway skip that commit for good
 (a rerun does not revive it, a new push does).*
 
@@ -68,25 +69,44 @@ anything ships.
 
 ## What to do next
 
-0. **Poured oil still deletes itself as it spreads** (583 cells of a basin pour are 19 ten
+0. **Deploy the lava fix once Railway's builds resume.** On 2026-10-21 from about 13:10,
+   https://status.railway.com read "Dashboard and API unavailable, builds paused" (a major
+   outage, builds down in every region), and the API refused a deploy with "Deploys have been
+   paused temporarily". Railway made no deployment record for the push at all, so it may never
+   pick it up by itself. The owner has approved this deploy. When the status page is clear:
+   1. `gh run list` (CI must be green for HEAD), then `npm run deploy:verify`. If it already
+      passes, Railway caught up on its own: go to step 4.
+   2. Start a deploy of HEAD from the service's GitHub source (what the outage refused):
+      `railway api 'mutation($s: String!, $e: String!, $c: String) { serviceInstanceDeployV2(serviceId: $s, environmentId: $e, commitSha: $c) }' --var s=b0acc433-99f7-4db1-9ec0-8fc94d813955 --var e=374411d2-6a14-448d-9e1f-1ccea6180158 --var c="\"$(git rev-parse HEAD)\""`
+      It returns a deployment id. HEAD is this handoff's commit on top of the lava fix, and
+      `deploy:verify` expects HEAD.
+   3. Repeat `npm run deploy:verify` until it passes (a build takes about 5 minutes).
+   4. `COZY_QA_URL=https://pixelfun.littlealbumclub.net npm run qa:live`.
+   Not `railway up`: a local upload gets no `RAILWAY_GIT_COMMIT_SHA`, so the page reports no
+   build commit and `deploy:verify` fails on that. Not the Railway MCP's `redeploy` (it re-runs
+   the old `04fa6e2` build) or `create-deployment` (it builds a separate, new service).
+   `.tmp/lava/deploy-when-open.sh` is the retry loop this chat ran (stopped): it tries the
+   mutation every 5 minutes for 2 hours, then waits for `deploy:verify` and runs live QA. Point
+   its `SHA` at HEAD before reusing it.
+1. **Poured oil still deletes itself as it spreads** (583 cells of a basin pour are 19 ten
    seconds later; lava had the same fault until 2026-10-21). It needs a sink that spares a slick,
    and two were tried and dropped, with numbers, in `docs/HARNESS.md` ("Reopened for lava over
    lava"): thinning moving oil 1 in 50 bounds its spring but empties every open slick within
    30 s, because oil on a floor keeps shuffling into any gap; thinning only crowded oil keeps
    slicks but its spring climbs (6.5% of the board at 16,000 ticks). A sink tied to the spring
    itself is the untried idea. Show the owner `film3.mjs oil-pond` (live, and each candidate).
-1. **The rest of the canvas shortlist, when the owner picks:** steam billowing instead of a
+2. **The rest of the canvas shortlist, when the owner picks:** steam billowing instead of a
    dotted thread (5, a sim lever; `VISUAL_PIPELINE.md` records why a renderer fix was tried and
    reverted), a burning log that stays alive past 5-7 seconds (6), and the tulip cup and nodding
    bluebell (8: `BLOOM_SHAPES` in its three copies, a parity scenario that grows each new head,
    and `FLOWER_REACH` in `shapeLanguage.ts`, which `renderer:probe` checks against the engine's
    shapes and will fail on until it is updated). The roster board has one upgrade per material.
-2. **Fallen petals in their flower's colour** needs a sim change: a shed petal becomes a Pollen
+3. **Fallen petals in their flower's colour** needs a sim change: a shed petal becomes a Pollen
    cell identical to a pollen puff, so the renderer cannot tell them apart.
-3. **If Chrome's launch flakes on CI again, read its stderr first.** `launchBrowserOnce` waits
+4. **If Chrome's launch flakes on CI again, read its stderr first.** `launchBrowserOnce` waits
    30 s and appends Chrome's stderr to the error. A red CI run on a good commit still needs a
    rerun to confirm the flake and then a new push to deploy.
-4. **Halves no check can see yet:** `flower.pollen` "more often when cosmic" is a rate, which one
+5. **Halves no check can see yet:** `flower.pollen` "more often when cosmic" is a rate, which one
    check cannot see without two gardens compared inside it; `lava.scorches` "thaws" is still
    unreachable by touch, even with lava pooling now: a kept pool against an ice wall barely melts
    it, because a stone crust forms between them (a check for it passed 0 of 16 seeds after the heat batch, and was not
@@ -110,20 +130,23 @@ anything ships.
 
 ## Where things stand
 
-Live, with the full gate, CI, `deploy:verify` and `qa:live` green:
+Pushed to `main`, with the full gate and CI green, and **not yet deployed** (item 0):
 
-- **Poured lava pools, and a pool sets into stone** (2026-10-21). Lava never deletes lava now
+- **Poured lava pools, and a pool sets into stone** (2026-10-21, `24d5075`). Lava never deletes lava now
   (`try_move`, beside the water guard): a 408-cell pour into the water budget's basin used to be
   51 cells ten seconds later, a film, and keeps every cell. Its sink is its own: lava deep in a
   pool cools too, one roll in `LAVA_DEEP_COOLS` (24) against one in 8 at an edge, so a pour sets
   to stone in 50-75 s and a lava spring builds a stone hill over itself and is sealed by it
   (`npm run water:budget`: 13.7% of the board at tick 1,000, then no lava and 7,480 stone, 24%,
-  by 16,000). Oil was ported too and taken out again before landing (item 0). Two new checks
+  by 16,000). Oil was ported too and taken out again before landing (item 1). Two new checks
   (`lava.flows` "pours into a pool instead of thinning to a film", `lava.cools` "a poured pool
   sets into stone from within") pass 32 of 32 and fail every seed with their rule sabotaged.
   Drift at 8 seeds: 6 of 165 checks moved, all gains (`lava.cools` crust 5 -> 11 cells,
   `stone.born` 21 -> 26 cells and contrast 201 -> 245, the two quench checks +3 or 4 cells); at
   32 seeds none of the 23 lava checks passes on fewer seeds. Review found only a duplicated note.
+
+Live, with the full gate, CI, `deploy:verify` and `qa:live` green:
+
 - **Heat that shows** (2026-10-20, the owner's items 6 and 7). Water's energy is its
   temperature and ice's energy is now its warmth. Four rules, each measured out against the others
   (`sim/src/lib.rs`, the constants after `PETAL_SHED_AGE`): heat spreads through water, exactly
@@ -135,7 +158,7 @@ Live, with the full gate, CI, `deploy:verify` and `qa:live` green:
   ice banks opens and refreezes once the flame goes, pots now simmer visibly and boil away at
   about the old rate, and lava by an ice block no longer grows it (52 -> 53 cells by 20 s,
   against 68). Lava radiating heat across a gap was built and dropped: it moved nothing (85 cells
-  against 84), because poured lava thins to a film (next item 0). A first version stopped hot
+  against 84), because poured lava thinned to a film (fixed in `24d5075`; a kept pool against ice still barely melts it). A first version stopped hot
   steam freezing at all; it cost `ice.condenses` and `steam.frosts` their frost (8 of 8 seeds to
   0 and 1), and the owner chose the steam-heat rule instead. Review (Codex: skeptic, parity,
   drift, minimalist) found conduction, then inside the reaction pass, giving away heat a vent or
@@ -169,7 +192,7 @@ checks pass 32 of 32.
 
 ## Design questions for the owner
 
-- **Poured oil still deletes itself as it spreads** — item 0, above.
+- **Poured oil still deletes itself as it spreads** — item 1, above.
 - Smaller, accepted unless the owner says otherwise: a soaked log leaves a few scorched cells
   unburnt; a burning log is live for only 5-7 seconds; a dormant wellspring blocks only
   non-sources; a meteor shock's scorch is often brief (26 of 32); the sim runs about 24 ticks a
