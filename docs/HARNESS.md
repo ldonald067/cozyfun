@@ -648,6 +648,20 @@ close the water leaks the motes caused, document the rest as intended.
 
 Phase 20 is closed. `npm run clobber:census` is the instrument if any of these is reopened.
 
+**Reopened for lava over lava, 2026-10-21, by the owner.** Measured in a pour rather than
+across the audit's scenes, the class was not small: a 408-cell lava pour into the water
+budget's basin was 51 cells 10 s later, a film, so lava never pooled. Conserving it alone
+flooded a spring (27.9% of the board at 8,000 ticks, rising), so it came with a sink: deep lava
+cools too (`LAVA_DEEP_COOLS`), so a pool sets to stone and a lava spring seals itself under the
+stone hill it builds. `npm run water:budget` reports the lava spring.
+
+Oil over oil is still open, measured the same day (583 poured, 19 left). Two sinks were tried on
+the JS mirror. Moving oil thinning at 1 in 50 held its spring at 1.5%, but oil on a floor keeps
+shuffling into any gap, so every open slick thinned to nothing within 30 s (live keeps a few
+dots for ever). Thinning only oil with two or more oil neighbours kept slicks (28-58 cells of a
+pond's 125 at 60 s) but let the spring climb, 3.8 -> 4.8 -> 6.5% at 4,000, 8,000 and 16,000
+ticks. Oil needs a sink that spares a slick, perhaps one tied to the spring itself.
+
 **Bubbles — gas hotter than mist trades places with whatever sinks into it** (after Phase 20).
 This is not a clobber class: the gas sat in the cell all tick, and `can_sink_through_gas`
 simply overwrote it. `audit:drift --per-seed` found what that cost on its first run —

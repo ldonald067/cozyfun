@@ -218,6 +218,44 @@ const scenarios = [
     };
   })(),
   (() => {
+    // Lava never deletes lava, and deep lava cools too (2026-10-21). Lava poured into a basin
+    // for 4.5 s, then left to set. The witnesses: once the pour ends, lava plus the stone it
+    // becomes never loses a cell, and cells with three or more hot neighbours set into stone.
+    let prev = null;
+    const HOT = [M.Fire, M.Lava, M.Meteor];
+    return {
+      name: "poured lava stays a pool and sets into stone from within",
+      w: 40, h: 30, seed: 167, ticks: 1600,
+      paint(p) {
+        for (let x = 0; x < 40; x++) p(x, 28, 1, M.Wall);
+        for (let y = 10; y <= 28; y++) { p(1, y, 1, M.Wall); p(38, y, 1, M.Wall); }
+      },
+      act(p, t) { if (t <= 90 && t % 3 === 1) p(20, 4, 4, M.Lava); },
+      observe(seen, cells, w, h, tick) {
+        seen.lost ??= 0;
+        seen.setFromWithin ??= 0;
+        const kind = (c, x, y) => (x < 0 || y < 0 || x >= w || y >= h ? M.Empty : c[(y * w + x) * STRIDE]);
+        let total = 0;
+        for (let i = 0; i < w * h; i++) if (cells[i * STRIDE] === M.Lava || cells[i * STRIDE] === M.Stone) total++;
+        if (tick === 91) seen.poured = total;
+        if (tick > 91 && total < seen.poured) seen.lost = Math.max(seen.lost, seen.poured - total);
+        if (prev) {
+          for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+              if (kind(prev, x, y) !== M.Lava || kind(cells, x, y) !== M.Stone) continue;
+              let hot = 0;
+              for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && HOT.includes(kind(prev, x + dx, y + dy))) hot++;
+              if (hot >= 3) seen.setFromWithin++;
+            }
+          }
+        }
+        prev = cells.slice();
+      },
+      expect: (seen) => (seen.lost === 0 && seen.setFromWithin >= 120
+        ? null : `lava lost after the pour ${seen.lost} (must be 0), set from within ${seen.setFromWithin} (floor 120)`),
+    };
+  })(),
+  (() => {
     // Frost from steam brings the steam's heat into the ice. Lava poured by an ice block
     // quenches into steam beside it; the witnesses are ice that warms while hot steam touches
     // it and no warm water does, and ice that melts with no flame, lava or meteor touching it.

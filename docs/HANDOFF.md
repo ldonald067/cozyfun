@@ -1,7 +1,8 @@
 # Handoff — where the work is, and what to do next
 
-*Rewritten at each handoff, never appended to. Written 2026-10-20, after the heat batch (the
-owner's items 6 and 7) went live. See `git log` for the live commit. Check `gh run list` first
+*Rewritten at each handoff, never appended to. Written 2026-10-21, after poured lava stopped
+deleting itself (it pools now, and sets into stone), the day after the heat batch (the owner's
+items 6 and 7). See `git log` for the live commit. Check `gh run list` first
 and only then run `npm run deploy:verify`: a red CI run makes Railway skip that commit for good
 (a rerun does not revive it, a new push does).*
 
@@ -14,7 +15,9 @@ The owner hits usage limits early, so keep each chat lean:
   `MATERIAL_AUDIT.md` are 40-70 KB each; reading a file under `app/src/rendering/` pulls
   `VISUAL_PIPELINE.md` in whole through that directory's `CLAUDE.md`, so grep there first.
 - **Measure narrowly.** `npm run audit:drift -- --seeds 32 --per-seed --only <ids>` takes a
-  couple of minutes; all checks at 8 seeds against `main` takes about five.
+  couple of minutes; all checks at 8 seeds against `main` takes about five. Keep `--only` to
+  about six ids a run: the cache file is named after the list, and 17 ids made the name too long
+  for macOS (ENAMETOOLONG).
 - **Run the full gate (`npm run check`, ~8 minutes) once per batch**, not after every edit.
 
 ## The owner picks from pictures, and there is a canvas for it
@@ -37,6 +40,14 @@ anything ships.
   sabotage from `.tmp/halves/sabotages.mjs` applied; `kinds.mjs <scene> <tick>` a material
   census; `boil.mjs` three pots under a held flame; `lavacount.mjs` the lava self-deletion below.
   `NOTES.md` there covers the exploration, including what was tried and dropped.
+- **Lava and oil (2026-10-21):** `.tmp/lava/variant.mjs` builds find/replace copies of
+  `app/src/engine.ts` without touching it; its `live` is the WORKING TREE, so compare against
+  `.tmp/lava/base` (refresh it with `git archive HEAD app/src | tar -x -C .tmp/lava/base`).
+  `measure.mjs <variant> pour|spring|long` (a basin pour, a spring on the 220x140 board, a pool
+  left 2.5 min), `scan.mjs <variant> [seeds]` (every audit check, live against a variant, pass
+  counts), `film.mjs <scene> <variant>` and `film3.mjs <scene>` (three engines in one strip),
+  `slick.mjs` and `pondcount.mjs` (oil in the open), `crowd.mjs <n>` (oil thinning only with n
+  oil neighbours). `NOTES.md` there has every number, oil's included.
 - **Sabotage:** `.tmp/halves/sabotages.mjs` holds find/replace edits on `app/src/engine.ts`, one
   per rule half, both ways where a rule has two sides; the heat batch's are at the end. Keep the
   dice (leave the `chance()` roll). `.tmp/halves/sab.mjs <name> [seeds] [id,id]` plays every
@@ -57,13 +68,13 @@ anything ships.
 
 ## What to do next
 
-0. **Poured lava and oil delete themselves as they spread** (found 2026-10-20, live engine,
-   `.tmp/heat/lavacount.mjs`): 49 cells of lava poured on a walled floor are 9 by tick 80, with
-   no stone made; oil 30 -> 3. Water is conserved. It is the move clobber `sim/CLAUDE.md`
-   describes, guarded for water only. It is why lava's heat cannot reach across a gap (a pour
-   thins to a one-cell film) and why poured lava never pools. An owner decision, shown in a
-   filmstrip: lava has a sink (it crusts), oil has none and must not be conserved (an oil spring
-   flooded a third of the board when it was), and a lava spring may need its own measure.
+0. **Poured oil still deletes itself as it spreads** (583 cells of a basin pour are 19 ten
+   seconds later; lava had the same fault until 2026-10-21). It needs a sink that spares a slick,
+   and two were tried and dropped, with numbers, in `docs/HARNESS.md` ("Reopened for lava over
+   lava"): thinning moving oil 1 in 50 bounds its spring but empties every open slick within
+   30 s, because oil on a floor keeps shuffling into any gap; thinning only crowded oil keeps
+   slicks but its spring climbs (6.5% of the board at 16,000 ticks). A sink tied to the spring
+   itself is the untried idea. Show the owner `film3.mjs oil-pond` (live, and each candidate).
 1. **The rest of the canvas shortlist, when the owner picks:** steam billowing instead of a
    dotted thread (5, a sim lever; `VISUAL_PIPELINE.md` records why a renderer fix was tried and
    reverted), a burning log that stays alive past 5-7 seconds (6), and the tulip cup and nodding
@@ -77,7 +88,8 @@ anything ships.
    rerun to confirm the flake and then a new push to deploy.
 4. **Halves no check can see yet:** `flower.pollen` "more often when cosmic" is a rate, which one
    check cannot see without two gardens compared inside it; `lava.scorches` "thaws" is still
-   unreachable by touch (a check for it passed 0 of 16 seeds after the heat batch, and was not
+   unreachable by touch, even with lava pooling now: a kept pool against an ice wall barely melts
+   it, because a stone crust forms between them (a check for it passed 0 of 16 seeds after the heat batch, and was not
    kept): frost lies only beside the ice that made it, and lava meets the ice first.
 
 ## How a witness gets checked
@@ -100,6 +112,18 @@ anything ships.
 
 Live, with the full gate, CI, `deploy:verify` and `qa:live` green:
 
+- **Poured lava pools, and a pool sets into stone** (2026-10-21). Lava never deletes lava now
+  (`try_move`, beside the water guard): a 408-cell pour into the water budget's basin used to be
+  51 cells ten seconds later, a film, and keeps every cell. Its sink is its own: lava deep in a
+  pool cools too, one roll in `LAVA_DEEP_COOLS` (24) against one in 8 at an edge, so a pour sets
+  to stone in 50-75 s and a lava spring builds a stone hill over itself and is sealed by it
+  (`npm run water:budget`: 13.7% of the board at tick 1,000, then no lava and 7,480 stone, 24%,
+  by 16,000). Oil was ported too and taken out again before landing (item 0). Two new checks
+  (`lava.flows` "pours into a pool instead of thinning to a film", `lava.cools` "a poured pool
+  sets into stone from within") pass 32 of 32 and fail every seed with their rule sabotaged.
+  Drift at 8 seeds: 6 of 165 checks moved, all gains (`lava.cools` crust 5 -> 11 cells,
+  `stone.born` 21 -> 26 cells and contrast 201 -> 245, the two quench checks +3 or 4 cells); at
+  32 seeds none of the 23 lava checks passes on fewer seeds. Review found only a duplicated note.
 - **Heat that shows** (2026-10-20, the owner's items 6 and 7). Water's energy is its
   temperature and ice's energy is now its warmth. Four rules, each measured out against the others
   (`sim/src/lib.rs`, the constants after `PETAL_SHED_AGE`): heat spreads through water, exactly
@@ -134,17 +158,18 @@ Live, with the full gate, CI, `deploy:verify` and `qa:live` green:
   when a material only moves**, and the clause-half witness work (2026-10-09 to 10-18); `git log`
   has each.
 
-The interaction audit has 163 checks bound to all 118 role ids; all pass on the audit's seed.
+The interaction audit has 165 checks bound to all 118 role ids; all pass on the audit's seed.
 The 32-seed list of checks that do not pass every seed was last taken in full on 2026-10-17:
 `fire.thaws`, both `oil.ignites` checks, the fanned-trail check of `meteor.trail`,
 `fungus.fairyring`, `lava.scorches` and `stem.burns` at 31, the stalk check of `stem.footing`
 at 27, and the ember check of `fire.dries` at 29 (re-measured after the heat batch). Of the heat
 batch's checks, two pass 32 of 32; `ice.condenses` "takes the steam's heat" passes 28 (four seeds
-show it under 30 ticks: how long the lava keeps quenching beside the ice varies).
+show it under 30 ticks: how long the lava keeps quenching beside the ice varies). The two lava
+checks pass 32 of 32.
 
 ## Design questions for the owner
 
-- **Poured lava and oil delete themselves as they spread** — item 0, above.
+- **Poured oil still deletes itself as it spreads** — item 0, above.
 - Smaller, accepted unless the owner says otherwise: a soaked log leaves a few scorched cells
   unburnt; a burning log is live for only 5-7 seconds; a dormant wellspring blocks only
   non-sources; a meteor shock's scorch is often brief (26 of 32); the sim runs about 24 ticks a
@@ -158,7 +183,12 @@ All by the owner, after seeing pictures or measurements:
 
 - **Heat** (2026-10-20): the four rules as shipped. Steam keeps frosting onto ice and gives the
   ice its heat; hot steam is NOT kept from freezing (that cost two frost interactions). Lava's
-  radiant heat across a gap is not in, until poured lava stops deleting itself.
+  radiant heat across a gap is not in.
+- **Lava pools and sets** (2026-10-21): lava never deletes lava, and a deep pool cools from
+  within at one roll in 24. A lava spring building a stone hill over itself (24% of the board at
+  its peak) and going quiet is accepted. **Oil stays as it is live** until it has a sink that
+  spares a slick; thinning every moving oil cell (1 in 50) was approved first and withdrawn when
+  it turned out to empty open slicks within 30 s.
 - **The poster** is a loose, wet watercolour with watercolour rain and lightning and two living
   jars, a garden and a bug jar (2026-10-18/19). Keep visual changes to it painterly and animated
   with transform/opacity only.

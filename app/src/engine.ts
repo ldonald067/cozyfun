@@ -777,7 +777,7 @@ class JsSandboxEngine implements SandboxEngine {
         const hotNeighbors = this.neighbors(x, y).filter((nidx) =>
           old[nidx] === MATERIAL.Fire || old[nidx] === MATERIAL.Lava || old[nidx] === MATERIAL.Meteor
         ).length;
-        if (hotNeighbors < 3 && this.chance(8)) {
+        if (this.chance(hotNeighbors < 3 ? 8 : LAVA_DEEP_COOLS)) {
           const energy = Math.max(0, readU16(next, idx + 4) - 4);
           writeU16(next, idx + 4, energy);
           if (energy < 60 && this.chance(4)) {
@@ -1738,6 +1738,8 @@ class JsSandboxEngine implements SandboxEngine {
     const target = this.index(x, y);
     // Water never deletes water — see Universe::try_move for why oil is not included.
     if (waterLike(movingCell[0]) && waterLike(next[target])) return false;
+    // Nor lava lava — see Universe::try_move for why oil is still left out.
+    if (movingCell[0] === MATERIAL.Lava && next[target] === MATERIAL.Lava) return false;
     // A gas never deletes a gas — see Universe::try_move.
     if (isGas(movingCell[0]) && isGas(next[target])) return false;
     // Nor water — see Universe::try_move.
@@ -1874,6 +1876,8 @@ const SLOW_SAND_COMPACTS = 8;
 // Settling through a liquid runs on one tick in this many; a parity gate, never a roll.
 const SINK_EVERY = 3;
 const MIST_ODDS = 450;
+// Deep lava cools too. See LAVA_DEEP_COOLS in lib.rs.
+const LAVA_DEEP_COOLS = 24;
 const MIST_ENERGY = 30;
 const SCATTER_OFFSETS: readonly number[] = [6, -6, 9, -9, 12, -12, 15, -15];
 const SCATTER_REACH = 14;

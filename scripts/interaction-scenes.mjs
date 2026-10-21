@@ -564,6 +564,29 @@ export const CHECKS = [
   { m: "Lava", covers: "lava.cools", role: "crusts into stone on its own", w: 26, h: 24, seed: 16, ticks: 3000,
     paint: (p) => { p(13, 18, 2, M.Lava); },
     outcome: (g, before) => g.appeared(M.Stone, before) },
+  { m: "Lava", covers: "lava.cools", role: "a poured pool sets into stone from within", w: 40, h: 30, seed: 167, ticks: 2000,
+    // The water budget's basin, lava poured into it for 4.5 s at the default brush. Lava never
+    // deletes lava (2026-10-21), so the pour stays a pool, and lava deep in it cools too
+    // (LAVA_DEEP_COOLS). The witness is stone that was lava last tick with three or more hot
+    // neighbours, and no water or moonwater touching it, so it set from within rather than
+    // crusting at an edge or being quenched; counted while it stays stone.
+    paint: (p) => {
+      for (let x = 0; x < 40; x++) p(x, 28, 1, M.Wall);
+      for (let y = 10; y <= 28; y++) { p(1, y, 1, M.Wall); p(38, y, 1, M.Wall); }
+    },
+    act: (p, t) => { if (t <= 90 && t % 3 === 1) p(20, 4, 4, M.Lava); },
+    outcome: (g, before, memo, prev) => {
+      memo.set ??= new Set();
+      for (let i = 0; i < g.size; i++) {
+        if (prev.kindOf(i) !== M.Lava || g.kindOf(i) !== M.Stone) continue;
+        if (touching(prev, i, (k) => k === M.Water || k === M.Moonwater)) continue;
+        const [x, y] = g.xyOf(i);
+        let hot = 0;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && HEAT(prev.kindAt(x + dx, y + dy))) hot++;
+        if (hot >= 3) memo.set.add(i);
+      }
+      return [...memo.set].filter((i) => g.kindOf(i) === M.Stone);
+    } },
   { m: "Ember", covers: "ember.cools", role: "cools into inert char", w: 26, h: 24, seed: 17, ticks: 2000,
     paint: (p) => { p(13, 18, 3, M.Wood); p(13, 15, 1, M.Fire); },
     outcome: (g) => g.all(M.Ember).filter((i) => g.energyAt(i) < 60) },
@@ -1273,6 +1296,21 @@ export const CHECKS = [
     paint: (p) => { p(15, 20, 4, M.Sand); p(15, 16, 2, M.Fire); },
     outcome: (g, before) => g.appeared(M.Glass, before) },
 
+  { m: "Lava", covers: "lava.flows", role: "pours into a pool instead of thinning to a film", w: 40, h: 30, seed: 168, ticks: 600,
+    // The same pour. Until 2026-10-21 lava moving into a cell another lava cell had just
+    // filled deleted it: 408 cells poured were about 70 ten seconds later, a film that lay
+    // three deep at most, in the pockets of the audit's floor. The witness is lava with three
+    // more stacked above it, a pool at least four deep, from 15 s on, so the pour itself (a
+    // falling column) is not counted: 0 cells on the old engine, about 300 now.
+    paint: (p) => {
+      for (let x = 0; x < 40; x++) p(x, 28, 1, M.Wall);
+      for (let y = 10; y <= 28; y++) { p(1, y, 1, M.Wall); p(38, y, 1, M.Wall); }
+    },
+    act: (p, t) => { if (t <= 90 && t % 3 === 1) p(20, 4, 4, M.Lava); },
+    outcome: (g, before, memo) => ((memo.t = (memo.t ?? -1) + 1) < 300 ? [] : g.all(M.Lava).filter((i) => {
+      const [x, y] = g.xyOf(i);
+      return [1, 2, 3].every((k) => g.kindAt(x, y - k) === M.Lava);
+    })) },
   { m: "Lava", covers: "lava.flows", role: "flows slowly and ignites fuel", w: 30, h: 26, seed: 84, ticks: 900,
     paint: (p) => { p(15, 20, 3, M.Wood); p(15, 15, 2, M.Lava); },
     // Wood ignites into ember rather than bare flame, so ignition is either of the two.

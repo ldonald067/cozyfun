@@ -272,6 +272,12 @@ const SINK_EVERY: u32 = 3;
 /// bed keeps every cell — while a pour, a fountain and a thin film that keeps shifting lose
 /// some. This is the deliberate water sink; see `try_move` for the accidental one it replaced.
 const MIST_ODDS: u32 = 450;
+/// Lava with three or more hot neighbours, deep in a pool, cools too: one roll in this many,
+/// against one in 8 at an exposed edge. Lava never deletes lava (`try_move`), so a pour stays a
+/// pool, and a pool must set or a lava spring floods the board (28% at 8,000 ticks, still
+/// rising). With it a pour sets to stone in 50-75 s, and a spring builds a stone hill over
+/// itself (about 24% of the board) and is sealed by it.
+const LAVA_DEEP_COOLS: u32 = 24;
 /// Mist is cool vapour — steam at the bottom of its energy range, so it reads as a faint
 /// sheen rather than as a kettle.
 const MIST_ENERGY: u16 = 30;
@@ -1175,9 +1181,12 @@ impl Universe {
                         if next[idx].energy < 90 && self.chance(3) {
                             next[idx] = Cell::new(Material::Stone as u8, cell.variant, 0);
                         }
-                    } else if next[idx].kind == Material::Lava as u8 && hot_neighbors < 3 && self.chance(8) {
-                        // Exposed lava slowly crusts over on its own, so pools cool edge-inward
-                        // and nothing stays molten forever without a heat source.
+                    } else if next[idx].kind == Material::Lava as u8
+                        && self.chance(if hot_neighbors < 3 { 8 } else { LAVA_DEEP_COOLS })
+                    {
+                        // Lava cools on its own, exposed edges fastest, so pools crust
+                        // edge-inward and nothing stays molten forever without a heat source.
+                        // Deep lava cooling too is what keeps a kept pool from lasting forever.
                         next[idx].energy = next[idx].energy.saturating_sub(4);
                         if next[idx].energy < 60 && self.chance(4) {
                             next[idx] = Cell::new(Material::Stone as u8, cell.variant, 0);
@@ -2796,6 +2805,13 @@ impl Universe {
         // spring flooded 31.9% of the board (main: 1.2%), because the clobber had been its
         // only sink too. Oil keeps the old behaviour until it is given a sink of its own.
         if is_water_like(moving_cell.kind) && is_water_like(target_next.kind) {
+            return false;
+        }
+        // Nor lava lava (2026-10-21). A spreading pour lost most of itself to the clobber, 408
+        // cells to 51 within 10 s, so lava never pooled. Its sink is its own: deep lava cools
+        // too (`LAVA_DEEP_COOLS`). Oil is still left out until it has a sink that spares a
+        // slick; the two tried are in docs/HARNESS.md ("Reopened for lava over lava").
+        if moving_cell.kind == Material::Lava as u8 && target_next.kind == Material::Lava as u8 {
             return false;
         }
         // A gas never deletes a gas (ROADMAP Phase 20D). Unlike water, smoke and steam already
@@ -5796,6 +5812,70 @@ mod tests {
             }
         }
         assert!(vented > 0, "some seed should have vented");
+    }
+
+    /// A wall basin two thick on every side (liquids hop a one-cell wall), open above `top`;
+    /// its inside runs from x 3 to `w - 4`, down to the floor at `floor`.
+    fn basin(u: &mut Universe, w: u32, floor: u32, top: u32) {
+        for x in 0..w {
+            set_cell(u, x, floor + 1, Material::Wall);
+            set_cell(u, x, floor + 2, Material::Wall);
+        }
+        for y in top..=floor {
+            for x in [1, 2, w - 3, w - 2] {
+                set_cell(u, x, y, Material::Wall);
+            }
+        }
+    }
+
+    #[test]
+    fn poured_lava_keeps_every_cell_while_it_spreads() {
+        // A column of lava dropped into a basin. Under the move clobber a spreading pour lost
+        // most of itself (408 cells to 51 in a basin); lava never deletes lava now.
+        let mut u = Universe::new(24, 20, 7);
+        basin(&mut u, 24, 16, 4);
+        for y in 4..=12 {
+            for x in 10..=13 {
+                set_cell(&mut u, x, y, Material::Lava);
+            }
+        }
+        let start = count_kind(&u, Material::Lava);
+        for _ in 0..200 {
+            u.tick();
+            assert_eq!(
+                count_kind(&u, Material::Lava) + count_kind(&u, Material::Stone),
+                start,
+                "spreading lava should lose no cell"
+            );
+        }
+    }
+
+    #[test]
+    fn a_deep_lava_pool_sets_into_stone_from_within() {
+        // A pool every cell of which has three hot neighbours or more: it used to stay molten
+        // for ever, and once lava stopped deleting itself a lava spring flooded the board.
+        let mut u = Universe::new(24, 20, 7);
+        basin(&mut u, 24, 16, 10);
+        for y in 13..=16 {
+            for x in 3..=20 {
+                set_cell(&mut u, x, y, Material::Lava);
+            }
+        }
+        let start = count_kind(&u, Material::Lava);
+        for _ in 0..300 {
+            u.tick();
+        }
+        assert!(count_kind(&u, Material::Lava) >= start * 9 / 10, "a deep pool should not set at once");
+        let mut set = false;
+        for _ in 0..3000 {
+            u.tick();
+            if count_kind(&u, Material::Lava) == 0 {
+                set = true;
+                break;
+            }
+        }
+        assert!(set, "a deep pool should set into stone from within");
+        assert_eq!(count_kind(&u, Material::Stone), start, "every cell of the pool should become stone");
     }
 
     #[test]

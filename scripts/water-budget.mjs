@@ -17,7 +17,9 @@
 //
 // Since ROADMAP Phase 20B the water sink is deliberate — moving water throws mist, and water
 // never deletes water — and the same three read: spring 7.1%, pour 82% kept, pond 94% kept.
-// An oil spring stays at 1.2%, as on main: oil has no sink of its own, so it is not conserved.
+// An oil spring stays at 1.2%, as on main: oil had no sink of its own, so it was not conserved.
+// Since 2026-10-21 lava is conserved with a sink of its own and a lava spring is measured too:
+// it floods about 14% at first, then seals itself under the stone it makes.
 // It reports, and exits 0; each later step of Phase 20 is judged against these numbers.
 import { M, loadWasmEngine } from "./interaction-scenes.mjs";
 
@@ -52,8 +54,10 @@ console.log("\nWater budget, on the shipped wasm build.\n");
 //    too because it is the liquid with NO sink: the first version of Phase 20B conserved it
 //    along with water, and an oil spring flooded 31.9% of the board (main: 1.2%) without any
 //    gate noticing — a water-only budget could not see it. Water and oil are reported side by
-//    side so a change to one cannot quietly flood the other.
-for (const [name, kind] of [["water", M.Water], ["oil", M.Oil]]) {
+//    side so a change to one cannot quietly flood the other. Lava joined them on 2026-10-21,
+//    when it stopped deleting itself; its stone is counted, because a lava spring's sink is
+//    the stone hill it builds over itself.
+for (const [name, kind] of [["water", M.Water], ["oil", M.Oil], ["lava", M.Lava]]) {
   const W = 220, H = 140;
   const b = board(W, H, 3);
   for (let x = 0; x < W; x++) b.paint(x, H - 2, 1, M.Wall);
@@ -66,10 +70,11 @@ for (const [name, kind] of [["water", M.Water], ["oil", M.Oil]]) {
     b.ticks(at - t);
     t = at;
     const n = b.count(kind);
-    samples.push(`tick ${at}: ${n} (${((100 * n) / (W * H)).toFixed(1)}%)`);
+    const stone = kind === M.Lava ? `, stone ${b.count(M.Stone)}` : "";
+    samples.push(`tick ${at}: ${n} (${((100 * n) / (W * H)).toFixed(1)}%${stone})`);
   }
   b.free();
-  console.log(`  ${name === "oil" ? "an oil" : "a water"} wellspring on the 220x140 board   ${samples.join("   ")}`);
+  console.log(`  ${name === "oil" ? "an oil" : `a ${name}`} wellspring on the 220x140 board   ${samples.join("   ")}`);
 }
 
 // 2. Water poured into a walled basin, stroke by stroke, then left to settle.
