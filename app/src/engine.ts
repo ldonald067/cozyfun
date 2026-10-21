@@ -166,7 +166,9 @@ class JsSandboxEngine implements SandboxEngine {
         if (!this.inBounds(px, py)) continue;
         if (clamped < 100 && this.rand() % 100 >= clamped) continue;
         const kind = Math.min(material, MATERIAL.Spark);
-        this.writeCell(this.index(px, py), kind, this.variant(px, py, kind), startEnergy(kind), 0);
+        // The eraser leaves a bare cell, as Universe::paint does: it used to stamp a variant on
+        // the empty cell, which no rule reads but a save and the parity harness both see.
+        this.writeCell(this.index(px, py), kind, kind === MATERIAL.Empty ? 0 : this.variant(px, py, kind), startEnergy(kind), 0);
       }
     }
   }
@@ -867,7 +869,13 @@ class JsSandboxEngine implements SandboxEngine {
   }
 
   private oil(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
-    if (this.ticks % 2 !== 0) return;
+    // Two ticks in four, one of each pass direction — see Universe::update_oil.
+    if (this.ticks % 4 >= 2) return;
+    // Spring oil fades; the roll is made for a spring's oil only.
+    if (next[idx] === MATERIAL.Oil && readU16(next, idx + 6) & SPRING_OIL && this.chance(OIL_SPRING_FADES)) {
+      next.fill(0, idx, idx + CELL_STRIDE);
+      return;
+    }
     if (y > 0) {
       const above = this.index(x, y - 1);
       if (waterLike(old[above]) && next[above] === old[above] && next[idx] === MATERIAL.Oil) {
@@ -881,13 +889,19 @@ class JsSandboxEngine implements SandboxEngine {
 
     const below = this.inBounds(x, y + 1) ? old[this.index(x, y + 1)] : MATERIAL.Wall;
     const supported = below !== MATERIAL.Empty && below !== MATERIAL.Smoke && below !== MATERIAL.Steam;
-    const side = this.ticks % 2 === 0 ? 1 : -1;
-    const dirs = supported
-      ? [[side, 0], [-side, 0], [side * 2, 0], [-side * 2, 0], [0, 1], [side, 1], [-side, 1]]
-      : [[0, 1], [side, 1], [-side, 1], [side, 0], [-side, 0], [side * 2, 0], [-side * 2, 0]];
+    // It keeps flowing the way it is going until blocked, then turns; resting on anything but
+    // oil it does not skate — see Universe::update_oil.
+    const east = Boolean(readU16(cell, 6) & CELL_FLAG.DriftEast) !== Boolean(cell[1] & 1);
+    const side = east ? 1 : -1;
+    const onOil = below === MATERIAL.Oil;
+    const sheeting = [[side, 0], [side * 2, 0], [0, 1], [side, 1], [-side, 1]];
+    const dirs = !supported
+      ? [[0, 1], [side, 1], [-side, 1], [side, 0], [-side, 0], [side * 2, 0], [-side * 2, 0]]
+      : onOil ? sheeting : sheeting.slice(2);
     for (const [dx, dy] of dirs) {
       if (this.move(idx, x + dx, y + dy, cell, old, next)) return;
     }
+    if (onOil && next[idx] === MATERIAL.Oil) writeU16(next, idx + 6, readU16(next, idx + 6) ^ CELL_FLAG.DriftEast);
   }
 
   private gas(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
@@ -1031,7 +1045,7 @@ class JsSandboxEngine implements SandboxEngine {
         // The roll happens only once a target exists, matching the sim, or the two RNG
         // streams part company.
         if (target >= 0 && this.chance(WELLSPRING_POUR)) {
-          writeCellBytes(next, target, source, this.rand() & 3, startEnergy(source));
+          writeCellBytes(next, target, source, this.rand() & 3, startEnergy(source), 0, source === MATERIAL.Oil ? SPRING_OIL : 0);
         }
       }
     }
@@ -1738,8 +1752,9 @@ class JsSandboxEngine implements SandboxEngine {
     const target = this.index(x, y);
     // Water never deletes water — see Universe::try_move for why oil is not included.
     if (waterLike(movingCell[0]) && waterLike(next[target])) return false;
-    // Nor lava lava — see Universe::try_move for why oil is still left out.
+    // Nor lava lava, nor oil oil — each has a sink of its own; see Universe::try_move.
     if (movingCell[0] === MATERIAL.Lava && next[target] === MATERIAL.Lava) return false;
+    if (movingCell[0] === MATERIAL.Oil && next[target] === MATERIAL.Oil) return false;
     // A gas never deletes a gas — see Universe::try_move.
     if (isGas(movingCell[0]) && isGas(next[target])) return false;
     // Nor water — see Universe::try_move.
@@ -1878,6 +1893,10 @@ const SINK_EVERY = 3;
 const MIST_ODDS = 450;
 // Deep lava cools too. See LAVA_DEEP_COOLS in lib.rs.
 const LAVA_DEEP_COOLS = 24;
+// Oil a spring poured fades, and only it: the rooted bit marks it. See OIL_SPRING_FADES and
+// FLAG_SPRING_OIL in lib.rs.
+const OIL_SPRING_FADES = 250;
+const SPRING_OIL = CELL_FLAG.Rooted;
 const MIST_ENERGY = 30;
 const SCATTER_OFFSETS: readonly number[] = [6, -6, 9, -9, 12, -12, 15, -15];
 const SCATTER_REACH = 14;

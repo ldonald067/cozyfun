@@ -655,12 +655,22 @@ flooded a spring (27.9% of the board at 8,000 ticks, rising), so it came with a 
 cools too (`LAVA_DEEP_COOLS`), so a pool sets to stone and a lava spring seals itself under the
 stone hill it builds. `npm run water:budget` reports the lava spring.
 
-Oil over oil is still open, measured the same day (583 poured, 19 left). Two sinks were tried on
-the JS mirror. Moving oil thinning at 1 in 50 held its spring at 1.5%, but oil on a floor keeps
-shuffling into any gap, so every open slick thinned to nothing within 30 s (live keeps a few
-dots for ever). Thinning only oil with two or more oil neighbours kept slicks (28-58 cells of a
-pond's 125 at 60 s) but let the spring climb, 3.8 -> 4.8 -> 6.5% at 4,000, 8,000 and 16,000
-ticks. Oil needs a sink that spares a slick, perhaps one tied to the spring itself.
+Oil over oil was closed the same day (583 poured, 19 left), and needed more than a guard. Two
+sinks tried first on the JS mirror failed: moving oil thinning at 1 in 50 held its spring at
+1.5% but emptied every open slick within 30 s, because oil on a floor kept shuffling into any
+gap; thinning only crowded oil kept slicks but let the spring climb to 6.5% by 16,000 ticks.
+Printing the board showed why oil never settled: it moved on even ticks only, which are always
+the left-to-right pass, so its side never flipped and every slick slid right (a pour on an open
+floor ended at the board's edge on 32 seeds of 32). Flipping its side alone left a poured heap
+shuffling in place, four rows high, for ever. What shipped, measured on the 220x140 board:
+oil moves on one tick of each pass direction, keeps flowing the way it is going until blocked
+(`FLAG_DRIFT_EAST`), and rests on anything but oil, so a pour spreads into a still sheet one
+cell deep; and only oil a spring poured fades, 1 in `OIL_SPRING_FADES` (250) of its moving
+ticks, at rest or not. A per-move sink was tried on the settled version too and the spring
+reached 24%: a finished layer lies still and never rolls. Pours, dabs and pond slicks keep
+every cell; an oil spring holds 7.0-7.2% from 4,000 to 16,000 ticks, the size of a water
+spring's lake. Four audit checks witness it from painted materials, each failing on main and
+under the sabotage of its own rule.
 
 **Bubbles — gas hotter than mist trades places with whatever sinks into it** (after Phase 20).
 This is not a clobber class: the gas sat in the cell all tick, and `can_sink_through_gas`

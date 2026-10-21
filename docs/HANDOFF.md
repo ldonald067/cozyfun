@@ -1,11 +1,13 @@
 # Handoff — where the work is, and what to do next
 
-*Rewritten at each handoff, never appended to. Written 2026-10-21. **The lava fix (`24d5075`,
-poured lava pools and sets into stone) is pushed to `main` with the full gate and CI green, but
-it is NOT deployed**: Railway paused builds platform-wide in an outage that afternoon, so the live
-site is still the heat batch (`04fa6e2`). Deploying it is item 0 below. Check `gh run list` first
-and only then run `npm run deploy:verify`: a red CI run makes Railway skip that commit for good
-(a rerun does not revive it, a new push does).*
+*Rewritten at each handoff, never appended to. Written 2026-10-21, evening. **The lava fix
+(`24d5075`, poured lava pools and sets into stone) is pushed to `main` with the full gate and CI
+green, but it is NOT deployed**: Railway paused builds platform-wide in an outage that afternoon
+and was still having issues that evening, so the live site is still the heat batch (`04fa6e2`).
+Deploying it is item 0 below. **The oil batch is on branch `oil-flow`**, full gate and review
+green, waiting for the owner to look at `.tmp/oil/oil-sheet.png` before it goes to `main`
+(item 1). Check `gh run list` first and only then run `npm run deploy:verify`: a red CI run makes
+Railway skip that commit for good (a rerun does not revive it, a new push does).*
 
 ## Work within the owner's usage limits
 
@@ -49,6 +51,14 @@ anything ships.
   counts), `film.mjs <scene> <variant>` and `film3.mjs <scene>` (three engines in one strip),
   `slick.mjs` and `pondcount.mjs` (oil in the open), `crowd.mjs <n>` (oil thinning only with n
   oil neighbours). `NOTES.md` there has every number, oil's included.
+- **Oil (2026-10-21, evening):** `.tmp/oil/` is this batch's. `variant.mjs` (find/replace
+  copies of `app/src/engine.ts`; `live` is the WORKING TREE), `measure.mjs <variant> [quick|spring]`
+  (open dab, basin pour, pond slick, spring at 4k/8k/16k), `bias32.mjs [root]` and `bias6.mjs`
+  (does a pour drift: centre offsets over varied pours; keep the sheet clear of the board's
+  edges or the edges set the centre), `checks.mjs <roleRegex> [seeds] [sab,sab|all]` (chosen
+  audit checks on the tree, on HEAD in `.tmp/oil/base`, and on named sabotages of the oil rules;
+  `PAINT=1` matches the regex against a scene's paint instead), `film.mjs <scene>` (HEAD above
+  the tree) and `sheet.py` (the four strips on one labelled sheet, `oil-sheet.png`).
 - **Sabotage:** `.tmp/halves/sabotages.mjs` holds find/replace edits on `app/src/engine.ts`, one
   per rule half, both ways where a rule has two sides; the heat batch's are at the end. Keep the
   dice (leave the `chance()` roll). `.tmp/halves/sab.mjs <name> [seeds] [id,id]` plays every
@@ -88,25 +98,30 @@ anything ships.
    `.tmp/lava/deploy-when-open.sh` is the retry loop this chat ran (stopped): it tries the
    mutation every 5 minutes for 2 hours, then waits for `deploy:verify` and runs live QA. Point
    its `SHA` at HEAD before reusing it.
-1. **Poured oil still deletes itself as it spreads** (583 cells of a basin pour are 19 ten
-   seconds later; lava had the same fault until 2026-10-21). It needs a sink that spares a slick,
-   and two were tried and dropped, with numbers, in `docs/HARNESS.md` ("Reopened for lava over
-   lava"): thinning moving oil 1 in 50 bounds its spring but empties every open slick within
-   30 s, because oil on a floor keeps shuffling into any gap; thinning only crowded oil keeps
-   slicks but its spring climbs (6.5% of the board at 16,000 ticks). A sink tied to the spring
-   itself is the untried idea. Show the owner `film3.mjs oil-pond` (live, and each candidate).
-2. **The rest of the canvas shortlist, when the owner picks:** steam billowing instead of a
+1. **Land the oil batch once the owner has seen `.tmp/oil/oil-sheet.png`** (branch `oil-flow`,
+   full gate green, adversarial review a pass). Fast-forward `main`, watch CI, and it deploys
+   with item 0. One look the owner should judge from the picture: a spring's oil holds a low,
+   speckled mound rather than a level lake, because fading leaves holes that resting oil does
+   not slide into. What changed is under "Where things stand".
+2. **Lava leans left, for the reason oil leaned right** (found 2026-10-21, not changed). Lava
+   moves on even ticks only (`update_liquid` at sluggishness 2), always the left-to-right pass:
+   a mid-floor pour ends 15-25 cells left of where it was poured, on every seed. Giving it one
+   tick of each pass (`tick % 4 < 2`, as oil now has) centres it (-0.3) and leaves a basin pour
+   setting to stone in 50-75 s as before, but a lava spring's stone hill grows from 24% of the
+   board to 29% (7,480 -> 9,067 stone at 16,000 ticks), and 24% is the owner's accepted number.
+   The owner decides; measure with `.tmp/oil/lava.mjs lcad` and `bias.mjs .tmp/oil/root-lcad`.
+3. **The rest of the canvas shortlist, when the owner picks:** steam billowing instead of a
    dotted thread (5, a sim lever; `VISUAL_PIPELINE.md` records why a renderer fix was tried and
    reverted), a burning log that stays alive past 5-7 seconds (6), and the tulip cup and nodding
    bluebell (8: `BLOOM_SHAPES` in its three copies, a parity scenario that grows each new head,
    and `FLOWER_REACH` in `shapeLanguage.ts`, which `renderer:probe` checks against the engine's
    shapes and will fail on until it is updated). The roster board has one upgrade per material.
-3. **Fallen petals in their flower's colour** needs a sim change: a shed petal becomes a Pollen
+4. **Fallen petals in their flower's colour** needs a sim change: a shed petal becomes a Pollen
    cell identical to a pollen puff, so the renderer cannot tell them apart.
-4. **If Chrome's launch flakes on CI again, read its stderr first.** `launchBrowserOnce` waits
+5. **If Chrome's launch flakes on CI again, read its stderr first.** `launchBrowserOnce` waits
    30 s and appends Chrome's stderr to the error. A red CI run on a good commit still needs a
    rerun to confirm the flake and then a new push to deploy.
-5. **Halves no check can see yet:** `flower.pollen` "more often when cosmic" is a rate, which one
+6. **Halves no check can see yet:** `flower.pollen` "more often when cosmic" is a rate, which one
    check cannot see without two gardens compared inside it; `lava.scorches` "thaws" is still
    unreachable by touch, even with lava pooling now: a kept pool against an ice wall barely melts
    it, because a stone crust forms between them (a check for it passed 0 of 16 seeds after the heat batch, and was not
@@ -130,6 +145,31 @@ anything ships.
 
 ## Where things stand
 
+On branch `oil-flow`, with the full gate and adversarial review green, **not on `main`** (item 1):
+
+- **Oil keeps what is poured, spreads evenly and comes to rest; only a spring's oil fades**
+  (2026-10-21). Printing the board found why oil never settled: it moved on even ticks only,
+  always the left-to-right pass, so its side never flipped and every slick slid right (a pour
+  on an open floor ended at the board's edge on 32 seeds of 32, 14 cells left of ~150). Now
+  (`update_oil`): oil moves on `tick % 4 < 2`, one tick of each pass; keeps flowing the way it
+  is going until blocked (`FLAG_DRIFT_EAST` xor the variant's low bit, so a dab starts both
+  ways); rests on anything but oil, so a pour becomes a still sheet one cell deep; never deletes
+  oil (`try_move`); and only oil a spring poured fades, 1 in `OIL_SPRING_FADES` (250) of its
+  moving ticks (`FLAG_SPRING_OIL`, the rooted bit). Measured: basin pour 455 of 455 kept (19 of
+  583 before), a dab and a pond slick keep every cell, an oil spring holds 7.0-7.2% of the
+  220x140 board from tick 4,000 to 16,000 on wasm (water: 7.0-7.2%), pours centre at -0.5 cells
+  over 32 varied pours (a 1-3 cell lean remains on an 85-cell sheet). Every step was needed:
+  flipping the side alone left a heap shuffling in place; momentum with the old cadence drifted
+  pours 23-28 cells left; a per-move sink let the settled spring reach 24%. Four new audit
+  checks under `oil.floats`, each failing on HEAD and under its own rule's sabotage; the old
+  "sheets sideways" check was restaged on a flat shelf after review (Codex: skeptic, parity,
+  drift, minimalist) found it passed with every sideways move taken out. All other oil and
+  spring checks pass 8 of 8 seeds (JS, against HEAD); "floats up above water" fell 24 -> 14
+  cells, `fire.ignites` contrast 448 -> 385. Two side fixes: the JS eraser stamped a variant
+  byte on empty cells (a parity bug Rust never had, found by the new spring scenario), and the
+  `oil_rises_above_water` fixture (three copies) leaked water and passed only by ending on the
+  swap tick.
+
 Pushed to `main`, with the full gate and CI green, and **not yet deployed** (item 0):
 
 - **Poured lava pools, and a pool sets into stone** (2026-10-21, `24d5075`). Lava never deletes lava now
@@ -138,7 +178,7 @@ Pushed to `main`, with the full gate and CI green, and **not yet deployed** (ite
   pool cools too, one roll in `LAVA_DEEP_COOLS` (24) against one in 8 at an edge, so a pour sets
   to stone in 50-75 s and a lava spring builds a stone hill over itself and is sealed by it
   (`npm run water:budget`: 13.7% of the board at tick 1,000, then no lava and 7,480 stone, 24%,
-  by 16,000). Oil was ported too and taken out again before landing (item 1). Two new checks
+  by 16,000). Oil was ported too and taken out again before landing; it is the batch above. Two new checks
   (`lava.flows` "pours into a pool instead of thinning to a film", `lava.cools` "a poured pool
   sets into stone from within") pass 32 of 32 and fail every seed with their rule sabotaged.
   Drift at 8 seeds: 6 of 165 checks moved, all gains (`lava.cools` crust 5 -> 11 cells,
@@ -181,7 +221,7 @@ Live, with the full gate, CI, `deploy:verify` and `qa:live` green:
   when a material only moves**, and the clause-half witness work (2026-10-09 to 10-18); `git log`
   has each.
 
-The interaction audit has 165 checks bound to all 118 role ids; all pass on the audit's seed.
+The interaction audit has 169 checks bound to all 118 role ids (on `oil-flow`); all pass on the audit's seed.
 The 32-seed list of checks that do not pass every seed was last taken in full on 2026-10-17:
 `fire.thaws`, both `oil.ignites` checks, the fanned-trail check of `meteor.trail`,
 `fungus.fairyring`, `lava.scorches` and `stem.burns` at 31, the stalk check of `stem.footing`
@@ -192,7 +232,8 @@ checks pass 32 of 32.
 
 ## Design questions for the owner
 
-- **Poured oil still deletes itself as it spreads** — item 1, above.
+- **Land the oil batch?** Item 1: the picture is `.tmp/oil/oil-sheet.png`.
+- **Should lava move evenly too?** Item 2: it centres a pour but grows a spring's hill to 29%.
 - Smaller, accepted unless the owner says otherwise: a soaked log leaves a few scorched cells
   unburnt; a burning log is live for only 5-7 seconds; a dormant wellspring blocks only
   non-sources; a meteor shock's scorch is often brief (26 of 32); the sim runs about 24 ticks a
@@ -211,7 +252,8 @@ All by the owner, after seeing pictures or measurements:
   within at one roll in 24. A lava spring building a stone hill over itself (24% of the board at
   its peak) and going quiet is accepted. **Oil stays as it is live** until it has a sink that
   spares a slick; thinning every moving oil cell (1 in 50) was approved first and withdrawn when
-  it turned out to empty open slicks within 30 s.
+  it turned out to empty open slicks within 30 s. The `oil-flow` batch is the candidate, not yet
+  approved.
 - **The poster** is a loose, wet watercolour with watercolour rain and lightning and two living
   jars, a garden and a bug jar (2026-10-18/19). Keep visual changes to it painterly and animated
   with transform/opacity only.

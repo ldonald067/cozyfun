@@ -17,9 +17,11 @@
 //
 // Since ROADMAP Phase 20B the water sink is deliberate — moving water throws mist, and water
 // never deletes water — and the same three read: spring 7.1%, pour 82% kept, pond 94% kept.
-// An oil spring stays at 1.2%, as on main: oil had no sink of its own, so it was not conserved.
+// An oil spring stayed at 1.2%: oil had no sink of its own, so it was not conserved.
 // Since 2026-10-21 lava is conserved with a sink of its own and a lava spring is measured too:
-// it floods about 14% at first, then seals itself under the stone it makes.
+// it floods about 14% at first, then seals itself under the stone it makes. Oil is conserved
+// the same day, and only oil a spring poured fades: its spring holds about 7%, and an oil pour
+// is reported beside the water one, because poured oil is meant to keep every cell.
 // It reports, and exits 0; each later step of Phase 20 is judged against these numbers.
 import { M, loadWasmEngine } from "./interaction-scenes.mjs";
 
@@ -88,6 +90,19 @@ for (const [name, kind] of [["water", M.Water], ["oil", M.Oil], ["lava", M.Lava]
   const kept = b.count(M.Water);
   b.free();
   console.log(`  water poured into a basin                  ${painted} painted, ${kept} kept (${((100 * kept) / painted).toFixed(0)}%)`);
+}
+
+// 2b. The same pour in oil. Until 2026-10-21 oil deleted oil as it spread: 583 painted, 19 kept.
+{
+  const W = 40, H = 30;
+  const b = board(W, H, 5);
+  basin(b, W, 10, 27, 1, 38);
+  let painted = 0;
+  for (let t = 0; t < 90; t++) { if (t % 3 === 0) painted += b.paint(20, 4, 4, M.Oil); b.ticks(1); }
+  b.ticks(600);
+  const kept = b.count(M.Oil);
+  b.free();
+  console.log(`  oil poured into a basin                    ${painted} painted, ${kept} kept (${((100 * kept) / painted).toFixed(0)}%)`);
 }
 
 // 3. Sand poured into a standing pond at the default brush and powder density.

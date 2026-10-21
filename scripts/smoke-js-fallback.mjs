@@ -176,12 +176,13 @@ withEngine(7, (engine) => {
   const cells = new Uint8Array(16 * 16 * CELL_STRIDE);
   setCell(cells, 16, 8, 7, MATERIAL.Water);
   setCell(cells, 16, 8, 8, MATERIAL.Oil);
-  for (const [x, y] of [[6, 7], [7, 7], [9, 7], [10, 7], [7, 8], [9, 8], [8, 9]]) {
+  // Sealed under the diagonals and two cells out, as `oil_rises_above_water` is: the lifted water
+  // would otherwise run or hop out the tick after the swap. Four ticks are one cycle of oil's cadence.
+  for (const [x, y] of [[6, 7], [7, 7], [9, 7], [10, 7], [6, 8], [7, 8], [9, 8], [10, 8], [7, 9], [8, 9], [9, 9]]) {
     setCell(cells, 16, x, y, MATERIAL.Wall);
   }
   loadCells(engine, cells, "oil float cells should load");
-  engine.tick();
-  engine.tick();
+  for (let t = 0; t < 4; t++) engine.tick();
   const updated = engine.getCellBytes();
   assert(kindAt(updated, 16, 8, 7) === MATERIAL.Oil, "oil should rise above water");
   assert(kindAt(updated, 16, 8, 8) === MATERIAL.Water, "water should settle below oil");

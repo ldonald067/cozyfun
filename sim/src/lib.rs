@@ -243,6 +243,11 @@ const WELLSPRING_REACH: i32 = 4;
 /// spare bits of `energy` because a scene load clamps energy to 255: a latch kept there turned
 /// a spring saved mid-lesson into one remembering material 255, which never pours.
 const FLAG_TAUGHT: u16 = FLAG_ROOTED;
+/// On oil, the rooted flag marks a cell a spring poured, the only oil that fades
+/// (`OIL_SPRING_FADES`). The same bit for the same reason as `FLAG_TAUGHT`: every other reader
+/// of `FLAG_ROOTED` is guarded on a seed, stem or flower, and oil's renderer reads only its frost
+/// and sheen.
+const FLAG_SPRING_OIL: u16 = FLAG_ROOTED;
 /// How long a re-taught spring keeps its latch once it is free of ice, in ticks (about 30 s).
 /// The cell's own `age` is the clock: nothing else reads a wellspring's age, and a scene load
 /// keeps it, where it clamps energy.
@@ -278,6 +283,13 @@ const MIST_ODDS: u32 = 450;
 /// rising). With it a pour sets to stone in 50-75 s, and a spring builds a stone hill over
 /// itself (about 24% of the board) and is sealed by it.
 const LAVA_DEEP_COOLS: u32 = 24;
+/// Oil a spring poured fades: one of oil's moving ticks in this many, moving or at rest, so a
+/// cell lasts about 25 s. Oil never deletes oil (`try_move`) and comes to rest as a sheet, so
+/// nothing else bounds a spring: without this it flooded 31.9% of the board, and thinning only
+/// MOVING spring oil still reached 24% by 16,000 ticks, because a finished layer lies still.
+/// At 250 an oil spring holds about 7.3% of the 220x140 board from tick 4,000 to 16,000, the
+/// size of a water spring's lake. Oil a player pours never fades.
+const OIL_SPRING_FADES: u32 = 250;
 /// Mist is cool vapour — steam at the bottom of its energy range, so it reads as a faint
 /// sheen rather than as a kettle.
 const MIST_ENERGY: u16 = 30;
@@ -1026,6 +1038,9 @@ impl Universe {
                                 if self.chance(WELLSPRING_POUR) {
                                     let variant = (self.rand() & 3) as u8;
                                     next[nidx] = Cell::new(source, variant, starting_energy(source));
+                                    if source == Material::Oil as u8 {
+                                        next[nidx].flags = FLAG_SPRING_OIL;
+                                    }
                                 }
                             }
                         }
@@ -1863,7 +1878,21 @@ impl Universe {
     }
 
     fn update_oil(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
-        if self.tick_count % 2 != 0 {
+        // Two ticks in four, one of each pass direction. Oil used to move on even ticks only,
+        // which are always the left-to-right pass, so its side never flipped and every slick
+        // slid right: a dab poured mid-floor ended against the board's right edge. Moving
+        // against the pass also lets a whole run shift in one tick, so one direction alone
+        // drifts either way; one tick of each is what makes a pour spread evenly.
+        if self.tick_count % 4 >= 2 {
+            return;
+        }
+        // Spring oil fades (`OIL_SPRING_FADES`). The roll is only made for a spring's oil, so
+        // oil a player pours never draws on the RNG here.
+        if next[idx].kind == Material::Oil as u8
+            && next[idx].flags & FLAG_SPRING_OIL != 0
+            && self.chance(OIL_SPRING_FADES)
+        {
+            next[idx] = Cell::empty();
             return;
         }
         let (x, y) = self.xy(idx);
@@ -1886,16 +1915,32 @@ impl Universe {
             Material::Wall as u8
         };
         let supported = below != Material::Empty as u8 && below != Material::Smoke as u8 && below != Material::Steam as u8;
-        let side = if self.tick_count % 2 == 0 { 1 } else { -1 };
-        let dirs = if supported {
-            [(side, 0), (-side, 0), (side * 2, 0), (-side * 2, 0), (0, 1), (side, 1), (-side, 1)]
+        // Oil keeps flowing the way it is going until it is blocked, then turns round. With the
+        // side alternating instead, a poured heap shuffled left and right in place and never
+        // spread. The way is `FLAG_DRIFT_EAST` (a gliding seed's) flipped by the variant's low
+        // bit, so a painted dab, whose flags are all clear, starts out both ways.
+        let east = (cell.flags & FLAG_DRIFT_EAST != 0) != (cell.variant & 1 != 0);
+        let side = if east { 1 } else { -1 };
+        let falling = [(0, 1), (side, 1), (-side, 1), (side, 0), (-side, 0), (side * 2, 0), (-side * 2, 0)];
+        let sheeting = [(side, 0), (side * 2, 0), (0, 1), (side, 1), (-side, 1)];
+        // Oil on oil sheets sideways; oil resting on anything else does not skate, though it
+        // still runs down a slope. So a pour spreads into a sheet one cell deep and comes to
+        // rest, where a film that kept shifting into every gap never settled.
+        let on_oil = below == Material::Oil as u8;
+        let dirs: &[(i32, i32)] = if !supported {
+            &falling
+        } else if on_oil {
+            &sheeting
         } else {
-            [(0, 1), (side, 1), (-side, 1), (side, 0), (-side, 0), (side * 2, 0), (-side * 2, 0)]
+            &sheeting[2..]
         };
-        for (dx, dy) in dirs {
+        for &(dx, dy) in dirs {
             if self.try_move(idx, x + dx, y + dy, cell, old, next, true) {
                 return;
             }
+        }
+        if on_oil && next[idx].kind == Material::Oil as u8 {
+            next[idx].flags ^= FLAG_DRIFT_EAST;
         }
     }
 
@@ -2803,15 +2848,20 @@ impl Universe {
         // Water and moonwater only, because conserving a liquid needs a sink and only those
         // two mist. Oil was in this guard at first and review measured the result: an oil
         // spring flooded 31.9% of the board (main: 1.2%), because the clobber had been its
-        // only sink too. Oil keeps the old behaviour until it is given a sink of its own.
+        // only sink too. Oil and lava have guards of their own below, each with its own sink.
         if is_water_like(moving_cell.kind) && is_water_like(target_next.kind) {
             return false;
         }
         // Nor lava lava (2026-10-21). A spreading pour lost most of itself to the clobber, 408
         // cells to 51 within 10 s, so lava never pooled. Its sink is its own: deep lava cools
-        // too (`LAVA_DEEP_COOLS`). Oil is still left out until it has a sink that spares a
-        // slick; the two tried are in docs/HARNESS.md ("Reopened for lava over lava").
+        // too (`LAVA_DEEP_COOLS`).
         if moving_cell.kind == Material::Lava as u8 && target_next.kind == Material::Lava as u8 {
+            return false;
+        }
+        // Nor oil oil (2026-10-21): a 583-cell pour was 19 cells ten seconds later, and a dab
+        // on an open floor ten dots. Its sink spares a slick: only oil a spring poured fades
+        // (`OIL_SPRING_FADES`), and oil a player pours is kept.
+        if moving_cell.kind == Material::Oil as u8 && target_next.kind == Material::Oil as u8 {
             return false;
         }
         // A gas never deletes a gas (ROADMAP Phase 20D). Unlike water, smoke and steam already
@@ -4883,10 +4933,13 @@ mod tests {
         let mut u = Universe::new(16, 16, 7);
         set_cell(&mut u, 8, 7, Material::Water);
         set_cell(&mut u, 8, 8, Material::Oil);
-        for (x, y) in [(6, 7), (7, 7), (9, 7), (10, 7), (7, 8), (9, 8), (8, 9)] {
+        // Sealed under the diagonals and two cells out too: the water the oil lifts would
+        // otherwise run or hop out of (8, 8) the tick after the swap. The test once passed only
+        // by ending on the swap's tick. Four ticks are one whole cycle of oil's cadence.
+        for (x, y) in [(6, 7), (7, 7), (9, 7), (10, 7), (6, 8), (7, 8), (9, 8), (10, 8), (7, 9), (8, 9), (9, 9)] {
             set_cell(&mut u, x, y, Material::Wall);
         }
-        for _ in 0..2 {
+        for _ in 0..4 {
             u.tick();
         }
         assert_eq!(kind_at(&u, 8, 7), Material::Oil as u8);
@@ -5876,6 +5929,146 @@ mod tests {
         }
         assert!(set, "a deep pool should set into stone from within");
         assert_eq!(count_kind(&u, Material::Stone), start, "every cell of the pool should become stone");
+    }
+
+    fn oil_cells(u: &Universe) -> Vec<(u32, u32)> {
+        (0..u.cells.len())
+            .filter(|&i| u.cells[i].kind == Material::Oil as u8)
+            .map(|i| u.xy(i))
+            .map(|(x, y)| (x as u32, y as u32))
+            .collect()
+    }
+
+    #[test]
+    fn poured_oil_keeps_every_cell_and_rests_as_a_sheet_spread_both_ways() {
+        // A brush dab on an open floor. Under the move clobber it thinned to a few dots, and
+        // oil moving on the left-to-right pass only slid them all to the board's right edge.
+        let mut u = Universe::new(48, 20, 7);
+        for x in 0..48 {
+            set_cell(&mut u, x, 17, Material::Wall);
+            set_cell(&mut u, x, 18, Material::Wall);
+        }
+        u.paint(24, 10, 3, Material::Oil as u8, 100);
+        let start = count_kind(&u, Material::Oil);
+        for _ in 0..400 {
+            u.tick();
+            assert_eq!(count_kind(&u, Material::Oil), start, "spreading oil should lose no cell");
+        }
+        let sheet = oil_cells(&u);
+        assert!(sheet.iter().all(|&(_, y)| y == 16), "a pour this size should end one cell deep: {sheet:?}");
+        let (left, right) = (sheet.iter().map(|c| c.0).min().unwrap(), sheet.iter().map(|c| c.0).max().unwrap());
+        assert!(left < 21 && right > 27, "the sheet should run out both ways from the dab, found {left}..{right}");
+        assert_eq!(right - left + 1, start as u32, "a sheet at rest has no gaps");
+        for _ in 0..8 {
+            u.tick();
+        }
+        assert_eq!(oil_cells(&u), sheet, "a sheet at rest should stay where it lies");
+    }
+
+    #[test]
+    fn a_pour_on_a_wide_floor_spreads_evenly_both_ways() {
+        // Oil moves on one tick of each pass direction. On the left-to-right pass alone, even
+        // flowing with momentum, a run moving against the pass shifts whole in one tick, and
+        // this pour ended about 22 cells left of where it was poured; it is within 3 now.
+        let mut u = Universe::new(200, 30, 7);
+        for x in 0..200 {
+            set_cell(&mut u, x, 27, Material::Wall);
+            set_cell(&mut u, x, 28, Material::Wall);
+        }
+        for t in 1..=500 {
+            if t <= 20 && t % 4 == 1 {
+                u.paint(100, 8, 3, Material::Oil as u8, 100);
+            }
+            u.tick();
+        }
+        let sheet = oil_cells(&u);
+        let centre = sheet.iter().map(|c| c.0 as f64).sum::<f64>() / sheet.len() as f64;
+        assert!((centre - 100.0).abs() < 6.0, "the pour should spread evenly, its centre is {centre:.1}");
+    }
+
+    #[test]
+    fn oil_on_oil_runs_along_it_but_oil_on_a_floor_does_not_skate() {
+        // The two halves of the rest rule. One cell alone on a wall floor has open air on both
+        // sides and stays put; one cell on top of a sheet runs to its end and drops off.
+        let mut u = Universe::new(40, 16, 7);
+        for x in 0..40 {
+            set_cell(&mut u, x, 13, Material::Wall);
+        }
+        set_cell(&mut u, 4, 12, Material::Oil);
+        for x in 14..=30 {
+            set_cell(&mut u, x, 12, Material::Oil);
+        }
+        set_cell(&mut u, 22, 11, Material::Oil);
+        for _ in 0..200 {
+            u.tick();
+        }
+        assert_eq!(kind_at(&u, 4, 12), Material::Oil as u8, "oil on a floor should not skate");
+        assert!(
+            (0..40).all(|x| kind_at(&u, x, 11) != Material::Oil as u8),
+            "oil on a sheet should run off its end, not stay on top"
+        );
+        assert!(
+            kind_at(&u, 13, 12) == Material::Oil as u8 || kind_at(&u, 31, 12) == Material::Oil as u8,
+            "the runner should come to rest at one end of the sheet"
+        );
+    }
+
+    #[test]
+    fn spring_oil_fades_and_poured_oil_does_not() {
+        // Two sheets side by side on a floor, alike but for the mark a spring puts on its oil.
+        let mut u = Universe::new(48, 16, 7);
+        for x in 0..48 {
+            set_cell(&mut u, x, 13, Material::Wall);
+        }
+        for y in 8..=12 {
+            set_cell(&mut u, 23, y, Material::Wall);
+            set_cell(&mut u, 24, y, Material::Wall);
+        }
+        for x in 2..=21 {
+            set_cell(&mut u, x, 12, Material::Oil);
+            set_cell_state(&mut u, x + 24, 12, Material::Oil, 0, 0, FLAG_SPRING_OIL);
+        }
+        let marked = |u: &Universe| {
+            u.cells.iter().filter(|c| c.kind == Material::Oil as u8 && c.flags & FLAG_SPRING_OIL != 0).count()
+        };
+        for _ in 0..40 {
+            u.tick();
+        }
+        assert!(marked(&u) >= 15, "spring oil should fade over time, not at once: {} left", marked(&u));
+        for _ in 0..4000 {
+            u.tick();
+        }
+        assert!(marked(&u) <= 1, "spring oil should fade away: {} left", marked(&u));
+        assert_eq!(count_kind(&u, Material::Oil) - marked(&u), 20, "poured oil should never fade");
+    }
+
+    #[test]
+    fn an_oil_spring_marks_its_oil_and_holds_a_lake_rather_than_flooding() {
+        // One attuned cell over a floor. Kept and unfading, its oil filled the board up to the
+        // spring (about 40% here) and kept the spring buried; the fade holds a lake instead.
+        let (w, h) = (64u32, 40u32);
+        let mut u = Universe::new(w, h, 7);
+        for x in 0..w {
+            set_cell(&mut u, x, h - 2, Material::Wall);
+            set_cell(&mut u, x, h - 1, Material::Wall);
+        }
+        set_cell_state(&mut u, 32, 20, Material::Wellspring, 0, Material::Oil as u16, 0);
+        for _ in 0..2000 {
+            u.tick();
+        }
+        let early = count_kind(&u, Material::Oil);
+        assert!(
+            u.cells.iter().filter(|c| c.kind == Material::Oil as u8).all(|c| c.flags & FLAG_SPRING_OIL != 0),
+            "every cell a spring pours should carry the mark"
+        );
+        for _ in 0..2000 {
+            u.tick();
+        }
+        let late = count_kind(&u, Material::Oil);
+        let board = (w * h) as usize;
+        assert!(early > 50, "the spring should have poured a lake: {early}");
+        assert!(late * 5 < board, "an oil spring should not flood the board: {late} of {board}");
+        assert!(late * 4 < early * 5, "the lake should hold its size: {early} then {late}");
     }
 
     #[test]

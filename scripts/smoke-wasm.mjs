@@ -211,13 +211,14 @@ withUniverse(16, 16, 7, (universe) => {
   const cells = new Uint8Array(16 * 16 * 8);
   setCell(cells, 16, 8, 7, MATERIAL.Water);
   setCell(cells, 16, 8, 8, MATERIAL.Oil);
-  for (const [x, y] of [[6, 7], [7, 7], [9, 7], [10, 7], [7, 8], [9, 8], [8, 9]]) setCell(cells, 16, x, y, MATERIAL.Wall);
+  // Sealed under the diagonals and two cells out, as `oil_rises_above_water` is: the lifted water
+  // would otherwise run or hop out the tick after the swap. Four ticks are one cycle of oil's cadence.
+  for (const [x, y] of [[6, 7], [7, 7], [9, 7], [10, 7], [6, 8], [7, 8], [9, 8], [10, 8], [7, 9], [8, 9], [9, 9]]) setCell(cells, 16, x, y, MATERIAL.Wall);
   const ptr = wasm.alloc(cells.byteLength);
   new Uint8Array(wasm.memory.buffer, ptr, cells.byteLength).set(cells);
   assert(wasm.universe_load_cells(universe, ptr, cells.byteLength) === 1, "oil float cells should load");
   wasm.dealloc(ptr, cells.byteLength);
-  wasm.universe_tick(universe);
-  wasm.universe_tick(universe);
+  for (let t = 0; t < 4; t++) wasm.universe_tick(universe);
   const updated = readCells(universe);
   assert(kindAt(updated, 16, 8, 7) === MATERIAL.Oil, "oil should rise above water");
   assert(kindAt(updated, 16, 8, 8) === MATERIAL.Water, "water should settle below oil");

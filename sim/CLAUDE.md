@@ -21,8 +21,8 @@ mirrored in `app/src/engine.ts` and behave byte-for-byte identically — see the
   and a floor that runs under them — the `shaft` test helper does both.
 - **`try_move` can overwrite a cell another mover filled this tick**, because it counts a
   target as free if it was empty in `old`. That clobber is load-bearing and mostly left alone,
-  with seven exceptions: a grain never overwrites a liquid (`try_fall`), water never
-  overwrites water, lava never overwrites lava, a gas never overwrites a gas — safe without a new rule, because smoke
+  with eight exceptions: a grain never overwrites a liquid (`try_fall`), water never
+  overwrites water, lava never overwrites lava, oil never overwrites oil, a gas never overwrites a gas — safe without a new rule, because smoke
   and steam already expire by age — a gas never overwrites water, water never overwrites a
   gas that arrived this tick (it may still sink through gas that was already there), and a
   mote (pollen, stardust) never overwrites water. The second only works because **moving water throws mist**
@@ -30,8 +30,16 @@ mirrored in `app/src/engine.ts` and behave byte-for-byte identically — see the
   **Never conserve a liquid that has no sink**: oil was in that guard at first and an oil
   spring flooded a third of the board. Lava was conserved on 2026-10-21 only with a sink of
   its own — deep lava cools too (`LAVA_DEEP_COOLS`), so a lava spring seals itself under the
-  stone it makes — and `npm run water:budget` reports a lava spring too. Oil still has none;
-  the two sinks tried for it are in `docs/HARNESS.md`, with what is still open.
+  stone it makes — and `npm run water:budget` reports a lava spring too. Oil was conserved the
+  same day with a sink that spares a slick: only oil a spring poured fades
+  (`OIL_SPRING_FADES`, marked by `FLAG_SPRING_OIL`). A per-MOVE sink cannot bound a spring once
+  its liquid comes to rest: a finished layer lies still, so it never rolls.
+- **A mover that runs on even ticks only always sees the left-to-right pass.** The bottom-up
+  pass flips direction every tick, so `tick % 2 == 0` is always the same direction, and
+  `side = tick % 2` never flips. Oil moved that way and every slick slid right until it met a
+  wall; lava (`update_liquid` at sluggishness 2) still does, and leans left. Moving against the
+  pass also lets a whole run shift in one tick, so even a symmetric side choice drifts unless
+  the mover gets one tick of each direction: oil moves on `tick % 4 < 2`.
 - **Hot gas bubbles; mist does not.** A mover sinking into gas that sat there all tick trades
   places with it when the gas is hotter than `MIST_ENERGY`, so steam rises out of a pool
   instead of being eaten. Letting mist bubble too flooded a spring to 29.5% of the board:

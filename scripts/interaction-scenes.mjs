@@ -1745,11 +1745,88 @@ export const CHECKS = [
     } },
 
   { m: "Oil", covers: "oil.floats", role: "sheets sideways when supported", w: 34, h: 26, seed: 115, ticks: 900,
-    paint: (p) => { p(17, 19, 3, M.Wall); p(17, 15, 2, M.Oil); },
+    // A dab on a flat wall shelf. This was a dab on a rounded pedestal, and once oil came to
+    // rest on anything but oil (2026-10-21) review found it passed with every sideways oil move
+    // taken out: oil dropping diagonally off the dome reached the witness. The witness is oil
+    // lying on the shelf more than six columns from the dab, which a heap this size cannot
+    // reach by dropping alone.
+    paint: (p) => { for (let x = 2; x <= 32; x++) p(x, 19, 1, M.Wall); p(17, 10, 3, M.Oil); },
     outcome: (g, before, memo) => {
       memo.sheet ??= new Set();
-      for (const i of g.appeared(M.Oil, before)) if (Math.abs(g.xyOf(i)[0] - 17) > 3) memo.sheet.add(i);
+      for (const i of g.appeared(M.Oil, before)) if (Math.abs(g.xyOf(i)[0] - 17) > 6 && g.xyOf(i)[1] === 17) memo.sheet.add(i);
       return [...memo.sheet].filter((i) => g.kindOf(i) === M.Oil);
+    } },
+  { m: "Oil", covers: "oil.floats", role: "pours into a pool instead of thinning to a film", w: 40, h: 30, seed: 182, ticks: 600,
+    // The water budget's basin pour. Until 2026-10-21 oil moving into a cell another oil cell
+    // had just filled deleted it: 583 cells poured were 19 ten seconds later, a film. The
+    // witness is oil with three more stacked above it, a pool at least four deep, from 15 s on,
+    // so the falling pour is not counted.
+    paint: (p) => {
+      for (let x = 0; x < 40; x++) p(x, 28, 1, M.Wall);
+      for (let y = 10; y <= 28; y++) { p(1, y, 1, M.Wall); p(38, y, 1, M.Wall); }
+    },
+    act: (p, t) => { if (t <= 90 && t % 3 === 1) p(20, 4, 4, M.Oil); },
+    outcome: (g, before, memo) => ((memo.t = (memo.t ?? -1) + 1) < 300 ? [] : g.all(M.Oil).filter((i) => {
+      const [x, y] = g.xyOf(i);
+      return [1, 2, 3].every((k) => g.kindAt(x, y - k) === M.Oil);
+    })) },
+  { m: "Oil", covers: "oil.floats", role: "runs out both ways from a dab and comes to rest", w: 100, h: 26, seed: 183, ticks: 600,
+    // A dab on a flat wall floor (the audit's own floor is bumped, and a pocket holds oil still
+    // whatever it does). Until 2026-10-21 oil moved only on the left-to-right pass, so its side
+    // never flipped: a slick slid right until something stopped it, thinning to dots on the
+    // way. The witness is oil that has lain still for 30 ticks between ten and thirty cells out
+    // from the dab, on whichever side has less of it, so a slick that runs one way, one that
+    // never stops shifting, or one that only stops against the board's edge shows nothing.
+    paint: (p) => { for (let x = 0; x < 100; x++) p(x, 19, 1, M.Wall); p(50, 8, 4, M.Oil); },
+    outcome: (g, before, memo, prev) => {
+      memo.t = (memo.t ?? 0) + 1;
+      memo.since ??= new Map();
+      const still = [[], []];
+      for (const i of g.all(M.Oil)) {
+        if (prev.kindOf(i) !== M.Oil) memo.since.set(i, memo.t);
+        const dx = g.xyOf(i)[0] - 50;
+        if (memo.t - (memo.since.get(i) ?? 0) >= 30 && Math.abs(dx) > 10 && Math.abs(dx) <= 30) still[dx < 0 ? 0 : 1].push(i);
+      }
+      return still[0].length <= still[1].length ? still[0] : still[1];
+    } },
+  { m: "Oil", covers: "oil.floats", role: "a spring's oil fades once the spring is gone", w: 64, h: 40, seed: 184, ticks: 1500,
+    // A spring taught oil pours for 15 s and is erased. Only oil a spring poured fades
+    // (2026-10-21): without that a spring had no sink once oil stopped deleting itself, and it
+    // flooded a third of the board. The witness is oil the spring left lying on the floor, gone
+    // since the erasing with no new oil beside it, against how it looked then. Only the bottom of
+    // its slick is counted, and only a cell no oil has moved in beside: oil that slid away is
+    // motion, not fading.
+    paint: (p) => { p(16, 20, 1, M.Wellspring); p(16, 18, 1, M.Oil); },
+    act: (p, t) => { if (t === 300) p(16, 20, 2, M.Empty); },
+    outcome: (g, before, memo, prev) => {
+      memo.t = (memo.t ?? 0) + 1;
+      if (memo.t === 301) {
+        memo.against = prev;
+        memo.resting = prev.all(M.Oil).filter((i) => {
+          const [x, y] = prev.xyOf(i);
+          return ![M.Empty, M.Wellspring, M.Oil].includes(prev.kindAt(x, y + 1));
+        });
+      }
+      const moved = (x, y) => [-2, -1, 0, 1, 2].some((dx) => [-1, 0, 1].some((dy) =>
+        g.kindAt(x + dx, y + dy) === M.Oil && memo.against.kindAt(x + dx, y + dy) !== M.Oil));
+      return (memo.resting ?? []).filter((i) => g.kindOf(i) === M.Empty && !moved(...g.xyOf(i)));
+    } },
+  { m: "Oil", covers: "oil.floats", role: "a poured slick keeps every cell", w: 64, h: 40, seed: 185, ticks: 1500,
+    absent: true,
+    // The scene above with a slick poured into a tray walled off beside the spring: only oil a
+    // spring poured fades. The tray has walls of its own on both sides, because the audit's
+    // floor leaves the last column open. The witness is the tray holding fewer cells than were
+    // poured. It requires the slick lying in the tray, so it fails with the slick taken out.
+    paint: (p) => {
+      p(16, 20, 1, M.Wellspring); p(16, 18, 1, M.Oil);
+      for (let y = 20; y <= 35; y++) for (const x of [40, 41, 61, 62]) p(x, y, 0, M.Wall);
+      p(51, 28, 3, M.Oil);
+    },
+    act: (p, t) => { if (t === 300) p(16, 20, 2, M.Empty); },
+    requires: (g) => g.all(M.Oil).filter((i) => g.xyOf(i)[0] >= 43 && g.xyOf(i)[1] >= 33).length >= 20,
+    outcome: (g, before) => {
+      const tray = (grid) => grid.all(M.Oil).filter((i) => grid.xyOf(i)[0] >= 43);
+      return tray(g).length < tray(before).length ? tray(g) : [];
     } },
   { m: "Oil", covers: "oil.ignites", role: "ignites readily near heat", w: 30, h: 26, seed: 131, ticks: 600,
     // Left as it is at 31 of 32, on purpose. The short seed shows its fire for 27 ticks, and

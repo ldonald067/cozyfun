@@ -256,6 +256,64 @@ const scenarios = [
     };
   })(),
   (() => {
+    // Oil never deletes oil, flows the way it is going, and rests on a floor (2026-10-21). A dab
+    // on an open floor, and a second one dropped onto the sheet it made ten seconds later. The
+    // witnesses: no cell is ever lost, the sheet runs out both ways from the dab, it ends one
+    // cell deep, and nothing in it moves over its last four ticks.
+    let late = null;
+    return {
+      name: "poured oil keeps every cell and rests as a sheet",
+      w: 64, h: 24, seed: 179, ticks: 600,
+      paint(p) { for (let x = 0; x < 64; x++) p(x, 21, 1, M.Wall); },
+      act(p, t) { if (t === 1) p(32, 8, 3, M.Oil); if (t === 200) p(32, 14, 1, M.Oil); },
+      observe(seen, cells, w, h, tick) {
+        const oil = [];
+        for (let i = 0; i < w * h; i++) if (cells[i * STRIDE] === M.Oil) oil.push(i);
+        if (tick === 1 || tick === 200) seen.poured = oil.length;
+        if (tick >= 1) seen.lost = Math.max(seen.lost ?? 0, seen.poured - oil.length);
+        if (tick === 596) late = oil.join();
+        if (tick === 600) {
+          seen.minX = Math.min(...oil.map((i) => i % w));
+          seen.maxX = Math.max(...oil.map((i) => i % w));
+          seen.deep = new Set(oil.map((i) => Math.floor(i / w))).size;
+          seen.still = oil.join() === late;
+        }
+      },
+      expect: (seen) => (seen.lost === 0 && seen.minX < 26 && seen.maxX > 38 && seen.deep === 1 && seen.still
+        ? null : `oil lost ${seen.lost} (must be 0), sheet x ${seen.minX}..${seen.maxX} (beyond 26..38), rows ${seen.deep} (must be 1), at rest ${seen.still}`),
+    };
+  })(),
+  (() => {
+    // Only oil a spring poured fades (2026-10-21). A spring taught oil pours for 15 s and is
+    // erased; a slick poured into a walled tray beside it is left alone. The witnesses: the
+    // spring's marked oil peaks, then fades to a tenth of that, and the tray never loses a cell.
+    const SPRING_OIL = CELL_FLAG.Rooted;
+    return {
+      name: "an erased oil spring's oil fades and a poured slick keeps",
+      w: 64, h: 40, seed: 180, ticks: 2400,
+      paint(p) {
+        for (let x = 0; x < 64; x++) p(x, 37, 1, M.Wall);
+        for (let y = 12; y <= 35; y++) { p(40, y, 0, M.Wall); p(41, y, 0, M.Wall); }
+        p(20, 20, 1, M.Wellspring); p(20, 18, 1, M.Oil);
+      },
+      act(p, t) { if (t === 2) p(52, 28, 3, M.Oil); if (t === 300) p(20, 20, 2, M.Empty); },
+      observe(seen, cells, w, h, tick) {
+        let marked = 0, tray = 0;
+        for (let i = 0; i < w * h; i++) {
+          if (cells[i * STRIDE] !== M.Oil) continue;
+          if ((cells[i * STRIDE + 6] | (cells[i * STRIDE + 7] << 8)) & SPRING_OIL) marked++;
+          else if (i % w >= 43) tray++;
+        }
+        seen.peak = Math.max(seen.peak ?? 0, marked);
+        seen.end = marked;
+        if (tick === 2) seen.poured = tray;
+        if (tick >= 2) seen.trayLost = Math.max(seen.trayLost ?? 0, seen.poured - tray);
+      },
+      expect: (seen) => (seen.peak >= 150 && seen.end * 10 <= seen.peak && seen.poured >= 25 && seen.trayLost === 0
+        ? null : `spring oil peak ${seen.peak} (floor 150), at the end ${seen.end} (at most a tenth), tray ${seen.poured} poured, ${seen.trayLost} lost (must be 0)`),
+    };
+  })(),
+  (() => {
     // Frost from steam brings the steam's heat into the ice. Lava poured by an ice block
     // quenches into steam beside it; the witnesses are ice that warms while hot steam touches
     // it and no warm water does, and ice that melts with no flame, lava or meteor touching it.
