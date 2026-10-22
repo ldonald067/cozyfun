@@ -256,6 +256,45 @@ const scenarios = [
     };
   })(),
   (() => {
+    // Nothing that moves deletes lava (2026-10-22). Lava and a splash of water on a walled
+    // floor, spreading into each other: water flowing into a cell lava had entered that tick
+    // used to overwrite it. Here lava becomes nothing but stone, and only where it stands, so the
+    // witnesses are lava gone without stone in its place (deleted) and lava that set while
+    // touching water (quenched).
+    let prev = null;
+    return {
+      name: "water quenches lava without deleting it",
+      w: 70, h: 44, seed: 169, ticks: 600,
+      paint(p) {
+        for (let x = 1; x < 70; x += 3) p(x, 40, 1, M.Wall);
+        for (const x of [1, 67]) for (let y = 20; y <= 39; y++) { p(x, y, 0, M.Wall); p(x + 1, y, 0, M.Wall); }
+        p(22, 26, 4, M.Lava); p(47, 26, 3, M.Water);
+      },
+      observe(seen, cells, w, h) {
+        seen.deleted ??= 0;
+        seen.quenched ??= 0;
+        const kind = (c, x, y) => (x < 0 || y < 0 || x >= w || y >= h ? M.Empty : c[(y * w + x) * STRIDE]);
+        if (prev) {
+          let was = 0, now = 0, set = 0;
+          for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+              if (kind(cells, x, y) === M.Lava) now++;
+              if (kind(prev, x, y) !== M.Lava) continue;
+              was++;
+              if (kind(cells, x, y) !== M.Stone) continue;
+              set++;
+              if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => kind(prev, x + dx, y + dy) === M.Water)) seen.quenched++;
+            }
+          }
+          seen.deleted += Math.max(0, was - now - set);
+        }
+        prev = cells.slice();
+      },
+      expect: (seen) => (seen.deleted === 0 && seen.quenched >= 10
+        ? null : `lava deleted ${seen.deleted} (must be 0), quenched ${seen.quenched} (floor 10)`),
+    };
+  })(),
+  (() => {
     // Oil never deletes oil, flows the way it is going, and rests on a floor (2026-10-21). A dab
     // on an open floor, and a second one dropped onto the sheet it made ten seconds later. The
     // witnesses: no cell is ever lost, the sheet runs out both ways from the dab, it ends one

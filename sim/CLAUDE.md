@@ -22,7 +22,7 @@ mirrored in `app/src/engine.ts` and behave byte-for-byte identically — see the
 - **`try_move` can overwrite a cell another mover filled this tick**, because it counts a
   target as free if it was empty in `old`. That clobber is load-bearing and mostly left alone,
   with eight exceptions: a grain never overwrites a liquid (`try_fall`), water never
-  overwrites water, lava never overwrites lava, oil never overwrites oil, a gas never overwrites a gas — safe without a new rule, because smoke
+  overwrites water, nothing overwrites lava, oil never overwrites oil, a gas never overwrites a gas — safe without a new rule, because smoke
   and steam already expire by age — a gas never overwrites water, water never overwrites a
   gas that arrived this tick (it may still sink through gas that was already there), and a
   mote (pollen, stardust) never overwrites water. The second only works because **moving water throws mist**

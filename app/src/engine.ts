@@ -1752,8 +1752,8 @@ class JsSandboxEngine implements SandboxEngine {
     const target = this.index(x, y);
     // Water never deletes water — see Universe::try_move for why oil is not included.
     if (waterLike(movingCell[0]) && waterLike(next[target])) return false;
-    // Nor lava lava, nor oil oil — each has a sink of its own; see Universe::try_move.
-    if (movingCell[0] === MATERIAL.Lava && next[target] === MATERIAL.Lava) return false;
+    // Nothing that moves deletes lava, nor oil oil — each has a sink of its own; see Universe::try_move.
+    if (next[target] === MATERIAL.Lava) return false;
     if (movingCell[0] === MATERIAL.Oil && next[target] === MATERIAL.Oil) return false;
     // A gas never deletes a gas — see Universe::try_move.
     if (isGas(movingCell[0]) && isGas(next[target])) return false;

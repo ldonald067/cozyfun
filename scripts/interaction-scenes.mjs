@@ -1318,6 +1318,29 @@ export const CHECKS = [
   { m: "Lava", covers: "lava.quenched", role: "is quenched by water into scorched stone", w: 30, h: 26, seed: 85, ticks: 900,
     paint: (p) => { p(15, 20, 3, M.Lava); p(15, 14, 4, M.Water); },
     outcome: (g) => g.all(M.Stone).filter((i) => g.hasFlag(i, F.Scorched)) },
+  { m: "Lava", covers: "lava.quenched", role: "water never deletes the lava it meets", w: 70, h: 44, seed: 169, ticks: 1200,
+    absent: true,
+    // Lava poured beside a splash of water on a walled floor, the scene the 2026-10-22 design
+    // review found the leak in. Until then water flowing into a cell lava had entered that tick
+    // overwrote it, and a pour kept a median 76% of itself as rock over 32 seeds, 14% at the
+    // worst; now 100%, and every seed below that is lava still molten. Here lava becomes nothing
+    // but stone, and only where it stands, so the witness is lava that is gone without stone where
+    // it stood: last tick's lava, less this tick's, less the cells that set, counted as that
+    // many of the cells lava left. It requires lava touching water, so it fails with the water
+    // left out; it leaks on 32 of 32 with water let through the guard. Grains are kept off fresh
+    // lava by the same guard, but that half shows here on 1 seed of 32. It counts lava only:
+    // water sinking into a steam cell a falling grain took that tick still deletes the grain,
+    // one cell of quench stone or sand on 3 of 32 seeds.
+    paint: (p) => {
+      for (const x of [1, 67]) for (let y = 20; y <= 39; y++) { p(x, y, 0, M.Wall); p(x + 1, y, 0, M.Wall); }
+      p(22, 26, 4, M.Lava); p(47, 26, 3, M.Water);
+    },
+    requires: (g) => g.all(M.Lava).some((i) => touching(g, i, (k) => k === M.Water)),
+    outcome: (g, before, memo, prev) => {
+      const was = prev.all(M.Lava);
+      const deleted = was.length - g.all(M.Lava).length - was.filter((i) => g.kindOf(i) === M.Stone).length;
+      return deleted > 0 ? was.filter((i) => g.kindOf(i) !== M.Lava && g.kindOf(i) !== M.Stone).slice(0, deleted) : [];
+    } },
   { m: "Lava", covers: "lava.vitrifies", role: "vitrifies dry sand into glass", w: 30, h: 26, seed: 86, ticks: 900,
     paint: (p) => { p(15, 20, 4, M.Sand); p(15, 15, 2, M.Lava); },
     outcome: (g, before) => g.appeared(M.Glass, before) },

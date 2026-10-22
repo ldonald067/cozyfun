@@ -1,13 +1,11 @@
 # Handoff — where the work is, and what to do next
 
-*Rewritten at each handoff, never appended to. Written 2026-10-22. **The lava fix (`24d5075`)
-and the oil batch (`f6c57e2`) are on `main` with the full gate and CI green, but NOT deployed**:
-Railway paused builds platform-wide in an outage on 2026-10-21, and on 2026-10-22 at 11:47 UTC
-builds were back only for Pro and Enterprise workspaces (Hobby, Free and Trial still to come),
-so the live site is still the heat batch (`04fa6e2`; `deploy:verify` says so). Deploying is item
-0 below. Check `gh run list` first and only then run `npm run deploy:verify`: a red CI run makes
-Railway skip that commit for good (a rerun does not revive it, a new push does). The petrol film
-(`9e92777`, renderer only) is on `main` too and waits with them.*
+*Rewritten at each handoff, never appended to. Written 2026-10-22, evening. Railway caught up
+by itself once builds resumed after the 2026-10-21 outage: lava pooling (`24d5075`), the oil
+batch (`f6c57e2`) and the petrol film (`9e92777`) went out together, with `deploy:verify` and
+`qa:live` green on `53c86a7`. Water no longer deleting lava was pushed on top the same evening
+("Where things stand"). After any push, check `gh run list` before `npm run deploy:verify`: a
+red CI run makes Railway skip that commit for good.*
 
 ## Work within the owner's usage limits
 
@@ -44,6 +42,12 @@ anything ships.
   sabotage from `.tmp/halves/sabotages.mjs` applied; `kinds.mjs <scene> <tick>` a material
   census; `boil.mjs` three pots under a held flame; `lavacount.mjs` the lava self-deletion below.
   `NOTES.md` there covers the exploration, including what was tried and dropped.
+- **Lava deleted by water (2026-10-22):** `.tmp/lavafix/`. `halves.mjs [seeds]` plays the new
+  check on the tree, without its water, and on three sabotages of the guard (water let through,
+  grains let through, lava-only as before); `census.mjs` / `perseed.mjs` the quench scene's
+  rock per seed; `diff.mjs <seeds>` the kinds that change on the tick lava plus rock drops;
+  `instr.mjs <seeds>` the same on an instrumented engine copy in `instr/` that names the move
+  overwriting rock; the filmstrip sheet is `lava-quench-sheet.png`.
 - **Lava and oil (2026-10-21):** `.tmp/lava/variant.mjs` builds find/replace copies of
   `app/src/engine.ts` without touching it; its `live` is the WORKING TREE, so compare against
   `.tmp/lava/base` (refresh it with `git archive HEAD app/src | tar -x -C .tmp/lava/base`).
@@ -87,55 +91,44 @@ anything ships.
 
 ## What to do next
 
-0. **Deploy `main` (lava and oil) once Railway's builds resume.** On 2026-10-21 from about 13:10,
-   https://status.railway.com read "Dashboard and API unavailable, builds paused" (a major
-   outage, builds down in every region), and the API refused a deploy with "Deploys have been
-   paused temporarily". Railway made no deployment record for the push at all, so it may never
-   pick it up by itself. The status page asks that the same deployment not be triggered more
-   than once while the queue drains. The owner has approved this deploy. When the page is clear:
-   1. `gh run list` (CI must be green for HEAD), then `npm run deploy:verify`. If it already
-      passes, Railway caught up on its own: go to step 4.
-   2. Start a deploy of HEAD from the service's GitHub source (what the outage refused):
-      `railway api 'mutation($s: String!, $e: String!, $c: String) { serviceInstanceDeployV2(serviceId: $s, environmentId: $e, commitSha: $c) }' --var s=b0acc433-99f7-4db1-9ec0-8fc94d813955 --var e=374411d2-6a14-448d-9e1f-1ccea6180158 --var c="\"$(git rev-parse HEAD)\""`
-      It returns a deployment id. HEAD is this handoff's commit on top of the oil batch, and
-      `deploy:verify` expects HEAD.
-   3. Repeat `npm run deploy:verify` until it passes (a build takes about 5 minutes).
-   4. `COZY_QA_URL=https://pixelfun.littlealbumclub.net npm run qa:live`.
-   Not `railway up`: a local upload gets no `RAILWAY_GIT_COMMIT_SHA`, so the page reports no
-   build commit and `deploy:verify` fails on that. Not the Railway MCP's `redeploy` (it re-runs
-   the old `04fa6e2` build) or `create-deployment` (it builds a separate, new service).
-   `.tmp/lava/deploy-when-open.sh` is the retry loop this chat ran (stopped): it tries the
-   mutation every 5 minutes for 2 hours, then waits for `deploy:verify` and runs live QA. Point
-   its `SHA` at HEAD before reusing it.
-1. **Water deletes lava that has just moved** (found 2026-10-22 in a design review, not changed).
-   `move` in `app/src/engine.ts` (and `try_move` in the sim) lets water enter a cell lava flowed
-   into this tick and overwrite it, and quench stone falling does the same. A 49-cell pour beside a
-   splash of water keeps a median 76% of itself as rock over 32 seeds, 14% at the worst;
-   `.tmp/review/lavacount.mjs . 32`. With nothing that moves allowed to overwrite lava (one line,
-   `if (next[target] === MATERIAL.Lava) return false;`, in `.tmp/review/vlava/`) it keeps 100%,
-   92% at the worst, and lava alone already kept every cell. A sim change: both engines, a cargo
-   test, a parity scenario, a painted audit check, drift, and the owner sees
-   `.tmp/review/lava-quench.png` (HEAD above the guard) first. "Oil and lava may still delete
-   water" is the opposite direction and does not cover this.
-1b. **Lava leans left, for the reason oil leaned right** (found 2026-10-21, not changed). Lava
+0. **If a push makes no Railway deployment at all**, check https://status.railway.com first, then
+   deploy the commit from the service's GitHub source:
+   `railway api 'mutation($s: String!, $e: String!, $c: String) { serviceInstanceDeployV2(serviceId: $s, environmentId: $e, commitSha: $c) }' --var s=b0acc433-99f7-4db1-9ec0-8fc94d813955 --var e=374411d2-6a14-448d-9e1f-1ccea6180158 --var c="\"$(git rev-parse HEAD)\""`.
+   The CLI was logged out on 2026-10-22 (`railway whoami`: Unauthorized); the owner runs
+   `railway login`. Never `railway up` (no build commit, so `deploy:verify` fails), nor the
+   Railway MCP's `redeploy` (re-runs the old build) or `create-deployment` (a new service).
+1. **Water deletes a grain that has just sunk into steam** (found 2026-10-22 while fixing lava,
+   not changed). `try_move` lets a mover sink through gas that was in a cell all tick
+   (`can_sink_through_gas`) without checking that the gas is still there: when quench stone or
+   sand bubbles down into a steam cell, water sinking into the same cell later in the pass
+   overwrites the grain. One cell of rock on 3 of 32 seeds of the lava quench scene
+   (`.tmp/lavafix/instr.mjs 27169 2169 13169` names the move). It is the general gas-sink
+   clobber, not a lava rule, and closing it changes how water moves through steam everywhere, so
+   it needs `water:budget` and drift; it is small enough that the owner may prefer to leave it.
+   The same review found a writer that is not a mover: a blocked meteor's impact writes fire
+   into any neighbour that was empty in `old` (`update_meteor`), so it can still replace lava
+   that flowed there this tick (Codex reproduced it on seeds 7, 8, 10, 20 and 31 of a 16x16
+   fixture, and on HEAD's guard too). Lava turning to fire under a meteor is hard to see; leave
+   it unless the owner asks.
+2. **Lava leans left, for the reason oil leaned right** (found 2026-10-21, not changed). Lava
    moves on even ticks only (`update_liquid` at sluggishness 2), always the left-to-right pass:
    a mid-floor pour ends 15-25 cells left of where it was poured, on every seed. Giving it one
    tick of each pass (`tick % 4 < 2`, as oil now has) centres it (-0.3) and leaves a basin pour
    setting to stone in 50-75 s as before, but a lava spring's stone hill grows from 24% of the
    board to 29% (7,480 -> 9,067 stone at 16,000 ticks), and 24% is the owner's accepted number.
    The owner decides; measure with `.tmp/oil/lava.mjs lcad` and `bias.mjs .tmp/oil/root-lcad`.
-2. **The rest of the canvas shortlist, when the owner picks:** steam billowing instead of a
+3. **The rest of the canvas shortlist, when the owner picks:** steam billowing instead of a
    dotted thread (5, a sim lever; `VISUAL_PIPELINE.md` records why a renderer fix was tried and
    reverted), a burning log that stays alive past 5-7 seconds (6), and the tulip cup and nodding
    bluebell (8: `BLOOM_SHAPES` in its three copies, a parity scenario that grows each new head,
    and `FLOWER_REACH` in `shapeLanguage.ts`, which `renderer:probe` checks against the engine's
    shapes and will fail on until it is updated). The roster board has one upgrade per material.
-3. **Fallen petals in their flower's colour** needs a sim change: a shed petal becomes a Pollen
+4. **Fallen petals in their flower's colour** needs a sim change: a shed petal becomes a Pollen
    cell identical to a pollen puff, so the renderer cannot tell them apart.
-4. **If Chrome's launch flakes on CI again, read its stderr first.** `launchBrowserOnce` waits
+5. **If Chrome's launch flakes on CI again, read its stderr first.** `launchBrowserOnce` waits
    30 s and appends Chrome's stderr to the error. A red CI run on a good commit still needs a
    rerun to confirm the flake and then a new push to deploy.
-5. **Halves no check can see yet:** `flower.pollen` "more often when cosmic" is a rate, which one
+6. **Halves no check can see yet:** `flower.pollen` "more often when cosmic" is a rate, which one
    check cannot see without two gardens compared inside it; `lava.scorches` "thaws" is still
    unreachable by touch, even with lava pooling now: a kept pool against an ice wall barely melts
    it, because a stone crust forms between them (a check for it passed 0 of 16 seeds after the heat batch, and was not
@@ -159,23 +152,38 @@ anything ships.
 
 ## Where things stand
 
-Pushed to `main` on 2026-10-22 (`9e92777`, fast-forwarded from branch `oil-petrol` on the
-owner's word), full gate and review (Codex: perceptual, skeptic) green, **not yet deployed**
-(item 0):
+Pushed to `main` on 2026-10-22 on the owner's word ("deploy and fix lava"), with the full gate and
+review green; `npm run deploy:verify` says whether the deployment has reached it:
 
-- **A thin oil slick on soil shows a petrol film** (the owner's pick from a board of three). A
-  poured slick rests one cell deep, and on soil 491 of 696 of its cells sat within 45 of the soil
-  under them; now none do. Renderer only, and only for a cell that is both the slick's surface and
+- **Water no longer deletes lava** (the design review's item 1). `try_move` (and `move` in the
+  JS mirror) let water flowing into a cell lava had entered that tick overwrite it; nothing that
+  moves may overwrite lava now, one line that replaced the lava-lava guard. The review's quench
+  scene (a 49-cell pour beside a splash of water) kept a median 76% of itself as rock over 32
+  seeds, 14% at the worst; now 100%, 92% at the worst, and every seed below 100% is lava still
+  molten (lava plus rock stays at 49 on every seed). Water is the whole leak: let grains through
+  the guard and the numbers do not move. `water:budget` is unchanged (the lava spring still peaks
+  at 13.7% and sets to 7,480 stone). A cargo test and a parity scenario (19 quenched, 0 deleted;
+  11 deleted with the old guard), and an absent audit check, `lava.quenched` "water never deletes
+  the lava it meets": 32 of 32 on the tree, leaks on 32 of 32 on HEAD and with water let through,
+  unreachable with the water left out. Drift at 8 seeds: only the new check moved (1 of 170); at
+  32 seeds no lava or `stone.born` check passes on fewer seeds (`lava.scorches` 31 -> 32). `clobber:census` finds no mover overwriting lava in any audit
+  scene. Review (Codex: parity, skeptic, drift) found no regression; the skeptic's one finding is
+  item 1's meteor half, which the old guard shares. The filmstrip is
+  `.tmp/lavafix/lava-quench-sheet.png` (live above the fix, seeds 11 and 8). Item 1 is the leak
+  this left: water still deletes a grain that sank into steam that tick.
+
+Live since 2026-10-22 (`deploy:verify` and `qa:live` green on `53c86a7`), after Railway's outage:
+
+- **A thin oil slick on soil shows a petrol film** (`9e92777`, fast-forwarded from branch
+  `oil-petrol` on the owner's word; full gate and review, Codex: perceptual, skeptic, green).
+  The owner's pick from a board of three. A poured slick rests one cell deep, and on soil 491 of
+  696 of its cells sat within 45 of the soil under them; now none do. Renderer only, and only for a cell that is both the slick's surface and
   lying on soil or char, so every other floor draws as before. `renderer:probe` gate 12, three
   tiers (ordinary soil 87, char 65, every soil state 29: a frozen slick on frozen soil is frost on
   frost). A showcase exhibit beside the two rocks. `VISUAL_PIPELINE.md`, Oil, has the numbers and
-  the three versions that were dropped. The same review found item 1.
-
-Pushed to `main` on 2026-10-22 (`f6c57e2`, landed from branch `oil-flow` after the owner saw the
-filmstrip), with the full gate, review and CI green, and **not yet deployed** (item 0):
-
+  the three versions that were dropped. The same review found water deleting lava (above).
 - **Oil keeps what is poured, spreads evenly and comes to rest; only a spring's oil fades**
-  (2026-10-21). Printing the board found why oil never settled: it moved on even ticks only,
+  (2026-10-21, `f6c57e2`, landed from branch `oil-flow` after the owner saw the filmstrip). Printing the board found why oil never settled: it moved on even ticks only,
   always the left-to-right pass, so its side never flipped and every slick slid right (a pour
   on an open floor ended at the board's edge on 32 seeds of 32, 14 cells left of ~150). Now
   (`update_oil`): oil moves on `tick % 4 < 2`, one tick of each pass; keeps flowing the way it
@@ -196,9 +204,6 @@ filmstrip), with the full gate, review and CI green, and **not yet deployed** (i
   byte on empty cells (a parity bug Rust never had, found by the new spring scenario), and the
   `oil_rises_above_water` fixture (three copies) leaked water and passed only by ending on the
   swap tick.
-
-Pushed to `main`, with the full gate and CI green, and **not yet deployed** (item 0):
-
 - **Poured lava pools, and a pool sets into stone** (2026-10-21, `24d5075`). Lava never deletes lava now
   (`try_move`, beside the water guard): a 408-cell pour into the water budget's basin used to be
   51 cells ten seconds later, a film, and keeps every cell. Its sink is its own: lava deep in a
@@ -212,7 +217,7 @@ Pushed to `main`, with the full gate and CI green, and **not yet deployed** (ite
   `stone.born` 21 -> 26 cells and contrast 201 -> 245, the two quench checks +3 or 4 cells); at
   32 seeds none of the 23 lava checks passes on fewer seeds. Review found only a duplicated note.
 
-Live, with the full gate, CI, `deploy:verify` and `qa:live` green:
+Live before that, with the full gate, CI, `deploy:verify` and `qa:live` green:
 
 - **Heat that shows** (2026-10-20, the owner's items 6 and 7). Water's energy is its
   temperature and ice's energy is now its warmth. Four rules, each measured out against the others
@@ -251,7 +256,7 @@ Live, with the full gate, CI, `deploy:verify` and `qa:live` green:
 The interaction audit has 169 checks bound to all 118 role ids; all pass on the audit's seed.
 The 32-seed list of checks that do not pass every seed was last taken in full on 2026-10-17:
 `fire.thaws`, both `oil.ignites` checks, the fanned-trail check of `meteor.trail`,
-`fungus.fairyring`, `lava.scorches` and `stem.burns` at 31, the stalk check of `stem.footing`
+`fungus.fairyring` and `stem.burns` at 31 (`lava.scorches` passes 32 since 2026-10-22), the stalk check of `stem.footing`
 at 27, and the ember check of `fire.dries` at 29 (re-measured after the heat batch). Of the heat
 batch's checks, two pass 32 of 32; `ice.condenses` "takes the steam's heat" passes 28 (four seeds
 show it under 30 ticks: how long the lava keeps quenching beside the ice varies). The two lava
@@ -259,8 +264,7 @@ checks pass 32 of 32.
 
 ## Design questions for the owner
 
-- **Should lava move evenly too?** Item 1b: it centres a pour but grows a spring's hill to 29%.
-- **Should water stop deleting lava?** Item 1: a quench keeps all its rock with a one-line guard.
+- **Should lava move evenly too?** Item 2: it centres a pour but grows a spring's hill to 29%.
 - Smaller, accepted unless the owner says otherwise: a soaked log leaves a few scorched cells
   unburnt; a burning log is live for only 5-7 seconds; a dormant wellspring blocks only
   non-sources; a meteor shock's scorch is often brief (26 of 32); the sim runs about 24 ticks a

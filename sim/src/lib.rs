@@ -2852,10 +2852,14 @@ impl Universe {
         if is_water_like(moving_cell.kind) && is_water_like(target_next.kind) {
             return false;
         }
-        // Nor lava lava (2026-10-21). A spreading pour lost most of itself to the clobber, 408
-        // cells to 51 within 10 s, so lava never pooled. Its sink is its own: deep lava cools
-        // too (`LAVA_DEEP_COOLS`).
-        if moving_cell.kind == Material::Lava as u8 && target_next.kind == Material::Lava as u8 {
+        // Nothing that moves deletes lava. First lava lava (2026-10-21): a spreading pour lost
+        // most of itself to the clobber, 408 cells to 51 within 10 s, so lava never pooled. Its
+        // sink is its own: deep lava cools too (`LAVA_DEEP_COOLS`). Then everything else
+        // (2026-10-22): water flowing into a cell lava had just entered deleted it, so a pour
+        // beside a splash of water kept a median 76% of itself as rock and 14% at the worst. A
+        // falling grain did the same, far more rarely. A meteor's impact can still write fire
+        // over lava that moved this tick (`update_meteor`), as it always could; no mover can.
+        if target_next.kind == Material::Lava as u8 {
             return false;
         }
         // Nor oil oil (2026-10-21): a 583-cell pour was 19 cells ten seconds later, and a dab
@@ -5901,6 +5905,43 @@ mod tests {
                 "spreading lava should lose no cell"
             );
         }
+    }
+
+    #[test]
+    fn water_never_deletes_the_lava_it_meets() {
+        // A blob of lava and a splash of water dropped apart onto a wide floor, spreading into
+        // each other, as in the audit's scene. Water flowing into a cell lava had entered that
+        // tick used to overwrite it. Here lava becomes nothing but stone, and only where it
+        // stands, so lava gone without stone in its place was deleted. The quench itself still
+        // happens.
+        let mut u = Universe::new(70, 34, 11);
+        basin(&mut u, 70, 30, 12);
+        let blobs = [(22i32, 16i32, 4i32, Material::Lava), (47, 16, 3, Material::Water)];
+        for (cx, cy, r, material) in blobs {
+            for y in cy - r..=cy + r {
+                for x in cx - r..=cx + r {
+                    if (x - cx) * (x - cx) + (y - cy) * (y - cy) <= r * r {
+                        set_cell(&mut u, x as u32, y as u32, material);
+                    }
+                }
+            }
+        }
+        for _ in 0..600 {
+            let was: Vec<usize> = (0..u.cells.len())
+                .filter(|&i| u.cells[i].kind == Material::Lava as u8)
+                .collect();
+            u.tick();
+            let set = was.iter().filter(|&&i| u.cells[i].kind == Material::Stone as u8).count();
+            assert_eq!(
+                was.len(),
+                count_kind(&u, Material::Lava) + set,
+                "lava should leave only by setting to stone where it stands"
+            );
+        }
+        assert!(
+            u.cells.iter().any(|c| c.kind == Material::Stone as u8 && c.flags & FLAG_SCORCHED != 0),
+            "water should still quench lava into scorched stone"
+        );
     }
 
     #[test]
