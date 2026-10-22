@@ -31,6 +31,9 @@ const EMBER_KINDS = [MATERIAL.Ember] as const;
 const ICE_KINDS = [MATERIAL.Ice] as const;
 const STEAM_KINDS = [MATERIAL.Steam] as const;
 const EARTH_CONTACT_KINDS = [MATERIAL.Sand, MATERIAL.Soil, MATERIAL.Stone, MATERIAL.Wall, MATERIAL.Wood] as const;
+// Where a one-deep oil slick shows its film (see liquidColor): soil, and char's ash. Not stone,
+// where the same film lands on the grey (`renderer:probe` gate 12 has the numbers).
+const DARK_GROUND_KINDS = new Set<number>([MATERIAL.Soil, MATERIAL.Ember]);
 
 // One species per plant, indexed by `variant & 7` — the same number that picks its
 // silhouette in BLOOM_SHAPES (sim/src/lib.rs). Keep these two tables in the same order:
@@ -1485,6 +1488,13 @@ function liquidColor({ kind, color, variant, energy, flags, time, cells, width, 
     if (hash % 17 === 0 && (top || left || right)) out = mixRgb(out, [214, 192, 116], 0.24);
     if (nearHeat) out = mixRgb(out, heatContact.top ? [240, 158, 82] : [95, 49, 30], heatContact.top ? 0.42 : 0.28);
     if (lifeContact.count > 0) out = mixRgb(out, [19, 24, 18], lifeContact.bottom ? 0.38 : 0.24);
+    // A thin slick on soil shows its film, as a real one does on wet asphalt. Poured oil rests one
+    // cell deep, and that sheet sat within the 45 floor of the soil under it on most cells: the
+    // slick that smothers a garden was the one slick you could not see. Only a cell that is both
+    // the surface and lying on the ground takes it, so a deeper pool on soil looks as it did.
+    if (top && !bottom && !nearHeat && DARK_GROUND_KINDS.has(kindAt(cells, width, height, x, y + 1))) {
+      out = mixRgb(out, [70, 150, 170], 0.55);
+    }
     if (frozen) out = mixRgb(out, [158, 190, 190], 0.44);
     if (flags & CELL_FLAG.Cosmic) {
       // Stardust's sheen: a rainbow film over the WHOLE slick, not the faint green-violet

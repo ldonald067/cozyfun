@@ -259,6 +259,13 @@ export function materialShowcaseScript() {
     rect(182, 192, 25, 33, material.Stone, 0, 90, flag.Bedded);
     rect(195, 203, 25, 33, material.Stone, 0, 90);
 
+    // A slick one cell deep on a dry soil bed: what a pour onto a garden comes to rest as, and
+    // the one place oil draws its petrol film. Bare soil showing at both ends for comparison.
+    // Wall stand, because soil falls; the bed sits inside it so no grain slides off the edge.
+    line(194, 214, 52, material.Wall);
+    rect(195, 213, 49, 51, material.Soil, 20, 40);
+    line(198, 210, 48, material.Oil, 70, 20);
+
     // Geology: a larger stone mass with mineral veins and an old patinated wall.
     rect(24, 44, 44, 56, material.Stone, 0, 60);
     line(24, 44, 57, material.Wall);

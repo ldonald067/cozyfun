@@ -971,6 +971,49 @@ function assertFloor(label, floor, worst, detail) {
     `keep the star palette off white and off gold, rose, mint and sky, which a plain spark blinks between.`);
 }
 
+// 12. A THIN OIL SLICK MUST SHOW ON THE SOIL IT LIES ON. Poured oil rests as a sheet one cell
+//     deep (2026-10-21), and in real pours on soil that sheet sat within the 45 floor of the
+//     soil under it on 491 of 696 cells: the slick that smothers a garden was the one slick you
+//     could not find. Each slick cell is judged against the NEAREST colour anywhere in the bed,
+//     not only the cell under it, because soil's beds vary and matching any of them is enough to
+//     vanish. Swept over ground energy and flags, oil variant, energy, frost and time; on stone
+//     the same film would land on the grey (159 of 696 cells under 45, against 51), which is why
+//     it is not applied there. Three tiers, because the ground's own state cues fight the film:
+//     ordinary soil, dry to wet, went 8 -> 87. Frozen and cosmic soil are tinted toward ice and
+//     starlight too, and a frozen slick on frozen wet soil is the worst case, 29 (the tier was 6):
+//     oil's frost tint comes after the film, and both cells are drawn as frost, which is true.
+//     Review found that tier missing from the first version of this gate. Char's ash: 22 -> 65.
+{
+  const ORDINARY = [0, CELL_FLAG.Wet];
+  const EVERY = [...ORDINARY, CELL_FLAG.Frozen, CELL_FLAG.Wet | CELL_FLAG.Frozen, CELL_FLAG.Cosmic, CELL_FLAG.Wet | CELL_FLAG.Cosmic];
+  const GROUNDS = [
+    ["ordinary soil, dry to wet", MATERIAL.Soil, [0, 40, 120], ORDINARY, 75],
+    ["soil in every state the sim gives it (frozen, cosmic)", MATERIAL.Soil, [0, 40, 120], EVERY, 25],
+    ["char's ash, in every state", MATERIAL.Ember, [0, 12, shape.COLD_CHAR_ENERGY], EVERY, 55],
+  ];
+  for (const [name, ground, energies, flagSets, floor] of GROUNDS) {
+    let worst = Infinity, at = null;
+    for (const ge of energies) for (const gf of flagSets) for (let ov = 0; ov < 8; ov++) for (const oe of [0, 36]) for (const frozen of [0, CELL_FLAG.Frozen]) {
+      const cells = board((put) => {
+        for (let y = 7; y <= 12; y++) for (let x = 0; x < W; x++) put(x, y, ground, ge, 200, gf, x * 3 + y);
+        for (let x = 3; x <= 22; x++) put(x, 6, MATERIAL.Oil, oe, 20, frozen, ov + x);
+      });
+      for (const t of TIMES) {
+        const bed = [];
+        for (let y = 7; y <= 11; y++) for (let x = 2; x <= 23; x++) bed.push(colourAt(cells, x, y, t));
+        for (let x = 5; x <= 20; x++) {
+          const slick = colourAt(cells, x, 6, t);
+          const d = Math.min(...bed.map((b) => redmean(slick, b)));
+          if (d < worst) { worst = d; at = `ground energy ${ge} flags ${gf}, oil variant ${ov}, energy ${oe}, frozen ${!!frozen}, x ${x}, time ${t}`; }
+        }
+      }
+    }
+    assertFloor(`a one-deep oil slick lying on ${name}`, floor, worst,
+      `worst at ${at}. Oil's smothering is an absence, seeds that never come up, and when the slick ` +
+      `that causes it cannot be seen the garden just looks broken. Keep the film on a sheet lying on it.`);
+  }
+}
+
 if (!quiet) {
   console.log("\nRendered state pairs, worst case over a full energy/age/species/time sweep:");
   for (const c of checks) {
