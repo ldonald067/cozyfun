@@ -6,7 +6,9 @@ Railway paused builds platform-wide in an outage on 2026-10-21, and on 2026-10-2
 builds were back only for Pro and Enterprise workspaces (Hobby, Free and Trial still to come),
 so the live site is still the heat batch (`04fa6e2`; `deploy:verify` says so). Deploying is item
 0 below. Check `gh run list` first and only then run `npm run deploy:verify`: a red CI run makes
-Railway skip that commit for good (a rerun does not revive it, a new push does).*
+Railway skip that commit for good (a rerun does not revive it, a new push does). **Branch
+`oil-petrol`** (renderer only: a thin oil slick on soil shows a petrol film) is committed with the
+full gate and review green, and is NOT merged to `main`; item 0b.*
 
 ## Work within the owner's usage limits
 
@@ -29,8 +31,9 @@ private to the owner) holds the eight flower species, the tulip and bluebell res
 stages, weather states, a ranked shortlist of eight upgrades, and the interaction roster marked
 shows / thin / reads weak / half hidden. Shortlist items 1, 2 and 7 shipped (`a20f77d`), and 3
 shipped as the heat batch; 4 (lava thawing across a gap) was built, measured and dropped (below).
-5, 6 and 8 are open. **The canvas does not say so yet**; its files are under
-`.tmp/design/canvas/`, publish edits to the same URL. The owner asks for a filmstrip before
+5, 6 and 8 are open. The shortlist board shows each item's status since 2026-10-22. Publish edits
+to the same URL; read the artifact first (`Artifact` read of the url, then the file by `path`),
+because a publish against a stale version is refused. The owner asks for a filmstrip before
 anything ships.
 
 ## Scratch tools (under `.tmp/`, untracked)
@@ -73,6 +76,13 @@ anything ships.
   (it is still the pre-heat `79761a6`). Flower scenes: `flowers-species`, `flowers-states`,
   `garden-life`. `.tmp/film/perf.mjs` times the renderer per frame on 24 full heads.
 - **Flower tuning:** `.tmp/design/pairs.mjs`, `.tmp/design/mock.py` / `mock2.py`.
+- **Liquids review (2026-10-22):** `.tmp/review/` holds the design review's tools.
+  `cmp.mjs <scene> <engineRoot:rendererRoot> <engineRoot:rendererRoot> [seed]` draws one row per
+  build (scenes in `cmpscenes.mjs`: `oil-on-soil`, `lava-quench`); `lavacount.mjs <engineRoot> [n]`
+  is the quench leak below; `oilsheet2.mjs [rendererRoot]` a resting slick against six floors;
+  `oilrivals.mjs` the slick against what else lies on soil; `slickgate.mjs` gate 12 standalone
+  (`STATES=frozen,cosmic,...`, `CHAR=1`). `vlava/` is HEAD's engine with the one-line lava guard;
+  `head/` is HEAD's `app/src`. `oil-candidates.png` is the board the owner picked from.
 - **The embed poster:** `.tmp/poster/shot.mjs`, `contrast.mjs`, `fps.mjs`, `motion.mjs`,
   `resize.mjs`, `ff.mjs` (see the 2026-10-18 entry below); `old.html` is the pre-watercolour one.
 
@@ -98,7 +108,19 @@ anything ships.
    `.tmp/lava/deploy-when-open.sh` is the retry loop this chat ran (stopped): it tries the
    mutation every 5 minutes for 2 hours, then waits for `deploy:verify` and runs live QA. Point
    its `SHA` at HEAD before reusing it.
-1. **Lava leans left, for the reason oil leaned right** (found 2026-10-21, not changed). Lava
+0b. **Merge `oil-petrol` when the owner says so.** A fast-forward of `main`; it is renderer only, so
+   it deploys with whatever else is waiting, and `deploy:verify` then expects its HEAD.
+1. **Water deletes lava that has just moved** (found 2026-10-22 in a design review, not changed).
+   `move` in `app/src/engine.ts` (and `try_move` in the sim) lets water enter a cell lava flowed
+   into this tick and overwrite it, and quench stone falling does the same. A 49-cell pour beside a
+   splash of water keeps a median 76% of itself as rock over 32 seeds, 14% at the worst;
+   `.tmp/review/lavacount.mjs . 32`. With nothing that moves allowed to overwrite lava (one line,
+   `if (next[target] === MATERIAL.Lava) return false;`, in `.tmp/review/vlava/`) it keeps 100%,
+   92% at the worst, and lava alone already kept every cell. A sim change: both engines, a cargo
+   test, a parity scenario, a painted audit check, drift, and the owner sees
+   `.tmp/review/lava-quench.png` (HEAD above the guard) first. "Oil and lava may still delete
+   water" is the opposite direction and does not cover this.
+1b. **Lava leans left, for the reason oil leaned right** (found 2026-10-21, not changed). Lava
    moves on even ticks only (`update_liquid` at sluggishness 2), always the left-to-right pass:
    a mid-floor pour ends 15-25 cells left of where it was poured, on every seed. Giving it one
    tick of each pass (`tick % 4 < 2`, as oil now has) centres it (-0.3) and leaves a basin pour
@@ -139,6 +161,17 @@ anything ships.
    fires). This catches a witness of the wrong KIND: a position standing in for a speed.
 
 ## Where things stand
+
+Committed on branch `oil-petrol` (2026-10-22), full gate and review (Codex: perceptual, skeptic)
+green, not merged:
+
+- **A thin oil slick on soil shows a petrol film** (the owner's pick from a board of three). A
+  poured slick rests one cell deep, and on soil 491 of 696 of its cells sat within 45 of the soil
+  under them; now none do. Renderer only, and only for a cell that is both the slick's surface and
+  lying on soil or char, so every other floor draws as before. `renderer:probe` gate 12, three
+  tiers (ordinary soil 87, char 65, every soil state 29: a frozen slick on frozen soil is frost on
+  frost). A showcase exhibit beside the two rocks. `VISUAL_PIPELINE.md`, Oil, has the numbers and
+  the three versions that were dropped. The same review found item 1.
 
 Pushed to `main` on 2026-10-22 (`f6c57e2`, landed from branch `oil-flow` after the owner saw the
 filmstrip), with the full gate, review and CI green, and **not yet deployed** (item 0):
@@ -228,7 +261,8 @@ checks pass 32 of 32.
 
 ## Design questions for the owner
 
-- **Should lava move evenly too?** Item 1: it centres a pour but grows a spring's hill to 29%.
+- **Should lava move evenly too?** Item 1b: it centres a pour but grows a spring's hill to 29%.
+- **Should water stop deleting lava?** Item 1: a quench keeps all its rock with a one-line guard.
 - Smaller, accepted unless the owner says otherwise: a soaked log leaves a few scorched cells
   unburnt; a burning log is live for only 5-7 seconds; a dormant wellspring blocks only
   non-sources; a meteor shock's scorch is often brief (26 of 32); the sim runs about 24 ticks a
