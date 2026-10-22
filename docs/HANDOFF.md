@@ -97,19 +97,33 @@ anything ships.
    The CLI was logged out on 2026-10-22 (`railway whoami`: Unauthorized); the owner runs
    `railway login`. Never `railway up` (no build commit, so `deploy:verify` fails), nor the
    Railway MCP's `redeploy` (re-runs the old build) or `create-deployment` (a new service).
-1. **Water deletes a grain that has just sunk into steam** (found 2026-10-22 while fixing lava,
-   not changed). `try_move` lets a mover sink through gas that was in a cell all tick
-   (`can_sink_through_gas`) without checking that the gas is still there: when quench stone or
-   sand bubbles down into a steam cell, water sinking into the same cell later in the pass
-   overwrites the grain. One cell of rock on 3 of 32 seeds of the lava quench scene
-   (`.tmp/lavafix/instr.mjs 27169 2169 13169` names the move). It is the general gas-sink
-   clobber, not a lava rule, and closing it changes how water moves through steam everywhere, so
-   it needs `water:budget` and drift; it is small enough that the owner may prefer to leave it.
-   The same review found a writer that is not a mover: a blocked meteor's impact writes fire
-   into any neighbour that was empty in `old` (`update_meteor`), so it can still replace lava
-   that flowed there this tick (Codex reproduced it on seeds 7, 8, 10, 20 and 31 of a 16x16
-   fixture, and on HEAD's guard too). Lava turning to fire under a meteor is hard to see; leave
-   it unless the owner asks.
+1. **Flowers with more depth** (the owner's ask, 2026-10-22, with three reference images in
+   `.tmp/flowers-ref/`: stock art to look at, never to ship or commit). What they do, read off
+   the images:
+   - `3.png` is the one that shows depth. Each petal is a ramp of three or four tones of its own
+     hue: a rim in a deeper shade of that hue (not black), a mid body, a light highlight on the
+     upper or inner side. Heads read as layered rings, darker outer petals round a lighter inner
+     ring round the centre. Centres have texture (the sunflower's dark disc with a ring round
+     it). Leaves are two greens with a lit edge, on cooler teal-green stems.
+   - `2.png`: a crisp outline round each head and leaf, two-tone leaves, and shapes you can name
+     at a glance (a star, a four-petal cross, a tulip with a white V of light, berry buds on
+     branching stems).
+   - `1.png`: flat two-tone heads on paired leaves, the floor of what reads at a small size.
+
+   Where we are: the 2026-10-19 batch draws each petal by where it sits in its head (the heart
+   ring, tips, a shaded underside, a darker rim the less a petal touches the head, a lit crest,
+   neighbours alternating a little) in `flowerColor` in `app/src/rendering/shapeLanguage.ts`;
+   hue and centre are `SPECIES` there, silhouettes are `BLOOM_SHAPES` (three copies, up to seven
+   cells across). Its own entry below says the change is modest in a grown garden at play size.
+   So measure before drawing: how many screen pixels a head covers at play zoom, and how far
+   apart its darkest and lightest petal pixels sit now, against the same in `3.png` (a ramp is
+   depth; one tone per petal is not). Then a board of candidates at play size on the design
+   canvas (`.tmp/film/film.mjs flowers-species`, `flowers-states`, `garden-life`) for the owner
+   to pick from before any code lands. A ramp inside a petal may mean drawing inside a cell, as
+   dew beads and ember lines already do. Renderer only keeps the sim and parity untouched. Gate
+   what ships in `renderer:probe`, swept rather than pinned, and keep the moonlit, frozen, wet
+   and charred states readable (`flowers-states`). It overlaps shortlist item 8 (the tulip cup
+   and nodding bluebell): ask the owner whether to do them together.
 2. **Lava leans left, for the reason oil leaned right** (found 2026-10-21, not changed). Lava
    moves on even ticks only (`update_liquid` at sluggishness 2), always the left-to-right pass:
    a mid-floor pour ends 15-25 cells left of where it was poured, on every seed. Giving it one
@@ -168,9 +182,9 @@ review green; `npm run deploy:verify` says whether the deployment has reached it
   unreachable with the water left out. Drift at 8 seeds: only the new check moved (1 of 170); at
   32 seeds no lava or `stone.born` check passes on fewer seeds (`lava.scorches` 31 -> 32). `clobber:census` finds no mover overwriting lava in any audit
   scene. Review (Codex: parity, skeptic, drift) found no regression; the skeptic's one finding is
-  item 1's meteor half, which the old guard shares. The filmstrip is
-  `.tmp/lavafix/lava-quench-sheet.png` (live above the fix, seeds 11 and 8). Item 1 is the leak
-  this left: water still deletes a grain that sank into steam that tick.
+  the meteor leak, which the old guard shares. The filmstrip is
+  `.tmp/lavafix/lava-quench-sheet.png` (live above the fix, seeds 11 and 8). The two leaks it
+  left are under "Decisions already made": the owner left both.
 
 Live since 2026-10-22 (`deploy:verify` and `qa:live` green on `53c86a7`), after Railway's outage:
 
@@ -279,6 +293,13 @@ All by the owner, after seeing pictures or measurements:
 - **Heat** (2026-10-20): the four rules as shipped. Steam keeps frosting onto ice and gives the
   ice its heat; hot steam is NOT kept from freezing (that cost two frost interactions). Lava's
   radiant heat across a gap is not in.
+- **Two leaks are left as they are** (2026-10-22, after the lava fix). Water still deletes a
+  grain that sank into steam that same tick: `try_move` lets a mover sink through gas that was
+  in a cell all tick without checking it is still there, which costs one cell of quench stone or
+  sand on 3 of 32 seeds of the quench scene (`.tmp/lavafix/instr.mjs 27169 2169 13169` names the
+  move). And a blocked meteor's impact writes fire into any neighbour empty in `old`
+  (`update_meteor`), so it can replace lava that flowed there that tick (Codex reproduced it on
+  seeds 7, 8, 10, 20 and 31 of a 16x16 fixture; the old guard does the same).
 - **Lava pools and sets** (2026-10-21): lava never deletes lava, and a deep pool cools from
   within at one roll in 24. A lava spring building a stone hill over itself (24% of the board at
   its peak) and going quiet is accepted. **Oil stays as it is live** until it has a sink that
