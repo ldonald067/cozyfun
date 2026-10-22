@@ -1,12 +1,11 @@
 # Handoff — where the work is, and what to do next
 
-*Rewritten at each handoff, never appended to. Written 2026-10-21, evening. **The lava fix
-(`24d5075`, poured lava pools and sets into stone) is pushed to `main` with the full gate and CI
-green, but it is NOT deployed**: Railway paused builds platform-wide in an outage that afternoon
-and was still having issues that evening, so the live site is still the heat batch (`04fa6e2`).
-Deploying it is item 0 below. **The oil batch is on branch `oil-flow`**, full gate and review
-green, waiting for the owner to look at `.tmp/oil/oil-sheet.png` before it goes to `main`
-(item 1). Check `gh run list` first and only then run `npm run deploy:verify`: a red CI run makes
+*Rewritten at each handoff, never appended to. Written 2026-10-22. **The lava fix (`24d5075`)
+and the oil batch (`f6c57e2`) are on `main` with the full gate and CI green, but NOT deployed**:
+Railway paused builds platform-wide in an outage on 2026-10-21, and on 2026-10-22 at 11:47 UTC
+builds were back only for Pro and Enterprise workspaces (Hobby, Free and Trial still to come),
+so the live site is still the heat batch (`04fa6e2`; `deploy:verify` says so). Deploying is item
+0 below. Check `gh run list` first and only then run `npm run deploy:verify`: a red CI run makes
 Railway skip that commit for good (a rerun does not revive it, a new push does).*
 
 ## Work within the owner's usage limits
@@ -79,16 +78,17 @@ anything ships.
 
 ## What to do next
 
-0. **Deploy the lava fix once Railway's builds resume.** On 2026-10-21 from about 13:10,
+0. **Deploy `main` (lava and oil) once Railway's builds resume.** On 2026-10-21 from about 13:10,
    https://status.railway.com read "Dashboard and API unavailable, builds paused" (a major
    outage, builds down in every region), and the API refused a deploy with "Deploys have been
    paused temporarily". Railway made no deployment record for the push at all, so it may never
-   pick it up by itself. The owner has approved this deploy. When the status page is clear:
+   pick it up by itself. The status page asks that the same deployment not be triggered more
+   than once while the queue drains. The owner has approved this deploy. When the page is clear:
    1. `gh run list` (CI must be green for HEAD), then `npm run deploy:verify`. If it already
       passes, Railway caught up on its own: go to step 4.
    2. Start a deploy of HEAD from the service's GitHub source (what the outage refused):
       `railway api 'mutation($s: String!, $e: String!, $c: String) { serviceInstanceDeployV2(serviceId: $s, environmentId: $e, commitSha: $c) }' --var s=b0acc433-99f7-4db1-9ec0-8fc94d813955 --var e=374411d2-6a14-448d-9e1f-1ccea6180158 --var c="\"$(git rev-parse HEAD)\""`
-      It returns a deployment id. HEAD is this handoff's commit on top of the lava fix, and
+      It returns a deployment id. HEAD is this handoff's commit on top of the oil batch, and
       `deploy:verify` expects HEAD.
    3. Repeat `npm run deploy:verify` until it passes (a build takes about 5 minutes).
    4. `COZY_QA_URL=https://pixelfun.littlealbumclub.net npm run qa:live`.
@@ -98,30 +98,25 @@ anything ships.
    `.tmp/lava/deploy-when-open.sh` is the retry loop this chat ran (stopped): it tries the
    mutation every 5 minutes for 2 hours, then waits for `deploy:verify` and runs live QA. Point
    its `SHA` at HEAD before reusing it.
-1. **Land the oil batch once the owner has seen `.tmp/oil/oil-sheet.png`** (branch `oil-flow`,
-   full gate green, adversarial review a pass). Fast-forward `main`, watch CI, and it deploys
-   with item 0. One look the owner should judge from the picture: a spring's oil holds a low,
-   speckled mound rather than a level lake, because fading leaves holes that resting oil does
-   not slide into. What changed is under "Where things stand".
-2. **Lava leans left, for the reason oil leaned right** (found 2026-10-21, not changed). Lava
+1. **Lava leans left, for the reason oil leaned right** (found 2026-10-21, not changed). Lava
    moves on even ticks only (`update_liquid` at sluggishness 2), always the left-to-right pass:
    a mid-floor pour ends 15-25 cells left of where it was poured, on every seed. Giving it one
    tick of each pass (`tick % 4 < 2`, as oil now has) centres it (-0.3) and leaves a basin pour
    setting to stone in 50-75 s as before, but a lava spring's stone hill grows from 24% of the
    board to 29% (7,480 -> 9,067 stone at 16,000 ticks), and 24% is the owner's accepted number.
    The owner decides; measure with `.tmp/oil/lava.mjs lcad` and `bias.mjs .tmp/oil/root-lcad`.
-3. **The rest of the canvas shortlist, when the owner picks:** steam billowing instead of a
+2. **The rest of the canvas shortlist, when the owner picks:** steam billowing instead of a
    dotted thread (5, a sim lever; `VISUAL_PIPELINE.md` records why a renderer fix was tried and
    reverted), a burning log that stays alive past 5-7 seconds (6), and the tulip cup and nodding
    bluebell (8: `BLOOM_SHAPES` in its three copies, a parity scenario that grows each new head,
    and `FLOWER_REACH` in `shapeLanguage.ts`, which `renderer:probe` checks against the engine's
    shapes and will fail on until it is updated). The roster board has one upgrade per material.
-4. **Fallen petals in their flower's colour** needs a sim change: a shed petal becomes a Pollen
+3. **Fallen petals in their flower's colour** needs a sim change: a shed petal becomes a Pollen
    cell identical to a pollen puff, so the renderer cannot tell them apart.
-5. **If Chrome's launch flakes on CI again, read its stderr first.** `launchBrowserOnce` waits
+4. **If Chrome's launch flakes on CI again, read its stderr first.** `launchBrowserOnce` waits
    30 s and appends Chrome's stderr to the error. A red CI run on a good commit still needs a
    rerun to confirm the flake and then a new push to deploy.
-6. **Halves no check can see yet:** `flower.pollen` "more often when cosmic" is a rate, which one
+5. **Halves no check can see yet:** `flower.pollen` "more often when cosmic" is a rate, which one
    check cannot see without two gardens compared inside it; `lava.scorches` "thaws" is still
    unreachable by touch, even with lava pooling now: a kept pool against an ice wall barely melts
    it, because a stone crust forms between them (a check for it passed 0 of 16 seeds after the heat batch, and was not
@@ -145,7 +140,8 @@ anything ships.
 
 ## Where things stand
 
-On branch `oil-flow`, with the full gate and adversarial review green, **not on `main`** (item 1):
+Pushed to `main` on 2026-10-22 (`f6c57e2`, landed from branch `oil-flow` after the owner saw the
+filmstrip), with the full gate, review and CI green, and **not yet deployed** (item 0):
 
 - **Oil keeps what is poured, spreads evenly and comes to rest; only a spring's oil fades**
   (2026-10-21). Printing the board found why oil never settled: it moved on even ticks only,
@@ -221,7 +217,7 @@ Live, with the full gate, CI, `deploy:verify` and `qa:live` green:
   when a material only moves**, and the clause-half witness work (2026-10-09 to 10-18); `git log`
   has each.
 
-The interaction audit has 169 checks bound to all 118 role ids (on `oil-flow`); all pass on the audit's seed.
+The interaction audit has 169 checks bound to all 118 role ids; all pass on the audit's seed.
 The 32-seed list of checks that do not pass every seed was last taken in full on 2026-10-17:
 `fire.thaws`, both `oil.ignites` checks, the fanned-trail check of `meteor.trail`,
 `fungus.fairyring`, `lava.scorches` and `stem.burns` at 31, the stalk check of `stem.footing`
@@ -232,8 +228,7 @@ checks pass 32 of 32.
 
 ## Design questions for the owner
 
-- **Land the oil batch?** Item 1: the picture is `.tmp/oil/oil-sheet.png`.
-- **Should lava move evenly too?** Item 2: it centres a pour but grows a spring's hill to 29%.
+- **Should lava move evenly too?** Item 1: it centres a pour but grows a spring's hill to 29%.
 - Smaller, accepted unless the owner says otherwise: a soaked log leaves a few scorched cells
   unburnt; a burning log is live for only 5-7 seconds; a dormant wellspring blocks only
   non-sources; a meteor shock's scorch is often brief (26 of 32); the sim runs about 24 ticks a
@@ -252,8 +247,9 @@ All by the owner, after seeing pictures or measurements:
   within at one roll in 24. A lava spring building a stone hill over itself (24% of the board at
   its peak) and going quiet is accepted. **Oil stays as it is live** until it has a sink that
   spares a slick; thinning every moving oil cell (1 in 50) was approved first and withdrawn when
-  it turned out to empty open slicks within 30 s. The `oil-flow` batch is the candidate, not yet
-  approved.
+  it turned out to empty open slicks within 30 s. **The oil batch was approved** from its
+  filmstrip (2026-10-22): poured oil keeps every cell and rests as a still sheet, and only a
+  spring's oil fades, so a spring holds a low, speckled mound of about 7% of the board.
 - **The poster** is a loose, wet watercolour with watercolour rain and lightning and two living
   jars, a garden and a bug jar (2026-10-18/19). Keep visual changes to it painterly and animated
   with transform/opacity only.
