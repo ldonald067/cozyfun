@@ -6,9 +6,8 @@ Railway paused builds platform-wide in an outage on 2026-10-21, and on 2026-10-2
 builds were back only for Pro and Enterprise workspaces (Hobby, Free and Trial still to come),
 so the live site is still the heat batch (`04fa6e2`; `deploy:verify` says so). Deploying is item
 0 below. Check `gh run list` first and only then run `npm run deploy:verify`: a red CI run makes
-Railway skip that commit for good (a rerun does not revive it, a new push does). **Branch
-`oil-petrol`** (renderer only: a thin oil slick on soil shows a petrol film) is committed with the
-full gate and review green, and is NOT merged to `main`; item 0b.*
+Railway skip that commit for good (a rerun does not revive it, a new push does). The petrol film
+(`9e92777`, renderer only) is on `main` too and waits with them.*
 
 ## Work within the owner's usage limits
 
@@ -108,8 +107,6 @@ anything ships.
    `.tmp/lava/deploy-when-open.sh` is the retry loop this chat ran (stopped): it tries the
    mutation every 5 minutes for 2 hours, then waits for `deploy:verify` and runs live QA. Point
    its `SHA` at HEAD before reusing it.
-0b. **Merge `oil-petrol` when the owner says so.** A fast-forward of `main`; it is renderer only, so
-   it deploys with whatever else is waiting, and `deploy:verify` then expects its HEAD.
 1. **Water deletes lava that has just moved** (found 2026-10-22 in a design review, not changed).
    `move` in `app/src/engine.ts` (and `try_move` in the sim) lets water enter a cell lava flowed
    into this tick and overwrite it, and quench stone falling does the same. A 49-cell pour beside a
@@ -162,8 +159,9 @@ anything ships.
 
 ## Where things stand
 
-Committed on branch `oil-petrol` (2026-10-22), full gate and review (Codex: perceptual, skeptic)
-green, not merged:
+Pushed to `main` on 2026-10-22 (`9e92777`, fast-forwarded from branch `oil-petrol` on the
+owner's word), full gate and review (Codex: perceptual, skeptic) green, **not yet deployed**
+(item 0):
 
 - **A thin oil slick on soil shows a petrol film** (the owner's pick from a board of three). A
   poured slick rests one cell deep, and on soil 491 of 696 of its cells sat within 45 of the soil
