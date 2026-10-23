@@ -253,6 +253,12 @@ const FLAG_TAUGHT: u16 = FLAG_ROOTED;
 /// of `FLAG_ROOTED` is guarded on a seed, stem or flower, and oil's renderer reads only its frost
 /// and sheen.
 const FLAG_SPRING_OIL: u16 = FLAG_ROOTED;
+/// On steam, the rooted bit marks a puff (`billow`): vapour that only fades. Every other reader
+/// of `FLAG_ROOTED` is guarded on its own kind, and the vapour renderer reads no flags.
+const FLAG_PUFF: u16 = FLAG_ROOTED;
+/// On steam, the drift bit marks a wisp that has already billowed, so it puffs once. The bit is
+/// otherwise read only on oil and on a gliding seed.
+const FLAG_BILLOWED: u16 = FLAG_DRIFT_EAST;
 /// How long a re-taught spring keeps its latch once it is free of ice, in ticks (about 30 s).
 /// The cell's own `age` is the clock: nothing else reads a wellspring's age, and a scene load
 /// keeps it, where it clamps energy.
@@ -298,6 +304,15 @@ const OIL_SPRING_FADES: u32 = 250;
 /// Mist is cool vapour — steam at the bottom of its energy range, so it reads as a faint
 /// sheen rather than as a kettle.
 const MIST_ENERGY: u16 = 30;
+/// A puff's energy, and so its life: steam drains 2 a tick and a puff goes when it reaches 0,
+/// about 3 s. The owner picked 3 s over 2 s from a filmstrip (2026-10-23).
+const PUFF_ENERGY: u16 = 120;
+/// Where a billowing wisp puffs, around the cell it rose into: a diamond two cells across each
+/// way. A plus of four was measured first and is invisible at play size. Nearest first: a puff
+/// goes only where air joins it to the wisp (`billow`), so each cell's way in comes before it.
+const PUFF_SHAPE: [(i32, i32); 12] = [
+    (-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (1, -1), (-1, 1), (1, 1), (-2, 0), (2, 0), (0, -2), (0, 2),
+];
 /// Every offset clears PLANT_SPACING, so a scattered seed lands where it can grow.
 const SCATTER_OFFSETS: [i32; 8] = [6, -6, 9, -9, 12, -12, 15, -15];
 const SCATTER_REACH: i32 = 14;
@@ -932,7 +947,10 @@ impl Universe {
                 }
             }
 
-            if cell.kind == Material::Steam as u8 && cell.age > 150 {
+            if cell.kind == Material::Steam as u8 && cell.flags & FLAG_PUFF != 0 && cell.energy == 0 {
+                // A puff fades without a trace: it is vapour a wisp spread into, never water.
+                *cell = Cell::empty();
+            } else if cell.kind == Material::Steam as u8 && cell.age > 150 {
                 // A quarter of expiring steam condenses back into a falling droplet.
                 *cell = if cell.variant & 3 == 0 {
                     Cell::new(Material::Water as u8, cell.variant, 26)
@@ -1477,7 +1495,12 @@ impl Universe {
                         } else if other.kind == Material::Moonwater as u8 && self.chance(10) {
                             next[nidx] = Cell::new(Material::Ice as u8, other.variant, 110);
                             next[nidx].flags = FLAG_COSMIC;
-                        } else if other.kind == Material::Steam as u8 && self.chance(4) {
+                        } else if other.kind == Material::Steam as u8 {
+                            // A puff never frosts: it would make ice, and bring heat, out of
+                            // vapour that was never water.
+                            if other.flags & FLAG_PUFF != 0 || !self.chance(4) {
+                                continue;
+                            }
                             // Frost from steam brings the steam's heat into the ice, all of it
                             // above ICE_TEMP: a wisp frosts it, a flood of quench steam beside
                             // lava melts it. Steam used to freeze for nothing, so lava poured by
@@ -1508,6 +1531,20 @@ impl Universe {
                 }
                 x if x == Material::Steam as u8 => {
                     let ice_nearby = neighbors.iter().any(|&nidx| old[nidx].kind == Material::Ice as u8);
+                    // A puff is vapour a wisp spread into, never water: one water cell's wisp
+                    // puffs into a dozen, so it neither turns back into water or ice nor wets what
+                    // it touches (heat vents a wet wall as ordinary steam, which condenses; review
+                    // made water from a puff that way). It skips those rolls. And a puff that
+                    // meets ice is gone, so it never crowds the ice's face: puffs lingering there
+                    // kept wisps from reaching it, and steam frosting a small ice dab passed the
+                    // audit on 29 of 32 seeds (32 before billowing); 31 now.
+                    let puff = cell.flags & FLAG_PUFF != 0;
+                    if puff {
+                        if ice_nearby && next[idx].kind == Material::Steam as u8 {
+                            next[idx] = Cell::empty();
+                        }
+                        continue;
+                    }
                     if ice_nearby && self.chance(5) {
                         next[idx] = Cell::new(Material::Ice as u8, cell.variant, 70);
                     }
@@ -1557,7 +1594,11 @@ impl Universe {
                         if other.kind == Material::Water as u8 || other.kind == Material::Moonwater as u8 {
                             next[idx].energy = next[idx].energy.saturating_sub(120);
                             next[idx].flags |= FLAG_WET;
-                            if cell.energy > 40 && self.chance(6) {
+                            // A hot ember hisses on 1 roll in 2 (1 in 6 before steam billowed).
+                            // The bed gets this roll only on the tick water first reaches it, so
+                            // at 1 in 6 a doused burning log billowed into a cloud half the size:
+                            // about 60 cells at its biggest against 120, over 16 seeds.
+                            if cell.energy > 40 && self.chance(2) {
                                 next[nidx] = Cell::new(Material::Steam as u8, other.variant, 170);
                             }
                             continue;
@@ -1956,10 +1997,65 @@ impl Universe {
         let (x, y) = self.xy(idx);
         let side = if self.tick_count % 2 == 0 { 1 } else { -1 };
         let dirs = [(0, -1), (side, -1), (-side, -1), (side, 0), (-side, 0)];
+        let mut at = idx;
         for (dx, dy) in dirs {
             if self.try_move(idx, x + dx, y + dy, cell, old, next, false) {
-                return;
+                at = self.idx((x + dx) as u32, (y + dy) as u32);
+                break;
             }
+        }
+        if cell.kind == Material::Steam as u8 {
+            self.billow(idx, at, cell, old, next);
+        }
+    }
+
+    /// Hot steam billows: the first time a wisp has open air around it, it puffs into the open
+    /// cells of `PUFF_SHAPE` around where it rose, and the puffs fade in about 3 s. Steam used
+    /// to leave every source one cell at a time and rise at once, so a kettle, a hot pond or a
+    /// doused fire drew a dotted thread: 82% of a held kettle's steam had no steam beside it.
+    /// The renderer already draws a body of steam as a soft cloud, and no shading can make
+    /// one out of cells that are not there (`VISUAL_PIPELINE.md`, Smoke/Steam).
+    ///
+    /// It is a wisp's FIRST open air, not its first tick, because quench steam is born inside
+    /// the water it boiled and reaches the air only after bubbling up. Mist never billows, and
+    /// a puff never does, so one wisp puffs once. Puffs only fill empty cells that touch the
+    /// wisp or a puff placed before them, so none appears through a wall: checking emptiness
+    /// alone let a wisp sealed inside a one-cell wall puff out beyond it (review). They never
+    /// turn back into water or ice and wet nothing (the steam and ice arms), and vanish when
+    /// spent (`age_and_decay`), so they cost no water and carry no heat anywhere. No RNG.
+    fn billow(&self, idx: usize, at: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
+        if cell.energy <= MIST_ENERGY || cell.flags & (FLAG_PUFF | FLAG_BILLOWED) != 0 {
+            return;
+        }
+        // Only the wisp itself puffs. Water sinking through it this tick trades places with it
+        // (a bubble), and then it puffs from where it is next tick; puffing from the cell it
+        // left, unmarked, sprayed lines of puffs along a hot pond's surface every tick.
+        if next[at].kind != Material::Steam as u8 || next[at].flags & FLAG_PUFF != 0 {
+            return;
+        }
+        let (px, py) = self.xy(at);
+        let mut placed = [at; PUFF_SHAPE.len() + 1];
+        let mut count = 1;
+        for (ox, oy) in PUFF_SHAPE {
+            let (tx, ty) = (px + ox, py + oy);
+            if !self.in_bounds(tx, ty) {
+                continue;
+            }
+            let target = self.idx(tx as u32, ty as u32);
+            let joined = [(1, 0), (-1, 0), (0, 1), (0, -1)].iter().any(|&(dx, dy)| {
+                self.in_bounds(tx + dx, ty + dy) && placed[..count].contains(&self.idx((tx + dx) as u32, (ty + dy) as u32))
+            });
+            if joined && next[target].is_empty() && (old[target].is_empty() || target == idx) {
+                let mut puff = Cell::new(Material::Steam as u8, cell.variant | 1, PUFF_ENERGY);
+                puff.age = next[at].age;
+                puff.flags = FLAG_PUFF;
+                next[target] = puff;
+                placed[count] = target;
+                count += 1;
+            }
+        }
+        if count > 1 {
+            next[at].flags |= FLAG_BILLOWED;
         }
     }
 
@@ -3357,7 +3453,9 @@ mod tests {
         set_cell_state(&mut u, 8, 8, Material::Steam, 0, 180, 0);
         u.tick();
         assert_eq!(count_kind(&u, Material::Sand), 1, "the sand should still be there");
-        assert_eq!(count_kind(&u, Material::Steam), 2, "both steam cells should survive the sand falling through them");
+        // Hot steam billows into puffs in open air (`billow`); the two wisps are what must survive.
+        let wisps = u.cells.iter().filter(|c| c.kind == Material::Steam as u8 && c.flags & FLAG_PUFF == 0).count();
+        assert_eq!(wisps, 2, "both steam cells should survive the sand falling through them");
         assert_eq!(kind_at(&u, 8, 8), Material::Sand as u8, "and the sand should have fallen through both");
     }
 
@@ -6272,6 +6370,92 @@ mod tests {
         assert!(flags_at(&u, 8, 8) & FLAG_WET != 0);
         assert!(flags_at(&u, 7, 9) & FLAG_WET != 0);
         assert!(energy_at(&u, 8, 8) > energy_at(&u, 7, 9));
+    }
+
+    /// Hot steam billows once: its first open air puffs it into `PUFF_SHAPE`, the puffs fade in
+    /// about 3 s and leave nothing behind, and neither a puff nor mist ever billows. A hot wisp
+    /// and a cell of mist side by side, so a rule that always fired or never fired both fail.
+    #[test]
+    fn hot_steam_billows_once_into_puffs_and_mist_does_not() {
+        let mut u = Universe::new(32, 32, 19);
+        set_cell_state(&mut u, 8, 24, Material::Steam, 0, 180, 0);
+        set_cell_state(&mut u, 24, 24, Material::Steam, 0, MIST_ENERGY, 0);
+        let puffs = |u: &Universe, left: bool| {
+            u.cells
+                .iter()
+                .enumerate()
+                .filter(|(i, c)| c.kind == Material::Steam as u8 && c.flags & FLAG_PUFF != 0 && (i % 32 < 16) == left)
+                .count()
+        };
+        u.tick();
+        assert_eq!(puffs(&u, true), PUFF_SHAPE.len(), "a hot wisp in open air should puff into every cell of its shape");
+        assert_eq!(puffs(&u, false), 0, "mist never billows");
+        for _ in 0..10 {
+            u.tick();
+        }
+        assert_eq!(puffs(&u, true), PUFF_SHAPE.len(), "a wisp billows once, and a puff never does");
+        for _ in 0..55 {
+            u.tick();
+        }
+        assert_eq!(puffs(&u, true), 0, "puffs fade in about 3 s");
+        assert_eq!(count_kind(&u, Material::Water), 0, "and leave no water behind");
+        assert_eq!(count_kind(&u, Material::Steam), 2, "while the wisp and the mist rise on");
+    }
+
+    /// A puff never turns back into water or ice and wets nothing: one wisp puffs into a dozen,
+    /// so a stone pot would make water out of nothing, directly or through a wall it wetted and
+    /// a flame later vents. Paired with an ordinary wisp in the same sealed pockets, which
+    /// condenses, frosts and wets.
+    #[test]
+    fn a_puff_never_condenses_frosts_or_wets_and_an_ordinary_wisp_does() {
+        for flags in [FLAG_PUFF, FLAG_BILLOWED] {
+            let mut u = Universe::new(24, 16, 23);
+            pocket(&mut u, &[(6, 8), (16, 8)]);
+            set_cell(&mut u, 7, 8, Material::Stone);
+            set_cell(&mut u, 17, 8, Material::Ice);
+            set_cell_state(&mut u, 6, 8, Material::Steam, 0, PUFF_ENERGY, flags);
+            set_cell_state(&mut u, 16, 8, Material::Steam, 0, PUFF_ENERGY, flags);
+            for _ in 0..70 {
+                u.tick();
+            }
+            let left = (count_kind(&u, Material::Water), count_kind(&u, Material::Ice), count_kind(&u, Material::Steam));
+            let wetted = u.cells.iter().filter(|c| c.flags & FLAG_WET != 0).count();
+            if flags == FLAG_PUFF {
+                assert_eq!(left, (0, 1, 0), "a puff should fade, never condense on stone or frost onto ice");
+                assert_eq!(wetted, 0, "and should wet nothing");
+            } else {
+                assert_eq!(left, (1, 2, 0), "an ordinary wisp condenses on stone and frosts onto ice");
+                assert!(wetted > 0, "and wets the masonry it touches");
+            }
+        }
+    }
+
+    /// A puff goes only where air joins it to its wisp. A hot wisp sealed in a ring of single
+    /// wall, with open air two cells out, puffs nothing; checking emptiness alone put puffs
+    /// beyond the wall (review). Its twin in open air billows, so the test cannot pass by
+    /// billowing never happening.
+    #[test]
+    fn a_wisp_never_puffs_through_a_wall() {
+        let mut u = Universe::new(32, 16, 29);
+        for dy in -1i32..=1 {
+            for dx in -1i32..=1 {
+                if (dx, dy) != (0, 0) {
+                    set_cell(&mut u, (8 + dx) as u32, (8 + dy) as u32, Material::Wall);
+                }
+            }
+        }
+        set_cell_state(&mut u, 8, 8, Material::Steam, 0, 180, 0);
+        set_cell_state(&mut u, 24, 8, Material::Steam, 0, 180, 0);
+        u.tick();
+        let puffs = |left: bool| {
+            u.cells
+                .iter()
+                .enumerate()
+                .filter(|(i, c)| c.kind == Material::Steam as u8 && c.flags & FLAG_PUFF != 0 && (i % 32 < 16) == left)
+                .count()
+        };
+        assert_eq!(puffs(true), 0, "a sealed wisp should puff nothing through its wall");
+        assert_eq!(puffs(false), PUFF_SHAPE.len(), "while its twin in open air billows");
     }
 
     #[test]

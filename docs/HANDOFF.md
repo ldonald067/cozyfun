@@ -1,6 +1,9 @@
 # Handoff — where the work is, and what to do next
 
-*Rewritten at each handoff, never appended to. Written 2026-10-23: the flowers batch is live (`c964f8e`), with `deploy:verify` and `qa:live` green, and the owner picked shortlist items 5 and 6 (steam, the burning log) as next. Railway caught up
+*Rewritten at each handoff, never appended to. Written 2026-10-23, later: steam that billows (shortlist
+item 5) is built on branch `steam-puffs`, the owner's pick "B: puffs that fade in 3 s, with the ember
+hiss" from a filmstrip, and waits for the owner's word to fast-forward `main` ("Where things stand").
+The flowers batch is live (`c964f8e`), with `deploy:verify` and `qa:live` green. Railway caught up
 by itself once builds resumed after the 2026-10-21 outage: lava pooling (`24d5075`), the oil
 batch (`f6c57e2`) and the petrol film (`9e92777`) went out together, with `deploy:verify` and
 `qa:live` green on `53c86a7`. Water no longer deleting lava was pushed on top the same evening
@@ -28,7 +31,9 @@ private to the owner) holds the eight flower species, the tulip and bluebell res
 stages, weather states, a ranked shortlist of eight upgrades, and the interaction roster marked
 shows / thin / reads weak / half hidden. Shortlist items 1, 2 and 7 shipped (`a20f77d`), and 3
 shipped as the heat batch; 4 (lava thawing across a gap) was built, measured and dropped (below).
-8 shipped on 2026-10-22 with the flower outline ("Where things stand"); 5 and 6 are next (items 1 and 2). The shortlist
+8 shipped on 2026-10-22 with the flower outline ("Where things stand"); 5 is built on a branch (item 1)
+and 6 is next (item 2). The steam pick was made from a sheet outside the canvas,
+`.tmp/steam/steam-candidates-sheet.png`. The shortlist
 board shows each item's status since 2026-10-22, and the "Flowers with more depth" board holds
 the four outline/depth candidates the owner picked from. Publish edits
 to the same URL; read the artifact first (`Artifact` read of the url, then the file by `path`),
@@ -36,6 +41,20 @@ because a publish against a stale version is refused. The owner asks for a films
 anything ships.
 
 ## Scratch tools (under `.tmp/`, untracked)
+
+- **Steam that billows (2026-10-23):** `.tmp/steam/`. `variant.mjs` builds find/replace copies
+  of `app/src/engine.ts` (`live` is the WORKING TREE; the two sabotages `sab-nobillow` and
+  `sab-hiss6` still apply, the candidate variants no longer match the tree); `base/` is `main`'s
+  `app/src` before the batch. `scenes.mjs` holds the kettle, pond, doused log, lava pour and
+  smoke reference on a tall 90x170 board; `measure.mjs <variant,...> [seeds] [scene,...]` the
+  clumping numbers (alone, touching, in bodies of 4+, peak); `film.mjs <scene> <main|variant,...>`
+  a strip (`TAG=-built` for the shipped rows) and `sheet.py [tag] ["row|row"]` the labelled sheet
+  (`steam-candidates-sheet.png` the owner picked from, `steam-built-sheet.png` the build);
+  `bound.mjs [seeds] [scene]` peak steam on the 220x140 board, `main` against the tree;
+  `witness.mjs` and `shown.mjs` the two audit checks' body sizes and shown ticks per seed;
+  `checks.mjs <roleRegex> [seeds] [variant,...]` chosen audit checks on JS engines against
+  `main`; `quench.mjs` the parity lava scene with the old guard; `waterloss.mjs` the mist-throw
+  count behind the "rising steam" scenario; `board.mjs` prints a region.
 
 - **Flowers with more depth (2026-10-22):** `.tmp/flowers-depth/`. `ref2.py` measures a
   reference sheet at its art-pixel grid (head size, tones, luminance spread); `ours.mjs` and
@@ -109,23 +128,10 @@ anything ships.
    The CLI was logged out on 2026-10-22 (`railway whoami`: Unauthorized); the owner runs
    `railway login`. Never `railway up` (no build commit, so `deploy:verify` fails), nor the
    Railway MCP's `redeploy` (re-runs the old build) or `create-deployment` (a new service).
-1. **Steam billows instead of a dotted thread** (canvas shortlist item 5; the owner's pick for
-   next, 2026-10-23). The promise on the canvas: a kettle, a hot pond or a quenched ember puts up
-   soft merging wisps. The lever is in the SIM, not the renderer: steam is emitted one cell at a
-   time and rises at once, so 26% of steam cells touch another steam cell against smoke's 75%,
-   and 74% have no cardinal neighbour at all. A renderer fix was built and reverted
-   (`VISUAL_PIPELINE.md`, Smoke/Steam): a dotted line stays dotted however it is shaded, and it
-   cost six interactions 25-30% of their contrast (`water.boils` 395 -> 275, `soil.breathes`
-   282 -> 158). So the change is where steam is BORN (vents, boiling, the drying buffer's wisp
-   in `update_fire` and the hot-water paths) or how it moves (`update_gas`), so that hot steam
-   leaves in small clusters. Hold what is already decided: gases are conserved, mist (steam at
-   `MIST_ENERGY` and below) does not bubble and must keep its fate (`water:budget` after any
-   change that touches it), hot steam still frosts onto ice and brings its heat, and peak steam
-   was 0.8% of the board when the vents widened, a bound to re-measure, not to blow through.
-   Measure first: the neighbour histogram above on a kettle, a hot pond and a quenched ember,
-   then a filmstrip of candidates for the owner before any code lands. It touches
-   `steam.rises`, `steam.condenses`, `steam.frosts`, `wood.steams`, `fire.dries`, `water.boils`
-   and the heat batch's checks: `audit:drift` on all of them, and parity.
+1. **Ship steam that billows when the owner says so.** Branch `steam-puffs`, built and gated
+   ("Where things stand"); the owner has seen `.tmp/steam/steam-built-sheet.png`, `main` above the
+   branch in four scenes. Fast-forward `main`, push, `gh run list`, then `npm run deploy:verify` and
+   `COZY_QA_URL=https://pixelfun.littlealbumclub.net npm run qa:live`.
 2. **A burning log stays alive** (canvas shortlist item 6; also the owner's pick, 2026-10-23).
    The promise: the hearth smoulders with glowing cracks well past today's 5-7 seconds. Wood
    lights straight into Ember at energy 230 (`ignited_cell` in `sim/src/lib.rs`); an ember above
@@ -155,7 +161,8 @@ anything ships.
 6. **If Chrome's launch flakes on CI again, read its stderr first.** `launchBrowserOnce` waits
    30 s and appends Chrome's stderr to the error. A red CI run on a good commit still needs a
    rerun to confirm the flake and then a new push to deploy.
-7. **Halves no check can see yet:** `flower.pollen` "more often when cosmic" is a rate, which one
+7. **Halves no check can see yet:** a hot ember's hiss (1 roll in 2, was 1 in 6) is a rate: the
+   doused-log check passes 15 of 16 at the old odds, with a cloud half the size. `flower.pollen` "more often when cosmic" is a rate, which one
    check cannot see without two gardens compared inside it; `lava.scorches` "thaws" is still
    unreachable by touch, even with lava pooling now: a kept pool against an ice wall barely melts
    it, because a stone crust forms between them (a check for it passed 0 of 16 seeds after the heat batch, and was not
@@ -178,6 +185,40 @@ anything ships.
    fires). This catches a witness of the wrong KIND: a position standing in for a speed.
 
 ## Where things stand
+
+On branch `steam-puffs`, not on `main` (2026-10-23), the owner's pick B from a filmstrip of two:
+
+- **Hot steam billows into soft puffs** (`billow` in `sim/src/lib.rs`, mirrored in `engine.ts`).
+  Measured first: a flame-held kettle's steam had no steam beside it 82% of the time (smoke off a
+  log 62%), and the renderer already draws a body of steam as a soft cloud, so the lever was the
+  sim. The first time a hot wisp meets open air it fills the empty cells of `PUFF_SHAPE` (a
+  radius-2 diamond, 12) around where it rose with puffs: the rooted bit marks a puff
+  (`FLAG_PUFF`), the drift bit a wisp that has billowed (`FLAG_BILLOWED`), both kept by a save.
+  A puff is born as bright as its wisp at energy `PUFF_ENERGY` (120) and goes at 0, about 3 s;
+  it never condenses on stone or glass, never frosts, wets nothing, skips those rolls, and
+  vanishes when it touches ice; it goes only where air joins it to the wisp or an earlier puff.
+  Mist and puffs never billow. Kettle: alone 82% -> 24%, in bodies of 4+ 0% ->
+  65%; a doused burning log's biggest cloud 9 -> about 120 cells. Water on lava looks much as
+  before (the lava crusts under the first water). A hot ember meeting water hisses on 1 roll in
+  2 (was 1 in 6). Volume, 220x140 board, default brush, peak: water on a lava pool 0.51-0.67%
+  (0.20-0.23% before), a doused bonfire 0.68-0.99% (0.13-0.18%; past the old 0.8% on 2 seeds
+  of 4), a flame held to a pond 0.17-0.25% (0.06-0.10%). `water:budget` unchanged to the cell. Three cargo tests (each fails
+  under sabotage), one parity scenario (a kettle in a stone pot under ice: 4,869 puff cell-ticks,
+  none turned to water or ice), two audit checks from painted materials (a held kettle, a doused
+  log: 0 of 16 seeds on `main` and with the billow taken out, 16 of 16 now). Two parity scenes
+  were restaged with reasons at each: the lava splash was a coin flip on `main` too and is a short
+  pour now; "rising steam" loads its steam already billowed, because a chamber of puffs made it
+  count mist eaten by water as deleted water (counting the throws found none). Drift at 8 seeds:
+  13 of 174 moved, all gains but `ice.freezes` (59 -> 54 cells) and `stone.weathers` (49 -> 39
+  cells, shown 1,499 -> 1,034 ticks), both still passing every seed; at 32 seeds
+  `ice.condenses` "condenses steam into frost" passes 31 (32 on `main`, median 8 cells both; 29
+  before puffs vanished at ice). `VISUAL_PIPELINE.md`, Smoke/Steam, has the five shapes
+  measured and dropped. Full gate green. Review (Codex: skeptic, parity, drift) found two
+  mediums, both fixed: a puff wetted masonry that heat then vented as ordinary steam, which can
+  condense (water from a puff), and puffs were placed through a one-cell wall. A second Codex pass
+  on the fixes found nothing. The fixes left the pond puffing about a quarter less than the
+  candidate the owner picked (puffs no longer land through the water's surface); the sheet of the
+  build is `.tmp/steam/steam-built-sheet.png`.
 
 Live since 2026-10-23 (`c964f8e`, fast-forwarded from branch `flowers-depth` on the owner's word
 "ship it" after the filmstrip; CI, `deploy:verify` and `qa:live` green). Full gate green, review
@@ -310,7 +351,8 @@ The interaction audit has 172 checks bound to all 118 role ids; all pass on the 
 The 32-seed list of checks that do not pass every seed was last taken in full on 2026-10-17:
 `fire.thaws`, both `oil.ignites` checks, the fanned-trail check of `meteor.trail`,
 `fungus.fairyring` and `stem.burns` at 31 (`lava.scorches` passes 32 since 2026-10-22), the stalk check of `stem.footing`
-at 27, and the ember check of `fire.dries` at 29 (re-measured after the heat batch). Of the heat
+at 27, and the ember check of `fire.dries` at 29 (re-measured after the heat batch). On the steam
+branch `ice.condenses` "condenses steam into frost" passes 31. Of the heat
 batch's checks, two pass 32 of 32; `ice.condenses` "takes the steam's heat" passes 28 (four seeds
 show it under 30 ticks: how long the lava keeps quenching beside the ice varies). The two lava
 checks pass 32 of 32.
@@ -328,6 +370,8 @@ checks pass 32 of 32.
 
 All by the owner, after seeing pictures or measurements:
 
+- **Steam billows** (2026-10-23): candidate B, puffs that fade in 3 s, with the ember hiss, picked
+  over A (2 s) from `.tmp/steam/steam-candidates-sheet.png`, volume included.
 - **Heat** (2026-10-20): the four rules as shipped. Steam keeps frosting onto ice and gives the
   ice its heat; hot steam is NOT kept from freezing (that cost two frost interactions). Lava's
   radiant heat across a gap is not in.

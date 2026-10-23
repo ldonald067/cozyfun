@@ -487,7 +487,10 @@ class JsSandboxEngine implements SandboxEngine {
       if (energy === 0) {
         writeU16(next, idx + 6, flags & CELL_FLAG.Frozen ? thawedFlags(kind, flags) : flags & ~(CELL_FLAG.Wet | CELL_FLAG.Cosmic));
       }
-      if (kind === MATERIAL.Steam && age > 150) {
+      if (kind === MATERIAL.Steam && flags & PUFF && energy === 0) {
+        // A puff fades without a trace; see the sim.
+        next.fill(0, idx, idx + CELL_STRIDE);
+      } else if (kind === MATERIAL.Steam && age > 150) {
         if ((next[idx + 1] & 3) === 0) {
           writeCellBytes(next, idx, MATERIAL.Water, next[idx + 1], 26);
         } else {
@@ -727,7 +730,8 @@ class JsSandboxEngine implements SandboxEngine {
           if (other === MATERIAL.Water || other === MATERIAL.Moonwater) {
             writeU16(next, idx + 4, Math.max(0, readU16(next, idx + 4) - 120));
             writeU16(next, idx + 6, readU16(next, idx + 6) | CELL_FLAG.Wet);
-            if (readU16(old, idx + 4) > 40 && this.chance(6)) {
+            // A hot ember hisses on 1 roll in 2; see the ember arm in lib.rs.
+            if (readU16(old, idx + 4) > 40 && this.chance(2)) {
               writeCellBytes(next, nidx, MATERIAL.Steam, old[nidx + 1], 170);
             }
             continue;
@@ -906,9 +910,38 @@ class JsSandboxEngine implements SandboxEngine {
 
   private gas(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
     const side = this.ticks % 2 === 0 ? 1 : -1;
+    let at = idx;
     for (const [dx, dy] of [[0, -1], [side, -1], [-side, -1], [side, 0], [-side, 0]]) {
-      if (this.move(idx, x + dx, y + dy, cell, old, next, false)) return;
+      if (this.move(idx, x + dx, y + dy, cell, old, next, false)) {
+        at = this.index(x + dx, y + dy);
+        break;
+      }
     }
+    if (cell[0] === MATERIAL.Steam) this.billow(idx, at, cell, old, next);
+  }
+
+  // Mirrors Universe::billow: a hot wisp's first open air puffs it into PUFF_SHAPE, each puff
+  // only where air joins it to the wisp or an earlier puff. No RNG.
+  private billow(idx: number, at: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
+    if (readU16(cell, 4) <= MIST_ENERGY || readU16(cell, 6) & (PUFF | BILLOWED)) return;
+    // Only the wisp itself puffs, not the cell a bubble swapped it out of; see the sim.
+    if (next[at] !== MATERIAL.Steam || readU16(next, at + 6) & PUFF) return;
+    const cellNumber = at / CELL_STRIDE;
+    const px = cellNumber % this.w;
+    const py = Math.floor(cellNumber / this.w);
+    const placed = [at];
+    for (const [ox, oy] of PUFF_SHAPE) {
+      const tx = px + ox;
+      const ty = py + oy;
+      if (!this.inBounds(tx, ty)) continue;
+      const target = this.index(tx, ty);
+      const joined = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => this.inBounds(tx + dx, ty + dy) && placed.includes(this.index(tx + dx, ty + dy)));
+      if (joined && next[target] === MATERIAL.Empty && (old[target] === MATERIAL.Empty || target === idx)) {
+        writeCellBytes(next, target, MATERIAL.Steam, cell[1] | 1, PUFF_ENERGY, readU16(next, at + 2), PUFF);
+        placed.push(target);
+      }
+    }
+    if (placed.length > 1) writeU16(next, at + 6, readU16(next, at + 6) | BILLOWED);
   }
 
   private fire(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
@@ -1142,6 +1175,12 @@ class JsSandboxEngine implements SandboxEngine {
   private steamReact(idx: number, x: number, y: number, old: Uint8Array, next: Uint8Array) {
     const neighbors = this.neighbors(x, y);
     const iceNearby = neighbors.some((nidx) => old[nidx] === MATERIAL.Ice);
+    // A puff never turns back into water or ice and wets nothing, skipping those rolls, and is
+    // gone when it meets ice; see the steam arm in lib.rs.
+    if (readU16(old, idx + 6) & PUFF) {
+      if (iceNearby && next[idx] === MATERIAL.Steam) next.fill(0, idx, idx + CELL_STRIDE);
+      return;
+    }
     // One freeze roll for the whole cell, matching Rust (not one per ice neighbor).
     if (iceNearby && this.chance(5)) {
       writeCellBytes(next, idx, MATERIAL.Ice, old[idx + 1], 70);
@@ -1226,7 +1265,9 @@ class JsSandboxEngine implements SandboxEngine {
         writeCellBytes(next, nidx, MATERIAL.Ice, old[nidx + 1], 90);
       } else if (other === MATERIAL.Moonwater && this.chance(10)) {
         writeCellBytes(next, nidx, MATERIAL.Ice, old[nidx + 1], 110, 0, CELL_FLAG.Cosmic);
-      } else if (other === MATERIAL.Steam && this.chance(4)) {
+      } else if (other === MATERIAL.Steam) {
+        // A puff never frosts, and does not roll. See the ice arm in lib.rs.
+        if (readU16(old, nidx + 6) & PUFF || !this.chance(4)) continue;
         // Frost from steam brings the steam's heat into the ice. See the ice arm in lib.rs.
         if (next[nidx] === MATERIAL.Steam) writeU16(next, idx + 4, Math.min(255, readU16(next, idx + 4) + Math.max(0, readU16(old, nidx + 4) - ICE_TEMP)));
         writeCellBytes(next, nidx, MATERIAL.Ice, old[nidx + 1], 70);
@@ -1898,6 +1939,14 @@ const LAVA_DEEP_COOLS = 24;
 const OIL_SPRING_FADES = 250;
 const SPRING_OIL = CELL_FLAG.Rooted;
 const MIST_ENERGY = 30;
+// Hot steam billows into puffs once; see `billow` in lib.rs. A puff is marked with the rooted
+// bit, a wisp that has billowed with the drift bit.
+const PUFF = CELL_FLAG.Rooted;
+const BILLOWED = CELL_FLAG.DriftEast;
+const PUFF_ENERGY = 120;
+const PUFF_SHAPE: readonly (readonly [number, number])[] = [
+  [-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1], [-2, 0], [2, 0], [0, -2], [0, 2]
+];
 const SCATTER_OFFSETS: readonly number[] = [6, -6, 9, -9, 12, -12, 15, -15];
 const SCATTER_REACH = 14;
 

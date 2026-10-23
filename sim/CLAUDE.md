@@ -44,6 +44,11 @@ mirrored in `app/src/engine.ts` and behave byte-for-byte identically — see the
   places with it when the gas is hotter than `MIST_ENERGY`, so steam rises out of a pool
   instead of being eaten. Letting mist bubble too flooded a spring to 29.5% of the board:
   keep anything that changes the mist's fate behind a `water:budget` run.
+- **A puff is not water.** Hot steam billows into up to 12 puffs (`billow`, `FLAG_PUFF`) the
+  first time it meets open air. Every rule that turns steam into water or ice skips a puff,
+  and skips its roll, or a stone pot would make water out of nothing; a new one must too. A
+  puff wets nothing either: heat vents a wet wall as ordinary steam, which condenses.
+  A puff that meets ice simply vanishes, so puffs never crowd wisps off an ice face.
 - **"Running water" has to be written as running water.** The soot rinse and the char wash
   gate on `liquid_can_flow` — somewhere the water could actually move. They used to take any
   touching water while their comments said "running", and their first fix reused erosion's

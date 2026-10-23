@@ -256,11 +256,16 @@ const scenarios = [
     };
   })(),
   (() => {
-    // Nothing that moves deletes lava (2026-10-22). Lava and a splash of water on a walled
-    // floor, spreading into each other: water flowing into a cell lava had entered that tick
-    // used to overwrite it. Here lava becomes nothing but stone, and only where it stands, so the
-    // witnesses are lava gone without stone in its place (deleted) and lava that set while
-    // touching water (quenched).
+    // Nothing that moves deletes lava (2026-10-22). Lava and water on a walled floor, spreading
+    // into each other: water flowing into a cell lava had entered that tick used to overwrite
+    // it. Here lava becomes nothing but stone, and only where it stands, so the witnesses are
+    // lava gone without stone in its place (deleted) and lava that set while touching water
+    // (quenched).
+    //
+    // The water is a short pour, not one splash (2026-10-23). A splash beside the lava was a coin
+    // flip: on about a third of seeds it boiled away at first touch, quenching 3 cells, on HEAD
+    // as much as after steam began to billow, which moved this seed onto that side. Poured, it
+    // quenches 11 or more on 16 seeds of 16, and the old guard still deletes lava on all 16.
     let prev = null;
     return {
       name: "water quenches lava without deleting it",
@@ -268,8 +273,9 @@ const scenarios = [
       paint(p) {
         for (let x = 1; x < 70; x += 3) p(x, 40, 1, M.Wall);
         for (const x of [1, 67]) for (let y = 20; y <= 39; y++) { p(x, y, 0, M.Wall); p(x + 1, y, 0, M.Wall); }
-        p(22, 26, 4, M.Lava); p(47, 26, 3, M.Water);
+        p(22, 26, 4, M.Lava);
       },
+      act(p, t) { if (t <= 40 && t % 4 === 1) p(47, 26, 3, M.Water); },
       observe(seen, cells, w, h) {
         seen.deleted ??= 0;
         seen.quenched ??= 0;
@@ -1293,13 +1299,29 @@ const scenarios = [
     // the water. Nothing here is hot or cold and Wall takes dew as a stain, so the only way
     // water may leave is as mist born this tick (age 0, MIST_ENERGY). Steam is NOT conserved:
     // hot steam bubbles up through water, but water sinking into MIST still deletes it.
+    //
+    // The steam starts already billowed (2026-10-23). Billowing, it fills the chamber with
+    // puffs, and then water sometimes sinks into mist another water cell threw that same tick,
+    // which the rules allow and which a board count cannot tell from a gas deleting water: it
+    // happened twice in 140 ticks, and counting every throw inside the engine found no water
+    // unaccounted for. Puffs meeting water are the next scenario's question.
     name: "rising steam never deletes falling water",
     w: 40, h: 34, seed: 4211, ticks: 140,
+    cells(w, h) {
+      const bytes = new Uint8Array(w * h * STRIDE);
+      for (let y = 22; y <= 28; y++) for (let x = 8; x <= 31; x += 2) {
+        const cx = x + ((y + 1) % 2);
+        for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const o = ((y + dy) * w + cx + dx) * STRIDE;
+          bytes[o] = M.Steam; bytes[o + 1] = 1; bytes[o + 4] = 160; bytes[o + 6] = CELL_FLAG.DriftEast;
+        }
+      }
+      return bytes;
+    },
     paint(p) {
       for (let x = 1; x <= 38; x++) { p(x, 1, 1, M.Wall); p(x, 32, 1, M.Wall); }
       for (let y = 1; y <= 32; y++) { p(1, y, 1, M.Wall); p(38, y, 1, M.Wall); }
       for (let y = 5; y <= 10; y++) for (let x = 8; x <= 31; x += 2) p(x + (y % 2), y, 1, M.Water);
-      for (let y = 22; y <= 28; y++) for (let x = 8; x <= 31; x += 2) p(x + ((y + 1) % 2), y, 1, M.Steam);
     },
     observe(seen, cells, w, h, tick) {
       let water = 0, fresh = 0, met = 0;
@@ -1322,6 +1344,49 @@ const scenarios = [
       return null;
     },
   },
+  (() => {
+    // Hot steam billows (2026-10-23). A flame held to a stone pot of water, with an ice block
+    // hanging over it: the kettle's wisps puff into PUFF_SHAPE, and the puffs pass the stone and
+    // vanish at the ice without ever turning back into water or ice, while ordinary steam still
+    // dews the stone and frosts the ice. The witness of a turned puff is a cell that was a puff
+    // and is water or ice born this tick.
+    let prev = null;
+    return {
+      name: "a kettle's steam billows into puffs that never become water or ice",
+      w: 60, h: 44, seed: 4231, ticks: 400,
+      paint(p) {
+        for (let x = 18; x <= 42; x++) p(x, 41, 0, M.Wall);
+        for (let y = 31; y <= 39; y++) for (const x of [19, 41]) p(x, y, 0, M.Stone);
+        for (let y = 35; y <= 39; y++) for (let x = 21; x <= 39; x++) p(x, y, 0, M.Water);
+        for (let y = 18; y <= 21; y++) for (let x = 26; x <= 34; x++) p(x, y, 0, M.Ice);
+      },
+      act(p, t) { if (t < 300 && t % 4 === 0) p(30, 33, 2, M.Fire, 55); },
+      observe(seen, cells, w, h) {
+        for (const key of ["puffs", "puffsAtStone", "puffsAtIce", "puffTurned", "dew", "frost"]) seen[key] ??= 0;
+        const kind = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? M.Empty : cells[(y * w + x) * STRIDE]);
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            const o = (y * w + x) * STRIDE, k = cells[o];
+            if (k === M.Steam && cells[o + 6] & CELL_FLAG.Rooted) {
+              seen.puffs++;
+              const near = [kind(x + 1, y), kind(x - 1, y), kind(x, y + 1), kind(x, y - 1)];
+              if (near.includes(M.Stone)) seen.puffsAtStone++;
+              if (near.includes(M.Ice)) seen.puffsAtIce++;
+            }
+            if (!prev || prev[o] !== M.Steam || (k !== M.Water && k !== M.Ice) || (cells[o + 2] | (cells[o + 3] << 8)) !== 0) continue;
+            if (prev[o + 6] & CELL_FLAG.Rooted) seen.puffTurned++;
+            else if (k === M.Water) seen.dew++;
+            else seen.frost++;
+          }
+        }
+        prev = cells.slice();
+      },
+      // Floors about half of what the scene witnessed (puffs 4,869 cell-ticks, 44 at the stone,
+      // 111 at the ice, each there for the one tick before it vanishes; dew 36, frost 55).
+      expect: (seen) => (seen.puffTurned === 0 && seen.puffs >= 2400 && seen.puffsAtStone >= 22 && seen.puffsAtIce >= 55 && seen.dew >= 18 && seen.frost >= 27
+        ? null : `${seen.puffTurned} puffs turned into water or ice (must be 0); puffs ${seen.puffs} (floor 2400), at stone ${seen.puffsAtStone} (22), at ice ${seen.puffsAtIce} (55), dew ${seen.dew} (18), frost ${seen.frost} (27)`),
+    };
+  })(),
   {
     // Sinking is a density ORDER, so this drops one of everything onto a pond under an oil
     // film: sand, soil, stone, seed and unlit rocket powder should all reach the bed, and

@@ -42,6 +42,26 @@ const plantSpacing = engineSource.match(/^const PLANT_SPACING = (\d+);$/m);
 if (!plantSpacing) throw new Error("interaction-scenes: PLANT_SPACING not found in app/src/engine.ts; the crowding check needs it");
 const PLANT_SPACING = Number(plantSpacing[1]);
 const thermalSteam = (g, before) => g.appeared(M.Steam, before).filter((i) => g.energyAt(i) > MIST_ENERGY);
+// Steam in a body of at least `n` touching cells (diagonals count): what a player reads as a
+// puff rather than as a dotted thread. It reads only kinds, so it credits nothing but cells.
+function steamInBodies(g, n) {
+  const seen = new Uint8Array(g.size), out = [];
+  for (const start of g.all(M.Steam)) {
+    if (seen[start]) continue;
+    const body = [start];
+    seen[start] = 1;
+    for (let k = 0; k < body.length; k++) {
+      const [x, y] = g.xyOf(body[k]);
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        if (g.kindAt(x + dx, y + dy) !== M.Steam) continue;
+        const j = (y + dy) * g.w + x + dx;
+        if (!seen[j]) { seen[j] = 1; body.push(j); }
+      }
+    }
+    if (body.length >= n) out.push(...body);
+  }
+  return out;
+}
 export const F = current.materials.CELL_FLAG;
 // On a wellspring, a lesson learned under ice and held until the ice is gone.
 const TAUGHT = current.materials.WELLSPRING_TAUGHT;
@@ -1177,6 +1197,21 @@ export const CHECKS = [
       for (const i of g.all(M.Steam)) if (g.xyOf(i)[1] < 18) memo.high.add(i);
       return [...memo.high].filter((i) => g.kindOf(i) === M.Steam);
     } },
+  { m: "Steam", covers: "steam.rises", role: "billows into soft puffs over a held flame", w: 40, h: 34, seed: 171, ticks: 400,
+    // A cup of water and a flame held to it for 15 s, as a player boils a kettle (fire at the
+    // app's brush density). Steam used to leave one cell at a time and rise as a dotted thread;
+    // it now billows the first time it meets open air. The witness is steam in a body of 8 or
+    // more touching cells. Over 16 seeds it shows for 118 ticks at the least; on the engine
+    // before billowing, which differs from this one here by nothing else, the most any seed
+    // showed was 19 ticks, under the floor on all 16. A radius-2 flame passed on 14 of 16 and
+    // this seed by one tick; at radius 4 the old engine's doused flame makes bodies too.
+    paint: (p) => {
+      for (let x = 10; x <= 30; x++) p(x, 30, 0, M.Wall);
+      for (let y = 23; y <= 29; y++) { p(10, y, 0, M.Wall); p(30, y, 0, M.Wall); }
+      p(20, 27, 3, M.Water); p(15, 27, 2, M.Water); p(25, 27, 2, M.Water);
+    },
+    act: (p, t) => { if (t < 300 && t % 4 === 0) p(20, 23, 3, M.Fire, 55); },
+    outcome: (g) => steamInBodies(g, 8) },
   { m: "Steam", covers: "steam.frosts", role: "frosts into ice near ice", w: 26, h: 30, seed: 69, ticks: 1500,
     // A pond, lava dropped into it a second later, and ice held over the steam — at the default
     // brush. The old scene was a small pool and a small ice dab: the lava quenches in about 60
@@ -1773,6 +1808,15 @@ export const CHECKS = [
       }
       return [...memo.quenched].filter((i) => g.kindOf(i) === M.Ember && g.hasFlag(i, F.Wet));
     } },
+  { m: "Ember", covers: "ember.quenched", role: "a burning log doused hisses up a cloud of steam", w: 30, h: 26, seed: 110, ticks: 600,
+    // The scene above, watched for its steam: a hot ember meeting water hisses (1 roll in 2) and
+    // each wisp billows. The witness is steam in a body of 24 or more cells: 16 of 16 seeds,
+    // 0 of 16 before billowing (biggest 9) and 0 of 16 with the billow taken out (22). The
+    // hiss's odds are a rate this cannot see alone: at the old 1 in 6 it still passes 15 of 16,
+    // with the biggest cloud about half the size (60 cells against 120).
+    paint: (p) => { p(15, 20, 4, M.Wood); p(15, 16, 1, M.Fire); },
+    act: (p, t) => { if (t === 40) p(15, 13, 4, M.Water); },
+    outcome: (g) => steamInBodies(g, 24) },
 
   { m: "Fungus", covers: "fungus.overtakes", role: "overtakes old or wet moss", w: 30, h: 26, seed: 111, ticks: 3000,
     paint: (p) => { p(15, 20, 4, M.Moss); p(15, 16, 1, M.Fungus); p(15, 13, 2, M.Water); },
