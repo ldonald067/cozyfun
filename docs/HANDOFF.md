@@ -317,13 +317,12 @@ checks pass 32 of 32.
 
 ## Design questions for the owner
 
-- **Should lava move evenly too?** Item 2: it centres a pour but grows a spring's hill to 29%.
+- **Should lava move evenly too?** Item 4: it centres a pour but grows a spring's hill to 29%.
 - Smaller, accepted unless the owner says otherwise: a soaked log leaves a few scorched cells
-  unburnt; a dormant wellspring blocks only
-  non-sources; a meteor shock's scorch is often brief (26 of 32); the sim runs about 24 ticks a
-  second at 120 Hz against 20 at 60 Hz; one watering grows a minimum plant; Phase 8's
-  listening pass is unfinished; the
-  `water.boils` scene is really a quench (fixture debt).
+  unburnt; a dormant wellspring blocks only non-sources; a meteor shock's scorch is often brief
+  (26 of 32); the sim runs about 24 ticks a second at 120 Hz against 20 at 60 Hz; one watering
+  grows a minimum plant; Phase 8's listening pass is unfinished; the `water.boils` scene is
+  really a quench (fixture debt).
 
 ## Decisions already made — do not relitigate
 
