@@ -1,6 +1,6 @@
 # Handoff — where the work is, and what to do next
 
-*Rewritten at each handoff, never appended to. Written 2026-10-23, just after midnight: the flowers batch is live (`c964f8e`), with `deploy:verify` and `qa:live` green. Railway caught up
+*Rewritten at each handoff, never appended to. Written 2026-10-23: the flowers batch is live (`c964f8e`), with `deploy:verify` and `qa:live` green, and the owner picked shortlist items 5 and 6 (steam, the burning log) as next. Railway caught up
 by itself once builds resumed after the 2026-10-21 outage: lava pooling (`24d5075`), the oil
 batch (`f6c57e2`) and the petrol film (`9e92777`) went out together, with `deploy:verify` and
 `qa:live` green on `53c86a7`. Water no longer deleting lava was pushed on top the same evening
@@ -28,7 +28,7 @@ private to the owner) holds the eight flower species, the tulip and bluebell res
 stages, weather states, a ranked shortlist of eight upgrades, and the interaction roster marked
 shows / thin / reads weak / half hidden. Shortlist items 1, 2 and 7 shipped (`a20f77d`), and 3
 shipped as the heat batch; 4 (lava thawing across a gap) was built, measured and dropped (below).
-8 shipped on 2026-10-22 with the flower outline ("Where things stand"); 5 and 6 are open. The shortlist
+8 shipped on 2026-10-22 with the flower outline ("Where things stand"); 5 and 6 are next (items 1 and 2). The shortlist
 board shows each item's status since 2026-10-22, and the "Flowers with more depth" board holds
 the four outline/depth candidates the owner picked from. Publish edits
 to the same URL; read the artifact first (`Artifact` read of the url, then the file by `path`),
@@ -109,28 +109,53 @@ anything ships.
    The CLI was logged out on 2026-10-22 (`railway whoami`: Unauthorized); the owner runs
    `railway login`. Never `railway up` (no build commit, so `deploy:verify` fails), nor the
    Railway MCP's `redeploy` (re-runs the old build) or `create-deployment` (a new service).
-1. **Flowers, if the owner wants more** (nothing asked yet). The outline and the two reshapes
+1. **Steam billows instead of a dotted thread** (canvas shortlist item 5; the owner's pick for
+   next, 2026-10-23). The promise on the canvas: a kettle, a hot pond or a quenched ember puts up
+   soft merging wisps. The lever is in the SIM, not the renderer: steam is emitted one cell at a
+   time and rises at once, so 26% of steam cells touch another steam cell against smoke's 75%,
+   and 74% have no cardinal neighbour at all. A renderer fix was built and reverted
+   (`VISUAL_PIPELINE.md`, Smoke/Steam): a dotted line stays dotted however it is shaded, and it
+   cost six interactions 25-30% of their contrast (`water.boils` 395 -> 275, `soil.breathes`
+   282 -> 158). So the change is where steam is BORN (vents, boiling, the drying buffer's wisp
+   in `update_fire` and the hot-water paths) or how it moves (`update_gas`), so that hot steam
+   leaves in small clusters. Hold what is already decided: gases are conserved, mist (steam at
+   `MIST_ENERGY` and below) does not bubble and must keep its fate (`water:budget` after any
+   change that touches it), hot steam still frosts onto ice and brings its heat, and peak steam
+   was 0.8% of the board when the vents widened, a bound to re-measure, not to blow through.
+   Measure first: the neighbour histogram above on a kettle, a hot pond and a quenched ember,
+   then a filmstrip of candidates for the owner before any code lands. It touches
+   `steam.rises`, `steam.condenses`, `steam.frosts`, `wood.steams`, `fire.dries`, `water.boils`
+   and the heat batch's checks: `audit:drift` on all of them, and parity.
+2. **A burning log stays alive** (canvas shortlist item 6; also the owner's pick, 2026-10-23).
+   The promise: the hearth smoulders with glowing cracks well past today's 5-7 seconds. Wood
+   lights straight into Ember at energy 230 (`ignited_cell` in `sim/src/lib.rs`); an ember above
+   90 lights its neighbours, and below `COLD_CHAR_ENERGY` (30) it is cold char, which the slow
+   world settles into soil. Find the ember's decay first and measure a real log (painted wood,
+   lit with a dab of flame) burning down: seconds lit, seconds glowing, cells left as char. A
+   slower arc for wood's embers is the obvious lever; check what rides on embers before moving
+   it (`rocket.lights`, `fire.dries` and its ember check at 29 of 32, `ember.cools`,
+   `ember.glows`, `ember.quenched`, `wood.burns`, the cold-char wink and ash in the renderer).
+   Decided and kept: embers dry wet fuel first, and a soaked log may leave a few scorched cells
+   unburnt. Filmstrip before code, as always.
+3. **Flowers, if the owner wants more** (nothing asked yet). The outline and the two reshapes
    are live ("Where things stand"). Left from the reference `3.png`: leaves in two greens with a
    lit edge on cooler stems, untouched. The bluebell is the darkest head at play size (deep bells
    and a deep ring); the owner saw it in the filmstrip
    (`.tmp/flowers-depth/flowers-batch-sheet.png`) and shipped it. The reference images in
    `.tmp/flowers-ref/` are stock art to look at, never to ship or commit.
-2. **Lava leans left, for the reason oil leaned right** (found 2026-10-21, not changed). Lava
+4. **Lava leans left, for the reason oil leaned right** (found 2026-10-21, not changed). Lava
    moves on even ticks only (`update_liquid` at sluggishness 2), always the left-to-right pass:
    a mid-floor pour ends 15-25 cells left of where it was poured, on every seed. Giving it one
    tick of each pass (`tick % 4 < 2`, as oil now has) centres it (-0.3) and leaves a basin pour
    setting to stone in 50-75 s as before, but a lava spring's stone hill grows from 24% of the
    board to 29% (7,480 -> 9,067 stone at 16,000 ticks), and 24% is the owner's accepted number.
    The owner decides; measure with `.tmp/oil/lava.mjs lcad` and `bias.mjs .tmp/oil/root-lcad`.
-3. **The rest of the canvas shortlist, when the owner picks:** steam billowing instead of a
-   dotted thread (5, a sim lever; `VISUAL_PIPELINE.md` records why a renderer fix was tried and
-   reverted) and a burning log that stays alive past 5-7 seconds (6). Item 8 shipped. The roster board has one upgrade per material.
-4. **Fallen petals in their flower's colour** needs a sim change: a shed petal becomes a Pollen
+5. **Fallen petals in their flower's colour** needs a sim change: a shed petal becomes a Pollen
    cell identical to a pollen puff, so the renderer cannot tell them apart.
-5. **If Chrome's launch flakes on CI again, read its stderr first.** `launchBrowserOnce` waits
+6. **If Chrome's launch flakes on CI again, read its stderr first.** `launchBrowserOnce` waits
    30 s and appends Chrome's stderr to the error. A red CI run on a good commit still needs a
    rerun to confirm the flake and then a new push to deploy.
-6. **Halves no check can see yet:** `flower.pollen` "more often when cosmic" is a rate, which one
+7. **Halves no check can see yet:** `flower.pollen` "more often when cosmic" is a rate, which one
    check cannot see without two gardens compared inside it; `lava.scorches` "thaws" is still
    unreachable by touch, even with lava pooling now: a kept pool against an ice wall barely melts
    it, because a stone crust forms between them (a check for it passed 0 of 16 seeds after the heat batch, and was not
@@ -294,10 +319,10 @@ checks pass 32 of 32.
 
 - **Should lava move evenly too?** Item 2: it centres a pour but grows a spring's hill to 29%.
 - Smaller, accepted unless the owner says otherwise: a soaked log leaves a few scorched cells
-  unburnt; a burning log is live for only 5-7 seconds; a dormant wellspring blocks only
+  unburnt; a dormant wellspring blocks only
   non-sources; a meteor shock's scorch is often brief (26 of 32); the sim runs about 24 ticks a
-  second at 120 Hz against 20 at 60 Hz; one watering grows a minimum plant; steam reads as a
-  dotted thread (the lever is in the sim); Phase 8's listening pass is unfinished; the
+  second at 120 Hz against 20 at 60 Hz; one watering grows a minimum plant; Phase 8's
+  listening pass is unfinished; the
   `water.boils` scene is really a quench (fixture debt).
 
 ## Decisions already made — do not relitigate
