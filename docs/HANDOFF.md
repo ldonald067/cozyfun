@@ -1,6 +1,6 @@
 # Handoff — where the work is, and what to do next
 
-*Rewritten at each handoff, never appended to. Written 2026-10-22, evening. Railway caught up
+*Rewritten at each handoff, never appended to. Written 2026-10-22, late evening: the flowers batch is on branch `flowers-depth`, unpushed (item 1). Railway caught up
 by itself once builds resumed after the 2026-10-21 outage: lava pooling (`24d5075`), the oil
 batch (`f6c57e2`) and the petrol film (`9e92777`) went out together, with `deploy:verify` and
 `qa:live` green on `53c86a7`. Water no longer deleting lava was pushed on top the same evening
@@ -28,12 +28,24 @@ private to the owner) holds the eight flower species, the tulip and bluebell res
 stages, weather states, a ranked shortlist of eight upgrades, and the interaction roster marked
 shows / thin / reads weak / half hidden. Shortlist items 1, 2 and 7 shipped (`a20f77d`), and 3
 shipped as the heat batch; 4 (lava thawing across a gap) was built, measured and dropped (below).
-5, 6 and 8 are open. The shortlist board shows each item's status since 2026-10-22. Publish edits
+8 is built on branch `flowers-depth` ("Where things stand"); 5 and 6 are open. The shortlist
+board shows each item's status since 2026-10-22, and the "Flowers with more depth" board holds
+the four outline/depth candidates the owner picked from. Publish edits
 to the same URL; read the artifact first (`Artifact` read of the url, then the file by `path`),
 because a publish against a stale version is refused. The owner asks for a filmstrip before
 anything ships.
 
 ## Scratch tools (under `.tmp/`, untracked)
+
+- **Flowers with more depth (2026-10-22):** `.tmp/flowers-depth/`. `ref2.py` measures a
+  reference sheet at its art-pixel grid (head size, tones, luminance spread); `ours.mjs` and
+  `board.mjs <scene> <tick> <scale> <variant,...> [crop]` the same on our heads, through scratch
+  renderer copies that `make-variants.py` builds (today, A lit from above, B rings inside, C the
+  outline, AC; D is drawn in `board.mjs`; `tree` is the working tree); `perf.mjs` times a frame
+  (`ALL=1` includes empty cells); `film2.mjs <ticks> <scale> [seed]` a painted meadow, HEAD above
+  the tree; `reshape-checks.mjs [seeds]` and `actor.mjs` the two reshape audit checks;
+  `sheet.py` builds `flowers-batch-sheet.png`, the filmstrip the owner saw. `.tmp/film/` now
+  plants each build's own shapes (`film.mjs` passes the build root), and has `reshape-opening`.
 
 - **Heat (2026-10-20):** `.tmp/heat/scenes.mjs` holds the batch's painted scenes (slab, puddle,
   warm-puddle, thaw, ice-wall). `probe.mjs [seeds] [scene]` prints counts at set ticks, base
@@ -97,33 +109,13 @@ anything ships.
    The CLI was logged out on 2026-10-22 (`railway whoami`: Unauthorized); the owner runs
    `railway login`. Never `railway up` (no build commit, so `deploy:verify` fails), nor the
    Railway MCP's `redeploy` (re-runs the old build) or `create-deployment` (a new service).
-1. **Flowers with more depth** (the owner's ask, 2026-10-22, with three reference images in
-   `.tmp/flowers-ref/`: stock art to look at, never to ship or commit). What they do, read off
-   the images:
-   - `3.png` is the one that shows depth. Each petal is a ramp of three or four tones of its own
-     hue: a rim in a deeper shade of that hue (not black), a mid body, a light highlight on the
-     upper or inner side. Heads read as layered rings, darker outer petals round a lighter inner
-     ring round the centre. Centres have texture (the sunflower's dark disc with a ring round
-     it). Leaves are two greens with a lit edge, on cooler teal-green stems.
-   - `2.png`: a crisp outline round each head and leaf, two-tone leaves, and shapes you can name
-     at a glance (a star, a four-petal cross, a tulip with a white V of light, berry buds on
-     branching stems).
-   - `1.png`: flat two-tone heads on paired leaves, the floor of what reads at a small size.
-
-   Where we are: the 2026-10-19 batch draws each petal by where it sits in its head (the heart
-   ring, tips, a shaded underside, a darker rim the less a petal touches the head, a lit crest,
-   neighbours alternating a little) in `flowerColor` in `app/src/rendering/shapeLanguage.ts`;
-   hue and centre are `SPECIES` there, silhouettes are `BLOOM_SHAPES` (three copies, up to seven
-   cells across). Its own entry below says the change is modest in a grown garden at play size.
-   So measure before drawing: how many screen pixels a head covers at play zoom, and how far
-   apart its darkest and lightest petal pixels sit now, against the same in `3.png` (a ramp is
-   depth; one tone per petal is not). Then a board of candidates at play size on the design
-   canvas (`.tmp/film/film.mjs flowers-species`, `flowers-states`, `garden-life`) for the owner
-   to pick from before any code lands. A ramp inside a petal may mean drawing inside a cell, as
-   dew beads and ember lines already do. Renderer only keeps the sim and parity untouched. Gate
-   what ships in `renderer:probe`, swept rather than pinned, and keep the moonlit, frozen, wet
-   and charred states readable (`flowers-states`). It overlaps shortlist item 8 (the tulip cup
-   and nodding bluebell): ask the owner whether to do them together.
+1. **Ship branch `flowers-depth` on the owner's word** ("Where things stand"). The owner asked
+   for a filmstrip before anything ships: `.tmp/flowers-depth/flowers-batch-sheet.png` (live
+   above the branch). On a yes: fast-forward `main`, push, `gh run list`, then
+   `npm run deploy:verify` and `COZY_QA_URL=https://pixelfun.littlealbumclub.net npm run qa:live`.
+   Leaves (two greens with a lit edge, cooler stems, from the reference `3.png`) were not part
+   of the pick and are untouched; the reference images in `.tmp/flowers-ref/` are stock art to
+   look at, never to ship or commit.
 2. **Lava leans left, for the reason oil leaned right** (found 2026-10-21, not changed). Lava
    moves on even ticks only (`update_liquid` at sluggishness 2), always the left-to-right pass:
    a mid-floor pour ends 15-25 cells left of where it was poured, on every seed. Giving it one
@@ -133,10 +125,8 @@ anything ships.
    The owner decides; measure with `.tmp/oil/lava.mjs lcad` and `bias.mjs .tmp/oil/root-lcad`.
 3. **The rest of the canvas shortlist, when the owner picks:** steam billowing instead of a
    dotted thread (5, a sim lever; `VISUAL_PIPELINE.md` records why a renderer fix was tried and
-   reverted), a burning log that stays alive past 5-7 seconds (6), and the tulip cup and nodding
-   bluebell (8: `BLOOM_SHAPES` in its three copies, a parity scenario that grows each new head,
-   and `FLOWER_REACH` in `shapeLanguage.ts`, which `renderer:probe` checks against the engine's
-   shapes and will fail on until it is updated). The roster board has one upgrade per material.
+   reverted) and a burning log that stays alive past 5-7 seconds (6). Item 8 is on branch
+   `flowers-depth`. The roster board has one upgrade per material.
 4. **Fallen petals in their flower's colour** needs a sim change: a shed petal becomes a Pollen
    cell identical to a pollen puff, so the renderer cannot tell them apart.
 5. **If Chrome's launch flakes on CI again, read its stderr first.** `launchBrowserOnce` waits
@@ -165,6 +155,31 @@ anything ships.
    fires). This catches a witness of the wrong KIND: a position standing in for a speed.
 
 ## Where things stand
+
+On branch `flowers-depth`, committed, NOT pushed, waiting on the owner's yes to the filmstrip
+(2026-10-22, late evening). Full gate green, review run (Codex: skeptic, parity, perceptual):
+
+- **Every flower head is outlined in a deep shade of its own colour** (renderer only; the owner's
+  pick, candidate C of four on the canvas's "Flowers with more depth" board). Measured first:
+  the reference `3.png`'s heads are 12-16 px across with 4-9 tones and a dark own-hue outline a
+  quarter to a half of each head, darkest to lightest about 30 -> 240; ours are 7 cells (about
+  23 px on a laptop, 12 on a phone), one cell per petal, spread 85. A ramp inside a petal cannot
+  exist at that size, so the outline is what carries over: open air beside a petal is drawn in
+  the plant's dark colour pushed toward violet (`headRing` in `emptyCellColor`), spread 85 -> 133,
+  heads drawn 9 wide. Only petals are ringed (no ring round a bud or seed head); the ring follows
+  the petal's weather in `flowerColor`'s order (review caught frost on a charred petal leaving a
+  black ring, 20 from the night). 0.15 ms a frame. `renderer:probe` gate 13: 120 from the night
+  (floor 110), 46 darker than its head (floor 40), none round buds or seed heads, swept over every
+  flag mix; every older flower gate is unchanged. `VISUAL_PIPELINE.md` has the four candidates.
+- **The tulip is a cup and the bluebell nods** (shortlist item 8, a sim change). `BLOOM_SHAPES` 4
+  and 6 in all three copies, `FLOWER_REACH`, and the two heads' colours from the canvas mock (the
+  bluebell's scape and crown are green). `the_tulip_opens_a_cup_and_the_bluebell_nods` asserts
+  the shapes as shapes and fails on the old rows; a parity scenario grows both whole (15/15,
+  12/12); two `flower.opens` checks witness a whole cup and a whole nodding bluebell in a
+  play-width meadow from painted materials: 30 and 29 of 32 seeds, every miss a meadow where no
+  plant of that species came up, 0 of 8 on `main`, unreachable without the watering. Drift at 8
+  seeds against `main`: only those two checks moved, of 172. Silhouette overlap: worst pair
+  unchanged at 0.75, the tulip's nearest 0.64 -> 0.58.
 
 Pushed to `main` on 2026-10-22 on the owner's word ("deploy and fix lava"), with the full gate and
 review green; `npm run deploy:verify` says whether the deployment has reached it:
@@ -267,7 +282,7 @@ Live before that, with the full gate, CI, `deploy:verify` and `qa:live` green:
   when a material only moves**, and the clause-half witness work (2026-10-09 to 10-18); `git log`
   has each.
 
-The interaction audit has 169 checks bound to all 118 role ids; all pass on the audit's seed.
+The interaction audit has 172 checks bound to all 118 role ids; all pass on the audit's seed.
 The 32-seed list of checks that do not pass every seed was last taken in full on 2026-10-17:
 `fire.thaws`, both `oil.ignites` checks, the fanned-trail check of `meteor.trail`,
 `fungus.fairyring` and `stem.burns` at 31 (`lava.scorches` passes 32 since 2026-10-22), the stalk check of `stem.footing`
@@ -312,7 +327,9 @@ All by the owner, after seeing pictures or measurements:
   with transform/opacity only.
 - **Flowers** (2026-10-19): species marks, weather drawn as what it is, readable life stages, as
   shipped. Moonlight keeps each species. Seed heads stay dry and speciesless except the poppy's
-  capsule and the sunflower's disc. Tulip and bluebell reshapes are a separate, unchosen item.
+  capsule and the sunflower's disc. **2026-10-22:** depth comes from an own-hue outline round
+  each head (C), not lighting from above (A), a dark rim inside the head (B), or petals drawn
+  inside the cell (D); the tulip cup and nodding bluebell are chosen, in the same batch.
 - A meteor's trail fans out and can light what it passes; sparks light oil; stardust gives oil a
   firework sheen (2026-10-15). A single meteor six cells from a fuse lights it on 2 of 32 seeds.
 - A fuse stops at a WIDE gap of air; a burst may relight the far side (2026-10-14).

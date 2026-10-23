@@ -1520,6 +1520,49 @@ const scenarios = [
     },
   },
   {
+    // The tulip and bluebell reshapes (the owner's pick from the design canvas, 2026-10-22): a
+    // rooted crown of each, on its stalk, opens its whole new head. The heads are written out
+    // here on purpose, so retuning either shape has to come through this scenario too; every
+    // other bloom scenario stays blind to which shape a species has.
+    name: "a tulip opens a cup and a bluebell nods",
+    w: 30, h: 20, seed: 4646, ticks: 1200,
+    cells(w, h) {
+      const bytes = new Uint8Array(w * h * STRIDE);
+      const put = (x, y, kind, variant = 0, energy = 0, flags = 0, age = 30) => {
+        const o = (y * w + x) * STRIDE;
+        bytes[o] = kind; bytes[o + 1] = variant; bytes[o + 2] = age;
+        bytes[o + 4] = energy & 255; bytes[o + 5] = energy >> 8; bytes[o + 6] = flags & 255; bytes[o + 7] = flags >> 8;
+      };
+      for (let x = 0; x < w; x++) { put(x, 18, M.Wall); put(x, 19, M.Wall); }
+      for (const [cx, variant] of RESHAPED_HEADS) {
+        for (let y = 13; y <= 17; y++) put(cx, y, M.Stem, variant, 20);
+        put(cx, 12, M.Flower, variant, 200, CELL_FLAG.Rooted, 20);
+      }
+      return bytes;
+    },
+    paint() {},
+    observe(seen, cells, w) {
+      for (const [cx, variant, shape] of RESHAPED_HEADS) {
+        const at = (x, y) => (y * w + x) * STRIDE;
+        const open = shape.filter(([dx, dy]) => cells[at(cx + dx, 12 + dy)] === M.Flower && cells[at(cx + dx, 12 + dy) + 1] === variant).length;
+        seen[`open${variant}`] = Math.max(seen[`open${variant}`] ?? 0, open);
+        // A petal of this plant anywhere its new shape has none.
+        for (let y = 2; y <= 16; y++) for (let x = cx - 4; x <= cx + 4; x++) {
+          if (cells[at(x, y)] !== M.Flower || cells[at(x, y) + 1] !== variant || (x === cx && y === 12)) continue;
+          if (!shape.some(([dx, dy]) => cx + dx === x && 12 + dy === y)) seen.stray = `${x - cx},${y - 12} on variant ${variant}`;
+        }
+      }
+    },
+    expect(seen) {
+      // One short is the pollen wedge `a_bud_opens_into_a_petal_crown` documents.
+      for (const [, variant, shape] of RESHAPED_HEADS) {
+        if ((seen[`open${variant}`] ?? 0) < shape.length - 1) return `variant ${variant} opened ${seen[`open${variant}`] ?? 0} of its ${shape.length} cells`;
+      }
+      if (seen.stray) return `a petal opened off the new shape, at ${seen.stray}`;
+      return null;
+    },
+  },
+  {
     // A meteor falls past a fuse laid on a ledge two cells from its path. Its trail fans: each
     // spark is thrown down, down-left or down-right by a roll both engines must take in step,
     // and on this seed one reaches the fuse and lights it, far above where the meteor lands.
@@ -1747,6 +1790,12 @@ const CUT_BLOOM_SHAPES = {
   0: [[-2, -2], [-1, -2], [1, -2], [2, -2], [-3, -1], [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [3, -1], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0], [-2, 1], [2, 1]],
   5: [[0, -1], [-1, -2], [1, -2], [0, -3], [-1, -4], [1, -4], [0, -5]],
 };
+
+// The tulip cup and the nodding bluebell, BLOOM_SHAPES 4 and 6, as [crown x, variant, shape].
+const RESHAPED_HEADS = [
+  [8, 4, [[0, -1], [-1, -1], [1, -1], [-1, 0], [1, 0], [-2, -1], [2, -1], [0, -2], [-1, -2], [1, -2], [-2, -2], [2, -2], [0, -3], [-2, -3], [2, -3]]],
+  [20, 6, [[0, -1], [0, -2], [0, -3], [1, -4], [2, -4], [3, -3], [1, -3], [1, -2], [3, -2], [3, -1], [-1, -3], [-1, -2]]],
+];
 
 // PARITY_ONLY=<text> runs just the scenarios whose name contains it. It exists for
 // vacuity-testing: the harness stops at the first failing scenario, so sabotaging a rule that

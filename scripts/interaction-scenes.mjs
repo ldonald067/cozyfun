@@ -269,6 +269,32 @@ export const FLOOR_FROM_BOTTOM = 4;
 const launchFixture = (p) => { p(15, 37, 4, M.Rocket); p(15, 31, 4, M.Fire); };
 
 
+// A play-width soil bed, a seed every seven cells and one watering, as a player plants a row.
+const wideMeadow = (p) => {
+  for (let x = 4; x <= 215; x++) p(x, 40, 3, M.Soil, 55);
+  for (let x = 8; x <= 212; x += 7) p(x, 35, 0, M.Seed);
+  for (let x = 6; x <= 214; x += 4) p(x, 30, 1, M.Water);
+};
+// BLOOM_SHAPES 4 and 6 from sim/src/lib.rs, written out because these two checks witness
+// exactly them: retuning either shape should have to come through here.
+const RESHAPED_HEADS = {
+  4: [[0, -1], [-1, -1], [1, -1], [-1, 0], [1, 0], [-2, -1], [2, -1], [0, -2], [-1, -2], [1, -2], [-2, -2], [2, -2], [0, -3], [-2, -3], [2, -3]],
+  6: [[0, -1], [0, -2], [0, -3], [1, -4], [2, -4], [3, -3], [1, -3], [1, -2], [3, -2], [3, -1], [-1, -3], [-1, -2]],
+};
+// Every head of this species standing whole: its rooted crown with all of its shape open, or
+// all but one (the pollen wedge `a_bud_opens_into_a_petal_crown` allows).
+function wholeHeads(g, variant) {
+  const shape = RESHAPED_HEADS[variant], out = [];
+  const ours = (x, y) => g.kindAt(x, y) === M.Flower && g.cells[(y * g.w + x) * STRIDE + 1] === variant;
+  for (const crown of g.all(M.Flower)) {
+    const [cx, cy] = g.xyOf(crown);
+    if (g.cells[crown * STRIDE + 1] !== variant || !g.hasFlag(crown, F.Rooted)) continue;
+    const open = shape.filter(([dx, dy]) => ours(cx + dx, cy + dy));
+    if (open.length >= shape.length - 1) out.push(crown, ...open.map(([dx, dy]) => (cy + dy) * g.w + cx + dx));
+  }
+  return out;
+}
+
 // The flame stem.burns sweeps over its garden. Its witness skips stalks under these strokes,
 // because a stalk the brush painted over did not catch.
 const STEM_FLAMES = Array.from({ length: 9 }, (_, k) => [14 + 4 * k, 14]);
@@ -742,6 +768,18 @@ export const CHECKS = [
   { m: "Flower", covers: "flower.opens", role: "opens into a multi-cell head", w: 40, h: 34, seed: 23, ticks: 4000,
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
     outcome: (g) => (g.count(M.Flower) >= 4 ? g.all(M.Flower) : []) },
+  // The tulip cup and the nodding bluebell (the owner's pick from the design canvas,
+  // 2026-10-22), grown from painted soil, seeds and one watering on a bed as wide as the play
+  // board. A plant's species is its seed's variant, so which ones come up is dice; thirty
+  // plants make a meadow with no tulip or no bluebell rare. The witness is a WHOLE new head,
+  // and neither old head (a seven-wide notched crown, bells on an upright stalk) fits it: 0 of 8
+  // seeds on the old engine, and unreachable on every seed with the watering left out. Over 32
+  // seeds the tulip passes 30 and the bluebell 29, and every miss is a meadow where no plant of
+  // that species came up; wherever one did, it grew whole.
+  { m: "Flower", covers: "flower.opens", role: "opens a tulip into a cup", w: 220, h: 48, seed: 25, ticks: 1500,
+    paint: wideMeadow, outcome: (g) => wholeHeads(g, 4) },
+  { m: "Flower", covers: "flower.opens", role: "nods a bluebell's bells off a bent scape", w: 220, h: 48, seed: 26, ticks: 1500,
+    paint: wideMeadow, outcome: (g) => wholeHeads(g, 6) },
   { m: "Pollen", covers: "pollen.drifts", role: "is released by a mature flower", w: 40, h: 34, seed: 24, ticks: 5000,
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
     outcome: (g, before) => g.appeared(M.Pollen, before) },

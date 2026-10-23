@@ -1014,6 +1014,88 @@ function assertFloor(label, floor, worst, detail) {
   }
 }
 
+// 13. A HEAD'S OUTLINE. Open air touching a petal is drawn in a deep shade of the plant's own
+//     colour (the owner's pick from the design canvas, 2026-10-22), so a head reads as a drawn
+//     shape with an edge: a petal is one cell, so the tones a reference sheet ramps through
+//     inside each petal cannot exist here, and the edge is the part of that depth that can.
+//     It is drawn on EMPTY cells, which no flower check above looks at, so it gets its own
+//     three questions, each swept over species, placement, petal energy, state and time:
+//       - does the ring show against the night it is drawn on? Charred is left out on
+//         purpose: a burnt head has no lit edge, and its ring goes into the dark;
+//       - does it stay an EDGE, darker than the head it outlines, rather than reading as one
+//         more petal that changes the head's shape? Against the head's mean, not the petal it
+//         touches: a poppy's blotch and a sunflower's disc reach the rim, and a ring is the
+//         plant's colour deepened, not darker than its darkest mark (measured, -25 per petal).
+//       - is it absent round a bud and a seed head? Each is one cell on a stalk, and they read
+//         apart from each other only at that cell (check 3), so a ring must not dress either.
+{
+  const POSITIONS = [[13, 6], [9, 6], [16, 7], [11, 7]];
+  const head = (variant, flags, [cx, cy], energy, petals, crown) => board((put) => {
+    for (let x = 0; x < W; x++) put(x, 12, MATERIAL.Wall, 0, 40, 0, x);
+    put(cx, 11, MATERIAL.Soil, 120, 40, CELL_FLAG.Wet);
+    for (let y = cy + 1; y <= 10; y++) put(cx, y, MATERIAL.Stem, 20, 50, y === 10 ? CELL_FLAG.Rooted : 0, variant);
+    put(cx, cy, MATERIAL.Flower, crown[0], crown[1], CELL_FLAG.Rooted | flags, variant);
+    if (petals) for (const [dx, dy] of ENGINE_BLOOM_SHAPES[variant]) put(cx + dx, cy + dy, MATERIAL.Flower, energy, 180, flags, variant);
+  });
+  const kindAt = (cells, x, y) => (x < 0 || y < 0 || x >= W || y >= H ? -1 : cells[(y * W + x) * STRIDE]);
+  const rooted = (cells, x, y) => (cells[(y * W + x) * STRIDE + 6] & CELL_FLAG.Rooted) !== 0;
+  const CARDINAL = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+  // Each empty cell beside a flower cell, with the flower cell it touches.
+  const besideFlowers = (cells, petalsOnly) => {
+    const out = [];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (kindAt(cells, x, y) !== MATERIAL.Empty) continue;
+      const by = CARDINAL.map(([dx, dy]) => [x + dx, y + dy])
+        .find(([nx, ny]) => kindAt(cells, nx, ny) === MATERIAL.Flower && !(petalsOnly && rooted(cells, nx, ny)));
+      if (by) out.push([x, y, by]);
+    }
+    return out;
+  };
+  const luma = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  // Every mix of the four flags a head can carry at once, except charred without frost (its
+  // ring goes dark on purpose). Review found single flags were not enough: frost on a charred
+  // petal drew pale while its ring stayed black, 20 from the night.
+  const STATES = [];
+  for (let m = 0; m < 16; m++) {
+    const flags = [CELL_FLAG.Wet, CELL_FLAG.Frozen, CELL_FLAG.Cosmic, CELL_FLAG.Scorched].filter((_, i) => m & (1 << i));
+    if (m & 8 && !(m & 2)) continue;
+    STATES.push([["wet", "frozen", "moonlit", "charred"].filter((_, i) => m & (1 << i)).join("+") || "plain", flags.reduce((a, f) => a | f, 0)]);
+  }
+  let night = Infinity, nightAt = null, edge = Infinity, edgeAt = null;
+  for (let v = 0; v < 8; v++) for (const [state, flags] of STATES) for (const p of POSITIONS) for (const e of [90, 60, 40]) {
+    const cells = head(v, flags, p, e, true, [95, 200]);
+    for (const t of TIMES) {
+      const petals = ENGINE_BLOOM_SHAPES[v].map(([dx, dy]) => luma(colourAt(cells, p[0] + dx, p[1] + dy, t)));
+      const headLuma = petals.reduce((a, b) => a + b, 0) / petals.length;
+      for (const [x, y] of besideFlowers(cells, true)) {
+        const ring = colourAt(cells, x, y, t);
+        const d = redmean(ring, NIGHT);
+        if (d < night) { night = d; nightAt = `species ${v}, ${state}, crown at ${p}, petal energy ${e}, cell (${x},${y})`; }
+        const step = Math.round(headLuma - luma(ring));
+        if (step < edge) { edge = step; edgeAt = `species ${v}, ${state}, crown at ${p}, petal energy ${e}, ring (${x},${y})`; }
+      }
+    }
+  }
+  assertFloor("a head's outline against the night it is drawn on", 110, night,
+    `worst at ${nightAt}. An outline the night swallows draws no edge at all.`);
+  assertFloor("a head's outline is darker than the head it edges (luminance)", 40, edge,
+    `worst at ${edgeAt}. A ring as bright as its petal reads as one more petal, and the head changes shape.`);
+  let bare = 0, bareAt = null;
+  for (let v = 0; v < 8; v++) for (const p of POSITIONS) for (const [stage, crown] of [["bud", [90, 20]], ["seed head", [0, 1400]]]) {
+    const cells = head(v, 0, p, 0, false, crown);
+    for (const t of TIMES) for (const [x, y] of besideFlowers(cells, false)) {
+      const d = redmean(colourAt(cells, x, y, t), NIGHT);
+      if (d > bare) { bare = d; bareAt = `species ${v}, ${stage}, crown at ${p}, cell (${x},${y})`; }
+    }
+  }
+  if (bare > 0) {
+    failures.push(`the air round a bud or a seed head is drawn ${bare} off the night, at ${bareAt}. ` +
+      `Only petals are outlined: a ring would dress the two ends of a plant's life alike.`);
+  } else {
+    checks.push({ label: "no outline round a bud or a seed head (cells off the night: none)", floor: 0, worst: 0, detail: "" });
+  }
+}
+
 if (!quiet) {
   console.log("\nRendered state pairs, worst case over a full energy/age/species/time sweep:");
   for (const c of checks) {

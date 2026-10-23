@@ -136,15 +136,20 @@ const BLOOM_SHAPES: [&[(i32, i32)]; 8] = [
     // at (0, 1), where the stalk stands, so in play the disc was only ever four tall. A leaf at
     // the stalk's tip takes one of the two on about half of plants.
     &[(0, -3), (-2, -2), (-1, -2), (0, -2), (1, -2), (2, -2), (-3, -1), (-2, -1), (-1, -1), (0, -1), (1, -1), (2, -1), (3, -1), (-3, 0), (-2, 0), (-1, 0), (1, 0), (2, 0), (3, 0), (-1, 1), (1, 1)],
-    // 4 Tulip: a CUP: a pronged rim over a full shoulder, tapering to a narrow base. The taper
-    // is what separates it from the cornflower's rounded body -- see the note there.
-    &[(-3, -2), (-1, -2), (1, -2), (3, -2), (-3, -1), (-2, -1), (-1, -1), (0, -1), (1, -1), (2, -1), (3, -1), (-2, 0), (-1, 0), (1, 0), (2, 0)],
+    // 4 Tulip: a CUP five wide and four tall: three lips at the rim, a full shoulder and body,
+    // tapering to two petals beside the crown. Seven wide with a notched rim it read as a crown
+    // rather than a cup; this is the owner's pick from the design canvas (2026-10-22). The
+    // taper still separates it from the cornflower's rounded body -- see the note there.
+    &[(0, -1), (-1, -1), (1, -1), (-1, 0), (1, 0), (-2, -1), (2, -1), (0, -2), (-1, -2), (1, -2), (-2, -2), (2, -2), (0, -3), (-2, -3), (2, -3)],
     // 5 Lavender: UNCHANGED at three wide. A tall narrow spike is this plant's whole identity and
     // widening it would buy size at the cost of the one silhouette nothing else in the row has.
     &[(0, -1), (-1, -2), (1, -2), (0, -3), (-1, -4), (1, -4), (0, -5)],
-    // 6 Bluebell: paired bells nodding off a bare central stalk, with one more pair. Also deliberately
-    // narrow: sparseness is the point, and a filled bluebell is just a small cornflower.
-    &[(0, -1), (0, -2), (-1, -1), (1, -2), (-2, 0), (2, -1), (-3, 1), (3, 0)],
+    // 6 Bluebell: a scape that climbs from the crown and bends over to one side, with bells
+    // hanging under the bend and off the scape. The first six cells are the scape, which opens
+    // first and is drawn green; the rest are bells. Bells on a bare upright stalk read as
+    // damage, and this is the owner's pick from the design canvas (2026-10-22). Still sparse:
+    // a filled bluebell is just a small cornflower.
+    &[(0, -1), (0, -2), (0, -3), (1, -4), (2, -4), (3, -3), (1, -3), (1, -2), (3, -2), (3, -1), (-1, -3), (-1, -2)],
     // 7 Cosmos: broad rounded petals around an open centre. Seven wide with the ring closed, because
     // leaving the centre gapped split it the same way the cornflower split.
     &[(-2, -1), (-1, -1), (1, -1), (2, -1), (-3, 0), (-2, 0), (-1, 0), (1, 0), (2, 0), (3, 0), (-2, 1), (-1, 1), (1, 1), (2, 1)],
@@ -4635,6 +4640,68 @@ mod tests {
             peak_of(5),
             "different variants should grow visibly different blooms"
         );
+    }
+
+    #[test]
+    fn the_tulip_opens_a_cup_and_the_bluebell_nods() {
+        // The two reshapes chosen on the design canvas (2026-10-22), grown from a rooted crown
+        // on its stalk and read at the head's fullest. Asserted as the shapes they are, not as
+        // offsets: a tulip is a CUP, wider at the body than at the base, lipped at the rim and
+        // with nothing below its crown; a bluebell LEANS, its top off the stalk's line and its
+        // bells hanging free. Either one drawn as a symmetric crown again fails here.
+        let fullest = |variant: u8| -> Vec<(i32, i32)> {
+            let mut u = Universe::new(20, 20, 3);
+            set_cell_state(&mut u, 10, 10, Material::Flower, 20, BLOOM_ENERGY, FLAG_ROOTED);
+            set_cell(&mut u, 10, 11, Material::Wall);
+            let idx = u.idx(10, 10);
+            u.cells[idx].variant = variant;
+            let mut best = Vec::new();
+            for _ in 0..2000 {
+                u.tick();
+                let head: Vec<(i32, i32)> = (0..20)
+                    .flat_map(|y| (0..20).map(move |x| (x, y)))
+                    .filter(|&(x, y)| (x, y) != (10, 10) && u.cells[u.idx(x as u32, y as u32)].kind == Material::Flower as u8)
+                    .map(|(x, y)| (x - 10, y - 10))
+                    .collect();
+                if head.len() > best.len() {
+                    best = head;
+                }
+            }
+            best
+        };
+        let row = |head: &[(i32, i32)], dy: i32| head.iter().filter(|c| c.1 == dy).count();
+
+        let tulip = fullest(4);
+        assert!(tulip.len() >= 14, "the tulip opened only {} of its 15 petals", tulip.len());
+        assert!(tulip.iter().all(|c| c.1 <= 0), "a tulip opened a petal below its crown: {tulip:?}");
+        assert!(row(&tulip, -1) > row(&tulip, 0), "a cup is wider at its body than at its base: {tulip:?}");
+        let top = tulip.iter().map(|c| c.1).min().unwrap();
+        let wide = tulip.iter().map(|c| c.0).max().unwrap() - tulip.iter().map(|c| c.0).min().unwrap() + 1;
+        // The crown these replaced was seven wide and three deep, a bowl read from above.
+        assert!(wide <= 1 - top + 1, "a cup is about as deep as it is wide: {wide} wide, {} deep", 1 - top);
+        let lips: Vec<i32> = tulip.iter().filter(|c| c.1 == top).map(|c| c.0).collect();
+        assert!(
+            lips.iter().all(|x| !lips.contains(&(x + 1))),
+            "a cup's rim is separate lips, not a solid bar: {lips:?}"
+        );
+
+        let bluebell = fullest(6);
+        assert!(bluebell.len() >= 11, "the bluebell opened only {} of its 12 cells", bluebell.len());
+        let (left, right) = (
+            -bluebell.iter().map(|c| c.0).min().unwrap(),
+            bluebell.iter().map(|c| c.0).max().unwrap(),
+        );
+        assert!(right > left, "a bluebell leans to one side of its stalk: reaches {left} left and {right} right");
+        let top = bluebell.iter().map(|c| c.1).min().unwrap();
+        assert!(
+            bluebell.iter().filter(|c| c.1 == top).all(|c| c.0 != 0),
+            "the scape bends over, so its highest point is off the stalk's line: {bluebell:?}"
+        );
+        let hanging = bluebell
+            .iter()
+            .filter(|&&(x, y)| x != 0 && y < -1 && !bluebell.contains(&(x, y + 1)))
+            .count();
+        assert!(hanging >= 2, "bells hang free off the scape, mouths open below: {bluebell:?}");
     }
 
     #[test]

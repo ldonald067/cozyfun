@@ -49,6 +49,12 @@ const DARK_GROUND_KINDS = new Set<number>([MATERIAL.Soil, MATERIAL.Ember]);
 // small flower of some eighth colour.
 const SEED_HEAD_STRAW: Rgb = [156, 136, 98];
 const SEED_HEAD_HUSK: Rgb = [82, 68, 46];
+// The bluebell's scape, crown included: the green the bells hang from, carrying on from the
+// stalk under it rather than reading as a ninth flower colour.
+const BLUEBELL_SCAPE: Rgb = [70, 124, 84];
+// A head's outline is a deep shade of the plant's own colour, pushed toward this violet the
+// way a pixel-art shadow shifts hue rather than going grey.
+const HEAD_RING_SHADE: Rgb = [44, 12, 64];
 
 // Mirrored from `sim/src/lib.rs` (and `app/src/engine.ts`), where they decide when a crown
 // stops pollinating, when its petals let go, and — in `slow_step` — when it sows. The
@@ -109,16 +115,43 @@ export function emptyCellColor(cells: Uint8Array, width: number, height: number,
     [0, 1],
     [-1, 0]
   ];
+  // The petal this cell outlines, if any. Read in the same pass as stardust so the ring costs
+  // one more comparison per neighbour rather than a second walk round every empty cell
+  // (measured: 0.15 ms a frame on the full board against 0.42 ms for a loop of its own).
+  let petal = -1;
   for (let i = 0; i < directions.length; i++) {
     const [dx, dy] = directions[i];
-    if (kindAt(cells, width, height, x + dx, y + dy) !== MATERIAL.Stardust) continue;
+    const near = kindAt(cells, width, height, x + dx, y + dy);
+    if (near === MATERIAL.Flower && petal < 0) {
+      const base = ((y + dy) * width + x + dx) * CELL_STRIDE;
+      if (!(readU16(cells, base + 6) & CELL_FLAG.Rooted)) petal = base;
+    }
+    if (near !== MATERIAL.Stardust) continue;
     const hash = hashCell(x, y, i);
     if ((hash & 3) === 0) {
       const twinkle = (Math.sin(time * 0.018 + hash * 0.0001) + 1) * 0.5;
       return mixRgb(background, [255, 214, 138], 0.24 + twinkle * 0.16);
     }
   }
+  if (petal >= 0) return headRing(cells[petal + 1], readU16(cells, petal + 6), background);
   return background;
+}
+
+// A head's outline (the owner's pick from the design canvas, 2026-10-22): open air touching a
+// petal is drawn in a deep shade of the plant's own colour, so a head reads as a drawn shape
+// with an edge, the way the reference sheets outline theirs. A petal is one cell, so a ramp
+// of tones inside it cannot exist at this size; the edge is the part of that depth that does.
+// Only petals are ringed, never a rooted crown, so a bud and a seed head stay single cells on
+// a stalk. The ring follows the weather on the petal it touches: frosted, silvered under
+// moonlight, and gone into the night when charred, since a burnt head has no lit edge. The
+// states stack in `flowerColor`'s order, so frost on a charred petal frosts its ring too
+// (review: the ring stayed black, 20 from the night, round a petal drawn as pale frost).
+function headRing(variant: number, flags: number, background: Rgb): Rgb {
+  let ring = mixRgb(SPECIES[variant & 7].dark, HEAD_RING_SHADE, 0.42);
+  if (flags & CELL_FLAG.Cosmic) ring = mixRgb(ring, STARLIGHT, 0.4);
+  if (flags & CELL_FLAG.Scorched) ring = mixRgb(CHAR, BLACK, 0.3);
+  if (flags & CELL_FLAG.Frozen) ring = mixRgb(FROST, ring, 0.55);
+  return mixRgb(ring, background, 0.3);
 }
 
 export function applyShapeLanguage(context: ShapeContext): Rgb {
@@ -886,9 +919,9 @@ export const FLOWER_REACH: readonly (readonly [number, number, number, number])[
   [-3, 3, -1, 1], // 1 poppy
   [-3, 3, -2, 1], // 2 daisy
   [-3, 3, -3, 1], // 3 sunflower
-  [-3, 3, -2, 0], // 4 tulip
+  [-2, 2, -3, 0], // 4 tulip
   [-1, 1, -5, -1], // 5 lavender
-  [-3, 3, -2, 1], // 6 bluebell
+  [-1, 3, -4, -1], // 6 bluebell
   [-3, 3, -1, 1]  // 7 cosmos
 ];
 
@@ -975,17 +1008,19 @@ function petalColour(
       else if (ring >= 3) out = under ? [220, 150, 40] : [252, 214, 96];
       else out = shaded();
       break;
-    case 4: // tulip: a cup, deep at the base and lit at the lips, one pale streak down it
-      out = dy <= -2 ? mixRgb(light, WHITE, 0.18) : dy === -1 ? light : dark;
-      if (dx === -1 && dy >= -1) out = mixRgb(out, WHITE, 0.28);
-      if (dx >= 2 && dy >= -1) out = mixRgb(out, dark, 0.3);
+    case 4: // tulip: a cup lit at its three lips and deepening to the base, a pale streak down
+      // the near petal and the far side in shade (the canvas's reshape, 2026-10-22)
+      out = dy <= -3 ? [252, 184, 208] : dy === -2 ? light : dy === -1 ? [222, 98, 146] : [190, 62, 110];
+      if (dx === -1 && (dy === -2 || dy === -1)) out = mixRgb(out, WHITE, 0.3);
+      if (dx === 2 && dy >= -2) out = mixRgb(out, [150, 44, 90], 0.4);
       break;
     case 5: // lavender: buds alternating down the spike, palest at its top
       out = dy <= -5 ? [226, 200, 250] : dy & 1 ? [206, 160, 246] : [128, 74, 186];
       break;
-    case 6: // bluebell: a dark arching scape, each bell's mouth lit where it hangs open
-      out = !isFlower(0, 1) ? [118, 128, 232] : [54, 60, 160];
-      if (dx >= 0 && dx <= 1 && (dy === -2 || (dx === 0 && dy === -1))) out = [66, 98, 120];
+    case 6: // bluebell: a green scape climbing and arching over, bells hanging deep blue from
+      // it, each lit at the mouth where it hangs open
+      if ((dx === 0 && dy < 0) || dy === -4 || (dx === 3 && dy === -3)) out = BLUEBELL_SCAPE;
+      else out = !isFlower(0, 1) ? [150, 162, 246] : [64, 70, 178];
       break;
     default: // cosmos: deep magenta round a darker heart, its notched tips a shade paler
       out = mixRgb(light, dark, 0.4 + 0.2 * alternate);
@@ -1006,7 +1041,7 @@ function eyeColour(variant: number, species: Species, x: number, y: number, hash
     case 3: return mixRgb([132, 108, 40], [104, 84, 30], fleck);   // the disc's fresh olive middle
     case 4: return [96, 120, 70];
     case 5: return [104, 120, 92];
-    case 6: return [66, 98, 120];
+    case 6: return BLUEBELL_SCAPE;
   }
   let out = mixRgb(species.eye ?? species.dark, species.dark, fleck);
   if ((hash & 7) === 0) out = mixRgb(out, [255, 246, 196], 0.35);

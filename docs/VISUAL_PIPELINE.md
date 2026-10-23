@@ -234,6 +234,32 @@ Shape language is intentionally procedural:
   — because a whole-head mean cannot see points (it read 14 before and 15 after). All of
   these are gated in `renderer:probe`, swept the same way.
 
+  **A head is outlined in a deep shade of its own colour** (the owner's pick from four
+  candidates on the design canvas, 2026-10-22). The reference sheets the owner brought get
+  their depth from heads 12-16 pixels across, where each petal ramps through three or four
+  tones and a dark outline in the flower's own hue makes up a quarter to a half of the head.
+  Ours are seven cells across, about 23 px on a laptop and 12 on a phone, and a petal is ONE
+  cell, so a ramp inside a petal cannot exist. Measured on the 15 heads of a meadow grown from
+  painted soil, seeds and one watering, a head's darkest-to-lightest luminance spread was **85**
+  against about 210 on the sheet. The outline is the part of that depth that survives at our
+  size: open air touching a petal is drawn in the plant's dark colour pushed toward a deep
+  violet (a hue-shifted shadow, not grey) and a third of the way to the night, which takes the
+  spread to **133** and draws a head nine cells wide instead of seven. It lives in
+  `emptyCellColor`, read in the same neighbour pass as stardust's twinkle: 0.15 ms a frame on the
+  full board, against 0.42 ms for a loop of its own. Only petals are ringed, never a rooted
+  crown, so a bud and a seed head stay one cell on a stalk, and the ring follows the petal's
+  weather (frosted, silvered by moonlight, gone into the dark when charred). Every petal colour,
+  and so every flower gate above, is untouched. `renderer:probe` gate 13 holds the ring at least
+  110 from the night (120 swept), 40 darker than its head's mean petal (46), and absent round a
+  bud and a seed head. The comparison is with the head's mean, not the petal it touches: a
+  poppy's blotch and a sunflower's disc reach the rim and are darker than the ring, as a mark
+  should be. Three other candidates were drawn and not picked: lighting each head from above
+  (spread 118, hard to see at play size, and the daisy's white undersides go grey), a deep rim
+  INSIDE the head round a lighter body, the sheet's own layering (75: against the night the rim
+  reads as missing petals), and petals split three by three inside the cell (127 and fourteen
+  tones up close, but a third of a cell is half a pixel on a phone, and lavender and bluebell
+  turn to dots). The outline alone shipped.
+
   **One thing the renderer cannot do here.** A petal that wilts off becomes a Pollen cell
   identical to a puff of pollen — same variant, energy and age — so drawing fallen petals in
   their flower's colour would tint every pollen mote too. It needs the sim to mark a shed
@@ -300,9 +326,11 @@ Current life/water rules:
 
   **Then the fix for that created a worse one, and only a measurement found it.** Filling the cornflower's centre gave it a regular notched rim over a full row — the tulip's exact rhythm — and made **the tulip a STRICT SUBSET of the cornflower**, identical but for one dropped row. Silhouette overlap between the two hit **0.85**, worse than any pair before the widening, and a greyscale render showed it plainly while a glance at the offsets did not: the eye called it "similar" and moved on. Measured as intersection-over-union across all 28 pairs, the worst case went 0.78 → 0.85. The cornflower is a ragged ROSETTE now (paired crest petals, full body, two outers dropped below) and the tulip a CUP (pronged rim, full shoulder, tapered base), which puts that pair at **0.64** and the worst pair back to 0.78 — the level before the heads grew. Shape crowding is not something `renderer:probe` can see: it gates colour pairs, and two species can be 79 redmean apart while sharing a silhouette.
 
+  **The tulip and bluebell were reshaped on 2026-10-22**, from the design canvas, because colour could not rescue either: a seven-wide tulip with a notched rim read as a crown rather than a cup, and bells on a bare upright stalk read as damage. The tulip is now a CUP five wide and four tall: three lips at the rim, a full shoulder and body, two petals beside the crown, lit at the lips, deepening to the base, a pale streak down the near petal and the far side shaded. The bluebell is a green scape that climbs from the crown and arches over to one side, with deep blue bells hanging under the arch and off the scape, each lit at its mouth; its crown is the scape's green too. Fifteen and twelve cells, both inside the petal budget below. Silhouette overlap measured across all 28 pairs: the worst stays **0.75** (cornflower against sunflower), the tulip's nearest goes 0.64 → **0.58** (now the sunflower; the cornflower is 0.50), and the bluebell's is **0.40**, the lavender. `the_tulip_opens_a_cup_and_the_bluebell_nods` asserts the shapes as shapes (a cup about as deep as it is wide, lipped and with nothing below the crown; a bluebell leaning off its stalk with bells hanging free) and fails on the old ones; a parity scenario grows both whole in both engines; and two `flower.opens` checks witness each whole head in a meadow grown from painted materials (both fail on every seed against the old engine).
+
   **A head cannot be bigger than a bloom can afford.** Petals cost `PETAL_COST` each and stop opening at `CROWN_RESERVE`, so with `BLOOM_ENERGY` at 200 a head can open roughly nineteen or twenty petals before its budget runs out. The first seven-wide sunflower asked for 24 and opened only 20: the shape table would have been promising a silhouette the sim can never draw. It was trimmed to 20 rather than raising the energy, because `BLOOM_ENERGY` also sets how long a bloom lives and how much pollen it puffs. `a_bud_opens_into_a_petal_crown` now measures the PEAK over a bloom's life against each shape's full size, tolerating exactly one petal for the documented pollen wedge, and its failure message names the budget so the next person widening a head knows what the ceiling is.
 
-  **Lavender and bluebell stay narrow on purpose.** A tall spike and nodding bells are those two plants' whole identity, and widening them would buy size at the cost of the only silhouettes in the row nothing else shares.
+  **Lavender and bluebell stay sparse on purpose.** A tall spike and nodding bells are those two plants' whole identity, and filling them in would buy size at the cost of the only silhouettes in the row nothing else shares.
 
   **BLOOM_SHAPES exists in three places** — `sim/src/lib.rs`, `app/src/engine.ts`, and `scripts/material-showcase.mjs` — and parity only compares the first two. The showcase copy carried a comment asking for it to be kept in step, which is not a check: it went stale the moment the shapes changed and quietly exhibited heads the sim could no longer grow. `npm run renderer:probe` now parses all three and fails when they disagree.
 - A petal may open through the head's own drifting pollen. A mote that lands on top of a bloom is wedged — the bloom is underneath it, so it cannot fall — and it otherwise holds the last petal site until it ages out, leaving large heads permanently one petal short at the crest.
