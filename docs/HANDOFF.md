@@ -1,6 +1,6 @@
 # Handoff — where the work is, and what to do next
 
-*Rewritten at each handoff, never appended to. Written 2026-10-22, late evening: the flowers batch is on branch `flowers-depth`, unpushed (item 1). Railway caught up
+*Rewritten at each handoff, never appended to. Written 2026-10-23, just after midnight: the flowers batch is live (`c964f8e`), with `deploy:verify` and `qa:live` green. Railway caught up
 by itself once builds resumed after the 2026-10-21 outage: lava pooling (`24d5075`), the oil
 batch (`f6c57e2`) and the petrol film (`9e92777`) went out together, with `deploy:verify` and
 `qa:live` green on `53c86a7`. Water no longer deleting lava was pushed on top the same evening
@@ -28,7 +28,7 @@ private to the owner) holds the eight flower species, the tulip and bluebell res
 stages, weather states, a ranked shortlist of eight upgrades, and the interaction roster marked
 shows / thin / reads weak / half hidden. Shortlist items 1, 2 and 7 shipped (`a20f77d`), and 3
 shipped as the heat batch; 4 (lava thawing across a gap) was built, measured and dropped (below).
-8 is built on branch `flowers-depth` ("Where things stand"); 5 and 6 are open. The shortlist
+8 shipped on 2026-10-22 with the flower outline ("Where things stand"); 5 and 6 are open. The shortlist
 board shows each item's status since 2026-10-22, and the "Flowers with more depth" board holds
 the four outline/depth candidates the owner picked from. Publish edits
 to the same URL; read the artifact first (`Artifact` read of the url, then the file by `path`),
@@ -109,13 +109,12 @@ anything ships.
    The CLI was logged out on 2026-10-22 (`railway whoami`: Unauthorized); the owner runs
    `railway login`. Never `railway up` (no build commit, so `deploy:verify` fails), nor the
    Railway MCP's `redeploy` (re-runs the old build) or `create-deployment` (a new service).
-1. **Ship branch `flowers-depth` on the owner's word** ("Where things stand"). The owner asked
-   for a filmstrip before anything ships: `.tmp/flowers-depth/flowers-batch-sheet.png` (live
-   above the branch). On a yes: fast-forward `main`, push, `gh run list`, then
-   `npm run deploy:verify` and `COZY_QA_URL=https://pixelfun.littlealbumclub.net npm run qa:live`.
-   Leaves (two greens with a lit edge, cooler stems, from the reference `3.png`) were not part
-   of the pick and are untouched; the reference images in `.tmp/flowers-ref/` are stock art to
-   look at, never to ship or commit.
+1. **Flowers, if the owner wants more** (nothing asked yet). The outline and the two reshapes
+   are live ("Where things stand"). Left from the reference `3.png`: leaves in two greens with a
+   lit edge on cooler stems, untouched. The bluebell is the darkest head at play size (deep bells
+   and a deep ring); the owner saw it in the filmstrip
+   (`.tmp/flowers-depth/flowers-batch-sheet.png`) and shipped it. The reference images in
+   `.tmp/flowers-ref/` are stock art to look at, never to ship or commit.
 2. **Lava leans left, for the reason oil leaned right** (found 2026-10-21, not changed). Lava
    moves on even ticks only (`update_liquid` at sluggishness 2), always the left-to-right pass:
    a mid-floor pour ends 15-25 cells left of where it was poured, on every seed. Giving it one
@@ -125,8 +124,7 @@ anything ships.
    The owner decides; measure with `.tmp/oil/lava.mjs lcad` and `bias.mjs .tmp/oil/root-lcad`.
 3. **The rest of the canvas shortlist, when the owner picks:** steam billowing instead of a
    dotted thread (5, a sim lever; `VISUAL_PIPELINE.md` records why a renderer fix was tried and
-   reverted) and a burning log that stays alive past 5-7 seconds (6). Item 8 is on branch
-   `flowers-depth`. The roster board has one upgrade per material.
+   reverted) and a burning log that stays alive past 5-7 seconds (6). Item 8 shipped. The roster board has one upgrade per material.
 4. **Fallen petals in their flower's colour** needs a sim change: a shed petal becomes a Pollen
    cell identical to a pollen puff, so the renderer cannot tell them apart.
 5. **If Chrome's launch flakes on CI again, read its stderr first.** `launchBrowserOnce` waits
@@ -156,8 +154,9 @@ anything ships.
 
 ## Where things stand
 
-On branch `flowers-depth`, committed, NOT pushed, waiting on the owner's yes to the filmstrip
-(2026-10-22, late evening). Full gate green, review run (Codex: skeptic, parity, perceptual):
+Live since 2026-10-23 (`c964f8e`, fast-forwarded from branch `flowers-depth` on the owner's word
+"ship it" after the filmstrip; CI, `deploy:verify` and `qa:live` green). Full gate green, review
+run (Codex: skeptic, parity, perceptual):
 
 - **Every flower head is outlined in a deep shade of its own colour** (renderer only; the owner's
   pick, candidate C of four on the canvas's "Flowers with more depth" board). Measured first:
