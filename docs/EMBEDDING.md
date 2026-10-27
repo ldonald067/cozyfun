@@ -265,6 +265,29 @@ type, or if the app fell back to the JS engine. Then, by hand, for the things it
    reload silently discarded unsaved scenes and this check could never have passed.
 4. Turn on sound and confirm ambience plays.
 
+### When a push does not deploy
+
+**Check CI before `deploy:verify`.** Run `gh run list` after any push. The service waits for
+CI (`checkSuites: true`), and a red run makes Railway skip that commit for good: a rerun that
+goes green does not bring it back, so a good commit that failed on a flake needs a rerun to
+confirm the flake and then a new push. If the flake is Chrome failing to launch, read its
+stderr first: `launchBrowserOnce` in `scripts/browser-qa-helpers.mjs` waits 30 s and appends
+Chrome's stderr to the error.
+
+**If a push makes no deployment at all**, check https://status.railway.com first: during
+Railway's outage on 2026-10-21 builds stopped, and the service caught up on its own once they
+resumed. If the commit still
+has no deployment, deploy it from the service's GitHub source:
+
+```sh
+railway api 'mutation($s: String!, $e: String!, $c: String) { serviceInstanceDeployV2(serviceId: $s, environmentId: $e, commitSha: $c) }' --var s=b0acc433-99f7-4db1-9ec0-8fc94d813955 --var e=374411d2-6a14-448d-9e1f-1ccea6180158 --var c="\"$(git rev-parse HEAD)\""
+```
+
+This needs the CLI signed in (`railway whoami`); if it says Unauthorized, the owner runs
+`railway login`. Do not use `railway up` instead: it uploads the working tree with no build
+commit, so `deploy:verify` fails. Nor the Railway MCP's `redeploy`, which re-runs the old
+build, or its `create-deployment`, which makes a new service.
+
 ## A tab left open does not know the game moved on
 
 **This is not a caching problem, and no server header can fix it.** The origin already sends

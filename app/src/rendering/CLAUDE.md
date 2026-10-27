@@ -40,4 +40,6 @@ the sim keeps running on it. Three consequences, each learned from a ruined capt
 - Loose material above an exhibit lands on it. Keep exhibits out of any column that a powder
   pile falls down.
 
-Deeper detail — layers, shape language per material, the glow contract: @../../../docs/VISUAL_PIPELINE.md
+Deeper detail — layers, shape language per material, the glow contract: `docs/VISUAL_PIPELINE.md`.
+It is about 87 KB, so `grep -n` for the section you need and read only that range. A plain path
+on purpose: an `@` link here loaded the whole file into every chat that opened a renderer file.
