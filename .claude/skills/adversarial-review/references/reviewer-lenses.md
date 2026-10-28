@@ -71,7 +71,7 @@ Challenge what the change breaks that nobody looked at.
 A new physics rule applies everywhere, not only where the author was thinking.
 
 - Enumerate the existing scenes, fixtures, and tests the new rule now also acts on: cargo
-  tests in `sim/src/lib.rs`, `scripts/smoke-*.mjs`, `scripts/material-showcase.mjs`, the
+  tests in `sim/src/tests.rs`, `scripts/smoke-*.mjs`, `scripts/material-showcase.mjs`, the
   room scenes. Which of them silently changes behavior?
 - Fixtures are usually written assuming the *old* physics. A scene built as scenery — a
   floor, a frame, a display stand — may now move, fall, ignite, or decay.

@@ -23,10 +23,6 @@ export function getAudioProviderDef(provider: AudioProvider) {
   return AUDIO_PROVIDERS.find((candidate) => candidate.id === provider) ?? AUDIO_PROVIDERS[0];
 }
 
-export function isAudioProvider(value: unknown): value is AudioProvider {
-  return typeof value === "string" && AUDIO_PROVIDERS.some((candidate) => candidate.id === value);
-}
-
 export function isAvailableAudioProvider(value: unknown): value is AudioProvider {
   return typeof value === "string" && AUDIO_PROVIDERS.some((candidate) => candidate.id === value && candidate.available);
 }

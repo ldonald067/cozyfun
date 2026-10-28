@@ -68,8 +68,9 @@ mirrored in `app/src/engine.ts` and behave byte-for-byte identically — see the
 1. Write it here, guarding on `old` state so it cannot depend on iteration order by accident.
 2. Mirror it in `app/src/engine.ts`, matching **`chance()` call order exactly** — a roll on
    one side but not the other desynchronises both engines permanently.
-3. Add a `#[test]`, and pair any "X happens" test with an "X does not happen when it
-   shouldn't" one. A single-sided test cannot tell a working rule from one that always fires.
+3. Add a `#[test]` in `sim/src/tests.rs`, and pair any "X happens" test with an "X does not
+   happen when it shouldn't" one. A single-sided test cannot tell a working rule from one
+   that always fires.
 4. Add a parity scenario, and a check in `scripts/interaction-audit.mjs` if a player is meant
    to see the outcome.
 
