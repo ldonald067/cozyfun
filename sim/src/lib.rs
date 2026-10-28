@@ -198,6 +198,15 @@ const HEAT_SHARE: i32 = 8;
 /// barely moves: three pot sizes held under a flame for 40 s keep 18, 39 and 80 cells against
 /// 17, 41 and 75 before, and now simmer, 9-11 cells over 120 at 10 s where there were none.
 const WATER_CHILL: u32 = 16;
+/// A burnt log smoulders in glowing cracks. Ember drains as fast as ever while it can light
+/// its neighbours (above 90), so a fire spreads exactly as before, but cells on a crack then
+/// hold between `EMBER_CRACK_FLOOR` and 90, where they still read as heat, draining one tick
+/// in `EMBER_CRACK_CLOCK`. A painted log was dark 7 s after it lit; its cracks now glow to
+/// 26 s (8 seeds), then ash over at the old pace. Cracks run along the grain (`ember_crack`):
+/// a scattered quarter of cells was tried too and read as speckle. A power of two on the
+/// global clock, because `tick_count` wraps at 2^32 here and the JS mirror's does not.
+const EMBER_CRACK_CLOCK: u32 = 32;
+const EMBER_CRACK_FLOOR: u16 = 66;
 /// Ice's temperature. Water no warmer freezes against ice; warmer water gives the ice
 /// `(energy - ICE_TEMP) / MELT_SHARE` a tick instead and spends as much; giving nothing, the
 /// slab keeps 68. The line used to be 120 for freezing; set at 60, a flame-warmed puddle (50-80
@@ -892,7 +901,7 @@ impl Universe {
     }
 
     fn age_and_decay(&self, cells: &mut [Cell]) {
-        for cell in cells {
+        for (idx, cell) in cells.iter_mut().enumerate() {
             if cell.kind == Material::Empty as u8 {
                 continue;
             }
@@ -934,6 +943,15 @@ impl Universe {
             // age saturates at 65535 here and wraps in the JS mirror, so an hour-old pond
             // keyed on age would stop cooling in one engine and not the other.
             let drain = if cell.kind == Material::Water as u8 && self.tick_count % WATER_CHILL != 0 {
+                0
+            } else {
+                drain
+            };
+            let drain = if cell.kind == Material::Ember as u8
+                && (EMBER_CRACK_FLOOR..=90).contains(&cell.energy)
+                && self.tick_count % EMBER_CRACK_CLOCK != 0
+                && ember_crack(idx as u32 % self.width, idx as u32 / self.width)
+            {
                 0
             } else {
                 drain
@@ -1589,6 +1607,12 @@ impl Universe {
                     }
                 }
                 x if x == Material::Ember as u8 => {
+                    // Heat relights spent ember below 60, and a crack anywhere in the band it
+                    // holds: a crack kept at 66-90 must catch again beside a new flame, or a
+                    // smouldering log would stop carrying a second fire through it (review,
+                    // 2026-10-28). `x` is the kind in this arm, so the crack is read from `idx`.
+                    let relights = cell.energy < 60
+                        || (cell.energy <= 90 && ember_crack(idx as u32 % self.width, idx as u32 / self.width));
                     for nidx in neighbors {
                         let other = old[nidx];
                         if other.kind == Material::Water as u8 || other.kind == Material::Moonwater as u8 {
@@ -1603,7 +1627,7 @@ impl Universe {
                             }
                             continue;
                         }
-                        if cell.energy < 60 && is_hot(other.kind) && next[idx].kind == Material::Ember as u8 {
+                        if relights && is_hot(other.kind) && next[idx].kind == Material::Ember as u8 {
                             next[idx].energy = 210;
                             next[idx].flags &= !FLAG_WET;
                             continue;
@@ -3142,6 +3166,12 @@ fn starting_energy(kind: u8) -> u16 {
 
 fn is_hot(kind: u8) -> bool {
     kind == Material::Fire as u8 || kind == Material::Lava as u8 || kind == Material::Meteor as u8
+}
+
+/// Whether a cell lies on one of a burnt log's cracks: every third row, offset per band of
+/// four columns, so a crack runs a few cells along the grain and jogs. By position, not a roll.
+fn ember_crack(x: u32, y: u32) -> bool {
+    (y + (x >> 2).wrapping_mul(374_761_393) % 3) % 3 == 0
 }
 
 fn ignited_cell(fuel: Cell, energy: u16) -> Cell {

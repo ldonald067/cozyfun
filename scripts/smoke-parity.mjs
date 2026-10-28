@@ -1530,6 +1530,33 @@ const scenarios = [
     expect: (seen) => (seen.emberDried >= EMBER_DRY_FLOOR ? null : `embers dried ${seen.emberDried} wet wood cells (floor ${EMBER_DRY_FLOOR})`),
   },
   {
+    // A burnt log smoulders in glowing cracks. A painted log lit with a dab of flame: 15 s in,
+    // the plain ember has gone dark (it was dark at 7 s before cracks) and only cells on a crack
+    // (`ember_crack`) still glow; by 35 s the cracks have gone dark too.
+    name: "a burnt log glows in cracks, then goes dark",
+    w: 48, h: 32, seed: 4242, ticks: 700,
+    paint(p) {
+      for (let x = 6; x < 42; x++) p(x, 30, 0, M.Wall);
+      for (let y = 22; y < 28; y++) for (let x = 12; x < 36; x++) p(x, y, 0, M.Wood);
+      p(24, 20, 2, M.Fire);
+    },
+    observe(seen, cells, w, h) {
+      seen.t = (seen.t ?? 0) + 1;
+      if (seen.t !== 300 && seen.t !== 700) return;
+      const crack = (x, y) => (y + ((Math.imul(x >> 2, 374761393) >>> 0) % 3)) % 3 === 0;
+      let on = 0, off = 0;
+      for (let i = 0; i < w * h; i++) {
+        if (cells[i * STRIDE] !== M.Ember || cells[i * STRIDE + 4] + cells[i * STRIDE + 5] * 256 < 60) continue;
+        if (crack(i % w, Math.floor(i / w))) on++; else off++;
+      }
+      if (seen.t === 300) { seen.cracksAt15s = on; seen.offCrackAt15s = off; } else seen.glowingAt35s = on + off;
+    },
+    expect: (seen) =>
+      seen.cracksAt15s < 20 ? `only ${seen.cracksAt15s} crack cells glow at 15 s`
+        : seen.offCrackAt15s ? `${seen.offCrackAt15s} cells off the cracks still glow at 15 s`
+        : seen.glowingAt35s ? `${seen.glowingAt35s} cells still glow at 35 s` : null,
+  },
+  {
     // A bloom stands on its stalk, and a petal hangs from its crown. Two heads built cell by
     // cell, each crown on a stalk: a full cornflower whose stalk has a gap cut in it, and a
     // lavender spike whose stalk is whole. The cut head must come down and no crown in it may

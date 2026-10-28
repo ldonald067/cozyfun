@@ -1,9 +1,10 @@
 # Handoff — where the work is, and what to do next
 
 *Rewritten at each handoff, never appended to. Shipped work lives in `git log`, whose commit
-messages carry each batch's measurements. Written 2026-10-27: everything on `main` is live
-(`deploy:verify` passed on `8937644`, wasm engine, CI green) and `interaction:audit` passes
-all 174 checks. Next is a burning log that stays alive (item 1).*
+messages carry each batch's measurements. Written 2026-10-28: a burnt log now smoulders in
+glowing cracks (owner's pick C from `.tmp/log/log-candidates-sheet.png`) and
+`interaction:audit` passes all 175 checks. Nothing is queued without the owner: item 1 is
+their call.*
 
 ## Keep chats lean
 
@@ -20,18 +21,7 @@ The owner hits usage limits early.
 
 ## What to do next
 
-1. **A burning log stays alive** (the owner's pick, 2026-10-23). The promise: the hearth
-   smoulders with glowing cracks well past today's 5-7 seconds. Wood lights straight into
-   Ember at energy 230 (`ignited_cell` in `sim/src/lib.rs`); an ember above 90 lights its
-   neighbours, and below `COLD_CHAR_ENERGY` (30) it is cold char, which the slow world settles
-   into soil. Find the ember's decay first, then measure a real log (painted wood, lit with a
-   dab of flame) burning down: seconds lit, seconds glowing, cells left as char. A slower arc
-   for wood's embers is the obvious lever. Check what rides on embers before moving it:
-   `rocket.lights`, `fire.dries` (its ember check passes 29 of 32 seeds), `ember.cools`,
-   `ember.glows`, `ember.quenched` (including the doused-log steam check), `wood.burns`, and
-   the renderer's cold-char wink and ash. Already decided: embers dry wet fuel first, and a
-   soaked log may leave a few scorched cells unburnt. Filmstrip before code.
-2. **Should lava move evenly?** The owner's call; nothing is changed. Lava moves on even ticks
+1. **Should lava move evenly?** The owner's call; nothing is changed. Lava moves on even ticks
    only (`update_liquid` at sluggishness 2), so it always sees the left-to-right pass
    (`sim/CLAUDE.md` has the mechanism), and a mid-floor pour ends 15-25 cells left of where
    it was poured, on every seed. Giving it one tick of each pass (`tick % 4 < 2`, as oil has)
@@ -39,21 +29,23 @@ The owner hits usage limits early.
    spring's stone hill grows from 24% of the board to 29% (7,480 -> 9,067 stone at 16,000
    ticks), and 24% is the number the owner accepted. Measure with `.tmp/oil/lava.mjs lcad`
    and `.tmp/oil/bias.mjs .tmp/oil/root-lcad`.
-3. **Flowers, only if the owner asks.** Left from the reference sheet `.tmp/flowers-ref/3.png`:
+2. **Flowers, only if the owner asks.** Left from the reference sheet `.tmp/flowers-ref/3.png`:
    leaves in two greens with a lit edge on cooler stems. The bluebell is the darkest head at
    play size; the owner saw that in the filmstrip and shipped it. The images in
    `.tmp/flowers-ref/` are stock art to look at, never to ship or commit.
-4. **Fallen petals in their flower's colour** needs a sim change first: a shed petal becomes a
+3. **Fallen petals in their flower's colour** needs a sim change first: a shed petal becomes a
    Pollen cell identical to a pollen puff, so the renderer cannot tell them apart.
-5. **Rules no audit check can see yet.**
+4. **Rules no audit check can see yet.**
    - A hot ember's hiss is a rate (1 roll in 2, was 1 in 6): the doused-log check still
      passes 15 of 16 seeds at the old odds, with a cloud half the size.
    - `flower.pollen` "more often when cosmic" is a rate too; one check cannot see it without
      comparing two gardens inside it.
+   - A crack's length: cracks are held 1 tick in 32 (`EMBER_CRACK_CLOCK`); the audit sees a
+     crack glowing 10 s after it caught, not how long it lasts (26 s, `.tmp/log/measure.mjs`).
    - `lava.scorches` "thaws" is unreachable by touch: a pool kept against an ice wall barely
      melts it, because a stone crust forms between them. A check for it passed 0 of 16 seeds
      and was not kept.
-6. **Sound levels, the owner's ears first** (audit of 2026-10-28; loops and memory are done).
+5. **Sound levels, the owner's ears first** (audit of 2026-10-28; loops and memory are done).
    - The mix is quiet: -41 dBFS RMS at default sliders, -35 at maximum, with 14 dB of
      headroom never used. Desk Radio (YouTube) plays ~20 dB louder. A makeup gain with a
      limiter would close that; render A/B clips before choosing a level.
@@ -78,6 +70,11 @@ The owner hits usage limits early.
 
 All by the owner, after seeing pictures or measurements:
 
+- **Burning log** (2026-10-28): glowing cracks along the grain (C). Ember above 90 drains as
+  before; cells on a crack (`ember_crack`, by position) hold 66-90 one tick in 32, so a log's
+  cracks glow to ~26 s against ~7 s, then ash over. Heat relights a held crack, as it does
+  char below 60 (a review fix). Whole-log slowing (A) and scattered specks (B) were shown and
+  not picked.
 - **Steam** (2026-10-23): hot steam billows into puffs that fade in 3 s, and a hot ember
   hisses on 1 roll in 2 (candidate B, over A at 2 s, from `.tmp/steam/steam-candidates-sheet.png`).
   The build puffs a pond about a quarter less than that candidate, because a review fix
@@ -127,8 +124,8 @@ All by the owner, after seeing pictures or measurements:
 
 ## Where the checks stand
 
-`npm run interaction:audit` passes 174 checks, bound to all 118 role ids, on the audit's seed
-(2026-10-27). These pass on fewer than 32 of 32 seeds:
+`npm run interaction:audit` passes 175 checks, bound to all 118 role ids, on the audit's seed
+(2026-10-28). These pass on fewer than 32 of 32 seeds:
 
 - **31:** `fire.thaws`, both `oil.ignites` checks, `meteor.trail`'s fanned-trail check,
   `fungus.fairyring`, `stem.burns`, and `ice.condenses` "condenses steam into frost".
@@ -145,8 +142,8 @@ checks it moved. Retake it before relying on it.
 **"Flowers and Interactions"** (https://claude.ai/artifact/9DB9Smb5oY65EfpdKJkXkS, private to
 the owner) holds the eight flower species, life stages, weather states, the interaction roster
 marked shows / thin / reads weak / half hidden, and a ranked shortlist of eight upgrades with
-each one's status. Six have shipped, one was dropped (lava thawing ice across a gap) and one is
-open: the burning log (item 1). The "Flowers with more depth" board holds the four outline
+each one's status. Seven have shipped (the burning log last, 2026-10-28) and one was dropped (lava
+thawing ice across a gap); the canvas itself still marks the log open. The "Flowers with more depth" board holds the four outline
 candidates. To edit the canvas, read it first (`Artifact` read of the URL, then the file by
 `path`) and publish to the same URL: a publish against a stale version is refused.
 
@@ -208,11 +205,14 @@ not this list.
   roll). `.tmp/halves/sab.mjs <name> [seeds] [id,id]` plays every check against one sabotage
   and counts only seeds the clean mirror passes. Launch parallel runs about 12 s apart: they
   share the `halves-base` compile.
-- **The closest template for item 1:** `.tmp/steam/`. `variant.mjs` builds find/replace copies
+- **The burning log:** `.tmp/log/` — `variant.mjs` (candidates patch `main`'s engine; `live`
+  and `sab-*` the working tree), `measure.mjs` (seconds lit / glowing / char), `film.mjs`,
+  `sheet.py`, `checks.mjs <roleRegex> <seeds> [variant,...]`.
+- **Steam's template:** `.tmp/steam/`. `variant.mjs` builds find/replace copies
   of `engine.ts` (`live` is the working tree), `scenes.mjs` has a doused log among its scenes,
   `checks.mjs <roleRegex> <seeds> [variant,...]` runs chosen audit checks against `main`, and
   `film.mjs` with `sheet.py` makes the labelled sheet the owner picks from.
-- **For item 2:** `.tmp/oil/lava.mjs` and `.tmp/oil/bias.mjs`; `.tmp/lava/NOTES.md` has every
+- **For item 1:** `.tmp/oil/lava.mjs` and `.tmp/oil/bias.mjs`; `.tmp/lava/NOTES.md` has every
   lava and oil number.
 - **Earlier batches**, each with tools for its own question: `.tmp/flowers-depth/`,
   `.tmp/heat/` (with `NOTES.md`), `.tmp/lavafix/`, `.tmp/review/`, `.tmp/cues/`,

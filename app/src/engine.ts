@@ -495,7 +495,17 @@ class JsSandboxEngine implements SandboxEngine {
       // would silently shift a loaded bloom's arc. The environmental drains ride the same
       // slow clock deliberately — see the note in sim/src/lib.rs.
       // Water holds its heat: it cools on the global clock, one tick in WATER_CHILL. See lib.rs.
-      const slowed = (kind === MATERIAL.Flower && age % BLOOM_CLOCK !== 0) || (kind === MATERIAL.Water && this.ticks % WATER_CHILL !== 0);
+      // A burnt log smoulders in glowing cracks: a crack cell holds between EMBER_CRACK_FLOOR
+      // and 90 on the global clock. See lib.rs.
+      const cellIndex = idx / CELL_STRIDE;
+      const slowed =
+        (kind === MATERIAL.Flower && age % BLOOM_CLOCK !== 0) ||
+        (kind === MATERIAL.Water && this.ticks % WATER_CHILL !== 0) ||
+        (kind === MATERIAL.Ember &&
+          readU16(next, idx + 4) >= EMBER_CRACK_FLOOR &&
+          readU16(next, idx + 4) <= 90 &&
+          this.ticks % EMBER_CRACK_CLOCK !== 0 &&
+          emberCrack(cellIndex % this.w, Math.floor(cellIndex / this.w)));
       const energy = slowed
         ? readU16(next, idx + 4)
         : Math.max(0, readU16(next, idx + 4) - drain - (flags & CELL_FLAG.Frozen ? 1 : 0) - (flags & CELL_FLAG.Wet && absorbent(kind) ? 1 : 0));
@@ -754,7 +764,9 @@ class JsSandboxEngine implements SandboxEngine {
             continue;
           }
           const emberEnergy = readU16(old, idx + 4);
-          if (emberEnergy < 60 && (other === MATERIAL.Fire || other === MATERIAL.Lava || other === MATERIAL.Meteor) && next[idx] === MATERIAL.Ember) {
+          // Heat relights spent ember, and a crack anywhere in the band it holds; see lib.rs.
+          const relights = emberEnergy < 60 || (emberEnergy <= 90 && emberCrack((idx / CELL_STRIDE) % this.w, Math.floor(idx / CELL_STRIDE / this.w)));
+          if (relights && (other === MATERIAL.Fire || other === MATERIAL.Lava || other === MATERIAL.Meteor) && next[idx] === MATERIAL.Ember) {
             writeU16(next, idx + 4, 210);
             writeU16(next, idx + 6, readU16(next, idx + 6) & ~CELL_FLAG.Wet);
             continue;
@@ -2035,6 +2047,12 @@ const PETAL_SHED_AGE = 1200;
 // Heat: water holds and shares it, and ice has a temperature. See lib.rs.
 const HEAT_SHARE = 8;
 const WATER_CHILL = 16;
+const EMBER_CRACK_CLOCK = 32;
+const EMBER_CRACK_FLOOR = 66;
+// Whether a cell lies on one of a burnt log's cracks; mirrors `ember_crack` (wrapping u32 math).
+function emberCrack(x: number, y: number) {
+  return (y + ((Math.imul(x >> 2, 374761393) >>> 0) % 3)) % 3 === 0;
+}
 const ICE_TEMP = 40;
 const MELT_SHARE = 8;
 const ICE_MELT = 180;

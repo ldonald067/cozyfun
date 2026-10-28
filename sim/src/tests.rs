@@ -3234,6 +3234,87 @@ fn cold_char_relights_near_fire() {
     assert!(energy_at(&u, 8, 8) > 150, "char should relight near open heat");
 }
 
+fn crack_and_plain_cells() -> ((u32, u32), (u32, u32)) {
+    let on = (4..12).flat_map(|y| (4..12).map(move |x| (x, y)));
+    let crack = on.clone().find(|&(x, y)| ember_crack(x, y)).unwrap();
+    let plain = on.filter(|&(x, y)| !ember_crack(x, y) && (x as i32 - crack.0 as i32).abs() > 1).next().unwrap();
+    (crack, plain)
+}
+
+#[test]
+fn a_crack_ember_holds_its_glow_where_a_plain_one_goes_cold() {
+    let mut u = Universe::new(16, 16, 7);
+    let ((cx, cy), (px, py)) = crack_and_plain_cells();
+    set_cell_state(&mut u, cx, cy, Material::Ember, 10, 90, 0);
+    set_cell_state(&mut u, px, py, Material::Ember, 10, 90, 0);
+    for _ in 0..200 {
+        u.tick();
+    }
+    assert!(energy_at(&u, cx, cy) >= 75, "a crack should still glow after 10 s, has {}", energy_at(&u, cx, cy));
+    assert_eq!(energy_at(&u, px, py), 0, "an ember off the cracks cools at the old pace");
+}
+
+#[test]
+fn a_crack_ember_drains_at_full_pace_while_it_can_light_wood() {
+    // Above 90 an ember lights its neighbours, so a crack must not linger there: a fire
+    // spreads exactly as it did before cracks.
+    let mut u = Universe::new(16, 16, 7);
+    let ((cx, cy), _) = crack_and_plain_cells();
+    set_cell_state(&mut u, cx, cy, Material::Ember, 10, 200, 0);
+    for _ in 0..50 {
+        u.tick();
+    }
+    assert_eq!(energy_at(&u, cx, cy), 100);
+}
+
+#[test]
+fn a_held_crack_relights_beside_a_new_flame_and_lights_fresh_wood() {
+    // A crack holds at 66-90, above the 60 that heat relights spent ember from; it must still
+    // catch, or a second fire would stop at a smouldering log. Found by review, 2026-10-28.
+    let mut u = Universe::new(16, 16, 7);
+    let ((cx, cy), _) = crack_and_plain_cells();
+    set_cell_state(&mut u, cx, cy, Material::Ember, 10, 80, 0);
+    set_cell(&mut u, cx - 1, cy, Material::Fire);
+    set_cell(&mut u, cx + 1, cy, Material::Wood);
+    u.tick();
+    assert!(energy_at(&u, cx, cy) > 150, "a crack should relight beside a flame, has {}", energy_at(&u, cx, cy));
+    let mut lit = false;
+    for _ in 0..40 {
+        u.tick();
+        lit |= kind_at(&u, cx + 1, cy) == Material::Ember as u8;
+    }
+    assert!(lit, "the relit crack should light the wood beside it");
+}
+
+#[test]
+fn a_painted_log_burns_down_to_glowing_cracks() {
+    let mut u = Universe::new(48, 32, 7);
+    for x in 6..42 {
+        u.paint(x, 30, 0, Material::Wall as u8, 100);
+    }
+    for y in 22..28 {
+        for x in 12..36 {
+            u.paint(x, y, 0, Material::Wood as u8, 100);
+        }
+    }
+    u.paint(24, 20, 2, Material::Fire as u8, 100);
+    let glowing = |u: &Universe| {
+        u.cells.iter().enumerate().filter(|(_, c)| c.kind == Material::Ember as u8 && c.energy >= 60).map(|(i, _)| i).collect::<Vec<_>>()
+    };
+    for _ in 0..300 {
+        u.tick();
+    }
+    // 15 s after it lit, today's log was long dark; now only its cracks glow.
+    let lit = glowing(&u);
+    assert!(lit.len() >= 20, "a burnt log should keep glowing cracks, has {}", lit.len());
+    assert!(lit.iter().all(|&i| ember_crack(i as u32 % 48, i as u32 / 48)), "only crack cells glow");
+    assert!(!u.cells.iter().any(|c| c.kind == Material::Wood as u8), "the log burned through");
+    for _ in 0..500 {
+        u.tick();
+    }
+    assert!(glowing(&u).is_empty(), "the cracks go dark in the end");
+}
+
 #[test]
 fn accumulated_freeze_thaw_crumbles_wall_into_stone() {
     let mut u = Universe::new(16, 16, 7);

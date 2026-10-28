@@ -1764,6 +1764,30 @@ export const CHECKS = [
       }
       return [...memo.caught].filter((i) => g.kindOf(i) === M.Ember && g.energyAt(i) >= 30);
     } },
+  { m: "Ember", covers: "ember.glows", role: "a burnt log smoulders in glowing cracks", w: 30, h: 26, seed: 137, ticks: 900,
+    // The glow check's own scene. The witness is ember still glowing (60, where the renderer
+    // shows heat and no ash) 10 s after its cell caught, with no flame, lava or meteor beside it
+    // now, so it was not relit. Without cracks a log was dark 7 s after it lit, so nothing here
+    // could pass: this is the ember's slow crack arc (`EMBER_CRACK_CLOCK`) and nothing else.
+    paint: (p) => { p(15, 20, 4, M.Wood); p(15, 16, 1, M.Fire); },
+    outcome: (g, before, memo) => {
+      memo.t = (memo.t ?? 0) + 1;
+      memo.lit ??= new Map();
+      const out = [];
+      for (let i = 0; i < g.size; i++) {
+        if (g.kindOf(i) !== M.Ember) { memo.lit.delete(i); continue; }
+        if (!memo.lit.has(i)) memo.lit.set(i, memo.t);
+        if (memo.t - memo.lit.get(i) < 10 * TICKS_PER_SECOND || g.energyAt(i) < 60) continue;
+        const [x, y] = g.xyOf(i);
+        let heat = false;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const k = g.kindAt(x + dx, y + dy);
+          if (k === M.Fire || k === M.Lava || k === M.Meteor) heat = true;
+        }
+        if (!heat) out.push(i);
+      }
+      return out;
+    } },
   { m: "Ember", covers: "ember.quenched", role: "running water washes cold char away", w: 30, h: 26, seed: 136, ticks: 900,
     // A log burnt out, then water poured over its cold char. The whole log is cold char by tick
     // 150; the pour starts at 200, above the log so the brush paints over none of it. The
