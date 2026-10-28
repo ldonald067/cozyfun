@@ -691,7 +691,8 @@ export const CHECKS = [
     // it, so the flood melts the block. Until 2026-10-20 steam froze for nothing and lava grew
     // the block toward itself, 52 cells to 68 by 20 s (the owner's item 6). The witness is ice
     // that turned to water with no flame, lava or meteor touching it last tick or now, counted
-    // while it stays water.
+    // while it stays water. Since lava is thick (2026-10-28) it creeps the gap rather than
+    // running it, and reaches the block in time on 30 seeds of 32, against 32 before.
     paint: (p) => {
       for (let x = 4; x <= 46; x++) { p(x, 25, 0, M.Wall); p(x, 26, 0, M.Wall); }
       for (let x = 6; x <= 44; x++) { p(x, 23, 0, M.Soil); p(x, 24, 0, M.Soil); }
@@ -1384,6 +1385,18 @@ export const CHECKS = [
       const [x, y] = g.xyOf(i);
       return [1, 2, 3].every((k) => g.kindAt(x, y - k) === M.Lava);
     })) },
+  { m: "Lava", covers: "lava.flows", role: "heaps where it is poured on an open floor", w: 80, h: 40, seed: 172, ticks: 900,
+    // Lava is thick (2026-10-28). Until then it moved as water does, and a pour mid-floor
+    // levelled into a sheet one grain deep that set 15-25 cells left of the pour. The witness
+    // is lava four deep within six columns of the pour, from 10 s on, after the brush stopped,
+    // counting only lava standing clear of the floor's bumps: four deep counted from the bottom
+    // of the floor's pockets, the old engine passed it with 8 cells.
+    paint: (p) => p(40, 12, 3, M.Lava),
+    act: (p, t) => { if (t <= 60 && t % 3 === 0) p(40, 12, 3, M.Lava); },
+    outcome: (g, before, memo) => ((memo.t = (memo.t ?? -1) + 1) < 200 ? [] : g.all(M.Lava).filter((i) => {
+      const [x, y] = g.xyOf(i);
+      return Math.abs(x - 40) <= 6 && y < 40 - FLOOR_FROM_BOTTOM - 1 && [1, 2, 3].every((k) => g.kindAt(x, y - k) === M.Lava);
+    })) },
   { m: "Lava", covers: "lava.flows", role: "flows slowly and ignites fuel", w: 30, h: 26, seed: 84, ticks: 900,
     paint: (p) => { p(15, 20, 3, M.Wood); p(15, 15, 2, M.Lava); },
     // Wood ignites into ember rather than bare flame, so ignition is either of the two.
@@ -1403,7 +1416,9 @@ export const CHECKS = [
     // left out; it leaks on 32 of 32 with water let through the guard. Grains are kept off fresh
     // lava by the same guard, but that half shows here on 1 seed of 32. It counts lava only:
     // water sinking into a steam cell a falling grain took that tick still deletes the grain,
-    // one cell of quench stone or sand on 3 of 32 seeds.
+    // one cell of quench stone or sand on 3 of 32 seeds. Since lava is thick (2026-10-28) it
+    // creeps toward the splash, which sits in the floor's pockets, rather than running to it,
+    // and the two meet on 31 seeds of 32.
     paint: (p) => {
       for (const x of [1, 67]) for (let y = 20; y <= 39; y++) { p(x, y, 0, M.Wall); p(x + 1, y, 0, M.Wall); }
       p(22, 26, 4, M.Lava); p(47, 26, 3, M.Water);

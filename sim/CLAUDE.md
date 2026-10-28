@@ -37,9 +37,9 @@ mirrored in `app/src/engine.ts` and behave byte-for-byte identically — see the
 - **A mover that runs on even ticks only always sees the left-to-right pass.** The bottom-up
   pass flips direction every tick, so `tick % 2 == 0` is always the same direction, and
   `side = tick % 2` never flips. Oil moved that way and every slick slid right until it met a
-  wall; lava (`update_liquid` at sluggishness 2) still does, and leans left. Moving against the
-  pass also lets a whole run shift in one tick, so even a symmetric side choice drifts unless
-  the mover gets one tick of each direction: oil moves on `tick % 4 < 2`.
+  wall, and lava did too and set 15-25 cells left of its pour. Moving against the pass also
+  lets a whole run shift in one tick, so even a symmetric side choice drifts unless the mover
+  gets one tick of each direction: oil and lava move on `tick % 4 < 2`.
 - **Hot gas bubbles; mist does not.** A mover sinking into gas that sat there all tick trades
   places with it when the gas is hotter than `MIST_ENERGY`, so steam rises out of a pool
   instead of being eaten. Letting mist bubble too flooded a spring to 29.5% of the board:

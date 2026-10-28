@@ -202,9 +202,9 @@ class JsSandboxEngine implements SandboxEngine {
         if (kind === MATERIAL.Sand) this.sand(idx, x, y, cell, old, next);
         if (kind === MATERIAL.Soil) this.soil(idx, x, y, cell, old, next);
         if (kind === MATERIAL.Stone) this.stone(idx, x, y, cell, old, next);
-        if (kind === MATERIAL.Water || kind === MATERIAL.Moonwater) this.liquid(idx, x, y, cell, old, next, 1);
+        if (kind === MATERIAL.Water || kind === MATERIAL.Moonwater) this.liquid(idx, x, y, cell, old, next);
         if (kind === MATERIAL.Oil) this.oil(idx, x, y, cell, old, next);
-        if (kind === MATERIAL.Lava) this.liquid(idx, x, y, cell, old, next, 2);
+        if (kind === MATERIAL.Lava) this.lava(idx, x, y, cell, old, next);
         if (kind === MATERIAL.Stardust) this.stardust(idx, x, y, cell, old, next);
         if (kind === MATERIAL.Pollen) this.pollen(idx, x, y, cell, old, next);
         if (kind === MATERIAL.Meteor) this.meteor(idx, x, y, cell, old, next);
@@ -886,8 +886,7 @@ class JsSandboxEngine implements SandboxEngine {
     return Boolean(aboveFlags & CELL_FLAG.Rooted) && (Boolean(aboveFlags & CELL_FLAG.Wet) || readU16(old, above + 4) > 40);
   }
 
-  private liquid(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array, slow: number) {
-    if (this.ticks % slow !== 0) return;
+  private liquid(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
     const side = this.ticks % 2 === 0 ? 1 : -1;
     for (const [dx, dy] of [[0, 1], [side, 1], [-side, 1], [side, 0], [-side, 0], [side * 2, 0], [-side * 2, 0]]) {
       if (this.move(idx, x + dx, y + dy, cell, old, next)) {
@@ -898,6 +897,22 @@ class JsSandboxEngine implements SandboxEngine {
         }
         return;
       }
+    }
+  }
+
+  // Thick: lava under lava is pushed aside, surface lava creeps one roll in LAVA_CREEPS, and it
+  // moves two ticks in four, one of each pass direction — see Universe::update_lava.
+  private lava(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
+    if (this.ticks % 4 >= 2) return;
+    const side = this.ticks % 2 === 0 ? 1 : -1;
+    for (const [dx, dy] of [[0, 1], [side, 1], [-side, 1]]) {
+      if (this.move(idx, x + dx, y + dy, cell, old, next)) return;
+    }
+    const pressed = y > 0 && old[this.index(x, y - 1)] === MATERIAL.Lava;
+    // The roll is made only for surface lava that could not fall.
+    if (!pressed && !this.chance(LAVA_CREEPS)) return;
+    for (const dx of [side, -side]) {
+      if (this.move(idx, x + dx, y, cell, old, next)) return;
     }
   }
 
@@ -1963,6 +1978,8 @@ const SINK_EVERY = 3;
 const MIST_ODDS = 450;
 // Deep lava cools too. See LAVA_DEEP_COOLS in lib.rs.
 const LAVA_DEEP_COOLS = 24;
+// Surface lava creeps sideways one roll in this many. See LAVA_CREEPS in lib.rs.
+const LAVA_CREEPS = 8;
 // Oil a spring poured fades, and only it: the rooted bit marks it. See OIL_SPRING_FADES and
 // FLAG_SPRING_OIL in lib.rs.
 const OIL_SPRING_FADES = 250;

@@ -1,10 +1,8 @@
 # Handoff — where the work is, and what to do next
 
 *Rewritten at each handoff, never appended to. Shipped work lives in `git log`, whose commit
-messages carry each batch's measurements. Written 2026-10-28: a burnt log now smoulders in
-glowing cracks (owner's pick C from `.tmp/log/log-candidates-sheet.png`) and
-`interaction:audit` passes all 175 checks. Nothing is queued without the owner: item 1 is
-their call.*
+messages carry each batch's measurements. Written 2026-10-28: lava is thick (the owner's
+call on the old item 1) and `interaction:audit` passes all 176 checks.*
 
 ## Keep chats lean
 
@@ -21,21 +19,13 @@ The owner hits usage limits early.
 
 ## What to do next
 
-1. **Should lava move evenly?** The owner's call; nothing is changed. Lava moves on even ticks
-   only (`update_liquid` at sluggishness 2), so it always sees the left-to-right pass
-   (`sim/CLAUDE.md` has the mechanism), and a mid-floor pour ends 15-25 cells left of where
-   it was poured, on every seed. Giving it one tick of each pass (`tick % 4 < 2`, as oil has)
-   centres a pour (-0.3 cells) and a basin pour still sets to stone in 50-75 s, but a lava
-   spring's stone hill grows from 24% of the board to 29% (7,480 -> 9,067 stone at 16,000
-   ticks), and 24% is the number the owner accepted. Measure with `.tmp/oil/lava.mjs lcad`
-   and `.tmp/oil/bias.mjs .tmp/oil/root-lcad`.
-2. **Flowers, only if the owner asks.** Left from the reference sheet `.tmp/flowers-ref/3.png`:
+1. **Flowers, only if the owner asks.** Left from the reference sheet `.tmp/flowers-ref/3.png`:
    leaves in two greens with a lit edge on cooler stems. The bluebell is the darkest head at
    play size; the owner saw that in the filmstrip and shipped it. The images in
    `.tmp/flowers-ref/` are stock art to look at, never to ship or commit.
-3. **Fallen petals in their flower's colour** needs a sim change first: a shed petal becomes a
+2. **Fallen petals in their flower's colour** needs a sim change first: a shed petal becomes a
    Pollen cell identical to a pollen puff, so the renderer cannot tell them apart.
-4. **Rules no audit check can see yet.**
+3. **Rules no audit check can see yet.**
    - A hot ember's hiss is a rate (1 roll in 2, was 1 in 6): the doused-log check still
      passes 15 of 16 seeds at the old odds, with a cloud half the size.
    - `flower.pollen` "more often when cosmic" is a rate too; one check cannot see it without
@@ -45,7 +35,7 @@ The owner hits usage limits early.
    - `lava.scorches` "thaws" is unreachable by touch: a pool kept against an ice wall barely
      melts it, because a stone crust forms between them. A check for it passed 0 of 16 seeds
      and was not kept.
-5. **Sound levels, the owner's ears first** (audit of 2026-10-28; loops and memory are done).
+4. **Sound levels, the owner's ears first** (audit of 2026-10-28; loops and memory are done).
    - The mix is quiet: -41 dBFS RMS at default sliders, -35 at maximum, with 14 dB of
      headroom never used. Desk Radio (YouTube) plays ~20 dB louder. A makeup gain with a
      limiter would close that; render A/B clips before choosing a level.
@@ -70,6 +60,13 @@ The owner hits usage limits early.
 
 All by the owner, after seeing pictures or measurements:
 
+- **Lava is thick** (2026-10-28, the owner: "lava should flow like lava, so not even"). It
+  falls like any liquid; lava with lava on top is pushed aside one cell; surface lava creeps
+  one roll in 8 (`LAVA_CREEPS`); it moves on `tick % 4 < 2`. A pour heaps into a dome that
+  slumps as it crusts, centred within a cell (was 15-25 cells left), a slope pour creeps down
+  as a tongue, and a lava spring builds a volcano cone, 13% of the board (was 24%).
+  `.tmp/lavaflow/lava-sheet.png` is the before/after; `.tmp/lavaflow/` has the variants tried
+  (`measure.mjs`, `pool.mjs`, `film.mjs`, `check.mjs`).
 - **Burning log** (2026-10-28): glowing cracks along the grain (C). Ember above 90 drains as
   before; cells on a crack (`ember_crack`, by position) hold 66-90 one tick in 32, so a log's
   cracks glow to ~26 s against ~7 s, then ash over. Heat relights a held crack, as it does
@@ -85,8 +82,8 @@ All by the owner, after seeing pictures or measurements:
   not kept from freezing (that cost two frost interactions). Lava radiating heat across a gap
   was built, measured and dropped.
 - **Lava** (2026-10-21/22): nothing that moves overwrites lava, and a deep pool cools from
-  within at one roll in 24. A lava spring building a stone hill over itself (24% of the board
-  at its peak) and going quiet is accepted.
+  within at one roll in 24. A lava spring building a stone hill over itself and going quiet
+  is accepted (24% of the board then; 13% since lava is thick).
 - **Two leaks stay** (2026-10-22). Water still deletes a grain that sank into steam that same
   tick (`try_move` lets a mover sink through gas that sat in a cell all tick without checking
   it is still there), which costs one cell of quench stone or sand on 3 of 32 seeds of the
@@ -124,14 +121,15 @@ All by the owner, after seeing pictures or measurements:
 
 ## Where the checks stand
 
-`npm run interaction:audit` passes 175 checks, bound to all 118 role ids, on the audit's seed
+`npm run interaction:audit` passes 176 checks, bound to all 118 role ids, on the audit's seed
 (2026-10-28). These pass on fewer than 32 of 32 seeds:
 
 - **31:** `fire.thaws`, both `oil.ignites` checks, `meteor.trail`'s fanned-trail check,
-  `fungus.fairyring`, `stem.burns`, and `ice.condenses` "condenses steam into frost".
+  `fungus.fairyring`, `stem.burns`, and `lava.quenched` "water never deletes the lava it
+  meets" (thick lava creeps toward the splash, and on one seed never meets it).
+- **30:** `ice.condenses` "takes the steam's heat" (thick lava creeps the gap to the ice, and
+  is late on two seeds).
 - **29:** `fire.dries`'s ember check.
-- **28:** `ice.condenses` "takes the steam's heat" (four seeds show it under 30 ticks: how long
-  lava keeps quenching beside the ice varies).
 - **27:** `stem.footing`'s stalk check.
 
 The full 32-seed list was last taken on 2026-10-17; each batch since re-measured only the
@@ -212,8 +210,8 @@ not this list.
   of `engine.ts` (`live` is the working tree), `scenes.mjs` has a doused log among its scenes,
   `checks.mjs <roleRegex> <seeds> [variant,...]` runs chosen audit checks against `main`, and
   `film.mjs` with `sheet.py` makes the labelled sheet the owner picks from.
-- **For item 1:** `.tmp/oil/lava.mjs` and `.tmp/oil/bias.mjs`; `.tmp/lava/NOTES.md` has every
-  lava and oil number.
+- **Lava:** `.tmp/lavaflow/` (thick lava, 2026-10-28); `.tmp/lava/NOTES.md` has the
+  earlier lava and oil numbers.
 - **Earlier batches**, each with tools for its own question: `.tmp/flowers-depth/`,
   `.tmp/heat/` (with `NOTES.md`), `.tmp/lavafix/`, `.tmp/review/`, `.tmp/cues/`,
   `.tmp/design/`, `.tmp/poster/`.

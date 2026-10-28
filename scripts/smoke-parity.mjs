@@ -256,6 +256,37 @@ const scenarios = [
     };
   })(),
   (() => {
+    // Lava is thick (2026-10-28): lava under lava is pushed aside, surface lava creeps one roll
+    // in LAVA_CREEPS, and it moves one tick of each pass direction. Lava poured mid-floor on an
+    // open board: the witnesses are where it sets (it used to set 15-25 cells left), that it
+    // heaps (it used to level into a sheet one grain deep), and that the heap slumps wider.
+    const W = 120, FLOOR = 37;
+    const heap = (cells) => {
+      const height = new Array(W).fill(0);
+      let n = 0, sum = 0;
+      for (let i = 0; i < W * 40; i++) {
+        const k = cells[i * STRIDE];
+        if (k !== M.Lava && k !== M.Stone) continue;
+        const x = i % W, y = Math.floor(i / W);
+        n++; sum += x; height[x] = Math.max(height[x], FLOOR - 1 - y);
+      }
+      return { offset: sum / n - W / 2, width: height.filter((v) => v > 0).length, tallest: Math.max(...height) };
+    };
+    return {
+      name: "poured lava heaps where it lands and slumps",
+      w: W, h: 40, seed: 171, ticks: 1000,
+      paint(p) { for (let x = 0; x < W; x++) p(x, FLOOR, 1, M.Wall); },
+      act(p, t) { if (t <= 60 && t % 3 === 1) p(W / 2, 20, 3, M.Lava); },
+      observe(seen, cells, w, h, tick) {
+        if (tick === 300) seen.early = heap(cells);
+        if (tick === 1000) seen.late = heap(cells);
+      },
+      expect: ({ early, late }) => (Math.abs(early.offset) <= 3 && Math.abs(late.offset) <= 3 && early.tallest >= 4
+        && late.width > early.width
+        ? null : `at 15 s ${JSON.stringify(early)}, at 50 s ${JSON.stringify(late)}: want centred within 3, 4+ tall, then wider`),
+    };
+  })(),
+  (() => {
     // Nothing that moves deletes lava (2026-10-22). Lava and water on a walled floor, spreading
     // into each other: water flowing into a cell lava had entered that tick used to overwrite
     // it. Here lava becomes nothing but stone, and only where it stands, so the witnesses are

@@ -301,8 +301,13 @@ const MIST_ODDS: u32 = 450;
 /// against one in 8 at an exposed edge. Lava never deletes lava (`try_move`), so a pour stays a
 /// pool, and a pool must set or a lava spring floods the board (28% at 8,000 ticks, still
 /// rising). With it a pour sets to stone in 50-75 s, and a spring builds a stone hill over
-/// itself (about 24% of the board) and is sealed by it.
+/// itself (about 13% of the board since lava is thick, 24% when it flowed as water does) and
+/// is sealed by it.
 const LAVA_DEEP_COOLS: u32 = 24;
+/// Lava at the surface of a heap creeps sideways one roll in this many (`update_lava`); lava
+/// under more lava is pushed aside every time. At 8 a pour on an open floor is a dome about
+/// three times as wide as it is tall, 15 s on. At 4 it slumped into a flatter, wider puddle.
+const LAVA_CREEPS: u32 = 8;
 /// Oil a spring poured fades: one of oil's moving ticks in this many, moving or at rest, so a
 /// cell lasts about 25 s. Oil never deletes oil (`try_move`) and comes to rest as a sheet, so
 /// nothing else bounds a spring: without this it flooded 31.9% of the board, and thinning only
@@ -489,12 +494,10 @@ impl Universe {
                 x if x == Material::Rocket as u8 && cell.energy == 0 => {
                     self.update_powder(idx, cell, &old, &mut next, 1)
                 }
-                x if x == Material::Water as u8 => self.update_liquid(idx, cell, &old, &mut next, 1),
-                x if x == Material::Moonwater as u8 => {
-                    self.update_liquid(idx, cell, &old, &mut next, 1)
-                }
+                x if x == Material::Water as u8 => self.update_liquid(idx, cell, &old, &mut next),
+                x if x == Material::Moonwater as u8 => self.update_liquid(idx, cell, &old, &mut next),
                 x if x == Material::Oil as u8 => self.update_oil(idx, cell, &old, &mut next),
-                x if x == Material::Lava as u8 => self.update_liquid(idx, cell, &old, &mut next, 2),
+                x if x == Material::Lava as u8 => self.update_lava(idx, cell, &old, &mut next),
                 _ => {}
             }
         }
@@ -1908,17 +1911,7 @@ impl Universe {
             && (above.flags & FLAG_WET != 0 || above.energy > 40)
     }
 
-    fn update_liquid(
-        &mut self,
-        idx: usize,
-        cell: Cell,
-        old: &[Cell],
-        next: &mut [Cell],
-        sluggishness: u32,
-    ) {
-        if sluggishness > 1 && self.tick_count % sluggishness != 0 {
-            return;
-        }
+    fn update_liquid(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
         let (x, y) = self.xy(idx);
         let side = if self.tick_count % 2 == 0 { 1 } else { -1 };
         let dirs = [
@@ -1942,6 +1935,38 @@ impl Universe {
                     // never quite dried. Mist disperses; steam from heat still condenses.
                     next[landed] = Cell::new(Material::Steam as u8, cell.variant | 1, MIST_ENERGY);
                 }
+                return;
+            }
+        }
+    }
+
+    /// Lava is thick. It falls like any liquid, but on the level only lava with more lava on top
+    /// of it is pushed aside, one cell, by the weight above; lava at the surface creeps one roll
+    /// in `LAVA_CREEPS`. So a pour heaps into a dome that slumps as it crusts, and runs down a
+    /// slope as a tongue. It used to move as water does, hopping two cells, and a pour levelled
+    /// into a sheet one grain deep that ran the width of the floor.
+    ///
+    /// Two ticks in four, one of each pass direction, as oil. On even ticks only it always saw
+    /// the left-to-right pass, so its side never flipped and a pour mid-floor set 15-25 cells
+    /// left of where it was poured.
+    fn update_lava(&mut self, idx: usize, cell: Cell, old: &[Cell], next: &mut [Cell]) {
+        if self.tick_count % 4 >= 2 {
+            return;
+        }
+        let (x, y) = self.xy(idx);
+        let side = if self.tick_count % 2 == 0 { 1 } else { -1 };
+        for (dx, dy) in [(0, 1), (side, 1), (-side, 1)] {
+            if self.try_move(idx, x + dx, y + dy, cell, old, next, true) {
+                return;
+            }
+        }
+        let pressed = y > 0 && old[self.idx(x as u32, (y - 1) as u32)].kind == Material::Lava as u8;
+        // The roll is made only for surface lava that could not fall.
+        if !pressed && !self.chance(LAVA_CREEPS) {
+            return;
+        }
+        for dx in [side, -side] {
+            if self.try_move(idx, x + dx, y, cell, old, next, true) {
                 return;
             }
         }

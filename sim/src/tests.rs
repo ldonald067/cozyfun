@@ -2729,6 +2729,55 @@ fn poured_lava_keeps_every_cell_while_it_spreads() {
     }
 }
 
+/// A blob dropped mid-floor on a 120-wide board, ticked `ticks`: the centre of its lava and
+/// stone against where it was dropped, how many columns it covers, and its tallest column.
+fn dropped_heap(material: Material, ticks: u32) -> (f32, u32, u32) {
+    let (w, floor) = (120u32, 37u32);
+    let mut u = Universe::new(w, 40, 21);
+    for x in 0..w {
+        set_cell(&mut u, x, floor, Material::Wall);
+    }
+    for y in 15..=25i32 {
+        for x in 55..=65i32 {
+            if (x - 60) * (x - 60) + (y - 20) * (y - 20) <= 25 {
+                set_cell(&mut u, x as u32, y as u32, material);
+            }
+        }
+    }
+    for _ in 0..ticks {
+        u.tick();
+    }
+    let (mut n, mut sum, mut height) = (0u32, 0u32, vec![0u32; w as usize]);
+    for i in 0..u.cells.len() {
+        let kind = u.cells[i].kind;
+        if kind == material as u8 || kind == Material::Stone as u8 {
+            let (x, y) = u.xy(i);
+            n += 1;
+            sum += x as u32;
+            height[x as usize] = height[x as usize].max(floor - y as u32);
+        }
+    }
+    let width = height.iter().filter(|&&h| h > 0).count() as u32;
+    (sum as f32 / n as f32 - 60.0, width, *height.iter().max().unwrap())
+}
+
+#[test]
+fn poured_lava_heaps_into_a_centred_dome_that_slumps() {
+    // Lava is thick (`update_lava`): it heaps where it lands and slumps outward as it crusts.
+    // It used to level as water does into a sheet one grain deep, and, moving on one pass
+    // direction only, set 15-25 cells left of where it was poured.
+    let (centre, width, height) = dropped_heap(Material::Lava, 150);
+    assert!(centre.abs() <= 3.0, "a pour should set where it was poured, centre off by {centre}");
+    assert!(height >= 4 && width <= 40, "a pour should heap: {width} wide, {height} tall");
+    // And it is still a liquid, not a powder: the heap slumps rather than standing as a cone.
+    let (later_centre, later_width, later_height) = dropped_heap(Material::Lava, 600);
+    assert!(later_centre.abs() <= 3.0, "a slumping heap should stay centred, off by {later_centre}");
+    assert!(
+        later_width > width && later_height < height,
+        "a heap should slump: {width} wide and {height} tall, then {later_width} and {later_height}"
+    );
+}
+
 #[test]
 fn water_never_deletes_the_lava_it_meets() {
     // A blob of lava and a splash of water dropped apart onto a wide floor, spreading into
