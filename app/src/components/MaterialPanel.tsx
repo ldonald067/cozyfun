@@ -1,61 +1,6 @@
 import type { CSSProperties } from "react";
-import {
-  BrickWall,
-  CircleDot,
-  CloudFog,
-  Droplet,
-  Eraser,
-  Flame,
-  FlameKindling,
-  Flower2,
-  Gem,
-  Grid2x2,
-  Leaf,
-  Moon,
-  Mountain,
-  Orbit,
-  Rocket,
-  Shell,
-  Snowflake,
-  Sparkle,
-  Sparkles,
-  Sprout,
-  TreePine,
-  Waves,
-  Wind,
-  type LucideIcon
-} from "lucide-react";
-import { MATERIAL, type MaterialDef, type MaterialId } from "../materials";
-
-const MATERIAL_ICONS: Record<MaterialId, LucideIcon> = {
-  [MATERIAL.Empty]: Eraser,
-  [MATERIAL.Wall]: BrickWall,
-  [MATERIAL.Sand]: Shell,
-  [MATERIAL.Water]: Waves,
-  [MATERIAL.Smoke]: CloudFog,
-  [MATERIAL.Soil]: Mountain,
-  [MATERIAL.Fire]: Flame,
-  [MATERIAL.Wood]: TreePine,
-  [MATERIAL.Lava]: FlameKindling,
-  [MATERIAL.Stone]: Gem,
-  [MATERIAL.Moss]: Leaf,
-  [MATERIAL.Seed]: Sprout,
-  [MATERIAL.Fungus]: Flower2,
-  [MATERIAL.Flower]: Flower2,
-  [MATERIAL.Oil]: Droplet,
-  [MATERIAL.Ice]: Snowflake,
-  [MATERIAL.Steam]: Wind,
-  [MATERIAL.Stardust]: Sparkles,
-  [MATERIAL.Meteor]: Orbit,
-  [MATERIAL.Moonwater]: Moon,
-  [MATERIAL.Glass]: Grid2x2,
-  [MATERIAL.Ember]: Flame,
-  [MATERIAL.Pollen]: Sparkle,
-  [MATERIAL.Stem]: Sprout,
-  [MATERIAL.Rocket]: Rocket,
-  [MATERIAL.Wellspring]: CircleDot,
-  [MATERIAL.Spark]: Sparkle
-};
+import type { MaterialDef, MaterialId } from "../materials";
+import { MaterialChip, readableMaterialColor } from "./MaterialChip";
 
 type MaterialPanelProps = {
   groupedMaterials: Record<string, MaterialDef[]>;
@@ -67,7 +12,6 @@ export function MaterialPanel({ groupedMaterials, selected, onSelect }: Material
   return (
     <aside className="tool-panel" aria-label="Materials">
       <div className="brand-mark">
-        <Sparkles size={18} />
         <span>Night Desk Terrarium</span>
       </div>
 
@@ -76,7 +20,6 @@ export function MaterialPanel({ groupedMaterials, selected, onSelect }: Material
           <span className="group-label">{group}</span>
           <div className="material-grid">
             {materials.map((material) => {
-              const MaterialIcon = MATERIAL_ICONS[material.id];
               const materialHint = `${material.label}: ${material.description} Identity: ${material.identity.join("; ")}.`;
               return (
                 <button
@@ -86,12 +29,10 @@ export function MaterialPanel({ groupedMaterials, selected, onSelect }: Material
                   aria-label={materialHint}
                   aria-pressed={selected === material.id}
                   title={materialHint}
-                  style={{ "--material-color": material.color } as CSSProperties}
+                  style={{ "--material-color": readableMaterialColor(material.color) } as CSSProperties}
                   onClick={() => onSelect(material)}
                 >
-                  <span className="material-icon">
-                    <MaterialIcon size={17} strokeWidth={2.15} />
-                  </span>
+                  <MaterialChip material={material} />
                   <span>{material.label}</span>
                 </button>
               );

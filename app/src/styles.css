@@ -250,10 +250,19 @@ input:focus-visible {
   padding: 18px;
 }
 
+/* The side panels are painted from the landing poster (public/embed.html): its indigo night
+   wash, a violet and a blue bleed where the pigment pooled, paper grain, and its serif and
+   cream for headings. The poster is the first thing a visitor sees; the panels are what
+   they land in. */
 .tool-panel,
 .control-panel {
-  border: 1px solid rgba(239, 211, 166, 0.14);
-  background: rgba(9, 13, 20, 0.72);
+  border: 1px solid rgba(244, 223, 184, 0.2);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .96 0 0 0 0 .87 0 0 0 0 .72 .16 0 0 0 0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23g)'/%3E%3C/svg%3E"),
+    radial-gradient(70% 32% at 92% 16%, rgba(150, 96, 178, 0.32), transparent 72%),
+    radial-gradient(60% 26% at 4% 62%, rgba(72, 112, 158, 0.26), transparent 72%),
+    radial-gradient(80% 30% at 60% 100%, rgba(118, 84, 160, 0.22), transparent 72%),
+    linear-gradient(180deg, rgba(34, 42, 72, 0.9), rgba(23, 29, 51, 0.9) 55%, rgba(14, 18, 34, 0.92));
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(16px);
   border-radius: 8px;
@@ -273,14 +282,34 @@ input:focus-visible {
   padding: 14px;
 }
 
+/* :where() keeps this at a bare element's weight, so every classed button rule below — the
+   segmented controls, the audio toggle's blue — still wins over the panel's resting fill. */
+:where(.tool-panel, .control-panel) button {
+  border-color: rgba(244, 223, 184, 0.16);
+  background: rgba(244, 223, 184, 0.06);
+}
+
+:where(.tool-panel, .control-panel) button:hover {
+  border-color: rgba(244, 223, 184, 0.42);
+  background: rgba(244, 223, 184, 0.12);
+}
+
+.brand-mark,
+.environment-control > span,
+.share-panel-header span,
+.audio-panel-title {
+  font-family: Georgia, "Iowan Old Style", serif;
+  font-weight: 600;
+  color: #f4dfb8;
+  letter-spacing: 0.01em;
+}
+
 .brand-mark {
   display: flex;
   align-items: center;
   gap: 8px;
   min-height: 34px;
-  color: #ffe4ad;
-  font-weight: 700;
-  letter-spacing: 0;
+  font-size: 18px;
 }
 
 .tool-group {
@@ -290,10 +319,11 @@ input:focus-visible {
 .group-label {
   display: block;
   margin-bottom: 8px;
-  color: #94b8c0;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0;
+  color: #b4c2d6;
+  font-family: Georgia, "Iowan Old Style", serif;
+  font-size: 13px;
+  font-style: italic;
+  letter-spacing: 0.02em;
 }
 
 .material-grid {
@@ -308,45 +338,80 @@ input:focus-visible {
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 7px;
-  border-radius: 6px;
+  padding: 6px 10px 6px 6px;
+  border-radius: 999px;
   font-size: 13px;
   text-align: left;
   white-space: nowrap;
 }
 
 .material-button.active {
-  border-color: color-mix(in srgb, var(--material-color) 78%, white 12%);
+  border-color: color-mix(in srgb, var(--material-color) 70%, #f4dfb8 30%);
   background:
-    radial-gradient(circle at 18px 50%, color-mix(in srgb, var(--material-color) 28%, transparent), transparent 64%),
-    linear-gradient(90deg, color-mix(in srgb, var(--material-color) 22%, rgba(20, 25, 34, 0.9)), rgba(21, 28, 39, 0.88));
+    radial-gradient(circle at 18px 50%, color-mix(in srgb, var(--material-color) 30%, transparent), transparent 64%),
+    rgba(244, 223, 184, 0.12);
   color: #fff3d2;
   box-shadow:
     inset 0 0 0 1px color-mix(in srgb, var(--material-color) 28%, transparent),
     0 0 20px color-mix(in srgb, var(--material-color) 18%, transparent);
 }
 
+/* A specimen jar: the material's own pixels (MaterialChip.tsx) under a glass ring in its
+   identity colour, lifted to read on the panel, with one painted glint. */
 .material-icon {
+  position: relative;
   color: var(--material-color);
-  width: 22px;
-  height: 22px;
-  flex: 0 0 22px;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
   display: grid;
   place-items: center;
-  border-radius: 6px;
-  background:
-    radial-gradient(circle at 50% 45%, color-mix(in srgb, currentColor 18%, transparent), transparent 62%),
-    rgba(255, 245, 220, 0.075);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
-    0 0 18px color-mix(in srgb, currentColor 26%, transparent);
+  overflow: hidden;
+  border-radius: 50%;
+  background: rgba(10, 12, 24, 0.6);
+  box-shadow: 0 0 14px color-mix(in srgb, currentColor 24%, transparent);
+}
+
+.material-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.material-icon.empty-chip svg {
+  width: 14px;
+  height: 14px;
+}
+
+.material-icon::before,
+.material-icon::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.material-icon::before {
+  inset: 0;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  box-shadow: inset -3px -4px 6px rgba(6, 8, 18, 0.38);
+}
+
+.material-icon::after {
+  left: 5px;
+  top: 3px;
+  width: 6px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  transform: rotate(-30deg);
+}
+
+.material-icon.empty-chip::after {
+  display: none;
 }
 
 .material-button.active .material-icon {
-  background: rgba(255, 232, 178, 0.12);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 232, 178, 0.22),
-    0 0 18px color-mix(in srgb, currentColor 38%, transparent);
+  box-shadow: 0 0 18px color-mix(in srgb, currentColor 40%, transparent);
 }
 
 .sandbox-stage {
@@ -1078,9 +1143,26 @@ input:focus-visible {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  /* Three columns at 390px leave ~106px a button: "Wellspring" at 14px with the desktop
+     padding ran ~9px past its pill. A smaller chip and tighter padding give it back. */
   .material-button {
     min-height: 44px;
+    gap: 5px;
+    padding: 6px 7px 6px 5px;
     font-size: 14px;
+  }
+
+  .material-icon {
+    width: 20px;
+    height: 20px;
+    flex-basis: 20px;
+  }
+
+  .material-icon::after {
+    left: 4px;
+    top: 3px;
+    width: 5px;
+    height: 3px;
   }
 
   .tray {
@@ -1147,5 +1229,13 @@ input:focus-visible {
 
   .desk-radio-panel {
     max-height: none;
+  }
+}
+
+/* Below this, three columns cannot hold a ten-letter name at a 14px tap-size label
+   (measured: Moonwater +3px at 390, +13px at 360), so the tray goes to two. */
+@media (max-width: 420px) {
+  .material-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
