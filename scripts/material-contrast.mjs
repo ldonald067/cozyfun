@@ -3,15 +3,13 @@
 // metric over each material's average palette color.
 // Usage: node scripts/material-contrast.mjs [--check]
 // With --check, fails when any pair falls below the distance floor.
-import { createRequire } from "node:module";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const outputDir = path.join(root, ".tmp", "material-contrast");
 
-const { MATERIALS } = await loadTsModule(path.join(root, "app", "src", "materials.ts"), "materials.generated.mjs");
+// Node strips the types itself (22.18+; CI runs 24): materials.ts has only erasable syntax.
+const { MATERIALS } = await import(pathToFileURL(path.join(root, "app", "src", "materials.ts")).href);
 
 const swatches = MATERIALS.filter((material) => material.slug !== "eraser").map((material) => ({
   label: material.label,
@@ -64,21 +62,4 @@ function redmeanDistance([r1, g1, b1], [r2, g2, b2]) {
   const dg = g1 - g2;
   const db = b1 - b2;
   return Math.sqrt((2 + rMean / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rMean) / 256) * db * db);
-}
-
-async function loadTsModule(sourcePath, fileName) {
-  await mkdir(outputDir, { recursive: true });
-  const requireFromApp = createRequire(path.join(root, "app", "package.json"));
-  const ts = requireFromApp("typescript");
-  const source = await readFile(sourcePath, "utf8");
-  const transpiled = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.ES2022,
-      target: ts.ScriptTarget.ES2020,
-      verbatimModuleSyntax: false
-    }
-  }).outputText;
-  const modulePath = path.join(outputDir, fileName);
-  await writeFile(modulePath, transpiled);
-  return import(`${pathToFileURL(modulePath).href}?t=${Date.now()}`);
 }

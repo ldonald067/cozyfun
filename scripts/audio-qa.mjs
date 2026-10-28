@@ -1,4 +1,3 @@
-import { createRequire } from "node:module";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -100,10 +99,10 @@ async function assertNativeAmbienceOnly() {
 }
 
 async function loadSourceModules() {
-  const assetsModule = await loadTsModule(path.join(root, "app", "src", "audio", "assets.ts"), "assets.generated.mjs");
-  const moodsModule = await loadTsModule(path.join(root, "app", "src", "audio", "moods.ts"), "moods.generated.mjs");
-  const roomsModule = await loadTsModule(path.join(root, "app", "src", "audio", "rooms.ts"), "rooms.generated.mjs");
-  const scenesModule = await loadTsModule(path.join(root, "app", "src", "sceneEnvironments.ts"), "scene-environments.generated.mjs");
+  const assetsModule = await loadTsModule("audio/assets.ts");
+  const moodsModule = await loadTsModule("audio/moods.ts");
+  const roomsModule = await loadTsModule("audio/rooms.ts");
+  const scenesModule = await loadTsModule("sceneEnvironments.ts");
   return {
     assets: assetsModule.AMBIENT_AUDIO_ASSETS,
     moods: moodsModule.AUDIO_MOODS,
@@ -112,18 +111,8 @@ async function loadSourceModules() {
   };
 }
 
-async function loadTsModule(sourcePath, fileName) {
-  const requireFromApp = createRequire(path.join(root, "app", "package.json"));
-  const ts = requireFromApp("typescript");
-  const source = await readFile(sourcePath, "utf8");
-  const transpiled = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.ES2022,
-      target: ts.ScriptTarget.ES2020,
-      verbatimModuleSyntax: false
-    }
-  }).outputText;
-  const modulePath = path.join(outputDir, fileName);
-  await writeFile(modulePath, transpiled);
-  return import(`${pathToFileURL(modulePath).href}?t=${Date.now()}`);
+// Node strips the types itself (22.18+; CI runs 24). These files use only erasable syntax and
+// `import type`, and `assets.ts` reads `import.meta.env?.BASE_URL`, which is undefined here.
+function loadTsModule(file) {
+  return import(pathToFileURL(path.join(root, "app", "src", file)).href);
 }

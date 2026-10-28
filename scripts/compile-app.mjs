@@ -30,7 +30,8 @@ export function compileApp(name, files, { root = repoRoot, outDir = resolve(repo
   const tsc = resolve(repoRoot, "app/node_modules/typescript/bin/tsc");
   const compiled = spawnSync(
     process.execPath,
-    [tsc, "--target", "ES2022", "--module", "CommonJS", "--moduleResolution", "Node",
+    // Bundler, as app/tsconfig.json: TypeScript 7 removed the old "Node" (node10) resolution.
+    [tsc, "--target", "ES2022", "--module", "CommonJS", "--moduleResolution", "Bundler",
      "--lib", "ES2022,DOM", "--strict", "true", "--skipLibCheck", "true",
      "--esModuleInterop", "true", "--outDir", outDir,
      ...files.map((file) => `app/src/${file}`)],
