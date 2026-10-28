@@ -111,6 +111,8 @@ export function AudioPanel({
           playbackState={deskRadioPlayback}
           source={deskRadioSource}
           usingExternalProvider={audioPrefs.provider === "external"}
+          volume={audioPrefs.volumes.master}
+          muted={audioPrefs.muted}
           onClear={onDeskRadioClear}
           onEmbedBlocked={onDeskRadioBlocked}
           onEmbedReady={onDeskRadioReady}

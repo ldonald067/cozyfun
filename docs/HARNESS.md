@@ -521,6 +521,7 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   reason to keep it unasserted. Fix the determinism, then assert — and if the determinism
   cannot be fixed, that is the finding.
 - `npm run audio:qa`: writes a native ambience manifest for local audio asset size, target loop length, and mood/room balance review into `.tmp/audio-qa`.
+- `npm run audio:levels`: renders the real mixer, beds and cues offline in headless Chrome, K-weighted, and fails when the default mix leaves -30 to -22 dBFS RMS; full sliders peak above -0.3 dBFS on either channel over a whole loop, with dense cues over the beds' loudest moment; a bed a room scales by 0.5 or more sits over 20 dB under the lead; a paintable material (or the eraser) has no cue; a cue group spans over 7 dB or a cue sits over 10 dB under the rain bed; or a cue peaks 24 dB over its own loudness (a click). The audio before 2026-10-28 failed it on the level, the rooms, the cue spread and level, clicks, and two silent toolbar materials.
 - `node scripts/preview-dist.mjs 4181`: serves the built `app/dist` with bundle badges so stale browser sessions are obvious. Build first. (Windows: `.\scripts\preview-current.ps1 -Port 4181` rebuilds and serves in one step.)
 - `npm run test:chrome` / `npm run test:firefox`: **Windows-only** — they shell out to PowerShell. They drive a *visible* browser against a preview server you started yourself, which is how to watch a QA run rather than read its result. Port via `CHROME_QA_APP_PORT` / `FIREFOX_QA_APP_PORT`, default 4173.
 

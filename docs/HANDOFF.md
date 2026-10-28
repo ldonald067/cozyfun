@@ -2,7 +2,8 @@
 
 *Rewritten at each handoff, never appended to. Shipped work lives in `git log`, whose commit
 messages carry each batch's measurements. Written 2026-10-28: lava is thick (the owner's
-call on the old item 1) and `interaction:audit` passes all 176 checks.*
+call on the old item 1), the sound audit's findings are fixed and gated (item 4 waits on the
+owner's ears), and `interaction:audit` passes all 176 checks.*
 
 ## Keep chats lean
 
@@ -35,16 +36,18 @@ The owner hits usage limits early.
    - `lava.scorches` "thaws" is unreachable by touch: a pool kept against an ice wall barely
      melts it, because a stone crust forms between them. A check for it passed 0 of 16 seeds
      and was not kept.
-4. **Sound levels, the owner's ears first** (audit of 2026-10-28; loops and memory are done).
-   - The mix is quiet: -41 dBFS RMS at default sliders, -35 at maximum, with 14 dB of
-     headroom never used. Desk Radio (YouTube) plays ~20 dB louder. A makeup gain with a
-     limiter would close that; render A/B clips before choosing a level.
-   - 33 of 36 background beds (mood x room) sit 20 dB or more under the featured one, and
-     fire never comes within 33 dB unless it is the mood, so `rooms.ts` is mostly
-     inaudible. Retune, or stop loading what cannot be heard.
-   - Probes: `.tmp/audio-audit/` (`probe.mjs` levels and seams, `beds.mjs` per-bed levels).
-   - Open with the owner: native beds keep playing under Desk Radio, and the app's Mute and
-     Master do not reach the YouTube player. Intended or not is undocumented.
+4. **Sound: the owner's ears on the 2026-10-28 retune.** Everything the audit found is fixed
+   and gated by `npm run audio:levels`: the mix is -25 to -28 dBFS RMS at default sliders (was
+   -41) through a makeup gain and a limiter; a room's own beds are heard 10-18 dB under the
+   featured one (rooms used to change the mix by 0.1 dB); each cue group spans under 6 dB and
+   sits 0-7 dB under the rain bed (painting oil was 14 dB under the rest, every cue 10-20 dB
+   under the bed); a click on half of all noise cues
+   (up to -3 dBFS) is gone; painting rockets and a wellspring has a cue (both were silent);
+   Desk Radio replaces the native beds once its player is up instead of playing over them,
+   and Master and Mute reach it. Listen to `.tmp/audio-fix/{before,after}-*.wav` (20 s each:
+   beds, then painting, then reaction cues) before tuning further; `audio:levels` holds the
+   bands. If the owner wants rain under the radio after all, it is `setDeskRadioOn` in
+   `controller.ts`.
 
 ## Open questions, accepted unless the owner says otherwise
 
@@ -52,9 +55,11 @@ The owner hits usage limits early.
 - A meteor shock's scorch is often brief (26 of 32 seeds).
 - The sim runs about 24 ticks a second at 120 Hz, against 20 at 60 Hz.
 - One watering grows a minimum plant: most stay at the 4-cell stalk, and over half leafless.
-- The owner's subjective listening pass on the audio, left from Phase 8, is unfinished.
 - The `water.boils` scene is really a quench (fixture debt).
 - The landing poster has not been tested in Safari/WebKit.
+- `test:browser`'s "a garden planted in the app actually blooms" timed out once in five runs
+  on 2026-10-28 (90 s wall clock; the brush lands at wall-clock times, so the bed differs run
+  to run). A second sighting should make it a harness fix, not a rerun.
 
 ## Decisions already made — do not relitigate
 

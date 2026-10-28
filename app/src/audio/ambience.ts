@@ -93,6 +93,7 @@ type NativeAmbienceProbe = {
     loop: boolean;
     filterType: BiquadFilterType;
     filterFrequency: number;
+    filterQ: number;
   }>;
 };
 
@@ -148,7 +149,8 @@ function recordNativeAmbienceStart(id: AmbientAudioAssetId, source: AudioBufferS
     gain: gain.gain.value,
     loop: source.loop,
     filterType: filter.type,
-    filterFrequency: filter.frequency.value
+    filterFrequency: filter.frequency.value,
+    filterQ: filter.Q.value
   });
 }
 

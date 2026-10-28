@@ -10,6 +10,9 @@ type YouTubeEvent = {
 
 type YouTubePlayer = {
   destroy(): void;
+  mute(): void;
+  unMute(): void;
+  setVolume(volume: number): void;
 };
 
 type YouTubePlayerOptions = {
@@ -38,6 +41,8 @@ type DeskRadioPanelProps = {
   playbackState: DeskRadioPlaybackState;
   source: DeskRadioSource | null;
   usingExternalProvider: boolean;
+  volume: number;
+  muted: boolean;
   onClear(): void;
   onEmbedBlocked(code: number): void;
   onEmbedReady(source: DeskRadioSource): void;
@@ -50,6 +55,8 @@ export function DeskRadioPanel({
   playbackState,
   source,
   usingExternalProvider,
+  volume,
+  muted,
   onClear,
   onEmbedBlocked,
   onEmbedReady,
@@ -81,6 +88,8 @@ export function DeskRadioPanel({
         <DeskRadioPlayer
           key={`${source.kind}:${source.id}:${source.startSeconds ?? 0}`}
           source={source}
+          volume={volume}
+          muted={muted}
           onBlocked={onEmbedBlocked}
           onReady={() => onEmbedReady(source)}
         />
@@ -124,21 +133,41 @@ export function DeskRadioPanel({
 
 function DeskRadioPlayer({
   source,
+  volume,
+  muted,
   onBlocked,
   onReady
 }: {
   source: DeskRadioSource;
+  volume: number;
+  muted: boolean;
   onBlocked(code: number): void;
   onReady(): void;
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const onBlockedRef = useRef(onBlocked);
   const onReadyRef = useRef(onReady);
+  const readyPlayerRef = useRef<YouTubePlayer | null>(null);
+  const levelRef = useRef({ volume, muted });
 
   useEffect(() => {
     onBlockedRef.current = onBlocked;
     onReadyRef.current = onReady;
   }, [onBlocked, onReady]);
+
+  // The app's Master slider and Mute reach the radio too. They used to stop at the Web Audio
+  // graph, so Mute silenced everything but the music. Both are set once the player is up;
+  // after that each change sets only its own control, so moving Master never unmutes a radio
+  // muted in YouTube's own controls, and Mute never overwrites a volume chosen there.
+  useEffect(() => {
+    levelRef.current = { ...levelRef.current, volume };
+    readyPlayerRef.current?.setVolume(Math.round(volume * 100));
+  }, [volume]);
+
+  useEffect(() => {
+    levelRef.current = { ...levelRef.current, muted };
+    if (readyPlayerRef.current) applyMute(readyPlayerRef.current, muted);
+  }, [muted]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -170,7 +199,11 @@ function DeskRadioPlayer({
           playerVars,
           events: {
             onReady: () => {
-              if (!cancelled) onReadyRef.current();
+              if (cancelled || !player) return;
+              readyPlayerRef.current = player;
+              player.setVolume(Math.round(levelRef.current.volume * 100));
+              applyMute(player, levelRef.current.muted);
+              onReadyRef.current();
             },
             onError: (event) => {
               if (!cancelled) onBlockedRef.current(Number(event.data ?? 0));
@@ -184,12 +217,18 @@ function DeskRadioPlayer({
 
     return () => {
       cancelled = true;
+      readyPlayerRef.current = null;
       player?.destroy();
       host.replaceChildren();
     };
   }, [source.id, source.kind, source.startSeconds]);
 
   return <div ref={hostRef} className="desk-radio-frame" data-testid="desk-radio-frame" aria-label="YouTube Desk Radio player" />;
+}
+
+function applyMute(player: YouTubePlayer, muted: boolean) {
+  if (muted) player.mute();
+  else player.unMute();
 }
 
 function loadYouTubeApi() {

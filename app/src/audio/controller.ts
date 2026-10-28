@@ -18,6 +18,7 @@ class CozyAudioController {
   private prefs = DEFAULT_AUDIO_PREFS;
   private room: SceneEnvironmentId = DEFAULT_AUDIO_ROOM;
   private ambience: AudioLayerHandle | null = null;
+  private deskRadioOn = false;
   private suspendTimer: ReturnType<typeof setTimeout> | undefined;
   private lastPaintCueAt = 0;
   private lastReactionCueAt = Number.NEGATIVE_INFINITY;
@@ -114,6 +115,16 @@ class CozyAudioController {
     this.applyPreferences(this.prefs);
   }
 
+  // Desk Radio replaces the beds once its player is up, rather than playing over them, as the
+  // app tells the player when it falls back ("native ambience restored"). They used to play on
+  // under the radio. Up, not merely selected: a player that never loads leaves the beds on.
+  // Cues are feedback, not ambience, and keep playing.
+  setDeskRadioOn(on: boolean) {
+    if (on === this.deskRadioOn) return;
+    this.deskRadioOn = on;
+    this.restartAmbienceLayer();
+  }
+
   playPaintCue(material: MaterialId) {
     if (!this.audio || !this.prefs.enabled || this.prefs.muted) return;
     const now = this.audio.context.currentTime;
@@ -174,7 +185,7 @@ class CozyAudioController {
   }
 
   private startAmbience() {
-    if (!this.audio || this.ambience) return;
+    if (!this.audio || this.ambience || this.deskRadioOn) return;
     this.ambience = startNativeAmbience(this.audio, this.prefs.mood, this.room);
   }
 

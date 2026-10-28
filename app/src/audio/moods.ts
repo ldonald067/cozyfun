@@ -7,11 +7,11 @@ export const AUDIO_MOODS: AudioMoodDef[] = [
     title: "Rainfall",
     status: "rain on",
     ambience: {
-      purrGain: 0.01,
+      purrGain: 0.046,
       purrFilter: 520,
       rainGain: 0.096,
       rainFilter: 3800,
-      fireGain: 0.0018
+      fireGain: 0.038
     }
   },
   {
@@ -22,9 +22,9 @@ export const AUDIO_MOODS: AudioMoodDef[] = [
     ambience: {
       purrGain: 0.09,
       purrFilter: 480,
-      rainGain: 0.018,
+      rainGain: 0.012,
       rainFilter: 3300,
-      fireGain: 0.0014
+      fireGain: 0.0194
     }
   },
   {
@@ -33,9 +33,9 @@ export const AUDIO_MOODS: AudioMoodDef[] = [
     title: "Hearth Crackle",
     status: "fireplace crackle on",
     ambience: {
-      purrGain: 0.006,
+      purrGain: 0.0265,
       purrFilter: 540,
-      rainGain: 0.006,
+      rainGain: 0.0146,
       rainFilter: 4200,
       fireGain: 0.09
     }

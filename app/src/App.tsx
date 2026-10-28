@@ -221,6 +221,10 @@ export function App() {
   }, [audio, sceneEnvironment]);
 
   useEffect(() => {
+    audio.setDeskRadioOn(audioPrefs.provider === "external" && deskRadioPlayback === "ready");
+  }, [audio, audioPrefs.provider, deskRadioPlayback]);
+
+  useEffect(() => {
     if (audioPrefs.provider !== "external" || deskRadioSource) return;
     setAudioPrefs((current) => ({ ...current, provider: "native" }));
     audio.setAudioProvider("native");

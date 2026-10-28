@@ -143,6 +143,10 @@ async function main() {
             else options.events.onReady({});
           }, 30);
           this.destroy = () => element.replaceChildren();
+          const level = (change) => { window.__cozyYouTubeMockLevel = { ...window.__cozyYouTubeMockLevel, ...change }; };
+          this.setVolume = (volume) => level({ volume });
+          this.mute = () => level({ muted: true });
+          this.unMute = () => level({ muted: false });
         }
       };
     `
@@ -460,8 +464,29 @@ async function main() {
     assert(readyState.nowPlaying.includes("Video"), `Desk Radio ready state was missing: ${readyState.nowPlaying}`);
     assert(readyState.storedSource?.id === "dQw4w9WgXcQ", "Playable Desk Radio source was not saved");
     assert(readyState.storedSource?.startSeconds === 72, "Playable Desk Radio start time was not saved");
+    // The app's Master and Mute reach the radio; they used to stop at the Web Audio graph.
+    const level = await evaluate(cdp, `window.__cozyYouTubeMockLevel ?? null`);
+    assert(level?.volume === 68 && level?.muted === false, `Desk Radio did not take the app's Master and Mute: ${JSON.stringify(level)}`);
+    await click(cdp, '[data-testid="audio-mute"]');
+    await waitForStatus(cdp, "audio muted");
+    await waitUntil(() => evaluate(cdp, `window.__cozyYouTubeMockLevel?.muted === true`), "Desk Radio to mute with the app");
+    await click(cdp, '[data-testid="audio-mute"]');
+    await waitForStatus(cdp, "audio unmuted");
+    await waitUntil(() => evaluate(cdp, `window.__cozyYouTubeMockLevel?.muted === false`), "Desk Radio to unmute with the app");
+    // The radio replaces the native beds: a mood change under it starts none, and clearing it
+    // brings them back. They used to play on underneath.
+    await evaluate(cdp, `window.__cozyNativeAmbienceProbe = { starts: [] }`);
+    await click(cdp, '[data-testid="audio-mood-rain"]');
+    await waitForStatus(cdp, "Rainfall ready");
+    await sleep(500);
+    const bedsUnderRadio = await evaluate(cdp, `(window.__cozyNativeAmbienceProbe?.starts ?? []).length`);
+    assert(bedsUnderRadio === 0, `${bedsUnderRadio} native beds started under Desk Radio`);
     await click(cdp, '[data-testid="desk-radio-clear"]');
     await waitForStatus(cdp, "native ambience selected");
+    await waitUntil(
+      () => evaluate(cdp, `(window.__cozyNativeAmbienceProbe?.starts ?? []).some((start) => start.id === "rainFall")`),
+      "native beds to return once Desk Radio is cleared"
+    );
 
     await click(cdp, '[data-testid="audio-provider-external"]');
     await waitForStatus(cdp, "desk radio needs a YouTube link");

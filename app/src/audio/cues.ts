@@ -27,7 +27,7 @@ export function playMaterialPaintCue(audio: RunningAudio, material: MaterialId, 
       return;
     case MATERIAL.Sand:
     case MATERIAL.Soil:
-      playNoise(audio, time, { duration: 0.045, frequency: 880, gain: 0.0064, type: "bandpass", q: 0.65 });
+      playNoise(audio, time, { duration: 0.045, frequency: 880, gain: 0.0121, type: "bandpass", q: 0.65 });
       return;
     case MATERIAL.Wall:
     case MATERIAL.Stone:
@@ -39,7 +39,7 @@ export function playMaterialPaintCue(audio: RunningAudio, material: MaterialId, 
       playDroplet(audio, time, material === MATERIAL.Moonwater);
       return;
     case MATERIAL.Oil:
-      playNoise(audio, time, { duration: 0.062, frequency: 360, gain: 0.0046, type: "lowpass", q: 0.3 });
+      playNoise(audio, time, { duration: 0.062, frequency: 360, gain: 0.0331, type: "lowpass", q: 0.3 });
       return;
     case MATERIAL.Ice:
       playTone(audio, time, { duration: 0.07, frequency: 760, endFrequency: 1040, gain: 0.0036, type: "sine" });
@@ -57,9 +57,19 @@ export function playMaterialPaintCue(audio: RunningAudio, material: MaterialId, 
       playNoise(audio, time, { duration: 0.044, frequency: material === MATERIAL.Fire ? 1700 : 1250, gain: 0.0042, type: "bandpass", q: 0.42 });
       playTone(audio, time, { duration: 0.036, frequency: material === MATERIAL.Meteor ? 92 : 120, gain: 0.0035, type: "sine" });
       return;
+    case MATERIAL.Rocket:
+      // Dry powder: a sharper grain than sand's, with a faint snap.
+      playNoise(audio, time, { duration: 0.034, frequency: 1500, gain: 0.0095, type: "bandpass", q: 0.6 });
+      playTone(audio, time + 0.004, { duration: 0.028, frequency: 430, gain: 0.0016, type: "triangle" });
+      return;
+    case MATERIAL.Wellspring:
+      // A spring wells up: a rising bloop, where water's droplet falls.
+      playTone(audio, time, { duration: 0.11, frequency: 260, endFrequency: 420, gain: 0.0028, type: "sine" });
+      playTone(audio, time + 0.04, { duration: 0.07, frequency: 390, endFrequency: 600, gain: 0.0011, type: "sine" });
+      return;
     case MATERIAL.Stardust:
-      playTone(audio, time, { duration: 0.078, frequency: 1040, endFrequency: 1560, gain: 0.0032, type: "sine" });
-      playTone(audio, time + 0.025, { duration: 0.066, frequency: 1390, gain: 0.002, type: "sine" });
+      playTone(audio, time, { duration: 0.078, frequency: 1040, endFrequency: 1560, gain: 0.0027, type: "sine" });
+      playTone(audio, time + 0.025, { duration: 0.066, frequency: 1390, gain: 0.0017, type: "sine" });
       return;
   }
 }
@@ -89,9 +99,9 @@ export function playReactionCue(audio: RunningAudio, cue: ReactionCue, time: num
       playTone(audio, time + 0.032, { duration: 0.07, frequency: 1380, endFrequency: 980, gain: 0.0018, type: "triangle" });
       return;
     case "vitrify":
-      playTone(audio, time, { duration: 0.14, frequency: 1680, endFrequency: 1240, gain: 0.0026, type: "sine" });
-      playTone(audio, time + 0.02, { duration: 0.09, frequency: 2140, gain: 0.0012, type: "triangle" });
-      playNoise(audio, time, { duration: 0.05, frequency: 3200, gain: 0.0008, type: "highpass", q: 0.4 });
+      playTone(audio, time, { duration: 0.14, frequency: 1680, endFrequency: 1240, gain: 0.0021, type: "sine" });
+      playTone(audio, time + 0.02, { duration: 0.09, frequency: 2140, gain: 0.00097, type: "triangle" });
+      playNoise(audio, time, { duration: 0.05, frequency: 3200, gain: 0.00064, type: "highpass", q: 0.4 });
       return;
     case "starfire":
       playTone(audio, time, { duration: 0.11, frequency: 1560, endFrequency: 1170, gain: 0.0024, type: "sine" });
@@ -103,8 +113,8 @@ export function playReactionCue(audio: RunningAudio, cue: ReactionCue, time: num
       playNoise(audio, time + 0.012, { duration: 0.09, frequency: 900, gain: 0.0024, type: "bandpass", q: 0.3 });
       return;
     case "quench":
-      playNoise(audio, time, { duration: 0.16, frequency: 640, gain: 0.003, type: "bandpass", q: 0.2 });
-      playNoise(audio, time + 0.05, { duration: 0.1, frequency: 320, gain: 0.0014, type: "lowpass", q: 0.3 });
+      playNoise(audio, time, { duration: 0.16, frequency: 640, gain: 0.0043, type: "bandpass", q: 0.2 });
+      playNoise(audio, time + 0.05, { duration: 0.1, frequency: 320, gain: 0.002, type: "lowpass", q: 0.3 });
       return;
     case "crumble":
       playTone(audio, time, { duration: 0.06, frequency: 96, gain: 0.0036, type: "triangle" });
@@ -112,12 +122,12 @@ export function playReactionCue(audio: RunningAudio, cue: ReactionCue, time: num
       playNoise(audio, time + 0.01, { duration: 0.1, frequency: 420, gain: 0.002, type: "lowpass", q: 0.35 });
       return;
     case "frost":
-      playTone(audio, time, { duration: 0.06, frequency: 1240, endFrequency: 1580, gain: 0.0018, type: "sine" });
-      playNoise(audio, time + 0.008, { duration: 0.04, frequency: 4200, gain: 0.0007, type: "highpass", q: 0.5 });
+      playTone(audio, time, { duration: 0.06, frequency: 1240, endFrequency: 1580, gain: 0.0022, type: "sine" });
+      playNoise(audio, time + 0.008, { duration: 0.04, frequency: 4200, gain: 0.00085, type: "highpass", q: 0.5 });
       return;
     case "dew":
-      playTone(audio, time, { duration: 0.06, frequency: 1180, endFrequency: 860, gain: 0.0022, type: "sine" });
-      playTone(audio, time + 0.05, { duration: 0.05, frequency: 1420, endFrequency: 1020, gain: 0.0014, type: "sine" });
+      playTone(audio, time, { duration: 0.06, frequency: 1180, endFrequency: 860, gain: 0.0026, type: "sine" });
+      playTone(audio, time + 0.05, { duration: 0.05, frequency: 1420, endFrequency: 1020, gain: 0.0017, type: "sine" });
       return;
     case "shatter":
       playTone(audio, time, { duration: 0.05, frequency: 2260, endFrequency: 1660, gain: 0.0026, type: "triangle" });
@@ -125,19 +135,19 @@ export function playReactionCue(audio: RunningAudio, cue: ReactionCue, time: num
       playNoise(audio, time, { duration: 0.09, frequency: 3400, gain: 0.0012, type: "highpass", q: 0.5 });
       return;
     case "erode":
-      playNoise(audio, time, { duration: 0.14, frequency: 760, gain: 0.0022, type: "bandpass", q: 0.3 });
-      playNoise(audio, time + 0.06, { duration: 0.09, frequency: 420, gain: 0.0012, type: "lowpass", q: 0.3 });
+      playNoise(audio, time, { duration: 0.14, frequency: 760, gain: 0.0062, type: "bandpass", q: 0.3 });
+      playNoise(audio, time + 0.06, { duration: 0.09, frequency: 420, gain: 0.0034, type: "lowpass", q: 0.3 });
       return;
     case "sprout":
-      playNoise(audio, time, { duration: 0.04, frequency: 620, gain: 0.001, type: "bandpass", q: 0.4 });
-      playTone(audio, time + 0.015, { duration: 0.09, frequency: 240, endFrequency: 340, gain: 0.0024, type: "triangle" });
+      playNoise(audio, time, { duration: 0.04, frequency: 620, gain: 0.0013, type: "bandpass", q: 0.4 });
+      playTone(audio, time + 0.015, { duration: 0.09, frequency: 240, endFrequency: 340, gain: 0.0031, type: "triangle" });
       return;
   }
 }
 
 function playDroplet(audio: RunningAudio, time: number, cosmic: boolean) {
-  playTone(audio, time, { duration: 0.1, frequency: cosmic ? 660 : 520, endFrequency: cosmic ? 920 : 380, gain: cosmic ? 0.004 : 0.0046, type: "sine" });
-  playTone(audio, time + 0.032, { duration: 0.064, frequency: cosmic ? 990 : 740, endFrequency: cosmic ? 1320 : 610, gain: cosmic ? 0.0022 : 0.0019, type: "sine" });
+  playTone(audio, time, { duration: 0.1, frequency: cosmic ? 660 : 520, endFrequency: cosmic ? 920 : 380, gain: cosmic ? 0.0029 : 0.0031, type: "sine" });
+  playTone(audio, time + 0.032, { duration: 0.064, frequency: cosmic ? 990 : 740, endFrequency: cosmic ? 1320 : 610, gain: cosmic ? 0.0016 : 0.0013, type: "sine" });
 }
 
 function playTone(audio: RunningAudio, time: number, options: ToneCue) {
@@ -147,7 +157,7 @@ function playTone(audio: RunningAudio, time: number, options: ToneCue) {
   oscillator.frequency.setValueAtTime(options.frequency, time);
   if (options.endFrequency) oscillator.frequency.exponentialRampToValueAtTime(options.endFrequency, time + options.duration);
 
-  const gain = context.createGain();
+  const gain = silentGain(context);
   gain.gain.setValueAtTime(0.0001, time);
   gain.gain.exponentialRampToValueAtTime(options.gain, time + 0.01);
   gain.gain.exponentialRampToValueAtTime(0.0001, time + options.duration);
@@ -169,7 +179,7 @@ function playNoise(audio: RunningAudio, time: number, options: NoiseCue) {
   filter.frequency.value = options.frequency;
   filter.Q.value = options.q ?? 0.5;
 
-  const gain = context.createGain();
+  const gain = silentGain(context);
   gain.gain.setValueAtTime(0.0001, time);
   gain.gain.exponentialRampToValueAtTime(options.gain, time + 0.008);
   gain.gain.exponentialRampToValueAtTime(0.0001, time + options.duration);
@@ -180,4 +190,15 @@ function playNoise(audio: RunningAudio, time: number, options: NoiseCue) {
   disconnectAfterEnded(source, filter, gain);
   source.start(time);
   source.stop(time + options.duration + 0.01);
+}
+
+// A voice's envelope starts on its first event, and until then a gain sits at its default of
+// 1. A voice scheduled a fraction of a sample after a frame (live play schedules at a render
+// quantum plus 5 or 6 ms, which is rarely a whole frame) let its first sample through at that
+// gain: noise voices clicked on about half of all cues, up to -3 dBFS against a cue level near
+// -55. A tone starts at zero phase, so only noise was heard, but both are guarded.
+function silentGain(context: BaseAudioContext) {
+  const gain = context.createGain();
+  gain.gain.value = 0.0001;
+  return gain;
 }
