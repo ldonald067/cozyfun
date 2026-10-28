@@ -1,4 +1,4 @@
-import { AMBIENT_AUDIO_ASSETS, ambientAudioUrl, loadAmbientAudioBuffer, type AmbientAudioAssetId } from "./assets";
+import { AMBIENT_AUDIO_ASSETS, ambientAudioUrl, decodeAmbientAudio, type AmbientAudioAssetId } from "./assets";
 import { getAudioMoodDef } from "./moods";
 import { DEFAULT_AUDIO_ROOM, getRoomAmbienceDef } from "./rooms";
 import type { AudioLayerHandle, AudioMood, RunningAudio } from "./types";
@@ -87,6 +87,8 @@ type NativeAmbienceProbe = {
     id: AmbientAudioAssetId;
     url: string;
     duration: number;
+    sampleRate: number;
+    buffer: AudioBuffer | null;
     gain: number;
     loop: boolean;
     filterType: BiquadFilterType;
@@ -107,11 +109,11 @@ function startRecordedLoop(
     cancelled = true;
   });
 
-  void loadAmbientAudioBuffer(audio.context, id).then((decodedBuffer) => {
-    if (cancelled || !decodedBuffer) return;
+  void loadAmbientLoop(audio.context, id).then((loop) => {
+    if (cancelled || !loop) return;
 
     const source = audio.context.createBufferSource();
-    source.buffer = createLongLoopBuffer(audio.context, decodedBuffer, AMBIENT_AUDIO_ASSETS[id].minLoopSeconds);
+    source.buffer = loop;
     source.loop = true;
 
     const filter = audio.context.createBiquadFilter();
@@ -141,6 +143,8 @@ function recordNativeAmbienceStart(id: AmbientAudioAssetId, source: AudioBufferS
     id,
     url: ambientAudioUrl(id),
     duration: source.buffer?.duration ?? 0,
+    sampleRate: source.buffer?.sampleRate ?? 0,
+    buffer: source.buffer,
     gain: gain.gain.value,
     loop: source.loop,
     filterType: filter.type,
@@ -148,52 +152,76 @@ function recordNativeAmbienceStart(id: AmbientAudioAssetId, source: AudioBufferS
   });
 }
 
-function createLongLoopBuffer(context: BaseAudioContext, source: AudioBuffer, minDurationSeconds: number) {
-  if (source.duration >= minDurationSeconds) return source;
+// Built once per bed and shared by every layer, so a mood or room switch replays the same
+// loop instead of decoding and rebuilding it. An AudioBuffer is not tied to a context, so
+// the cache outlives one. A failed load is dropped so the next start retries it.
+const loopCache = new Map<AmbientAudioAssetId, Promise<AudioBuffer | null>>();
 
-  const targetLength = Math.max(source.length, Math.ceil(minDurationSeconds * source.sampleRate));
-  const output = context.createBuffer(source.numberOfChannels, targetLength, source.sampleRate);
-  const fadeLength = Math.min(
-    Math.floor(source.sampleRate * 0.28),
-    Math.floor(source.length / 4),
-    Math.floor(targetLength / 24)
-  );
-  const stride = Math.max(1, source.length - fadeLength);
+function loadAmbientLoop(context: BaseAudioContext, id: AmbientAudioAssetId) {
+  const cached = loopCache.get(id);
+  if (cached) return cached;
+  const loop = decodeAmbientAudio(id, context).then((decoded) => (decoded ? buildSeamlessLoop(context, decoded) : null));
+  loopCache.set(id, loop);
+  void loop.then((built) => {
+    if (!built) loopCache.delete(id);
+  });
+  return loop;
+}
 
+// Below this a sample is digital silence: decoder priming, or the recording's own lead-in.
+// The purr opened on 71 ms of it and the fire on 17 ms, a dropout at every wrap.
+const SILENCE = 1e-4;
+// Kept clear of each end past the silence: the purr fades in over its first quarter second
+// and the fire fades out over its last, and either would dip at every wrap.
+const LOOP_EDGE_SECONDS = 0.25;
+// Equal-power, because the beds are noise-like and uncorrelated across the seam, where a
+// linear fade dips ~3 dB at its middle.
+const LOOP_CROSSFADE_SECONDS = 0.5;
+
+/**
+ * A recording turned into a buffer that loops without a seam. The kept span's last `fade`
+ * samples are crossfaded with the `fade` samples just before the loop's first sample, so
+ * the tail arrives exactly where playback wraps to:
+ *
+ *   kept:    [head | body .................................... | tail]
+ *   output:         [body .................................... | tail x head]
+ *
+ * The extension this replaces was written for clips shorter than a loop should be. Every
+ * bed now runs about two minutes or more, and it faded the tail into the START of the
+ * recording and then wrapped back to that same start: a jump at every wrap, the first four
+ * seconds of the purr heard twice running, and a second full-length copy in memory.
+ */
+function buildSeamlessLoop(context: BaseAudioContext, source: AudioBuffer) {
+  const rate = source.sampleRate;
+  const edge = Math.floor(rate * LOOP_EDGE_SECONDS);
+  const [first, last] = soundingSpan(source);
+  const start = first + edge;
+  const end = last - edge;
+  const fade = Math.min(Math.floor(rate * LOOP_CROSSFADE_SECONDS), Math.floor((end - start) / 4));
+  if (fade < 1) return source;
+
+  const length = end - start - fade;
+  const output = context.createBuffer(source.numberOfChannels, length, rate);
   for (let channel = 0; channel < source.numberOfChannels; channel++) {
     const input = source.getChannelData(channel);
     const data = output.getChannelData(channel);
-    let writeAt = 0;
-
-    while (writeAt < targetLength) {
-      const remaining = targetLength - writeAt;
-      const readable = Math.min(source.length, remaining);
-      if (writeAt === 0 || fadeLength <= 0) {
-        data.set(input.subarray(0, readable), writeAt);
-      } else {
-        const overlap = Math.min(fadeLength, readable);
-        for (let i = 0; i < overlap; i++) {
-          const amount = (i + 1) / (overlap + 1);
-          data[writeAt + i] = data[writeAt + i] * (1 - amount) + input[i] * amount;
-        }
-        if (readable > overlap) {
-          data.set(input.subarray(overlap, readable), writeAt + overlap);
-        }
-      }
-      writeAt += stride;
+    data.set(input.subarray(start + fade, end));
+    const tailAt = length - fade;
+    for (let i = 0; i < fade; i++) {
+      const angle = ((i + 0.5) / fade) * (Math.PI / 2);
+      data[tailAt + i] = input[end - fade + i] * Math.cos(angle) + input[start + i] * Math.sin(angle);
     }
-
-    smoothLoopBoundary(data, fadeLength);
   }
-
   return output;
 }
 
-function smoothLoopBoundary(data: Float32Array, fadeLength: number) {
-  if (fadeLength <= 0 || data.length <= fadeLength) return;
-  const endStart = data.length - fadeLength;
-  for (let i = 0; i < fadeLength; i++) {
-    const amount = (i + 1) / (fadeLength + 1);
-    data[endStart + i] = data[endStart + i] * (1 - amount) + data[i] * amount;
-  }
+/** First sounding sample and one past the last, across every channel. */
+function soundingSpan(buffer: AudioBuffer): [number, number] {
+  const channels = Array.from({ length: buffer.numberOfChannels }, (_, channel) => buffer.getChannelData(channel));
+  const sounding = (i: number) => channels.some((data) => Math.abs(data[i]) >= SILENCE);
+  let first = 0;
+  while (first < buffer.length && !sounding(first)) first++;
+  let last = buffer.length;
+  while (last > first && !sounding(last - 1)) last--;
+  return [first, last];
 }

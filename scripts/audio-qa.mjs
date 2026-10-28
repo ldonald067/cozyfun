@@ -41,7 +41,7 @@ async function main() {
         file: filePath,
         bytes: fileStat.size,
         minimumBytes,
-        minLoopSeconds: asset.minLoopSeconds,
+        storeRate: asset.storeRate,
         ok: fileStat.size >= minimumBytes
       };
     })
@@ -49,7 +49,7 @@ async function main() {
 
   const manifest = {
     generatedAt: new Date().toISOString(),
-    note: "Native ambience QA manifest. Long-running cat purr, rain, and fire ambience comes from local recordings; the browser extends shorter recordings into longer in-memory loops.",
+    note: "Native ambience QA manifest. Long-running cat purr, rain, and fire ambience comes from local recordings, each decoded at its storeRate and looped with an equal-power crossfade seam.",
     ambienceGuard,
     assetChecks,
     moods: moods.map((mood) => ({
@@ -78,7 +78,7 @@ async function main() {
   console.log("Audio QA manifest written:");
   console.log(`- ${manifestPath}`);
   for (const asset of assetChecks) {
-    console.log(`- ${asset.id}: ${asset.bytes} bytes, ${asset.minLoopSeconds}s target loop`);
+    console.log(`- ${asset.id}: ${asset.bytes} bytes, held at ${asset.storeRate} Hz`);
   }
   if (failed.length > 0) {
     throw new Error(`Audio asset check failed: ${failed.map((asset) => asset.id).join(", ")}`);

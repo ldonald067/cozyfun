@@ -11,6 +11,8 @@ export type SandboxEngine = {
   clear(): void;
   paint(x: number, y: number, radius: number, material: number, density?: number): void;
   getCellBytes(): Uint8Array;
+  /** getCellBytes into `target` when it is the right size, so a per-tick reader allocates nothing. */
+  readCellBytes(target?: Uint8Array): Uint8Array;
   loadCellBytes(bytes: Uint8Array): boolean;
   dispose(): void;
 };
@@ -106,6 +108,15 @@ class WasmSandboxEngine implements SandboxEngine {
     const ptr = this.wasm.universe_cells_ptr(this.ptr);
     const len = this.wasm.universe_cells_byte_len(this.ptr);
     return new Uint8Array(this.wasm.memory.buffer, ptr, len).slice();
+  }
+
+  readCellBytes(target?: Uint8Array) {
+    const ptr = this.wasm.universe_cells_ptr(this.ptr);
+    const len = this.wasm.universe_cells_byte_len(this.ptr);
+    const view = new Uint8Array(this.wasm.memory.buffer, ptr, len);
+    if (target?.byteLength !== len) return view.slice();
+    target.set(view);
+    return target;
   }
 
   loadCellBytes(bytes: Uint8Array) {
@@ -392,6 +403,12 @@ class JsSandboxEngine implements SandboxEngine {
 
   getCellBytes() {
     return this.cells.slice();
+  }
+
+  readCellBytes(target?: Uint8Array) {
+    if (target?.byteLength !== this.cells.byteLength) return this.cells.slice();
+    target.set(this.cells);
+    return target;
   }
 
   loadCellBytes(bytes: Uint8Array) {

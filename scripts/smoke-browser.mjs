@@ -94,6 +94,16 @@ async function main() {
           return buffer;
         };
 
+        // The context itself, so a check can ask whether silence actually stopped it.
+        const contextProto = window.AudioContext?.prototype;
+        if (contextProto) {
+          const originalResume = contextProto.resume;
+          contextProto.resume = function resume(...args) {
+            window.__cozyAudioContext = this;
+            return originalResume.apply(this, args);
+          };
+        }
+
         const originalCreateBufferSource = baseProto.createBufferSource;
         baseProto.createBufferSource = function createBufferSource() {
           const source = originalCreateBufferSource.call(this);
@@ -377,12 +387,15 @@ async function main() {
     for (const path of ["/audio/cat-purr.mp3", "/audio/rain.mp3", "/audio/fire-crackle.mp3"]) {
       assert(nativeAmbience.fetches.includes(path), `native ambience did not fetch ${path}: ${nativeAmbience.fetches.join(", ")}`);
     }
-    assertLoopSource(nativeAmbience.loopSources, "cat purr", 120);
-    assertLoopSource(nativeAmbience.loopSources, "rain", 150);
-    assertLoopSource(nativeAmbience.loopSources, "fire crackle", 120);
-    assertNativeStart(nativeAmbience.nativeStarts, "catPurr", "/audio/cat-purr.mp3", 120, { minGain: 0.001 });
-    assertNativeStart(nativeAmbience.nativeStarts, "rainFall", "/audio/rain.mp3", 150, { minGain: 0.01 });
-    assertNativeStart(nativeAmbience.nativeStarts, "fireCrackle", "/audio/fire-crackle.mp3", 120, { minGain: 0.0001 });
+    // A loop is the recording minus its silent lead-in, a quarter second at each end and the
+    // crossfade, so a little under the file: 116 s of purr plays as ~115.
+    assertLoopSource(nativeAmbience.loopSources, "cat purr", 110);
+    assertLoopSource(nativeAmbience.loopSources, "rain", 260);
+    assertLoopSource(nativeAmbience.loopSources, "fire crackle", 110);
+    assertNativeStart(nativeAmbience.nativeStarts, "catPurr", "/audio/cat-purr.mp3", 110, { minGain: 0.001 });
+    assertNativeStart(nativeAmbience.nativeStarts, "rainFall", "/audio/rain.mp3", 260, { minGain: 0.01 });
+    assertNativeStart(nativeAmbience.nativeStarts, "fireCrackle", "/audio/fire-crackle.mp3", 110, { minGain: 0.0001 });
+    await assertSeamlessLoops(cdp);
 
     await evaluate(cdp, `window.__cozyNativeAmbienceProbe = { starts: [] }`);
     await click(cdp, '[data-testid="audio-mood-purr"]');
@@ -403,24 +416,29 @@ async function main() {
     await waitUntil(
       () => evaluate(
         cdp,
-        `(() => (window.__cozyNativeAmbienceProbe?.starts ?? []).some((start) => start.id === "fireCrackle" && start.url === "/audio/fire-crackle.mp3" && start.duration >= 119 && start.gain >= 0.05))()`
+        `(() => (window.__cozyNativeAmbienceProbe?.starts ?? []).some((start) => start.id === "fireCrackle" && start.url === "/audio/fire-crackle.mp3" && start.duration >= 110 && start.gain >= 0.05))()`
       ),
       "hearth fire crackle native loop to start"
     );
     const hearthAmbience = await evaluate(cdp, `window.__cozyNativeAmbienceProbe?.starts ?? []`);
-    assertNativeStart(hearthAmbience, "fireCrackle", "/audio/fire-crackle.mp3", 120, { minGain: 0.05 });
+    assertNativeStart(hearthAmbience, "fireCrackle", "/audio/fire-crackle.mp3", 110, { minGain: 0.05 });
     await click(cdp, '[data-testid="audio-mood-fire"]');
     await waitForStatus(cdp, "fireplace crackle on");
     await click(cdp, '[data-testid="audio-mute"]');
     await waitForStatus(cdp, "audio muted");
     await waitUntil(() => textIncludes(cdp, '[data-testid="audio-mute"]', "Muted"), "mute button to show muted");
+    // Muted is silent, and silent should be idle: the three loops stop mixing on the audio
+    // thread once the fade is done, rather than playing at zero gain for the life of the tab.
+    await waitUntil(() => evaluate(cdp, `window.__cozyAudioContext?.state === "suspended"`), "muted audio context to suspend");
     await setRange(cdp, '[data-testid="audio-volume-ambience"]', "0.52");
     const ambienceVolume = await evaluate(cdp, `document.querySelector('[data-testid="audio-volume-ambience"]')?.value`);
     assert(ambienceVolume === "0.52", `ambience volume did not update, got ${ambienceVolume}`);
     await click(cdp, '[data-testid="audio-mute"]');
     await waitForStatus(cdp, "audio unmuted");
+    await waitUntil(() => evaluate(cdp, `window.__cozyAudioContext?.state === "running"`), "unmuted audio context to resume");
     await click(cdp, '[data-testid="audio-toggle"]');
     await waitForStatus(cdp, "Hearth Crackle resting");
+    await waitUntil(() => evaluate(cdp, `window.__cozyAudioContext?.state === "suspended"`), "stopped audio context to suspend");
   });
 
   await check("desk radio handles playable and blocked YouTube embeds", async () => {
@@ -868,6 +886,53 @@ async function canvasSignature(cdp) {
 
 async function textIncludes(cdp, selector, expected) {
   return evaluate(cdp, `document.querySelector(${JSON.stringify(selector)})?.textContent?.includes(${JSON.stringify(expected)}) ?? false`);
+}
+
+/**
+ * Reads the buffers the beds actually loop and checks the wrap is inaudible, the way the
+ * old in-memory loop extension's was not: it faded its tail into the START of the recording
+ * and then wrapped back to that same start, so the purr jumped by 16x a typical sample step
+ * at every wrap, and played the 71 ms of silence it opens on (the fire, 17 ms). It also
+ * kept every bed at the context's 48 kHz, ~240 MB of PCM between them.
+ */
+async function assertSeamlessLoops(cdp) {
+  const loops = await evaluate(cdp, `(() => {
+    const SILENCE = 1e-4;
+    return (window.__cozyNativeAmbienceProbe?.starts ?? []).map((start) => {
+      const b = start.buffer;
+      if (!b) return { id: start.id, missing: true };
+      const d = b.getChannelData(0), n = d.length, edge = Math.floor(b.sampleRate * 0.25);
+      const steps = [];
+      for (let i = 1; i < n; i += 31) steps.push(Math.abs(d[i] - d[i - 1]));
+      steps.sort((x, y) => x - y);
+      // Longest digital silence within a quarter second either side of the wrap.
+      let run = 0, longest = 0;
+      for (let k = -edge; k < edge; k++) {
+        const v = d[(k + n) % n];
+        run = Math.abs(v) < SILENCE ? run + 1 : 0;
+        longest = Math.max(longest, run);
+      }
+      return {
+        id: start.id,
+        sampleRate: b.sampleRate,
+        mb: (b.length * b.numberOfChannels * 4) / 1e6,
+        wrapJump: Math.abs(d[n - 1] - d[0]),
+        p99Step: steps[Math.floor(steps.length * 0.99)],
+        silentMsAtWrap: (longest / b.sampleRate) * 1000
+      };
+    });
+  })()`);
+  const expectedRates = { catPurr: 24000, rainFall: 22050, fireCrackle: 32000 };
+  let total = 0;
+  for (const id of Object.keys(expectedRates)) {
+    const loop = loops.find((candidate) => candidate.id === id);
+    assert(loop && !loop.missing, `${id} loop buffer was not reported to the ambience probe`);
+    assert(loop.sampleRate === expectedRates[id], `${id} loop is held at ${loop.sampleRate} Hz, expected its storeRate ${expectedRates[id]}`);
+    assert(loop.wrapJump <= loop.p99Step, `${id} loop jumps ${loop.wrapJump.toFixed(4)} at its wrap, above a 99th-percentile step of ${loop.p99Step.toFixed(4)}`);
+    assert(loop.silentMsAtWrap < 5, `${id} loop goes silent for ${loop.silentMsAtWrap.toFixed(1)} ms at its wrap`);
+    total += loop.mb;
+  }
+  assert(total < 100, `ambience loops hold ${total.toFixed(1)} MB of PCM, budget 100 MB (was ~240 at 48 kHz)`);
 }
 
 function assertLoopSource(sources, label, minimumDuration) {

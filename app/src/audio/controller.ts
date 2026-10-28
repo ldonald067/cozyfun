@@ -18,6 +18,7 @@ class CozyAudioController {
   private prefs = DEFAULT_AUDIO_PREFS;
   private room: SceneEnvironmentId = DEFAULT_AUDIO_ROOM;
   private ambience: AudioLayerHandle | null = null;
+  private suspendTimer: ReturnType<typeof setTimeout> | undefined;
   private lastPaintCueAt = 0;
   private lastReactionCueAt = Number.NEGATIVE_INFINITY;
   private lastReactionCueByKind: Record<ReactionCue, number> = {
@@ -140,15 +141,36 @@ class CozyAudioController {
     this.prefs = normalizeAudioPrefs(prefs);
     if (!this.audio) return;
     applyMixerPreferences(this.audio, this.prefs);
+    this.syncContextRunning();
   }
 
   dispose() {
+    clearTimeout(this.suspendTimer);
     this.ambience?.stop();
     this.ambience = null;
     if (this.audio) {
       void this.audio.context.close();
       this.audio = null;
     }
+  }
+
+  // Silent is not idle: at zero gain the three loops still play and mix on the audio
+  // thread for as long as the tab is open. Once the fade to silence has run its course the
+  // context is suspended, and it resumes the moment sound is wanted again — always from a
+  // click (Start or Unmute), which is what lets a browser resume it.
+  private syncContextRunning() {
+    const audio = this.audio;
+    if (!audio) return;
+    clearTimeout(this.suspendTimer);
+    if (this.prefs.enabled && !this.prefs.muted) {
+      if (audio.context.state !== "running") void audio.context.resume().catch(() => undefined);
+      return;
+    }
+    this.suspendTimer = setTimeout(() => {
+      if (this.audio === audio && (!this.prefs.enabled || this.prefs.muted)) {
+        void audio.context.suspend().catch(() => undefined);
+      }
+    }, SUSPEND_AFTER_FADE_MS);
   }
 
   private startAmbience() {
@@ -173,6 +195,9 @@ class CozyAudioController {
     return null;
   }
 }
+
+// The master fade has a 55 ms time constant (mixer.ts): by 500 ms it is ~80 dB down.
+const SUSPEND_AFTER_FADE_MS = 500;
 
 const REACTION_CUE_PRIORITY: ReactionCue[] = [
   "crumble",

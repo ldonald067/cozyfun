@@ -53,6 +53,16 @@ The owner hits usage limits early.
    - `lava.scorches` "thaws" is unreachable by touch: a pool kept against an ice wall barely
      melts it, because a stone crust forms between them. A check for it passed 0 of 16 seeds
      and was not kept.
+6. **Sound levels, the owner's ears first** (audit of 2026-10-28; loops and memory are done).
+   - The mix is quiet: -41 dBFS RMS at default sliders, -35 at maximum, with 14 dB of
+     headroom never used. Desk Radio (YouTube) plays ~20 dB louder. A makeup gain with a
+     limiter would close that; render A/B clips before choosing a level.
+   - 33 of 36 background beds (mood x room) sit 20 dB or more under the featured one, and
+     fire never comes within 33 dB unless it is the mood, so `rooms.ts` is mostly
+     inaudible. Retune, or stop loading what cannot be heard.
+   - Probes: `.tmp/audio-audit/` (`probe.mjs` levels and seams, `beds.mjs` per-bed levels).
+   - Open with the owner: native beds keep playing under Desk Radio, and the app's Mute and
+     Master do not reach the YouTube player. Intended or not is undocumented.
 
 ## Open questions, accepted unless the owner says otherwise
 

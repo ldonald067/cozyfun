@@ -241,6 +241,9 @@ export function App() {
     let lastSimTick = performance.now();
     let lastFpsAt = lastSimTick;
     let frames = 0;
+    // Reused every tick: two fresh grid copies a tick was ~480 KB of garbage, 20 times a second.
+    let reactionBefore: Uint8Array | undefined;
+    let reactionAfter: Uint8Array | undefined;
 
     const loop = (time: number) => {
       if (fastForwardRef.current > 0 && ownsTerrariumRef.current) {
@@ -261,10 +264,12 @@ export function App() {
         );
         lastSimTick = time;
       } else if (!paused && time - lastSimTick >= SIM_TICK_MS) {
-        const reactionCellsBefore = audio.canPlayReactionCues() ? engine.getCellBytes() : null;
+        const listening = audio.canPlayReactionCues();
+        if (listening) reactionBefore = engine.readCellBytes(reactionBefore);
         engine.tick();
-        if (reactionCellsBefore) {
-          audio.playReactionCues(detectReactionCues(reactionCellsBefore, engine.getCellBytes()));
+        if (listening && reactionBefore) {
+          reactionAfter = engine.readCellBytes(reactionAfter);
+          audio.playReactionCues(detectReactionCues(reactionBefore, reactionAfter));
         }
         // Field notes sample on a slow cadence, never during catch-up: a retroactive
         // discovery is exactly the "wait, what was that?" confusion they exist to avoid.

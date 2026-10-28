@@ -3,26 +3,32 @@ export type AmbientAudioAssetId = "catPurr" | "rainFall" | "fireCrackle";
 // levelTrim normalizes each recording's loudness to the rain reference so mood/room
 // gains mean the same thing across beds (measured filtered RMS: rain 0.194,
 // fire 0.020, purr 0.0075). The credited files themselves stay untouched.
+//
+// storeRate is the sample rate a bed is decoded to and held at. Decoding to the context's
+// rate (48 kHz) held ~240 MB of PCM for three beds. Purr (24 kHz) and fire (32 kHz) keep
+// the rate they were recorded at, so nothing is lost. Rain is resampled to 22.05 kHz: its
+// lowpass never opens past 6.5 kHz in any mood or room, and what the filtered rain still
+// carries above 11 kHz measured 41 dB under the rest of it (.tmp/audio-audit/rate.mjs).
 export const AMBIENT_AUDIO_ASSETS: Record<
   AmbientAudioAssetId,
-  { url: string; label: string; minLoopSeconds: number; levelTrim: number }
+  { url: string; label: string; storeRate: number; levelTrim: number }
 > = {
   catPurr: {
     url: "audio/cat-purr.mp3",
     label: "cat purr",
-    minLoopSeconds: 120,
+    storeRate: 24000,
     levelTrim: 26
   },
   rainFall: {
     url: "audio/rain.mp3",
     label: "rain",
-    minLoopSeconds: 150,
+    storeRate: 22050,
     levelTrim: 1
   },
   fireCrackle: {
     url: "audio/fire-crackle.mp3",
     label: "fire crackle",
-    minLoopSeconds: 120,
+    storeRate: 32000,
     levelTrim: 9.7
   }
 };
@@ -38,33 +44,24 @@ export function ambientAudioUrl(id: AmbientAudioAssetId) {
   return `${base}${AMBIENT_AUDIO_ASSETS[id].url}`;
 }
 
-const audioBufferCache = new WeakMap<BaseAudioContext, Map<AmbientAudioAssetId, Promise<AudioBuffer | null>>>();
-
-export function loadAmbientAudioBuffer(context: BaseAudioContext, id: AmbientAudioAssetId) {
-  let contextCache = audioBufferCache.get(context);
-  if (!contextCache) {
-    contextCache = new Map();
-    audioBufferCache.set(context, contextCache);
+/**
+ * Fetch and decode one bed at its storeRate. An AudioBuffer is not tied to the context that
+ * decoded it, so a throwaway OfflineAudioContext does the resampling and the live context
+ * plays the result. Browsers without one fall back to decoding on the live context.
+ */
+export async function decodeAmbientAudio(id: AmbientAudioAssetId, fallback: BaseAudioContext): Promise<AudioBuffer | null> {
+  try {
+    const response = await fetch(ambientAudioUrl(id));
+    if (!response.ok) return null;
+    const bytes = await response.arrayBuffer();
+    let decoder: BaseAudioContext = fallback;
+    try {
+      decoder = new OfflineAudioContext(1, 1, AMBIENT_AUDIO_ASSETS[id].storeRate);
+    } catch {
+      // Keep the live context.
+    }
+    return await decoder.decodeAudioData(bytes);
+  } catch {
+    return null;
   }
-
-  const cached = contextCache.get(id);
-  if (cached) return cached;
-
-  const buffer: Promise<AudioBuffer | null> = fetch(ambientAudioUrl(id))
-    .then((response) => {
-      if (!response.ok) return null;
-      return response.arrayBuffer();
-    })
-    .then((arrayBuffer) => {
-      if (!arrayBuffer) return null;
-      return context.decodeAudioData(arrayBuffer);
-    })
-    .catch(() => null);
-
-  void buffer.then((decoded) => {
-    if (!decoded) contextCache?.delete(id);
-  });
-
-  contextCache.set(id, buffer);
-  return buffer;
 }

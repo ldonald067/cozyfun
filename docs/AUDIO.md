@@ -16,8 +16,8 @@ Focused implementation modules live under `app/src/audio`:
 - `rooms.ts`: room-linked ambience profiles that bias native ambience without adding controls.
 - `providers.ts`: native/Desk Radio source definitions and compatibility rules.
 - `mixer.ts`: Web Audio graph for `master` and `ambience`.
-- `assets.ts`: local ambience recording metadata, per-asset loudness trims that normalize the recordings to a shared reference level, and the browser decode cache.
-- `ambience.ts`: recorded rain, cat purr, and fire loops, including in-memory loop extension for short local recordings.
+- `assets.ts`: local ambience recording metadata, per-asset loudness trims that normalize the recordings to a shared reference level, and the decoder, which holds each bed at its `storeRate` rather than the context's 48 kHz.
+- `ambience.ts`: recorded rain, cat purr, and fire loops. Each bed is built once into a seamless loop (silent lead-in trimmed, equal-power crossfade at the wrap) and cached for every later mood or room switch.
 - `cues.ts`: short paint and reaction cues for material feedback.
 - `reactions.ts`: post-tick reaction detector for sparse audio cues.
 - `buffers.ts`: reusable generated noise buffers.
@@ -30,6 +30,7 @@ Focused implementation modules live under `app/src/audio`:
 - The app must fully work without sound.
 - Preferences persist, but `enabled` always reloads as false so browsers do not autoplay.
 - Mute and stop should fade through mixer gain instead of tearing down every node.
+- Silent means idle: once a stop or mute has faded out, the controller suspends the AudioContext, and Start or Unmute resumes it. At zero gain the loops would otherwise keep mixing for the life of the tab.
 - Native ambience owns the Web Audio graph. Desk Radio plays through its visible YouTube player.
 - Mood changes restart the ambience layer cleanly.
 - Room changes may restart the ambience layer with a backdrop-specific profile, but they should not add more visible audio controls.
@@ -63,7 +64,7 @@ npm run audio:qa
 
 (Windows wrapper: `.\scripts\audio-qa.ps1`.)
 
-It writes a native ambience manifest to `.tmp/audio-qa`. When a recording is added or replaced, also run `node scripts/audio-loudness.mjs` (after a build) to measure its RMS loudness and update the `levelTrim` in `assets.ts` so the beds stay loudness-matched. The manifest covers local audio asset presence, minimum byte checks, target loop length, the checked-in mood and room balances, and a guard that fails if `ambience.ts` reintroduces generated noise or oscillator ambience. Browser smoke checks verify that the assets are served and decodable. Browser Web Audio routing, autoplay behavior, and Desk Radio embedding are still covered by browser checks.
+It writes a native ambience manifest to `.tmp/audio-qa`. When a recording is added or replaced, also run `node scripts/audio-loudness.mjs` (after a build) to measure its RMS loudness and update the `levelTrim` in `assets.ts` so the beds stay loudness-matched. The manifest covers local audio asset presence, minimum byte checks, target loop length, the checked-in mood and room balances, and a guard that fails if `ambience.ts` reintroduces generated noise or oscillator ambience. Browser smoke checks verify that the assets are served and decodable, that each playing loop is held at its `storeRate` with no jump or silence at its wrap and under 100 MB of PCM between them, and that the context suspends when muted or stopped. A bed's `storeRate` may sit below 48 kHz only where its filter has already removed what the lower rate drops; measure that before lowering one. Browser Web Audio routing, autoplay behavior, and Desk Radio embedding are still covered by browser checks.
 
 Reference tracks can guide taste, but do not sample, copy, scrape, or embed hidden audio from them. YouTube links remain user-provided Desk Radio sources only.
 
