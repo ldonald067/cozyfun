@@ -265,6 +265,11 @@ const FLAG_SPRING_OIL: u16 = FLAG_ROOTED;
 /// On steam, the rooted bit marks a puff (`billow`): vapour that only fades. Every other reader
 /// of `FLAG_ROOTED` is guarded on its own kind, and the vapour renderer reads no flags.
 const FLAG_PUFF: u16 = FLAG_ROOTED;
+/// On pollen, the rooted bit marks a petal a flower shed (`flower.wilts`) rather than a mote it
+/// puffed: the two were one cell, so every fallen petal was drawn as pollen. Its variant already
+/// carries the species. Every other reader of `FLAG_ROOTED` is guarded on its own kind, and a
+/// mote that sets seed builds the seed's flags afresh, so a petal never lands a rooted seed.
+const FLAG_PETAL: u16 = FLAG_ROOTED;
 /// On steam, the drift bit marks a wisp that has already billowed, so it puffs once. The bit is
 /// otherwise read only on oil and on a gliding seed.
 const FLAG_BILLOWED: u16 = FLAG_DRIFT_EAST;
@@ -2497,14 +2502,15 @@ impl Universe {
         // Wilt: a spent petal finally lets go and drifts off as a mote, so an old
         // bloom visibly thins instead of standing perfect forever, and what it sheds
         // can still seed the soil under it. The crown stays behind as a seed head —
-        // which is why a finished garden is not a field of bare poles.
+        // which is why a finished garden is not a field of bare poles. The mote is
+        // marked a petal, so it is drawn in its flower's colour rather than as pollen.
         if cell.flags & FLAG_ROOTED == 0
             && cell.age > PETAL_SHED_AGE
             && cell.energy < POLLEN_RESERVE
             && self.chance(400)
         {
             next[idx] = Cell::new(Material::Pollen as u8, cell.variant, 150);
-            next[idx].flags = cell.flags & FLAG_COSMIC;
+            next[idx].flags = (cell.flags & FLAG_COSMIC) | FLAG_PETAL;
         }
     }
 

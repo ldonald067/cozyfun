@@ -1,4 +1,4 @@
-import { CELL_FLAG, CELL_STRIDE, MATERIAL, MATERIAL_BY_ID, WELLSPRING_TAUGHT, type MaterialId } from "../materials";
+import { CELL_FLAG, CELL_STRIDE, MATERIAL, MATERIAL_BY_ID, POLLEN_PETAL, WELLSPRING_TAUGHT, type MaterialId } from "../materials";
 import { adjustRgb, hexToRgb, mixRgb, type Rgb } from "./color";
 import { cardinalNeighborCount, contactInfo, edgeInfo, hasNearbyKind, kindAt, readU16, sameKind, sameLiquid } from "./cells";
 import { hashCell } from "./hash";
@@ -425,7 +425,27 @@ function soilColor({ variant, energy, flags, cells, width, height, x, y }: Shape
   return out;
 }
 
-function pollenColor({ color, variant, age, flags, time, x, y }: ShapeContext) {
+// A petal a flower shed is a pollen cell the sim marks POLLEN_PETAL, with the species in its
+// variant. It used to be drawn as pollen, so a wilting garden dusted the ground gold. It is
+// drawn as its flower's petal, as dulled as it was on the head when it let go, browning as it
+// lies until it ages out. Falling, it tumbles, showing its pale face and its dark one by turns.
+function shedPetalColor({ variant, age, time, cells, width, height, x, y }: ShapeContext) {
+  const species = SPECIES[variant & 7];
+  const hash = hashCell(x, y, variant);
+  const falling = kindAt(cells, width, height, x, y + 1) === MATERIAL.Empty;
+  const turn = falling ? (Math.sin(time * 0.012 + hash * 1.7) + 1) * 0.5 : (hash & 3) === 0 ? 0.7 : 0.15;
+  let out = mixRgb(species.light, species.dark, turn);
+  // A shed petal is spent, so it leaves the head at the head's full fade (0.4) and browns on.
+  out = mixRgb(out, [122, 108, 88], 0.4 + Math.min(1, age / 150) * 0.25);
+  // No moonlit tint: starlight pulled a white daisy petal to 48 from a moonlit puff, and a
+  // petal is rarely still moonlit when it lets go (its energy, and the flag, run out first).
+  const fade = Math.max(0, 1 - age / 150);
+  return mixRgb([9, 14, 20], out, 0.55 + fade * 0.45);
+}
+
+function pollenColor(context: ShapeContext) {
+  if (context.flags & POLLEN_PETAL) return shedPetalColor(context);
+  const { color, variant, age, flags, time, x, y } = context;
   const hash = hashCell(x, y, variant);
   const bob = (Math.sin(time * 0.01 + hash * 1.3 + x) + 1) * 0.5;
   let out = mixRgb(color, [255, 246, 214], 0.3 + bob * 0.25);

@@ -1,4 +1,4 @@
-import { CELL_FLAG, CELL_FLAG_MASK, CELL_STRIDE, MATERIAL, WELLSPRING_TAUGHT } from "./materials";
+import { CELL_FLAG, CELL_FLAG_MASK, CELL_STRIDE, MATERIAL, POLLEN_PETAL, WELLSPRING_TAUGHT } from "./materials";
 
 export type SandboxEngine = {
   source: "wasm" | "js";
@@ -1726,9 +1726,10 @@ class JsSandboxEngine implements SandboxEngine {
     // Wilt: a spent petal finally lets go and drifts off as a mote, so an old bloom
     // visibly thins instead of standing perfect forever, and what it sheds can still seed
     // the soil under it. The crown stays behind as a seed head — which is why a finished
-    // garden is not a field of bare poles.
+    // garden is not a field of bare poles. The mote is marked a petal, so it is drawn in its
+    // flower's colour rather than as pollen.
     if (!(flags & CELL_FLAG.Rooted) && age > PETAL_SHED_AGE && energy < POLLEN_RESERVE && this.chance(400)) {
-      writeCellBytes(next, idx, MATERIAL.Pollen, cell[1], 150, 0, flags & CELL_FLAG.Cosmic);
+      writeCellBytes(next, idx, MATERIAL.Pollen, cell[1], 150, 0, (flags & CELL_FLAG.Cosmic) | POLLEN_PETAL);
     }
   }
 

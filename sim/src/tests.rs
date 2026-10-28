@@ -1516,6 +1516,83 @@ fn a_spent_petal_sheds_as_a_drifting_mote() {
 }
 
 #[test]
+fn a_shed_petal_is_marked_a_petal_of_its_species_while_it_drifts_and_after_it_lands() {
+    // A shed petal used to be a pollen cell exactly like a puff, so the renderer drew every
+    // fallen petal as pollen. A tulip petal high above a wall floor, so the mote has a long
+    // fall and then lies there until it ages out.
+    let mut u = Universe::new(16, 16, 9);
+    set_cell_state(&mut u, 8, 4, Material::Flower, PETAL_SHED_AGE + 40, 20, 0);
+    let idx = u.idx(8, 4);
+    u.cells[idx].variant = 4;
+    set_cell(&mut u, 8, 5, Material::Wall);
+    for x in 0..16 {
+        set_cell(&mut u, x, 15, Material::Wall);
+    }
+    let (mut drifting, mut landed) = (0, 0);
+    for _ in 0..4000 {
+        u.tick();
+        for (i, cell) in u.cells.iter().enumerate() {
+            if cell.kind != Material::Pollen as u8 {
+                continue;
+            }
+            assert_eq!(cell.flags & FLAG_PETAL, FLAG_PETAL, "a shed petal should be marked a petal");
+            assert_eq!(cell.variant & 7, 4, "a shed petal should keep its flower's species");
+            if i / 16 == 14 {
+                landed += 1;
+            } else if i / 16 > 5 {
+                drifting += 1;
+            }
+        }
+        if landed > 0 && !u.cells.iter().any(|cell| cell.kind == Material::Pollen as u8) {
+            break;
+        }
+    }
+    assert!(drifting > 0, "the petal should have been seen falling");
+    assert!(landed > 0, "the petal should have been seen lying on the floor");
+}
+
+#[test]
+fn a_pollen_puff_is_never_marked_a_petal() {
+    // Pairs with the petal test: the mark must be the shed's alone, or every mote would be
+    // drawn as a petal. A fresh tulip opens and puffs for 900 ticks, short of any petal it
+    // opens reaching PETAL_SHED_AGE.
+    let mut u = Universe::new(20, 20, 3);
+    set_cell_state(&mut u, 10, 10, Material::Flower, 20, BLOOM_ENERGY, FLAG_ROOTED);
+    let idx = u.idx(10, 10);
+    u.cells[idx].variant = 4;
+    set_cell(&mut u, 10, 11, Material::Wall);
+    let mut puffs = 0;
+    for _ in 0..900 {
+        u.tick();
+        for cell in u.cells.iter().filter(|cell| cell.kind == Material::Pollen as u8) {
+            assert_eq!(cell.flags & FLAG_PETAL, 0, "a pollen puff should stay plain pollen");
+            puffs += 1;
+        }
+    }
+    assert!(puffs > 0, "the bloom should have puffed pollen");
+}
+
+#[test]
+fn a_shed_petal_that_sets_seed_never_sets_a_rooted_one() {
+    // The petal mark is the rooted bit. Pollination builds the seed's flags afresh; if it
+    // ever copied the mote's, a petal would set a rooted seed that sprouts where it lands.
+    let mut u = pollen_beside_a_flower(2, 2, 0);
+    for y in 2..8 {
+        let idx = u.idx(11, y);
+        u.cells[idx].flags = FLAG_PETAL;
+    }
+    let mut set = false;
+    for _ in 0..300 {
+        u.tick();
+        for cell in u.cells.iter().filter(|cell| cell.kind == Material::Seed as u8) {
+            assert_eq!(cell.flags & FLAG_ROOTED, 0, "a seed a petal set should not be rooted");
+            set = true;
+        }
+    }
+    assert!(set, "a petal brushing a flower of its kind should still set seed");
+}
+
+#[test]
 fn a_fresh_crown_holds_its_petals() {
     // Pairs with the shed test: without this, "petals fall off" could be passing
     // because every bloom crumbles immediately rather than only when spent.

@@ -1575,6 +1575,29 @@ export const CHECKS = [
       memo.peak = Math.max(memo.peak ?? 0, g.count(M.Flower));
       return memo.peak >= 5 && g.count(M.Flower) < memo.peak ? g.all(M.Flower) : [];
     } },
+  { m: "Flower", covers: "flower.wilts", role: "a shed petal falls and lies in its flower's colour, not as pollen", w: 40, h: 40, seed: 100, ticks: 6000,
+    // The same planting. A shed petal is a pollen cell the sim marks with the rooted bit, of
+    // its flower's species; until 2026-10-28 it was a puff in every byte, so every fallen petal
+    // was drawn as pollen. The witness is a marked mote of the plant's own species, counted
+    // only once the plant has puffed plain pollen, so marking every mote cannot pass. Contrast
+    // is against the same cells drawn as plain pollen: how far a petal is from what it was.
+    paint: (p) => { p(20, 34, 4, M.Soil); p(20, 29, 3, M.Seed); p(20, 24, 3, M.Water); },
+    outcome: (g, before, memo) => {
+      const species = new Set(g.all(M.Flower).map((i) => g.cells[i * STRIDE + 1] & 7));
+      const motes = g.all(M.Pollen);
+      if (!memo.puffed) memo.puffed = motes.some((i) => !g.hasFlag(i, F.Rooted));
+      if (!memo.puffed) return [];
+      const petals = motes.filter((i) => g.hasFlag(i, F.Rooted) && species.has(g.cells[i * STRIDE + 1] & 7));
+      // runCheck keeps the snapshot of the tick with the most cells, so the grid it is scored
+      // against is taken on exactly that tick.
+      if (petals.length > (memo.peak ?? 0)) {
+        memo.peak = petals.length;
+        const plain = g.cells.slice();
+        for (const i of petals) plain[i * STRIDE + 6] &= ~F.Rooted;
+        memo.against = grid(plain, g.w, g.h);
+      }
+      return petals;
+    } },
 
   { m: "Pollen", covers: "pollen.drifts", role: "drifts down and settles where it lands", w: 40, h: 34, seed: 101, ticks: 5000,
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },

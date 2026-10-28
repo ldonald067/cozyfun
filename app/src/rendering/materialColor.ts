@@ -1,4 +1,4 @@
-import { CELL_FLAG, GLOW_MATERIALS, MATERIAL, MATERIAL_BY_ID, type MaterialId } from "../materials";
+import { CELL_FLAG, GLOW_MATERIALS, MATERIAL, MATERIAL_BY_ID, POLLEN_PETAL, type MaterialId } from "../materials";
 import { clampColor, hexToRgb, type Rgb } from "./color";
 import { applyShapeLanguage, emptyCellColor, FIREWORK_HUES, WELLSPRING_TINTS } from "./shapeLanguage";
 
@@ -78,6 +78,8 @@ export function hasGlow(kind: number, flags: number, energy: number, age: number
   if (kind === MATERIAL.Wellspring) return WELLSPRING_TINTS[energy & 255] !== undefined;
   if (kind === MATERIAL.Rocket) return energy > 0;
   if (kind === MATERIAL.Glass) return age < 70;
+  // A shed petal is not a light: pollen's gold glow would draw it as pollen again after dark.
+  if (kind === MATERIAL.Pollen) return (flags & POLLEN_PETAL) === 0;
   return GLOW_MATERIALS.has(kind as MaterialId);
 }
 

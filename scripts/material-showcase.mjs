@@ -116,6 +116,9 @@ export function materialShowcaseScript() {
     setCell(87, 54, material.Moonwater, 140, 22, flag.Cosmic);
     setCell(88, 55, material.Flower, 95, 44, flag.Cosmic, 4);
     for (const [x, y] of [[85, 53], [89, 52], [92, 54]]) setCell(x, y, material.Pollen, 150, 24, 0, x);
+    // Petals the tulip shed, beside its pollen: a shed petal is pollen with the rooted bit
+    // (POLLEN_PETAL) and its flower's variant, and must read as a petal, not as a puff.
+    for (const [x, y] of [[86, 51], [91, 52], [93, 53]]) setCell(x, y, material.Pollen, 150, 24, flag.Rooted, 4);
 
     // Cosmic and heat/cold readable outcomes.
     rect(104, 118, 63, 69, material.Moonwater, 130, 24, flag.Cosmic);

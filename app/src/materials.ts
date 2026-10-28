@@ -25,6 +25,10 @@ export const CELL_FLAG_MASK =
 // is the same bit and says why it is a flag rather than spare bits of energy.
 export const WELLSPRING_TAUGHT = CELL_FLAG.Rooted;
 
+// On pollen, the rooted flag marks a petal a flower shed rather than a mote it puffed, so the
+// renderer can draw it in its flower's colour. `FLAG_PETAL` in sim/src/lib.rs is the same bit.
+export const POLLEN_PETAL = CELL_FLAG.Rooted;
+
 export const MATERIAL = {
   Empty: 0,
   Wall: 1,

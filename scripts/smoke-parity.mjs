@@ -913,16 +913,32 @@ const scenarios = [
     observe(seen, cells, w, h) {
       const kindAt = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : cells[(y * w + x) * STRIDE]);
       let head = 0, pollen = 0, cosmicHead = 0, leaf = false;
+      seen.species ??= {};
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
           const k = kindAt(x, y);
+          const at = (y * w + x) * STRIDE;
+          // Each planter is one plant, so its species is whatever its head is.
+          const planter = x < 20 ? "plain" : "cosmic";
           if (k === 19) {
             head++;
-            if (cells[(y * w + x) * STRIDE + 6] & 4) cosmicHead++;
-          } else if (k === 22) pollen++;
-          else if (k === 23 && kindAt(x + 1, y) === 23) leaf = true;
+            if (cells[at + 6] & 4) cosmicHead++;
+            seen.species[planter] = cells[at + 1] & 7;
+          } else if (k === 22) {
+            pollen++;
+            // A shed petal is pollen marked with the rooted bit (FLAG_PETAL); a puff is not.
+            // A petal is witnessed only while its own head still stands, so its species
+            // has something to be checked against.
+            if (cells[at + 6] & 2) {
+              seen.petalMotes = (seen.petalMotes ?? 0) + 1;
+              if (seen.species[planter] !== undefined && (cells[at + 1] & 7) !== seen.species[planter]) {
+                seen.strayPetal = `a ${planter} petal mote of species ${cells[at + 1] & 7} under a head of ${seen.species[planter]}`;
+              }
+            } else if (!seen.petalFell) seen.puffs = (seen.puffs ?? 0) + 1;
+          } else if (k === 23 && kindAt(x + 1, y) === 23) leaf = true;
         }
       }
+      if (seen.petalMotes) seen.petalFell = true;
       seen.maxHead = Math.max(seen.maxHead ?? 0, head);
       seen.maxCosmicHead = Math.max(seen.maxCosmicHead ?? 0, cosmicHead);
       seen.pollenTicks = (seen.pollenTicks ?? 0) + (pollen > 0 ? 1 : 0);
@@ -940,6 +956,11 @@ const scenarios = [
       if ((seen.maxCosmicHead ?? 0) < 4) return `cosmic head never opened into a multi-cell bloom (peaked at ${seen.maxCosmicHead ?? 0})`;
       if ((seen.pollenTicks ?? 0) < 20) return `pollen was airborne on only ${seen.pollenTicks ?? 0} ticks`;
       if (!seen.shed) return "no bloom ever shed a petal";
+      // Plain motes before the first petal falls are puffs: no petal is old enough to
+      // shed before then, so a mark on any of them would be a puff drawn as a petal.
+      if (!seen.puffs) return "no plain pollen puff was seen before the petals fell";
+      if (!seen.petalMotes) return "no shed petal was ever marked a petal";
+      if (seen.strayPetal) return seen.strayPetal;
       return null;
     },
   },
