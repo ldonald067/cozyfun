@@ -535,6 +535,9 @@ function assertFloor(label, floor, worst, detail) {
 //    that happening again by accident. Measured on PETAL CELLS, not on a box around the head:
 //    a box is mostly night sky and compresses every pair toward zero.
 {
+  // Heads stand up to 11 rows over their crown and reach six cells either side (2026-10-29),
+  // so flowers get a board of their own: the shared 26x14 one cut every big head off at the top.
+  const { board, colourAt, width: W, height: H } = grid(30, 26);
   // The heads the sim actually grows, read out of the engine (the first check above holds
   // the engine to the sim). This was a hand-kept copy of the old five-wide heads and went
   // stale when they widened to seven, so the gate measured flowers nobody can grow; once
@@ -545,9 +548,9 @@ function assertFloor(label, floor, worst, detail) {
   // `flags` go on every cell of the head, crown included, the way a state lands on a whole
   // plant; the petals carry `energy`, which a head drains through as it fades.
   const plantedHead = (variant, flags, [cx, cy], energy, crown = [95, 200], petalAge = 180) => board((put) => {
-    for (let x = 0; x < W; x++) put(x, 12, MATERIAL.Wall, 0, 40, 0, x);
-    put(cx, 11, MATERIAL.Soil, 120, 40, CELL_FLAG.Wet);
-    for (let y = cy + 1; y <= 10; y++) put(cx, y, MATERIAL.Stem, 20, 50, y === 10 ? CELL_FLAG.Rooted : 0, variant);
+    for (let x = 0; x < W; x++) put(x, H - 2, MATERIAL.Wall, 0, 40, 0, x);
+    put(cx, H - 3, MATERIAL.Soil, 120, 40, CELL_FLAG.Wet);
+    for (let y = cy + 1; y <= H - 4; y++) put(cx, y, MATERIAL.Stem, 20, 50, y === H - 4 ? CELL_FLAG.Rooted : 0, variant);
     put(cx, cy, MATERIAL.Flower, crown[0], crown[1], CELL_FLAG.Rooted | flags, variant);
     for (const [dx, dy] of BLOOM_SHAPES[variant]) put(cx + dx, cy + dy, MATERIAL.Flower, energy, petalAge, flags, variant);
   });
@@ -555,7 +558,7 @@ function assertFloor(label, floor, worst, detail) {
   // dew where another placement measured 19, and a fading head's heart 95 where a fresh one
   // measured 159. Every flower check below takes its worst over these placements, and the
   // heart and weather checks over the energies a head drains through before it sheds.
-  const POSITIONS = [[13, 6], [9, 6], [16, 7], [11, 7]];
+  const POSITIONS = [[15, 16], [11, 16], [18, 17], [13, 17]];
   const ENERGIES = [90, 60, 40];
   // `pick` chooses which petals to average, by their offset from the crown.
   const headMean = (variant, time, flags = 0, pick = () => true, at = POSITIONS[0], energy = 90) => {
@@ -578,16 +581,21 @@ function assertFloor(label, floor, worst, detail) {
     "Two species a player cannot tell apart is variety that is not there.");
 
   // 6b. What each species is known by, and what weather does to a head (the owner's flower
-  //     batch, 2026-10-18). A petal is now drawn by where it sits, so a head has a HEART —
-  //     the ring round its crown — that has to read against the rest of its petals: a
-  //     poppy's black blotch, a sunflower's seed disc, a daisy's wide gold eye, a
-  //     cornflower's violet, a cosmos's deep magenta. Only those five carry a heart; a
-  //     tulip, lavender and bluebell hold their petals above the crown.
+  //     batch, 2026-10-18). A petal is drawn by where it sits, so a head has a HEART that has
+  //     to read against the rest of its petals: its centre cells in HEAD_ART (C, D, or the
+  //     poppy's S), which since the big heads (2026-10-29) sit in the middle of the head, not
+  //     round the crown at its foot: a poppy's dark heart and capsule, a sunflower's seed disc,
+  //     a daisy's gold eye, a cosmos's gold centre. The other four have no centre.
   {
-    const ring1 = (dx, dy) => Math.max(Math.abs(dx), Math.abs(dy)) === 1;
+    const hearts = shape.HEAD_ART.map((rows) => {
+      const cy = rows.length - 1, cx = rows[cy].indexOf("X"), out = new Set();
+      rows.forEach((row, y) => [...row].forEach((ch, x) => { if ("CDS".includes(ch)) out.add(`${x - cx},${y - cy}`); }));
+      return out;
+    });
     let worst = Infinity, at = null;
-    for (const v of [0, 1, 2, 3, 7]) for (const t of TIMES) for (const p of POSITIONS) for (const e of ENERGIES) {
-      const d = redmean(headMean(v, t, 0, ring1, p, e), headMean(v, t, 0, (dx, dy) => !ring1(dx, dy), p, e));
+    for (let v = 0; v < 8; v++) if (hearts[v].size) for (const t of TIMES) for (const p of POSITIONS) for (const e of ENERGIES) {
+      const heart = (dx, dy) => hearts[v].has(`${dx},${dy}`);
+      const d = redmean(headMean(v, t, 0, heart, p, e), headMean(v, t, 0, (dx, dy) => !heart(dx, dy), p, e));
       if (d < worst) { worst = d; at = `${NAMES[v]}, time ${t}, crown at ${p}, petal energy ${e}`; }
     }
     assertFloor("a bloom's heart vs the rest of its petals", 120, worst,
@@ -600,7 +608,10 @@ function assertFloor(label, floor, worst, detail) {
   //     mean): heart 5 -> 132, frozen 31 -> 62, scorched 157 -> 102, moonlit 73 -> 57.
   //     Scorched and moonlit fell on purpose: each used to turn the whole head one colour,
   //     which a mean rewards, and now each is drawn at the rim over a head that keeps its
-  //     species. Floors are ratchets just under today's swept values.
+  //     species. Floors are ratchets just under today's swept values. The big heads
+  //     (2026-10-29) first measured frozen 43, scorched 52, moonlit 47: near-white frost
+  //     vanished on a white daisy and rim char on a dark-rimmed poppy. The owner asked for the
+  //     weather strengthened rather than the floors moved, and it measures 70, 108, 63.
   for (const [label, flag, floor] of [["frozen", CELL_FLAG.Frozen, 55],
     ["scorched", CELL_FLAG.Scorched, 95], ["moonlit", CELL_FLAG.Cosmic, 50]]) {
     let worst = Infinity, at = null;
@@ -1070,11 +1081,14 @@ function assertFloor(label, floor, worst, detail) {
 //       - is it absent round a bud and a seed head? Each is one cell on a stalk, and they read
 //         apart from each other only at that cell (check 3), so a ring must not dress either.
 {
-  const POSITIONS = [[13, 6], [9, 6], [16, 7], [11, 7]];
+  // Heads stand up to 11 rows over their crown and reach six cells either side (2026-10-29),
+  // so flowers get a board of their own: the shared 26x14 one cut every big head off at the top.
+  const { board, colourAt, width: W, height: H } = grid(30, 26);
+  const POSITIONS = [[15, 16], [11, 16], [18, 17], [13, 17]];
   const head = (variant, flags, [cx, cy], energy, petals, crown) => board((put) => {
-    for (let x = 0; x < W; x++) put(x, 12, MATERIAL.Wall, 0, 40, 0, x);
-    put(cx, 11, MATERIAL.Soil, 120, 40, CELL_FLAG.Wet);
-    for (let y = cy + 1; y <= 10; y++) put(cx, y, MATERIAL.Stem, 20, 50, y === 10 ? CELL_FLAG.Rooted : 0, variant);
+    for (let x = 0; x < W; x++) put(x, H - 2, MATERIAL.Wall, 0, 40, 0, x);
+    put(cx, H - 3, MATERIAL.Soil, 120, 40, CELL_FLAG.Wet);
+    for (let y = cy + 1; y <= H - 4; y++) put(cx, y, MATERIAL.Stem, 20, 50, y === H - 4 ? CELL_FLAG.Rooted : 0, variant);
     put(cx, cy, MATERIAL.Flower, crown[0], crown[1], CELL_FLAG.Rooted | flags, variant);
     if (petals) for (const [dx, dy] of ENGINE_BLOOM_SHAPES[variant]) put(cx + dx, cy + dy, MATERIAL.Flower, energy, 180, flags, variant);
   });
@@ -1128,7 +1142,11 @@ function assertFloor(label, floor, worst, detail) {
   }
   assertFloor("a head's outline against the night it is drawn on", 110, night,
     `worst at ${nightAt}. An outline the night swallows draws no edge at all.`);
-  assertFloor("a head's outline is darker than the head it edges (luminance)", 40, edge,
+  // 28 since the big heads (the owner's call, 2026-10-29, after a picture of every state): a
+  // head now draws its own dark rim inside it, and its ring cannot go darker without sinking
+  // into the night (the check above). Swept worst 30, a wet, frozen, moonlit sunflower; it
+  // was 40 on the old heads, which had no rim of their own.
+  assertFloor("a head's outline is darker than the head it edges (luminance)", 28, edge,
     `worst at ${edgeAt}. A ring as bright as its petal reads as one more petal, and the head changes shape.`);
   let bare = 0, bareAt = null;
   for (let v = 0; v < 8; v++) for (const p of POSITIONS) for (const [stage, crown] of [["bud", [90, 20]], ["seed head", [0, shape.PETAL_SHED_AGE + 200]]]) {

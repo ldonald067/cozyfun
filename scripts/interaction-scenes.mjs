@@ -295,11 +295,12 @@ const wideMeadow = (p) => {
   for (let x = 8; x <= 212; x += 7) p(x, 35, 0, M.Seed);
   for (let x = 6; x <= 214; x += 4) p(x, 30, 1, M.Water);
 };
-// BLOOM_SHAPES 4 and 6 from sim/src/lib.rs, written out because these two checks witness
-// exactly them: retuning either shape should have to come through here.
+// BLOOM_SHAPES 3, 4 and 6 from sim/src/lib.rs, written out because these checks witness
+// exactly them: retuning any of these shapes should have to come through here.
 const RESHAPED_HEADS = {
-  4: [[0, -1], [-1, -1], [1, -1], [-1, 0], [1, 0], [-2, -1], [2, -1], [0, -2], [-1, -2], [1, -2], [-2, -2], [2, -2], [0, -3], [-2, -3], [2, -3]],
-  6: [[0, -1], [0, -2], [0, -3], [1, -4], [2, -4], [3, -3], [1, -3], [1, -2], [3, -2], [3, -1], [-1, -3], [-1, -2]],
+  3: [[0, -1], [-1, 0], [1, 0], [0, -2], [-1, -1], [1, -1], [0, -3], [-1, -2], [1, -2], [-2, -1], [2, -1], [0, -4], [-1, -3], [1, -3], [-2, -2], [2, -2], [-3, -1], [3, -1], [0, -5], [-1, -4], [1, -4], [-2, -3], [2, -3], [-3, -2], [3, -2], [-4, -1], [-3, 0], [4, -1], [3, 0], [0, -6], [-1, -5], [1, -5], [-2, -4], [2, -4], [-3, -3], [3, -3], [-4, -2], [4, -2], [0, -7], [-1, -6], [1, -6], [-2, -5], [2, -5], [-3, -4], [3, -4], [-4, -3], [4, -3], [-5, -2], [5, -2], [0, -8], [-1, -7], [1, -7], [-2, -6], [2, -6], [-3, -5], [3, -5], [-4, -4], [4, -4], [-5, -3], [5, -3], [0, -9], [-1, -8], [1, -8], [-2, -7], [2, -7], [-3, -6], [3, -6], [-4, -5], [4, -5], [-5, -4], [5, -4], [-6, -3], [6, -3], [-1, -9], [1, -9], [-2, -8], [2, -8], [-3, -7], [3, -7], [-4, -6], [4, -6], [-5, -5], [5, -5], [-1, -10], [-2, -9], [1, -10], [2, -9], [-3, -8], [3, -8], [-4, -7], [4, -7], [-5, -6], [5, -6], [-6, -5], [6, -5], [-3, -9], [3, -9], [-4, -8], [4, -8], [-5, -7], [5, -7], [-3, -10], [-4, -9], [3, -10], [4, -9], [-5, -8], [5, -8], [-6, -7], [6, -7]],
+  4: [[0, -1], [-1, 0], [1, 0], [0, -2], [-1, -1], [1, -1], [0, -3], [-1, -2], [1, -2], [-2, -1], [2, -1], [0, -4], [-1, -3], [1, -3], [-2, -2], [2, -2], [0, -5], [-1, -4], [1, -4], [-2, -3], [2, -3], [-3, -2], [3, -2], [0, -6], [-1, -5], [1, -5], [-2, -4], [2, -4], [-3, -3], [3, -3], [0, -7], [-1, -6], [1, -6], [-2, -5], [2, -5], [-3, -4], [3, -4], [-4, -3], [4, -3], [0, -8], [-1, -7], [1, -7], [-2, -6], [2, -6], [-3, -5], [3, -5], [-4, -4], [4, -4], [-3, -6], [3, -6], [-4, -5], [4, -5], [-3, -7], [-4, -6], [3, -7], [4, -6], [-4, -7], [4, -7], [-4, -8], [4, -8]],
+  6: [[0, -1], [0, -2], [0, -3], [0, -4], [1, -3], [0, -5], [2, -3], [0, -6], [2, -2], [0, -7], [-1, -6], [3, -2], [2, -1], [0, -8], [-2, -6], [4, -2], [3, -1], [2, 0], [0, -9], [-2, -5], [4, -1], [1, -9], [-3, -5], [-2, -4], [4, 0], [1, -10], [-4, -5], [-3, -4], [-2, -3], [2, -10], [-4, -4], [3, -10], [-4, -3], [4, -10], [4, -9], [4, -8], [3, -8], [5, -8], [4, -7], [3, -7], [5, -7], [3, -6], [5, -6]],
 };
 // Every head of this species standing whole: its rooted crown with all of its shape open, or
 // all but one (the pollen wedge `a_bud_opens_into_a_petal_crown` allows).
@@ -315,9 +316,15 @@ function wholeHeads(g, variant) {
   return out;
 }
 
+// A bed blooms in two waves (HEAD_REACH_X in sim/src/lib.rs). The second opens as the first
+// sheds, its last heads near five minutes in and fully open about fifteen seconds later, so a
+// check that waits for a given head waits for both. At 6000 ticks a sunflower that had waited
+// out its neighbour's last petals was still opening when the check stopped looking.
+const TWO_WAVES = 7200;
+
 // Every plant standing under a rooted crown: its stalk (the run of Stem straight under the
 // crown), its leaves (Stem beside that run, not itself standing on Stem) and its head (Flower
-// of its species within the widest silhouette's reach of the crown).
+// of its species within the widest head's reach of the crown: six either side, ten up).
 function grownPlants(g) {
   const plants = [];
   for (const crown of g.all(M.Flower)) {
@@ -328,7 +335,7 @@ function grownPlants(g) {
       stalk.push(y * g.w + x);
       for (const lx of [x - 1, x + 1]) if (g.kindAt(lx, y) === M.Stem && g.kindAt(lx, y + 1) !== M.Stem) leaves.push(y * g.w + lx);
     }
-    for (let y = cy - 5; y <= cy + 1; y++) for (let hx = x - 3; hx <= x + 3; hx++) {
+    for (let y = cy - 10; y <= cy; y++) for (let hx = x - 6; hx <= x + 6; hx++) {
       if (g.kindAt(hx, y) === M.Flower && g.cells[(y * g.w + hx) * STRIDE + 1] === variant) head.push(y * g.w + hx);
     }
     plants.push({ crown, stalk, leaves, head, age: g.cells[crown * STRIDE + 2] | (g.cells[crown * STRIDE + 3] << 8) });
@@ -818,20 +825,38 @@ export const CHECKS = [
   // seeds on the old engine, and unreachable on every seed with the watering left out. Over 32
   // seeds the tulip passes 30 and the bluebell 29, and every miss is a meadow where no plant of
   // that species came up; wherever one did, it grew whole.
-  { m: "Flower", covers: "flower.opens", role: "opens a tulip into a cup", w: 220, h: 48, seed: 25, ticks: 1500,
+  { m: "Flower", covers: "flower.opens", role: "opens a tulip into a cup", w: 220, h: 48, seed: 25, ticks: TWO_WAVES,
     paint: wideMeadow, outcome: (g) => wholeHeads(g, 4) },
-  { m: "Flower", covers: "flower.opens", role: "nods a bluebell's bells off a bent scape", w: 220, h: 48, seed: 26, ticks: 1500,
+  { m: "Flower", covers: "flower.opens", role: "nods a bluebell's bells off a bent scape", w: 220, h: 48, seed: 26, ticks: TWO_WAVES,
     paint: wideMeadow, outcome: (g) => wholeHeads(g, 6) },
+  { m: "Flower", covers: "flower.opens", role: "opens a sunflower whole, the biggest head", w: 220, h: 48, seed: 29, ticks: TWO_WAVES,
+    // The budget check in play: 109 petals is the most a crown opens, and at a reserve of 100
+    // a lone sunflower stalled at 90 of 110 cells (2026-10-29). STAT_SUNFLOWER.
+    paint: wideMeadow, outcome: (g) => wholeHeads(g, 3) },
+  { m: "Flower", covers: "flower.opens", role: "a bed watered once blooms again in a second wave", w: 220, h: 48, seed: 30, ticks: 7200,
+    // The owner's pick (2026-10-29): heads 13 across on plants seven apart take turns, so a
+    // bed blooms in two waves. A head's arc starts when it opens, so its crown's age says when:
+    // the witness is five heads of twenty cells or more, all opened after the third minute,
+    // open at once. Over 32 seeds 7 to 12 are; 4 at the most with any one part of taking turns
+    // taken out (buds that never wait, drain while they wait, puff pollen while they wait, or
+    // keep their bud's age), or with petals letting go at the old age.
+    paint: wideMeadow,
+    outcome: (g, before, memo) => {
+      memo.t = (memo.t ?? -1) + 1; // called once before the first tick, then once a tick
+      const late = grownPlants(g).filter((pl) => pl.head.length >= 20 && pl.age <= memo.t - 3600);
+      return late.length >= 5 ? late.flatMap((pl) => pl.head) : [];
+    } },
   { m: "Flower", covers: "flower.opens", role: "a watered bed stays in bloom for minutes", w: 220, h: 48, seed: 27, ticks: 3200,
     // The owner's pick from a filmstrip (2026-10-29): a head holds its petals for
     // PETAL_SHED_AGE, so a bed watered once is in full bloom for about three minutes, where it
-    // was about one and bare by two. The witness is twelve heads, each opened two minutes ago
-    // or more and still at least five cells. Over 32 seeds the bed holds 21 to 26 such heads;
-    // with petals letting go at the old age (1200) it holds 3 at the most.
+    // was about one and bare by two. The witness is six heads, each opened two minutes ago or
+    // more and still at least twenty cells. Over 32 seeds the bed holds 10 to 14 such heads at
+    // once (half the bed: heads take turns); with petals letting go at the old age (1200) it
+    // holds 1 at the most. Before the heads grew big it held 21 to 26 of five cells.
     paint: wideMeadow,
     outcome: (g) => {
-      const held = grownPlants(g).filter((pl) => pl.age >= 2400 && pl.head.length >= 5);
-      return held.length >= 12 ? held.flatMap((pl) => pl.head) : [];
+      const held = grownPlants(g).filter((pl) => pl.age >= 2400 && pl.head.length >= 20);
+      return held.length >= 6 ? held.flatMap((pl) => pl.head) : [];
     } },
   { m: "Pollen", covers: "pollen.drifts", role: "is released by a mature flower", w: 40, h: 34, seed: 24, ticks: 5000,
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
@@ -1725,7 +1750,9 @@ export const CHECKS = [
       p(40, 31, 1, M.Seed);
       p(40, 26, 3, M.Water);
     },
-    act: (p, t) => { if (t % 400 === 200) for (let x = 6; x <= 74; x += 3) p(x, 20, 1, M.Water, 30); },
+    // The rain falls from above the tallest plant: at row 20 it was painted into a big head
+    // (2026-10-29), and the brush writes over whatever it covers.
+    act: (p, t) => { if (t % 400 === 200) for (let x = 6; x <= 74; x += 3) p(x, 4, 1, M.Water, 30); },
     outcome: (g, before, memo, prev) => {
       memo.landed ??= new Set();
       memo.sown ??= new Set();

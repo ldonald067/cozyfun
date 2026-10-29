@@ -1,9 +1,9 @@
 # Handoff — where the work is, and what to do next
 
 *Rewritten at each handoff, never appended to. Shipped work lives in `git log`, whose commit
-messages carry each batch's measurements. Written 2026-10-29: the owner called the sound
-retune fine, and the fuller garden (A + B: taller, leafier plants whose heads hold for about
-three minutes) is built from their pick off a filmstrip.*
+messages carry each batch's measurements. Written 2026-10-29: big flower heads (up to 13
+cells across, each drawn in its own tones) that bloom in two waves are built from the owner's
+picks off a close-up and a filmstrip, with the weather on them strengthened at their word.*
 
 ## Keep chats lean
 
@@ -32,6 +32,20 @@ The owner hits usage limits early.
 
 ## Open questions, accepted unless the owner says otherwise
 
+- **Big heads, the edges of taking turns** (2026-10-29). A bud waits for a neighbour of another
+  species until its last petal has gone, but for one of its own species only until the petals
+  round that crown have gone: two heads of one species cannot be told apart cell by cell, and
+  reading every leftover petal stalled two cornflowers at 30 of 70 (the cargo test now says
+  so). So a second-wave head beside a same-species neighbour can open a few cells short where
+  its neighbour's last petals still hang. And the renderer draws a petal from its crown's grid
+  only while that crown has a petal beside it; leftover outer petals round a bare crown are
+  drawn in the plain species colour.
+- The showcase has no frozen or scorched flower head, before or after the big heads (review,
+  2026-10-29): the strengthened weather is measured by `renderer:probe` and was judged by the
+  owner from `.tmp/bighead/states-sheet-2.png`, not from the maintained capture.
+- The big heads' rendering was timed in Node only: 5.6 ms a full-board frame against 5.9 ms
+  for the old heads (`.tmp/bighead/perf.mjs`). Not timed on a phone.
+
 - A dormant wellspring blocks only non-sources.
 - A meteor shock's scorch is often brief (26 of 32 seeds).
 - The sim runs about 24 ticks a second at 120 Hz, against 20 at 60 Hz.
@@ -54,6 +68,25 @@ The owner hits usage limits early.
 ## Decisions already made — do not relitigate
 
 All by the owner, after seeing pictures or measurements:
+
+- **Big heads in two waves** (2026-10-29), from a close-up of our own eight designs against the
+  old heads (`.tmp/bighead/tweak-sheet.png`) and a filmstrip of a watered bed
+  (`.tmp/bighead/bighead-sheet.png`). Heads are up to 13 cells across and 11 tall, crown at the
+  bottom; `HEAD_ART` in `rendering/shapeLanguage.ts` draws each as a grid of tones and the sim
+  grows the same cells (`renderer:probe` holds them together). Cornflower, poppy and cosmos were
+  redrawn after measuring outline overlap (worst pair 0.77, now 0.71) and the poppy's black
+  heart sinking into the sky; the bluebell's arch is rounded two cells so it bends over.
+  Neighbours take turns (`HEAD_REACH_X` 12, `HEAD_REACH_Y` 10): a bud waits with its whole
+  budget and no pollen while a head is open within reach, and its arc starts when it opens. A
+  watered bed holds 10-14 big heads at once in each of two waves, about seven minutes in all,
+  with about twice the flower on screen. Budget: `BLOOM_ENERGY` 250, `PETAL_COST` 1,
+  `CROWN_RESERVE` 40, or the sunflower stalls (90 of 110 at a reserve of 100).
+- **Weather on big heads strengthened, not the floors moved** (2026-10-29, from
+  `.tmp/bighead/states-sheet.png` and `-2.png`): bluer frost tinting further in, char that
+  browns the whole head behind its ember line, moonlight weighted toward pale petals, and a
+  dew pattern that cannot miss a head. One floor was re-set on the owner's word: a head's
+  outline darker than the head, 40 to 28, because big heads draw their own dark rim and the
+  ring cannot go darker without sinking into the night.
 
 - **A spent garden stays as it is** (2026-10-29, from `.tmp/garden/rebloom-sheet.png`).
   Watering it again already brings it back: water feeds a flower's energy, so a spent head
@@ -160,21 +193,28 @@ All by the owner, after seeing pictures or measurements:
 
 ## Where the checks stand
 
-`npm run interaction:audit` passes 181 checks, bound to all 118 role ids, on the audit's seed
-(2026-10-29, with the fuller garden). Retaken over 32 seeds on 2026-10-29 at `a19b507` (before
-the wash), with the plant checks retaken on the fuller garden, these pass on fewer than 32:
+`npm run interaction:audit` passes 183 checks, bound to all 118 role ids, on the audit's seed
+(2026-10-29, with big heads). Retaken over 32 seeds on 2026-10-29 at `a19b507` (before the
+wash), with the plant checks retaken on the fuller garden and the `flower.opens`,
+`pollen.seeds`, `stem.climbs` and `seed.germinates` checks on big heads, these pass on fewer
+than 32:
 
 - **31:** `seed.germinates` grows taller fed cosmic (its bar is 11 cells now, the height only a
   moonlit plant reaches), `meteor.impacts`, `meteor.trail`'s fanned trail, `moonwater.bursts`,
   `fire.thaws`, `lava.quenched` "water never deletes the lava it meets", `ember.quenched`'s
   doused-log cloud, both `oil.ignites` checks, and `stem.footing`'s stalk check (was 27).
-- **30:** `ice.condenses` "takes the steam's heat", `flower.opens` "opens a tulip into a cup",
-  `meteor.shocked`, and `flower.pollen` "a moonlit garden puffs pollen more often" (was 32: the
-  plain planting puffs 18 times on two seeds, short of 20; the scene says so).
+- **30:** `ice.condenses` "takes the steam's heat", `flower.opens` "opens a tulip into a cup"
+  and "opens a sunflower whole" (on each one's two misses no plant of that species grew),
+  `meteor.shocked`, and `flower.pollen` "a moonlit garden puffs pollen more often" (on the
+  fuller garden; not retaken at 32 on big heads, where buds puff nothing while they wait).
 - **27:** `fire.dries`'s ember check.
 - **25:** `meteor.vitrifies`.
 
 The fuller garden lifted `pollen.seeds` and `stem.burns` to 32 and the bluebell from 29 to 32.
+On big heads the bluebell, both wave checks and `pollen.seeds` pass 32 of 32; `pollen.seeds`'s
+rain now falls from row 4, because at row 20 the brush painted it into the heads. Every check
+over 8 seeds against `main`: none passes on fewer seeds; the 16 that moved are all garden and
+pollen checks.
 
 Against the 2026-10-17 list: `fungus.fairyring` now passes 32 of 32, `fire.dries`'s ember
 check fell from 29 to 27, and eight checks are new to it. Nobody has looked at why; each batch
@@ -254,6 +294,12 @@ not this list.
   `try.mjs <candidate> <seeds> [sabotage,...]` (distributions and verdicts on the JS mirror,
   live and sabotaged), `board.mjs` (print a candidate's board). How the four 2026-10-28
   thresholds were chosen: measure both sides, then pick a round number between them.
+- **Big heads:** `.tmp/bighead/` — `bighead.py` (the designs as grids, and the first mock as a
+  copy of `app/src`; it no longer applies to the tree), `gen.py` (writes the shapes into both
+  engines), `closeup.mjs` / `states.mjs` (every head, every state, today against the build),
+  `film.mjs`, `arc.mjs` (heads over time), `measure.mjs` (outline overlap, tones against the
+  sky), `thresh.mjs <sabotage>` (the new checks' raw numbers), `trace.mjs <seed> <x>` (one
+  crown tick by tick), `sunmiss.mjs`, `perf.mjs`.
 - **The garden:** `.tmp/garden/` — `measure.mjs` (stalk heights, leaves, heads per plant;
   `KIND=brush` for a bed painted with the app's brush), `arc.mjs` (a bed's bloom over time),
   `variants.py` + `film.mjs` + `sheet.py` (the filmstrip the owner picked from), `thresh.mjs`

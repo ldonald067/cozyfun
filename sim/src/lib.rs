@@ -101,63 +101,48 @@ const SEED_SOAK_LOSS: u16 = 20;
 
 /// A seed will not germinate this close to an existing plant. Without it every cell of a
 /// watered bed sprouts and the meadow becomes one solid wall of blooms with no silhouette.
-/// Five keeps a clear gap between heads now that a head is itself five cells across.
+/// It keeps stalks at least seven apart. A head is wider than that (up to 13 cells), so
+/// neighbours take turns to open instead (`HEAD_REACH_X`).
 const PLANT_SPACING: i32 = 6;
+/// A bud waits while another head is open this close: a head reaches six cells either side
+/// of its stalk and stands 11 tall, so two heads open at once stand at least 13 apart. In a
+/// bed at the closest spacing every other plant opens, and the rest open as those shed (the
+/// owner's pick from a filmstrip, 2026-10-29): a garden in two waves, each of big heads.
+const HEAD_REACH_X: i32 = 12;
+const HEAD_REACH_Y: i32 = 10;
 /// A sprouting stalk's height budget. Each segment costs 55, so 365 is seven cells; a
 /// seed's variant adds up to three more and a cosmic one one more (`STEM_BUDGET_MAX`).
 const STEM_BUDGET: u16 = 365;
 const STEM_BUDGET_MAX: u16 = STEM_BUDGET + 4 * 55;
 
-/// Per-plant bloom silhouettes, chosen by the plant's variant exactly as its hue is.
-/// Offsets are relative to the crown, which always sits directly above the stalk tip, and
-/// are opened in listed order. A head that is always a filled 3x3 reads as a square; these
-/// give a meadow actual shapes to tell apart. Every offset stays connected to the one
-/// before it, so no petal is ever stranded on its own.
-/// One species per plant, chosen by `variant & 7` — the same number that picks its hue in
-/// the renderer, so a bluebell is always bluebell-blue. Heads are up to five cells across,
-/// which is the smallest head that can hold a shape at all: at three there are too few
-/// pixels to be anything but a block or a cross. Petals are listed in opening order and
-/// every offset touches one already placed, so a half-open bloom is never a scatter of
-/// stranded cells. Offsets are relative to the crown, which sits directly above the tip of
-/// the stalk. `app/src/rendering/shapeLanguage.ts` holds the matching hue and eye per index.
+/// Per-plant bloom silhouettes, chosen by `variant & 7` exactly as the renderer picks the
+/// plant's hue and tones: `HEAD_ART` in `app/src/rendering/shapeLanguage.ts` draws each head as a
+/// grid, and `renderer:probe` holds these offsets to it cell for cell. Offsets are relative to the
+/// crown, the cell on the stalk's tip, which is the bottom of every head, so no petal opens beside
+/// the stalk where leaves grow. Petals open breadth-first from the crown: a head opens outward and
+/// every petal touches one already open, so a half-open bloom is never a scatter of cells.
+///
+/// Heads are up to 13 cells across and 11 tall, the owner's pick (2026-10-29) from a close-up
+/// against the old heads of 3 to 7 cells, which read as blobs of one colour: at this size a
+/// species has room for a rim, gaps and a centre. Lined up at the crown, no two outlines share
+/// more than 71% of their cells (cornflower and tulip); the old heads' worst pair was 75%.
 const BLOOM_SHAPES: [&[(i32, i32)]; 8] = [
-    // 0 Cornflower: a ragged ROSETTE: paired petals at the crest, a full body, two outers
-    // dropped below. It must not share a rim rhythm with the tulip -- the first seven-wide
-    // pass gave both a regular notched top and a full row under it, which made the TULIP A
-    // STRICT SUBSET OF THIS SHAPE. Silhouette overlap hit 0.85, worse than any pair before
-    // the widening, and a greyscale render showed it plainly while a glance at the offsets
-    // did not.
-    &[(-2, -2), (-1, -2), (1, -2), (2, -2), (-3, -1), (-2, -1), (-1, -1), (0, -1), (1, -1), (2, -1), (3, -1), (-3, 0), (-2, 0), (-1, 0), (1, 0), (2, 0), (3, 0), (-2, 1), (2, 1)],
-    // 1 Poppy: a broad bowl whose outer petals still DROOP below the rim, now two cells further
-    // out each side. The crest stays rounded -- a filled top row reads as a bar.
-    &[(-2, -1), (-1, -1), (0, -1), (1, -1), (2, -1), (-3, 0), (-2, 0), (-1, 0), (1, 0), (2, 0), (3, 0), (-3, 1), (-2, 1), (2, 1), (3, 1)],
-    // 2 Daisy: the same span opened out into a star, so the gaps do the work. Widening it kept
-    // the alternating rhythm rather than filling in, or it becomes a second sunflower. Its
-    // bottom spoke is the stalk itself: (0, 1) is where the stalk stands, so no head opens there.
-    &[(0, -2), (-2, -1), (0, -1), (2, -1), (-3, 0), (-2, 0), (-1, 0), (1, 0), (2, 0), (3, 0), (-2, 1), (2, 1)],
-    // 3 Sunflower: the biggest head in the set and deliberately so: a full disc under a crown of rays,
-    // seven wide and five tall. The bottom row is two petals hugging the stalk. It used to be one
-    // at (0, 1), where the stalk stands, so in play the disc was only ever four tall. A leaf at
-    // the stalk's tip takes one of the two on about half of plants.
-    &[(0, -3), (-2, -2), (-1, -2), (0, -2), (1, -2), (2, -2), (-3, -1), (-2, -1), (-1, -1), (0, -1), (1, -1), (2, -1), (3, -1), (-3, 0), (-2, 0), (-1, 0), (1, 0), (2, 0), (3, 0), (-1, 1), (1, 1)],
-    // 4 Tulip: a CUP five wide and four tall: three lips at the rim, a full shoulder and body,
-    // tapering to two petals beside the crown. Seven wide with a notched rim it read as a crown
-    // rather than a cup; this is the owner's pick from the design canvas (2026-10-22). The
-    // taper still separates it from the cornflower's rounded body -- see the note there.
-    &[(0, -1), (-1, -1), (1, -1), (-1, 0), (1, 0), (-2, -1), (2, -1), (0, -2), (-1, -2), (1, -2), (-2, -2), (2, -2), (0, -3), (-2, -3), (2, -3)],
-    // 5 Lavender: UNCHANGED at three wide. A tall narrow spike is this plant's whole identity and
-    // widening it would buy size at the cost of the one silhouette nothing else in the row has.
-    &[(0, -1), (-1, -2), (1, -2), (0, -3), (-1, -4), (1, -4), (0, -5)],
-    // 6 Bluebell: a scape that climbs from the crown and bends over to one side, with bells
-    // hanging under the bend and off the scape. The first six cells are the scape, which opens
-    // first and is drawn green; the rest are bells. Bells on a bare upright stalk read as
-    // damage, and this is the owner's pick from the design canvas (2026-10-22). Still sparse:
-    // a filled bluebell is just a small cornflower.
-    &[(0, -1), (0, -2), (0, -3), (1, -4), (2, -4), (3, -3), (1, -3), (1, -2), (3, -2), (3, -1), (-1, -3), (-1, -2)],
-    // 7 Cosmos: broad rounded petals around an open centre. Seven wide with the ring closed, because
-    // leaving the centre gapped split it the same way the cornflower split.
-    &[(-2, -1), (-1, -1), (1, -1), (2, -1), (-3, 0), (-2, 0), (-1, 0), (1, 0), (2, 0), (3, 0), (-2, 1), (-1, 1), (1, 1), (2, 1)],
-
+    // 0 Cornflower: a ragged ball of florets on a green scaly cup.
+    &[(0, -1), (-1, 0), (1, 0), (0, -2), (-1, -1), (1, -1), (0, -3), (-1, -2), (1, -2), (0, -4), (-1, -3), (1, -3), (-2, -2), (2, -2), (0, -5), (-1, -4), (1, -4), (-2, -3), (2, -3), (0, -6), (-1, -5), (1, -5), (-2, -4), (2, -4), (-3, -3), (3, -3), (0, -7), (-1, -6), (1, -6), (-2, -5), (2, -5), (-3, -4), (3, -4), (0, -8), (-1, -7), (1, -7), (-2, -6), (2, -6), (-3, -5), (3, -5), (-4, -4), (4, -4), (-1, -8), (1, -8), (-2, -7), (2, -7), (-3, -6), (3, -6), (-4, -5), (4, -5), (-1, -9), (-2, -8), (1, -9), (2, -8), (-3, -7), (3, -7), (-4, -6), (4, -6), (-5, -5), (5, -5), (-3, -8), (3, -8), (-4, -7), (4, -7), (-3, -9), (-4, -8), (3, -9), (4, -8), (-5, -7), (5, -7)],
+    // 1 Poppy: a wide low bowl, a dark heart round a green seed capsule.
+    &[(0, -1), (-1, 0), (1, 0), (0, -2), (-1, -1), (1, -1), (-2, 0), (2, 0), (0, -3), (-1, -2), (1, -2), (-2, -1), (2, -1), (-3, 0), (3, 0), (0, -4), (-1, -3), (1, -3), (-2, -2), (2, -2), (-3, -1), (3, -1), (0, -5), (-1, -4), (1, -4), (-2, -3), (2, -3), (-3, -2), (3, -2), (-4, -1), (4, -1), (-1, -5), (1, -5), (-2, -4), (2, -4), (-3, -3), (3, -3), (-4, -2), (4, -2), (-3, -4), (3, -4), (-4, -3), (4, -3), (-5, -2), (5, -2), (-4, -4), (4, -4), (-5, -3), (5, -3), (-4, -5), (-5, -4), (4, -5), (5, -4), (-6, -3), (6, -3), (-5, -5), (-6, -4), (5, -5), (6, -4), (-5, -6), (-6, -5), (5, -6), (6, -5), (-6, -6), (6, -6)],
+    // 2 Daisy: a star of thin white rays with gaps, a gold eye.
+    &[(0, -1), (-1, 0), (1, 0), (0, -2), (-1, -1), (1, -1), (0, -3), (-1, -2), (1, -2), (0, -4), (-1, -3), (1, -3), (0, -5), (-1, -4), (1, -4), (-2, -3), (2, -3), (0, -6), (-1, -5), (1, -5), (-2, -4), (2, -4), (-3, -3), (3, -3), (0, -7), (-1, -6), (1, -6), (-2, -5), (2, -5), (-3, -4), (3, -4), (-4, -3), (-3, -2), (4, -3), (3, -2), (0, -8), (-1, -7), (1, -7), (-3, -5), (3, -5), (-4, -4), (4, -4), (-4, -2), (4, -2), (-1, -8), (1, -8), (-3, -6), (-4, -5), (3, -6), (4, -5), (-5, -4), (5, -4), (-5, -2), (-4, -1), (5, -2), (4, -1), (-4, -6), (4, -6), (-6, -4), (6, -4), (-4, -7), (-5, -6), (4, -7), (5, -6)],
+    // 3 Sunflower: the biggest, a seeded disc in a ring of rays.
+    &[(0, -1), (-1, 0), (1, 0), (0, -2), (-1, -1), (1, -1), (0, -3), (-1, -2), (1, -2), (-2, -1), (2, -1), (0, -4), (-1, -3), (1, -3), (-2, -2), (2, -2), (-3, -1), (3, -1), (0, -5), (-1, -4), (1, -4), (-2, -3), (2, -3), (-3, -2), (3, -2), (-4, -1), (-3, 0), (4, -1), (3, 0), (0, -6), (-1, -5), (1, -5), (-2, -4), (2, -4), (-3, -3), (3, -3), (-4, -2), (4, -2), (0, -7), (-1, -6), (1, -6), (-2, -5), (2, -5), (-3, -4), (3, -4), (-4, -3), (4, -3), (-5, -2), (5, -2), (0, -8), (-1, -7), (1, -7), (-2, -6), (2, -6), (-3, -5), (3, -5), (-4, -4), (4, -4), (-5, -3), (5, -3), (0, -9), (-1, -8), (1, -8), (-2, -7), (2, -7), (-3, -6), (3, -6), (-4, -5), (4, -5), (-5, -4), (5, -4), (-6, -3), (6, -3), (-1, -9), (1, -9), (-2, -8), (2, -8), (-3, -7), (3, -7), (-4, -6), (4, -6), (-5, -5), (5, -5), (-1, -10), (-2, -9), (1, -10), (2, -9), (-3, -8), (3, -8), (-4, -7), (4, -7), (-5, -6), (5, -6), (-6, -5), (6, -5), (-3, -9), (3, -9), (-4, -8), (4, -8), (-5, -7), (5, -7), (-3, -10), (-4, -9), (3, -10), (4, -9), (-5, -8), (5, -8), (-6, -7), (6, -7)],
+    // 4 Tulip: a tall cup with three pointed lips.
+    &[(0, -1), (-1, 0), (1, 0), (0, -2), (-1, -1), (1, -1), (0, -3), (-1, -2), (1, -2), (-2, -1), (2, -1), (0, -4), (-1, -3), (1, -3), (-2, -2), (2, -2), (0, -5), (-1, -4), (1, -4), (-2, -3), (2, -3), (-3, -2), (3, -2), (0, -6), (-1, -5), (1, -5), (-2, -4), (2, -4), (-3, -3), (3, -3), (0, -7), (-1, -6), (1, -6), (-2, -5), (2, -5), (-3, -4), (3, -4), (-4, -3), (4, -3), (0, -8), (-1, -7), (1, -7), (-2, -6), (2, -6), (-3, -5), (3, -5), (-4, -4), (4, -4), (-3, -6), (3, -6), (-4, -5), (4, -5), (-3, -7), (-4, -6), (3, -7), (4, -6), (-4, -7), (4, -7), (-4, -8), (4, -8)],
+    // 5 Lavender: a tall narrow spike of florets.
+    &[(0, -1), (-1, 0), (1, 0), (0, -2), (-1, -1), (1, -1), (0, -3), (-1, -2), (1, -2), (0, -4), (-1, -3), (1, -3), (-2, -2), (2, -2), (0, -5), (-1, -4), (1, -4), (0, -6), (-1, -5), (1, -5), (-2, -4), (2, -4), (0, -7), (-1, -6), (1, -6), (0, -8), (-1, -7), (1, -7), (-2, -6), (2, -6), (0, -9), (0, -10), (-1, -9), (1, -9)],
+    // 6 Bluebell: a scape that arches over, bells hanging off it.
+    &[(0, -1), (0, -2), (0, -3), (0, -4), (1, -3), (0, -5), (2, -3), (0, -6), (2, -2), (0, -7), (-1, -6), (3, -2), (2, -1), (0, -8), (-2, -6), (4, -2), (3, -1), (2, 0), (0, -9), (-2, -5), (4, -1), (1, -9), (-3, -5), (-2, -4), (4, 0), (1, -10), (-4, -5), (-3, -4), (-2, -3), (2, -10), (-4, -4), (3, -10), (-4, -3), (4, -10), (4, -9), (4, -8), (3, -8), (5, -8), (4, -7), (3, -7), (5, -7), (3, -6), (5, -6)],
+    // 7 Cosmos: broad petals with open gaps between, round a gold centre.
+    &[(0, -1), (-1, 0), (1, 0), (0, -2), (-1, -1), (1, -1), (-2, 0), (2, 0), (0, -3), (-1, -2), (1, -2), (-2, -1), (2, -1), (0, -4), (-1, -3), (1, -3), (0, -5), (-1, -4), (1, -4), (0, -6), (-1, -5), (1, -5), (-2, -4), (2, -4), (0, -7), (-1, -6), (1, -6), (-2, -5), (2, -5), (-3, -4), (3, -4), (0, -8), (-1, -7), (1, -7), (-2, -6), (2, -6), (-3, -5), (3, -5), (-4, -4), (4, -4), (0, -9), (-1, -8), (1, -8), (-3, -6), (3, -6), (-4, -5), (4, -5), (-5, -4), (-4, -3), (5, -4), (4, -3), (0, -10), (-1, -9), (1, -9), (-4, -6), (4, -6), (-5, -5), (5, -5), (-6, -4), (-5, -3), (6, -4), (5, -3), (-1, -10), (1, -10), (-2, -9), (2, -9), (-4, -7), (-5, -6), (4, -7), (5, -6), (-6, -3), (-5, -2), (6, -3), (5, -2), (-2, -10), (2, -10), (-5, -7), (-6, -6), (5, -7), (6, -6), (-5, -8), (-6, -7), (5, -8), (6, -7)],
 ];
 
 /// A bloom runs on a slower clock than the rest of the life materials: it loses
@@ -168,18 +153,20 @@ const BLOOM_SHAPES: [&[(i32, i32)]; 8] = [
 /// keeping a bloom's energy under 255, which is what the scene-import clamp in
 /// `load_cells` holds every material but a stalk to.
 const BLOOM_CLOCK: u16 = 8;
-const BLOOM_ENERGY: u16 = 200;
-const BLOOM_ENERGY_COSMIC: u16 = 250;
+const BLOOM_ENERGY: u16 = 250;
+const BLOOM_ENERGY_COSMIC: u16 = 255;
 /// The crown only unfurls petals down to this reserve, so a head is bounded by
-/// budget as well as by its silhouette. The cost must leave room for the largest shape
-/// (the sunflower's 21 petals) *plus* the energy the crown drains while it is opening
-/// (one every `BLOOM_CLOCK` ticks, and a petal opens about every 12) and any pollen it puffs
-/// meanwhile, or the biggest blooms stall half-open. At a cost of 3 they did, in play: on a
-/// stalk over 24 seeds the sunflower's outer rim opened on 15 and its bottom pair on 11 and
-/// 6, and the cornflower's drooping outers on 16 and 12. At 2: 22, 22 and 19, 20 and 19.
-const CROWN_RESERVE: u16 = 100;
+/// budget as well as by its silhouette. The budget must cover the largest shape (the
+/// sunflower's 109 petals at `PETAL_COST`) *plus* what the crown drains while it opens (one
+/// every `BLOOM_CLOCK` ticks, and a petal opens about one tick in three) and any pollen it
+/// puffs meanwhile, or the biggest blooms stall half-open, as the old heads once did at a
+/// cost of 3. Measured on a lone stalk, the sunflower opened 90 of its 110 cells at a reserve
+/// of 100 and 108 at 60; at 40, the pollen reserve under which a bloom is spent anyway, every
+/// head opens whole, the sunflower in about 15 s. A bud waiting its turn drains nothing
+/// (`is_waiting_bud`).
+const CROWN_RESERVE: u16 = 40;
 const PETAL_ENERGY: u16 = 150;
-const PETAL_COST: u16 = 2;
+const PETAL_COST: u16 = 1;
 /// Below this a bloom is spent: no more pollen, and petals may start to let go.
 const POLLEN_RESERVE: u16 = 40;
 const POLLEN_COST: u16 = 15;
@@ -919,6 +906,9 @@ impl Universe {
     }
 
     fn age_and_decay(&self, cells: &mut [Cell]) {
+        // A bud waiting its turn keeps its budget. Read before the pass, which changes no
+        // Flower's kind or flags, and no cell's energy before its own turn.
+        let waiting: Vec<bool> = (0..cells.len()).map(|idx| self.is_waiting_bud(idx, cells)).collect();
         for (idx, cell) in cells.iter_mut().enumerate() {
             if cell.kind == Material::Empty as u8 {
                 continue;
@@ -952,7 +942,7 @@ impl Universe {
             // a watered garden is usually wet, and Flower is absorbent, so letting the
             // wet drain run at full rate would collapse the whole arc back to the few
             // seconds this change exists to fix.
-            let drain = if cell.kind == Material::Flower as u8 && cell.age % BLOOM_CLOCK != 0 {
+            let drain = if cell.kind == Material::Flower as u8 && (cell.age % BLOOM_CLOCK != 0 || waiting[idx]) {
                 0
             } else {
                 drain
@@ -2386,6 +2376,77 @@ impl Universe {
         next[leaf].flags = cell.flags & FLAG_COSMIC;
     }
 
+    /// Whether another head is open within reach of a crown at (x, y): a rooted crown with a
+    /// petal beside it, last tick or already this one, so two buds never open side by side on
+    /// the same tick. A neighbour of another species is open while any petal of its head is
+    /// still on: petals shed one at a time, and a bud that read it as done once the petals
+    /// round its crown had gone opened into cells its outer petals still held (a sunflower 106
+    /// of 109, 2026-10-29). Not for one of the same species, whose petals cannot be told from
+    /// the bud's own: two sunflowers read each other's heads as their own and stalled.
+    fn head_in_reach(&self, x: i32, y: i32, variant: u8, old: &[Cell], next: &[Cell]) -> bool {
+        for cy in (y - HEAD_REACH_Y).max(0)..=(y + HEAD_REACH_Y).min(self.height as i32 - 1) {
+            for cx in (x - HEAD_REACH_X).max(0)..=(x + HEAD_REACH_X).min(self.width as i32 - 1) {
+                if cx == x && cy == y {
+                    continue;
+                }
+                let at = self.idx(cx as u32, cy as u32);
+                for cells in [old, next] {
+                    let other = cells[at];
+                    if other.kind == Material::Flower as u8
+                        && other.flags & FLAG_ROOTED != 0
+                        && (self.own_petal_beside(cx, cy, other.variant, cells)
+                            || (other.variant != variant && self.head_still_on(cx, cy, other.variant, cells)))
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Whether any petal of the head on the crown at (x, y) is still on.
+    fn head_still_on(&self, x: i32, y: i32, variant: u8, cells: &[Cell]) -> bool {
+        BLOOM_SHAPES[usize::from(variant) & 7].iter().any(|&(dx, dy)| {
+            self.in_bounds(x + dx, y + dy) && {
+                let petal = cells[self.idx((x + dx) as u32, (y + dy) as u32)];
+                petal.kind == Material::Flower as u8 && petal.variant == variant
+            }
+        })
+    }
+
+    /// Whether the crown at (x, y) has a petal of its own beside it: one of its species, on a
+    /// face its head opens. Any Flower would do on level ground, but a neighbour's petal can
+    /// touch a bud on a taller stalk, and read as the bud's own it made the bud look open: the
+    /// neighbour stalled half-open waiting on it, and the bud, no longer waiting, drained to
+    /// nothing (review, 2026-10-29).
+    fn own_petal_beside(&self, x: i32, y: i32, variant: u8, cells: &[Cell]) -> bool {
+        let shape = BLOOM_SHAPES[usize::from(variant) & 7];
+        [(0, -1), (-1, 0), (1, 0)].iter().any(|&(dx, dy)| {
+            self.in_bounds(x + dx, y + dy) && shape.contains(&(dx, dy)) && {
+                let petal = cells[self.idx((x + dx) as u32, (y + dy) as u32)];
+                petal.kind == Material::Flower as u8 && petal.variant == variant
+            }
+        })
+    }
+
+    /// A bud waiting its turn: a rooted crown with no petal open yet and the budget to open.
+    /// A seed head watered back to a little energy is not one; it drains back to spent. Nor is
+    /// a frozen bud: frost lifts only when a cell's energy runs out, so one that drained
+    /// nothing stayed frozen for good (review, 2026-10-29).
+    fn is_waiting_bud(&self, idx: usize, cells: &[Cell]) -> bool {
+        let cell = cells[idx];
+        if cell.kind != Material::Flower as u8
+            || cell.flags & FLAG_ROOTED == 0
+            || cell.flags & FLAG_FROZEN != 0
+            || cell.energy <= CROWN_RESERVE
+        {
+            return false;
+        }
+        let (x, y) = self.xy(idx);
+        !self.own_petal_beside(x, y, cell.variant, cells)
+    }
+
     /// First empty cell around `idx`, scanning the canonical faces from `start`.
     /// Rotating the start spreads pollen off a bloom's whole rim rather than
     /// always puffing from the same corner.
@@ -2479,12 +2540,19 @@ impl Universe {
         // budget unfurling petals into the open air around it, one per beat, so a
         // bloom is watched opening rather than appearing whole. Petals are never
         // rooted, so only the crown ever opens and a head cannot run away.
+        // It waits while another head is open within reach, so neighbours take turns.
         if cell.flags & FLAG_ROOTED != 0
             && cell.energy > CROWN_RESERVE
             && cell.age > 12
-            && self.chance(if cosmic { 8 } else { 12 })
+            && !self.head_in_reach(x, y, cell.variant, old, next)
+            && self.chance(if cosmic { 2 } else { 3 })
         {
             if let Some(petal) = self.next_petal_site(idx, cell.variant, old, next) {
+                // A head's arc starts when it opens, not when its bud formed: a bud that waited
+                // its turn would otherwise open already past PETAL_SHED_AGE, a seed head at once.
+                if !self.own_petal_beside(x, y, cell.variant, old) {
+                    next[idx].age = 0;
+                }
                 next[petal] = Cell::new(Material::Flower as u8, cell.variant, PETAL_ENERGY);
                 next[petal].flags = if cosmic { FLAG_COSMIC } else { 0 };
                 next[idx].energy = next[idx].energy.saturating_sub(PETAL_COST);
@@ -2493,7 +2561,11 @@ impl Universe {
 
         // Pollen leaves from any open face. Straight up alone would silence a
         // finished bloom outright, because the crown is walled in by its own petals.
-        if cell.energy > POLLEN_RESERVE && cell.age > 24 && self.chance(if cosmic { 90 } else { 200 })
+        // A bud makes none: one waiting its turn would spend the budget it opens with.
+        if cell.energy > POLLEN_RESERVE
+            && cell.age > 24
+            && (cell.flags & FLAG_ROOTED == 0 || self.own_petal_beside(x, y, cell.variant, old))
+            && self.chance(if cosmic { 90 } else { 200 })
         {
             let start =
                 (cell.variant as usize).wrapping_add(cell.age as usize) % FACE_OFFSETS.len();

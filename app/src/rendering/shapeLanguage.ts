@@ -39,20 +39,16 @@ const DARK_GROUND_KINDS = new Set<number>([MATERIAL.Soil, MATERIAL.Ember]);
 // One species per plant, indexed by `variant & 7` — the same number that picks its
 // silhouette in BLOOM_SHAPES (sim/src/lib.rs). Keep these two tables in the same order:
 // index 3 must be the sunflower in both, or plants get a shape from one species and a
-// colour from another. The hue is per plant, never per cell — deriving petal colour from
-// a per-cell hash, which this used to do, turned a multi-cell head into confetti.
+// colour from another. The hue is per plant; within a head a cell's tone comes from the
+// head's grid (HEAD_ART), never from a per-cell hash, which once turned a head into confetti.
 //
-// `eye` is whether the crown sits at the middle of the head, where a bright centre
-// belongs. Tulip, lavender and bluebell carry their petals *above* the crown, so gilding
-// it would put a dot at the bloom's base rather than its heart.
+// `eye` is the colour of a head's centre, its C cells in HEAD_ART, or null for the three
+// heads with no centre (tulip, lavender, bluebell).
 // The end of the arc has no species in it. A seed head is dry husk, and every plant's is
 // the same dry husk — which is exactly what makes it read as an ending rather than as a
 // small flower of some eighth colour.
 const SEED_HEAD_STRAW: Rgb = [156, 136, 98];
 const SEED_HEAD_HUSK: Rgb = [82, 68, 46];
-// The bluebell's scape, crown included: the green the bells hang from, carrying on from the
-// stalk under it rather than reading as a ninth flower colour.
-const BLUEBELL_SCAPE: Rgb = [70, 124, 84];
 // A head's outline is a deep shade of the plant's own colour, pushed toward this violet the
 // way a pixel-art shadow shifts hue rather than going grey.
 const HEAD_RING_SHADE: Rgb = [44, 12, 64];
@@ -163,8 +159,8 @@ function redmean([r1, g1, b1]: Rgb, [r2, g2, b2]: Rgb) {
 
 // A head's outline (the owner's pick from the design canvas, 2026-10-22): open air touching a
 // petal is drawn in a deep shade of the plant's own colour, so a head reads as a drawn shape
-// with an edge, the way the reference sheets outline theirs. A petal is one cell, so a ramp
-// of tones inside it cannot exist at this size; the edge is the part of that depth that does.
+// with an edge, the way the reference sheets outline theirs. Big heads (2026-10-29) carry a
+// dark rim of their own inside the head (HEAD_ART's O cells); the ring sits outside it.
 // Only petals are ringed, never a rooted crown, so a bud and a seed head stay single cells on
 // a stalk. The ring follows the weather on the petal it touches: frosted, silvered under
 // moonlight, and gone into the night when charred, since a burnt head has no lit edge. The
@@ -969,7 +965,7 @@ function stemColor({ color, variant, energy, flags, cells, width, height, x, y }
 // The owner chose these from a design canvas on 2026-10-18. Colour only: every cell drawn
 // here is a cell the sim grew.
 const DEW: Rgb = [236, 246, 255];
-const FROST: Rgb = [216, 240, 250];
+const FROST: Rgb = [176, 218, 246];
 const CHAR: Rgb = [40, 28, 26];
 const EMBER_LINE: Rgb = [232, 110, 40];
 const STARLIGHT: Rgb = [176, 196, 255];
@@ -977,25 +973,172 @@ const POLLEN_GOLD: Rgb = [255, 214, 96];
 const WHITE: Rgb = [255, 255, 255];
 const BLACK: Rgb = [0, 0, 0];
 
-// How far each species' petals reach from their crown, as [minDx, maxDx, minDy, maxDy]: the
-// bounding box of its row of BLOOM_SHAPES (sim/src/lib.rs). renderer:probe checks it against
-// the engine's shapes, so it cannot go stale the way the probe's own copy of the shapes did.
-export const FLOWER_REACH: readonly (readonly [number, number, number, number])[] = [
-  [-3, 3, -2, 1], // 0 cornflower
-  [-3, 3, -1, 1], // 1 poppy
-  [-3, 3, -2, 1], // 2 daisy
-  [-3, 3, -3, 1], // 3 sunflower
-  [-2, 2, -3, 0], // 4 tulip
-  [-1, 1, -5, -1], // 5 lavender
-  [-1, 3, -4, -1], // 6 bluebell
-  [-3, 3, -1, 1]  // 7 cosmos
+// Each species' head drawn as a grid, the owner's pick (2026-10-29) from a close-up against the
+// old heads of 3 to 7 cells, which read as blobs of one colour. X is the crown, on the stalk's
+// tip at the bottom of the head; every other letter is a petal and its tone: O rim, P petal,
+// L light, C centre, D dark centre, G green (scape, sepal or cup), S the poppy's seed capsule.
+// The sim grows exactly these cells (BLOOM_SHAPES in sim/src/lib.rs); renderer:probe holds the
+// two to each other cell for cell. Our own designs of our own species: the stock sheet they were
+// compared against is not shipped.
+export const HEAD_ART: readonly (readonly string[])[] = [
+  // 0 cornflower: a ragged ball of florets on a green scaly cup
+  [
+    "...O.O.O.O...",
+    "..OLOLPLOLO..",
+    ".OLPPLPLPPLO.",
+    "..LPPOPOPPL..",
+    ".OLPOPPPOPLO.",
+    "..OLPPOPPLO..",
+    "...OGGGGGO...",
+    "....GGGGG....",
+    ".....GGG.....",
+    ".....GXG.....",
+  ],
+  // 1 poppy: a wide low bowl, a dark heart round a green seed capsule
+  [
+    "OO.........OO",
+    "OPO..OPO..OPO",
+    "OPLOOPLPOOLPO",
+    "OPLLPDDDPLLPO",
+    ".OPLDDSDDLPO.",
+    "..OPPDDDPPO..",
+    "...OOPXPOO...",
+  ],
+  // 2 daisy: a star of thin white rays with gaps, a gold eye
+  [
+    ".....LLL.....",
+    "..L..LPL..L..",
+    ".LPL.LPL.LPL.",
+    "..LPLCCCLPL..",
+    "LLLPPCDCPPLLL",
+    "..LPLCCCLPL..",
+    ".LPL.LPL.LPL.",
+    "..L..LPL..L..",
+    ".....LXL.....",
+  ],
+  // 3 sunflower: the biggest, a seeded disc in a ring of rays
+  [
+    "...P.P.P.P...",
+    "..PLPLPLPLP..",
+    ".PLOOOOOOOLP.",
+    "PLODCDCDCDOLP",
+    ".PODDCDCDDOP.",
+    "PLOCDDDDDCOLP",
+    ".PODDCDCDDOP.",
+    "PLODCDCDCDOLP",
+    ".PLOOOOOOOLP.",
+    "..PLPLPLPLP..",
+    "...P.PXP.P...",
+  ],
+  // 4 tulip: a tall cup with three pointed lips
+  [
+    "..O...O...O..",
+    "..PO.OPO.OP..",
+    "..PLOPLPOLP..",
+    "..PLPPLPPLP..",
+    "..PLPPLPPLP..",
+    "..OPLPPPLPO..",
+    "...OPPPPPO...",
+    "....OPPPO....",
+    ".....OXO.....",
+  ],
+  // 5 lavender: a tall narrow spike of florets
+  [
+    "......L......",
+    ".....LPL.....",
+    "......P......",
+    ".....PLP.....",
+    "....LPPPL....",
+    ".....PLP.....",
+    "....LPDPL....",
+    ".....PDP.....",
+    "....LPPPL....",
+    ".....PDP.....",
+    ".....GXG.....",
+  ],
+  // 6 bluebell: a scape that arches over, bells hanging off it
+  [
+    ".......GGGG..",
+    "......GG..G..",
+    "......G..OPO.",
+    "......G..PLP.",
+    "....GGG..O.O.",
+    "..OPO.G......",
+    "..PLP.G......",
+    "..O.O.GGG....",
+    "......G.OPO..",
+    "......G.PLP..",
+    "......X.O.O..",
+  ],
+  // 7 cosmos: broad petals with open gaps between, round a gold centre
+  [
+    "....OPPPO....",
+    "....PLLLP....",
+    ".O...PLP...O.",
+    "OLO..OPO..OLO",
+    "OLLPPOCOPPLLO",
+    ".OPPPCDCPPPO.",
+    "OLLPPOCOPPLLO",
+    "OLO..OPO..OLO",
+    ".O...PLP...O.",
+    "....PLLLP....",
+    "....OPXPO....",
+  ],
 ];
 
+type HeadTone = "O" | "P" | "L" | "C" | "D" | "G" | "S";
+// Each head's tone by offset from its crown, keyed "dx,dy". The crown takes its neighbours'
+// tone: green where the head meets a green scape or cup, petal otherwise.
+const HEAD_TONES: readonly ReadonlyMap<string, HeadTone>[] = HEAD_ART.map((rows) => {
+  const cy = rows.length - 1;
+  const cx = rows[cy].indexOf("X");
+  const at = (x: number, y: number) => rows[y]?.[x] ?? ".";
+  const tones = new Map<string, HeadTone>();
+  rows.forEach((row, y) => [...row].forEach((ch, x) => {
+    if (ch === ".") return;
+    const crownTone = [at(cx - 1, cy), at(cx + 1, cy), at(cx, cy - 1)].includes("G") ? "G" : "P";
+    tones.set(`${x - cx},${y - cy}`, (ch === "X" ? crownTone : ch) as HeadTone);
+  }));
+  return tones;
+});
+
+// How far each species' petals reach from their crown, as [minDx, maxDx, minDy, maxDy]: the
+// bounding box of its head. renderer:probe checks it against the engine's shapes.
+export const FLOWER_REACH: readonly (readonly [number, number, number, number])[] = HEAD_TONES.map((tones) => {
+  const offsets = [...tones.keys()].map((key) => key.split(",").map(Number));
+  const xs = offsets.map(([dx]) => dx), ys = offsets.map(([, dy]) => dy);
+  return [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)] as const;
+});
+
+// The green of a head's scape, sepals or cup, a shade brighter than the stalk it grows from.
+const HEAD_GREEN: Rgb = [92, 156, 76];
+const HEAD_RIM_SHADE: Rgb = [24, 16, 34];
+const POPPY_CAPSULE: Rgb = [128, 150, 96];
+
+function headColour(species: Species, tone: HeadTone): Rgb {
+  const eye = species.eye;
+  switch (tone) {
+    case "O": return mixRgb(species.dark, HEAD_RIM_SHADE, 0.24);
+    case "P": return mixRgb(species.light, species.dark, 0.32);
+    case "L": return mixRgb(species.light, WHITE, 0.22);
+    case "C": return eye ?? mixRgb(species.light, WHITE, 0.5);
+    // A near-black eye (the poppy's) would match the night sky, so its dark is the petal's own,
+    // deepened: drawn black, 11 of the poppy's cells sat within 34 redmean of the sky
+    // (2026-10-29); this deep red stays clear of it and of the petals round it.
+    case "D":
+      if (!eye) return mixRgb(species.dark, BLACK, 0.45);
+      return eye[0] + eye[1] + eye[2] > 200 ? mixRgb(eye, BLACK, 0.42) : mixRgb(species.dark, BLACK, 0.56);
+    case "G": return HEAD_GREEN;
+    case "S": return POPPY_CAPSULE;
+  }
+}
+
 // The crown a petal belongs to: the nearest rooted Flower cell of the same species that the
-// petal could have grown from, i.e. with the petal inside that species' reach. Nearest alone
-// was not enough (review): two plants of one species standing at different heights — a
-// cosmic plant grows a cell taller — put a lavender's top petal two cells from its
-// neighbour's crown and five from its own.
+// petal could have grown from, i.e. with the petal on that species' head. Nearest alone was
+// not enough (review): two plants of one species standing at different heights — a cosmic
+// plant grows a cell taller — put a lavender's top petal two cells from its neighbour's crown
+// and five from its own. And with heads 13 across on plants seven apart, an edge petal can
+// be nearer a neighbour's bud waiting its turn, so a crown with no petal beside it is not one.
 type Crown = { dx: number; dy: number; open: number };
 function crownOf(cells: Uint8Array, width: number, height: number, x: number, y: number, variant: number): Crown | null {
   const [minDx, maxDx, minDy, maxDy] = FLOWER_REACH[variant & 7];
@@ -1007,9 +1150,11 @@ function crownOf(cells: Uint8Array, width: number, height: number, x: number, y:
       if (cells[base] !== MATERIAL.Flower || (cells[base + 1] & 7) !== (variant & 7)) continue;
       if (!(readU16(cells, base + 6) & CELL_FLAG.Rooted)) continue;
       const distance = Math.max(Math.abs(x - cx), Math.abs(y - cy));
-      if (distance >= bestDistance) continue;
+      if (distance >= bestDistance || !HEAD_TONES[variant & 7].has(`${x - cx},${y - cy}`)) continue;
+      const open = flowerNeighbours(cells, width, height, cx, cy);
+      if (!open) continue;
       bestDistance = distance;
-      best = { dx: x - cx, dy: y - cy, open: flowerNeighbours(cells, width, height, cx, cy) };
+      best = { dx: x - cx, dy: y - cy, open };
     }
   }
   return best;
@@ -1025,94 +1170,12 @@ function flowerNeighbours(cells: Uint8Array, width: number, height: number, x: n
   return count;
 }
 
-// A head with a heart is OPENING while its crown has two petals or fewer: the first petals
-// out are outer colour, cupped over a heart that is not showing yet, so the heart is drawn
-// only once the head is properly open. Only those five species: a full lavender's crown
-// touches ONE petal and a full bluebell's two (review), so for them this test would read a
-// grown head as a bud for its whole life.
+// A head with a centre is OPENING while its crown has two petals or fewer: its crown is
+// still drawn as a bud, and its centre is not dusted gold until the head is properly under
+// way. A full head's crown touches five petals. The three heads with no centre are buds only
+// while their crown has none.
 const OPENING_PETALS = 2;
 const isOpening = (species: Species, crownPetals: number) => species.eye !== null && crownPetals <= OPENING_PETALS;
-
-function petalColour(
-  variant: number, species: Species, dx: number, dy: number, opening: boolean,
-  isFlower: (ox: number, oy: number) => boolean
-): Rgb {
-  const light = species.light;
-  const dark = species.dark;
-  const ring = Math.max(Math.abs(dx), Math.abs(dy));
-  const sx = Math.sign(dx);
-  const sy = Math.sign(dy);
-  const tip = ring >= 2 && !isFlower(sx, sy) && !isFlower(sx, 0);
-  const under = dy >= 0 && !isFlower(0, 1);
-  const alternate = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) & 1;
-  const heart = ring === 1 && !opening;
-  // The plain shading, for the species that keep it where they have no mark of their own.
-  const shaded = () => {
-    let out = mixRgb(light, dark, 0.18 + 0.2 * alternate);
-    if (tip) out = mixRgb(light, WHITE, 0.22);
-    if (under) out = mixRgb(out, dark, 0.35);
-    return out;
-  };
-  let out: Rgb;
-  switch (variant & 7) {
-    case 0: // cornflower: bright sky blue round a violet heart, a frilled rim of light tips
-      out = mixRgb(light, dark, 0.08 + 0.18 * alternate);
-      if (under) out = mixRgb(out, dark, 0.3);
-      if (heart) out = [122, 104, 214];
-      else if (tip) out = alternate ? mixRgb(light, WHITE, 0.34) : mixRgb(light, WHITE, 0.12);
-      break;
-    case 1: // poppy: the black blotch round the capsule, warm lit tips
-      out = heart ? mixRgb([34, 20, 24], dark, 0.25) : tip ? [252, 126, 98] : shaded();
-      break;
-    case 2: // daisy: a gold eye three cells wide, white rays, a cool lilac underside
-      if (!opening && ((dx === 0 && dy === -1) || (dy === 0 && Math.abs(dx) === 1))) out = [244, 196, 70];
-      else out = tip ? WHITE : under ? [196, 192, 214] : [250, 249, 242];
-      break;
-    case 3: // sunflower: a speckled brown seed disc, orange at the petal base, yellow tips
-      if (heart) out = (dx + dy) & 1 ? [116, 72, 36] : [84, 52, 26];
-      else if (ring === 2) out = [236, 158, 44];
-      else if (ring >= 3) out = under ? [220, 150, 40] : [252, 214, 96];
-      else out = shaded();
-      break;
-    case 4: // tulip: a cup lit at its three lips and deepening to the base, a pale streak down
-      // the near petal and the far side in shade (the canvas's reshape, 2026-10-22)
-      out = dy <= -3 ? [252, 184, 208] : dy === -2 ? light : dy === -1 ? [222, 98, 146] : [190, 62, 110];
-      if (dx === -1 && (dy === -2 || dy === -1)) out = mixRgb(out, WHITE, 0.3);
-      if (dx === 2 && dy >= -2) out = mixRgb(out, [150, 44, 90], 0.4);
-      break;
-    case 5: // lavender: buds alternating down the spike, palest at its top
-      out = dy <= -5 ? [226, 200, 250] : dy & 1 ? [206, 160, 246] : [128, 74, 186];
-      break;
-    case 6: // bluebell: a green scape climbing and arching over, bells hanging deep blue from
-      // it, each lit at the mouth where it hangs open
-      if ((dx === 0 && dy < 0) || dy === -4 || (dx === 3 && dy === -3)) out = BLUEBELL_SCAPE;
-      else out = !isFlower(0, 1) ? [150, 162, 246] : [64, 70, 178];
-      break;
-    default: // cosmos: deep magenta round a darker heart, its notched tips a shade paler
-      out = mixRgb(light, dark, 0.4 + 0.2 * alternate);
-      if (under) out = mixRgb(out, dark, 0.3);
-      if (heart) out = [132, 22, 84];
-      else if (tip) out = [236, 128, 184];
-      break;
-  }
-  return out;
-}
-
-// The eye of an open head, by species. Tulip, lavender and bluebell carry their petals
-// above the crown, so theirs is the green calyx the head sits in rather than a centre.
-function eyeColour(variant: number, species: Species, x: number, y: number, hash: number): Rgb {
-  const fleck = ((x ^ y) & 1) === 0 ? 0.08 : 0.3;
-  switch (variant & 7) {
-    case 1: return mixRgb([118, 128, 96], [92, 100, 74], fleck);   // poppy's green seed capsule
-    case 3: return mixRgb([132, 108, 40], [104, 84, 30], fleck);   // the disc's fresh olive middle
-    case 4: return [96, 120, 70];
-    case 5: return [104, 120, 92];
-    case 6: return BLUEBELL_SCAPE;
-  }
-  let out = mixRgb(species.eye ?? species.dark, species.dark, fleck);
-  if ((hash & 7) === 0) out = mixRgb(out, [255, 246, 196], 0.35);
-  return out;
-}
 
 // How each species goes to seed. Dry and speciesless by design — a seed head reads as an
 // ending, never as a ninth flower colour, and renderer:probe holds every one 60 or more
@@ -1192,19 +1255,17 @@ function flowerColor({ variant, age, energy, flags, time, cells, width, height, 
     out = mixRgb(mixRgb(petalDark, petalLight, 0.34), [58, 104, 58], 0.26 - bloom * 0.1);
     if ((hash & 3) === 0) out = mixRgb(out, [104, 160, 82], 0.18);
   } else if (rooted) {
-    out = eyeColour(variant, species, x, y, hash);
+    out = headColour(species, HEAD_TONES[variant & 7].get("0,0") ?? "P");
   } else {
     const crown = crownOf(cells, width, height, x, y, variant);
-    if (crown) {
-      const isFlower = (ox: number, oy: number) => sameKind(cells, width, height, x + ox, y + oy, MATERIAL.Flower);
-      const opening = isOpening(species, crown.open);
-      out = petalColour(variant, species, crown.dx, crown.dy, opening, isFlower);
-      // Gold dusts a heart cell while that cell is puffing pollen. Every Flower cell puffs
+    const tone = crown && HEAD_TONES[variant & 7].get(`${crown.dx},${crown.dy}`);
+    if (crown && tone) {
+      out = headColour(species, tone);
+      // Gold dusts a centre cell while that cell is puffing pollen. Every Flower cell puffs
       // on its own budget — the sim's test is the cell's own energy over POLLEN_RESERVE and
       // age past 24 — so this reads the petal's state, not the crown's (review: keyed to the
       // crown, the gold went while petals were still puffing). Never while still opening.
-      const ring = Math.max(Math.abs(crown.dx), Math.abs(crown.dy));
-      if (ring === 1 && species.eye && !opening && energy > POLLEN_RESERVE && age > 24 && (hash & 7) === 1) {
+      if (tone === "C" && species.eye && !isOpening(species, crown.open) && energy > POLLEN_RESERVE && age > 24 && (hash & 7) === 1) {
         out = mixRgb(out, POLLEN_GOLD, 0.7);
       }
     } else {
@@ -1229,14 +1290,19 @@ function flowerColor({ variant, age, energy, flags, time, cells, width, height, 
   if (wet) {
     // Wet petals deepen, and a few rim cells hold a bead of dew: a regular lattice of them
     // rather than a hash, so every head gets its share wherever it stands (review: a
-    // hashed choice left one placement with almost none).
+    // hashed choice left one placement with almost none). One cell in three along any row:
+    // one in four by (3x + y) missed every rim cell of a big sunflower's spaced rays at one
+    // placement (renderer:probe, 2026-10-29).
     out = mixRgb(out, BLACK, 0.16);
-    if (rimCell && ((x * 3 + y) & 3) === 0) out = mixRgb(out, DEW, 0.85);
+    if (rimCell && (x + 2 * y) % 3 === 0) out = mixRgb(out, DEW, 0.85);
   }
   if (cosmic) {
     // Moonlit: the plant's own colours cool toward starlight, brightest at the rim.
     const pulse = (Math.sin(time * 0.012 + hash * 0.001) + 1) * 0.5;
-    out = mixRgb(out, STARLIGHT, 0.42);
+    // Paler petals take more of it, so a white daisy is plainly moonlit while the deep pinks
+    // keep enough of their own hue to stay apart (tulip and cosmos, renderer:probe).
+    const pale = (out[0] + out[1] + out[2]) / 765;
+    out = mixRgb(out, STARLIGHT, 0.06 + 0.62 * pale);
     if (rimCell) out = mixRgb(out, WHITE, 0.18 + pulse * 0.1);
   }
   if (oilContact.count > 0) {
@@ -1245,11 +1311,11 @@ function flowerColor({ variant, age, energy, flags, time, cells, width, height, 
   }
   if (scorched) {
     // Char eats in from the rim, with a live ember line where it meets the petal.
-    out = edge.count >= 2 ? mixRgb(out, CHAR, 0.86) : edge.count === 1 ? mixRgb(out, EMBER_LINE, 0.72) : mixRgb(out, [55, 37, 31], 0.4);
+    out = edge.count >= 2 ? mixRgb(out, CHAR, 0.86) : edge.count === 1 ? mixRgb(out, EMBER_LINE, 0.72) : mixRgb(out, [55, 37, 31], 0.82);
   }
   if (frozen) {
     // Frost grows in from the rims and glints; the heart keeps its colour, dimmed.
-    out = rimCell ? mixRgb(out, FROST, 0.78) : mixRgb(out, [120, 150, 190], 0.4);
+    out = rimCell ? mixRgb(out, FROST, 0.78) : mixRgb(out, [120, 150, 190], 0.55);
     if (rimCell && (hash & 7) === 3) out = WHITE;
   }
   if (age < 8) out = mixRgb(out, [255, 252, 224], 0.55 * (1 - age / 8));

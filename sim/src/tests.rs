@@ -1480,10 +1480,144 @@ fn a_bud_opens_into_a_petal_crown() {
     );
 }
 
+/// Two crowns on stalks `apart` cells apart on a wall floor, both ready to open.
+fn two_buds(apart: u32) -> (Universe, (u32, u32), (u32, u32)) {
+    let mut u = Universe::new(40, 24, 11);
+    for x in 0..40 {
+        set_cell(&mut u, x, 22, Material::Wall);
+        set_cell(&mut u, x, 23, Material::Wall);
+    }
+    let (a, b) = ((10, 13), (10 + apart, 13));
+    for &(x, y) in &[a, b] {
+        for sy in y + 1..22 {
+            set_cell_state(&mut u, x, sy, Material::Stem, 30, 20, 0);
+        }
+        set_cell_state(&mut u, x, y, Material::Flower, 20, BLOOM_ENERGY, FLAG_ROOTED);
+    }
+    (u, a, b)
+}
+
+fn has_petal(u: &Universe, (x, y): (u32, u32)) -> bool {
+    [(0i32, -1i32), (-1, 0), (1, 0)].iter().any(|&(dx, dy)| kind_at(u, (x as i32 + dx) as u32, (y as i32 + dy) as u32) == Material::Flower as u8)
+}
+
+#[test]
+fn neighbouring_heads_take_turns_to_open() {
+    // The owner's pick (2026-10-29): heads 13 across on plants seven apart open in turns, so
+    // a bed blooms in two waves of big heads. One opens; the other waits, keeping its budget
+    // and making no pollen, opens once the first has shed, and starts its own arc then.
+    let (mut u, a, b) = two_buds(7);
+    let mut both_open = 0;
+    let mut first = None;
+    for _ in 0..600 {
+        u.tick();
+        let (oa, ob) = (has_petal(&u, a), has_petal(&u, b));
+        if oa && ob {
+            both_open += 1;
+        }
+        if first.is_none() && (oa || ob) {
+            first = Some(if oa { (a, b) } else { (b, a) });
+        }
+    }
+    let (open, waiting) = first.expect("neither bud opened");
+    assert_eq!(both_open, 0, "two heads seven apart were open at once");
+    // Both buds are cornflowers, so each head's petals sit where the other's shape would put
+    // its own. The open one must not read its neighbour as open from them and stall half-open.
+    let petals = BLOOM_SHAPES[0]
+        .iter()
+        .filter(|&&(dx, dy)| kind_at(&u, (open.0 as i32 + dx) as u32, (open.1 as i32 + dy) as u32) == Material::Flower as u8)
+        .count();
+    assert!(petals + 1 >= BLOOM_SHAPES[0].len(), "the first head stalled at {petals} of {} petals", BLOOM_SHAPES[0].len());
+    assert_eq!(energy_at(&u, waiting.0, waiting.1), BLOOM_ENERGY, "a waiting bud kept its budget");
+    let pollen = (0..24u32).flat_map(|y| (0..40u32).map(move |x| (x, y)))
+        .filter(|&(x, y)| kind_at(&u, x, y) == Material::Pollen as u8 && (x as i32 - waiting.0 as i32).abs() <= 1 && (y as i32 - waiting.1 as i32).abs() <= 1)
+        .count();
+    assert_eq!(pollen, 0, "a waiting bud puffs no pollen");
+    let mut turned = None;
+    for t in 0..6000 {
+        u.tick();
+        assert!(!(has_petal(&u, open) && has_petal(&u, waiting)), "two heads seven apart were open at once, tick {t}");
+        if has_petal(&u, waiting) {
+            turned = Some(t);
+            break;
+        }
+    }
+    assert!(turned.is_some(), "the waiting bud never opened after its neighbour shed");
+    assert!(u.cells[u.idx(waiting.0, waiting.1)].age < 30, "a head's arc starts when it opens");
+}
+
+#[test]
+fn a_neighbours_petal_touching_a_bud_does_not_open_it() {
+    // Review (2026-10-29): a poppy beside a moonlit sunflower bud a stalk taller. The poppy's
+    // petal touched the bud, which then read as open: the poppy stalled half-open, and the bud,
+    // no longer protected as waiting, drained to nothing without opening.
+    let mut u = Universe::new(40, 24, 2);
+    for x in 0..40 {
+        set_cell(&mut u, x, 22, Material::Wall);
+        set_cell(&mut u, x, 23, Material::Wall);
+    }
+    let (poppy, sunflower) = ((10u32, 13u32), (17u32, 10u32));
+    for (&(x, y), variant, flags) in [(&poppy, 1u8, 0), (&sunflower, 3u8, FLAG_COSMIC)] {
+        for sy in y + 1..22 {
+            set_cell_state(&mut u, x, sy, Material::Stem, 30, 20, 0);
+        }
+        set_cell_state(&mut u, x, y, Material::Flower, 20, BLOOM_ENERGY, FLAG_ROOTED | flags);
+        let idx = u.idx(x, y);
+        u.cells[idx].variant = variant;
+    }
+    let open_cells = |u: &Universe, (x, y): (u32, u32), variant: u8| {
+        BLOOM_SHAPES[usize::from(variant)]
+            .iter()
+            .filter(|&&(dx, dy)| {
+                let c = u.cells[u.idx((x as i32 + dx) as u32, (y as i32 + dy) as u32)];
+                c.kind == Material::Flower as u8 && c.variant == variant
+            })
+            .count()
+    };
+    let (mut poppy_peak, mut sunflower_peak) = (0, 0);
+    for _ in 0..8000 {
+        u.tick();
+        poppy_peak = poppy_peak.max(open_cells(&u, poppy, 1));
+        sunflower_peak = sunflower_peak.max(open_cells(&u, sunflower, 3));
+    }
+    assert!(poppy_peak + 1 >= BLOOM_SHAPES[1].len(), "the poppy stalled at {poppy_peak} of {}", BLOOM_SHAPES[1].len());
+    assert!(sunflower_peak + 1 >= BLOOM_SHAPES[3].len(), "the sunflower bud opened only {sunflower_peak} of {}", BLOOM_SHAPES[3].len());
+}
+
+#[test]
+fn a_frozen_bud_thaws_once_the_ice_is_gone() {
+    // Review (2026-10-29): a waiting bud drains nothing, and frost only lifts when a cell's
+    // energy runs out, so a bud frozen and left alone stayed frozen for good.
+    let mut u = Universe::new(16, 16, 9);
+    for x in 0..16 {
+        set_cell(&mut u, x, 14, Material::Wall);
+    }
+    for y in 9..14 {
+        set_cell_state(&mut u, 8, y, Material::Stem, 30, 20, 0);
+    }
+    set_cell_state(&mut u, 8, 8, Material::Flower, 20, BLOOM_ENERGY, FLAG_ROOTED | FLAG_FROZEN);
+    for _ in 0..4000 {
+        u.tick();
+    }
+    assert_eq!(flags_at(&u, 8, 8) & FLAG_FROZEN, 0, "a frozen bud with no ice near it never thawed");
+}
+
+#[test]
+fn heads_out_of_reach_open_together() {
+    // Pairs with the turn-taking test: fourteen apart, past HEAD_REACH_X, neither waits.
+    let (mut u, a, b) = two_buds(14);
+    let mut together = false;
+    for _ in 0..600 {
+        u.tick();
+        together |= has_petal(&u, a) && has_petal(&u, b);
+    }
+    assert!(together, "two heads fourteen apart should open at the same time");
+}
+
 #[test]
 fn the_tulip_opens_a_cup_and_the_bluebell_nods() {
-    // The two reshapes chosen on the design canvas (2026-10-22), grown from a rooted crown
-    // on its stalk and read at the head's fullest. Asserted as the shapes they are, not as
+    // The two reshapes chosen on the design canvas (2026-10-22), kept when the heads grew big
+    // (2026-10-29), grown from a rooted crown on its stalk and read at the head's fullest. Asserted as the shapes they are, not as
     // offsets: a tulip is a CUP, wider at the body than at the base, lipped at the rim and
     // with nothing below its crown; a bluebell LEANS, its top off the stalk's line and its
     // bells hanging free. Either one drawn as a symmetric crown again fails here.
@@ -1510,12 +1644,13 @@ fn the_tulip_opens_a_cup_and_the_bluebell_nods() {
     let row = |head: &[(i32, i32)], dy: i32| head.iter().filter(|c| c.1 == dy).count();
 
     let tulip = fullest(4);
-    assert!(tulip.len() >= 14, "the tulip opened only {} of its 15 petals", tulip.len());
+    let petals = BLOOM_SHAPES[4].len();
+    assert!(tulip.len() + 1 >= petals, "the tulip opened only {} of its {petals} petals", tulip.len());
     assert!(tulip.iter().all(|c| c.1 <= 0), "a tulip opened a petal below its crown: {tulip:?}");
     assert!(row(&tulip, -1) > row(&tulip, 0), "a cup is wider at its body than at its base: {tulip:?}");
     let top = tulip.iter().map(|c| c.1).min().unwrap();
     let wide = tulip.iter().map(|c| c.0).max().unwrap() - tulip.iter().map(|c| c.0).min().unwrap() + 1;
-    // The crown these replaced was seven wide and three deep, a bowl read from above.
+    // The crown the first cup replaced was seven wide and three deep, a bowl read from above.
     assert!(wide <= 1 - top + 1, "a cup is about as deep as it is wide: {wide} wide, {} deep", 1 - top);
     let lips: Vec<i32> = tulip.iter().filter(|c| c.1 == top).map(|c| c.0).collect();
     assert!(
@@ -1524,7 +1659,8 @@ fn the_tulip_opens_a_cup_and_the_bluebell_nods() {
     );
 
     let bluebell = fullest(6);
-    assert!(bluebell.len() >= 11, "the bluebell opened only {} of its 12 cells", bluebell.len());
+    let cells = BLOOM_SHAPES[6].len();
+    assert!(bluebell.len() + 1 >= cells, "the bluebell opened only {} of its {cells} cells", bluebell.len());
     let (left, right) = (
         -bluebell.iter().map(|c| c.0).min().unwrap(),
         bluebell.iter().map(|c| c.0).max().unwrap(),
@@ -1703,7 +1839,9 @@ fn a_cut_stalk_drops_its_bloom() {
     // while the stalk stands; cut the stalk and the whole head comes down, the crown no
     // longer rooted. Before, the stalk fell and the head hung in the air.
     let mut u = Universe::new(16, 16, 9);
-    let (dx, dy) = BLOOM_SHAPES[0][0];
+    // A petal beside the crown, not above it: one above lands where the crown was after a
+    // one-cell drop, and the head would look as if it had not moved.
+    let &(dx, dy) = BLOOM_SHAPES[0].iter().find(|o| o.0 != 0).unwrap();
     let petal = ((8 + dx) as u32, (8 + dy) as u32);
     for x in 0..16 {
         set_cell(&mut u, x, 14, Material::Wall);

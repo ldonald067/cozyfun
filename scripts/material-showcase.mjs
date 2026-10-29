@@ -172,9 +172,9 @@ export function materialShowcaseScript() {
     for (const [x, y] of [[22, 63], [22, 66], [22, 69]]) setCell(x, y, material.Ice, 90, 28);
     for (const [x, y] of [[34, 68], [34, 69]]) setCell(x, y, material.Fire, 230, 10);
 
-    // Grown plants: all five bloom silhouettes side by side, in the exact cell layout the
-    // sim produces — a head is a crown with its shape's petals opened around it, on a leafy
-    // stalk. One specimen cannot show that shape AND hue are both chosen per plant, so the
+    // Grown plants: all eight bloom silhouettes, in the exact cell layout the sim produces —
+    // a head is a crown with its shape's petals opened above it, on a stalk leafed on every
+    // segment. One specimen cannot show that shape AND hue are both chosen per plant, so the
     // row is the only place a reviewer can check that a lavender is not a daisy.
     // These offsets mirror BLOOM_SHAPES in sim/src/lib.rs. This is the THIRD copy of that
     // table -- sim, engine, and here -- and a comment asking for it to be kept in step is
@@ -183,22 +183,26 @@ export function materialShowcaseScript() {
     // three and fails when they disagree, so this block is generated-from-truth rather than
     // remembered.
     const BLOOM_SHAPES = [
-      [[-2,-2],[-1,-2],[1,-2],[2,-2],[-3,-1],[-2,-1],[-1,-1],[0,-1],[1,-1],[2,-1],[3,-1],[-3,0],[-2,0],[-1,0],[1,0],[2,0],[3,0],[-2,1],[2,1]], // 0 cornflower
-      [[-2,-1],[-1,-1],[0,-1],[1,-1],[2,-1],[-3,0],[-2,0],[-1,0],[1,0],[2,0],[3,0],[-3,1],[-2,1],[2,1],[3,1]], // 1 poppy
-      [[0,-2],[-2,-1],[0,-1],[2,-1],[-3,0],[-2,0],[-1,0],[1,0],[2,0],[3,0],[-2,1],[2,1]], // 2 daisy
-      [[0,-3],[-2,-2],[-1,-2],[0,-2],[1,-2],[2,-2],[-3,-1],[-2,-1],[-1,-1],[0,-1],[1,-1],[2,-1],[3,-1],[-3,0],[-2,0],[-1,0],[1,0],[2,0],[3,0],[-1,1],[1,1]], // 3 sunflower
-      [[0,-1],[-1,-1],[1,-1],[-1,0],[1,0],[-2,-1],[2,-1],[0,-2],[-1,-2],[1,-2],[-2,-2],[2,-2],[0,-3],[-2,-3],[2,-3]], // 4 tulip
-      [[0,-1],[-1,-2],[1,-2],[0,-3],[-1,-4],[1,-4],[0,-5]], // 5 lavender
-      [[0,-1],[0,-2],[0,-3],[1,-4],[2,-4],[3,-3],[1,-3],[1,-2],[3,-2],[3,-1],[-1,-3],[-1,-2]], // 6 bluebell
-      [[-2,-1],[-1,-1],[1,-1],[2,-1],[-3,0],[-2,0],[-1,0],[1,0],[2,0],[3,0],[-2,1],[-1,1],[1,1],[2,1]], // 7 cosmos
+      [[0,-1],[-1,0],[1,0],[0,-2],[-1,-1],[1,-1],[0,-3],[-1,-2],[1,-2],[0,-4],[-1,-3],[1,-3],[-2,-2],[2,-2],[0,-5],[-1,-4],[1,-4],[-2,-3],[2,-3],[0,-6],[-1,-5],[1,-5],[-2,-4],[2,-4],[-3,-3],[3,-3],[0,-7],[-1,-6],[1,-6],[-2,-5],[2,-5],[-3,-4],[3,-4],[0,-8],[-1,-7],[1,-7],[-2,-6],[2,-6],[-3,-5],[3,-5],[-4,-4],[4,-4],[-1,-8],[1,-8],[-2,-7],[2,-7],[-3,-6],[3,-6],[-4,-5],[4,-5],[-1,-9],[-2,-8],[1,-9],[2,-8],[-3,-7],[3,-7],[-4,-6],[4,-6],[-5,-5],[5,-5],[-3,-8],[3,-8],[-4,-7],[4,-7],[-3,-9],[-4,-8],[3,-9],[4,-8],[-5,-7],[5,-7]], // 0 cornflower
+      [[0,-1],[-1,0],[1,0],[0,-2],[-1,-1],[1,-1],[-2,0],[2,0],[0,-3],[-1,-2],[1,-2],[-2,-1],[2,-1],[-3,0],[3,0],[0,-4],[-1,-3],[1,-3],[-2,-2],[2,-2],[-3,-1],[3,-1],[0,-5],[-1,-4],[1,-4],[-2,-3],[2,-3],[-3,-2],[3,-2],[-4,-1],[4,-1],[-1,-5],[1,-5],[-2,-4],[2,-4],[-3,-3],[3,-3],[-4,-2],[4,-2],[-3,-4],[3,-4],[-4,-3],[4,-3],[-5,-2],[5,-2],[-4,-4],[4,-4],[-5,-3],[5,-3],[-4,-5],[-5,-4],[4,-5],[5,-4],[-6,-3],[6,-3],[-5,-5],[-6,-4],[5,-5],[6,-4],[-5,-6],[-6,-5],[5,-6],[6,-5],[-6,-6],[6,-6]], // 1 poppy
+      [[0,-1],[-1,0],[1,0],[0,-2],[-1,-1],[1,-1],[0,-3],[-1,-2],[1,-2],[0,-4],[-1,-3],[1,-3],[0,-5],[-1,-4],[1,-4],[-2,-3],[2,-3],[0,-6],[-1,-5],[1,-5],[-2,-4],[2,-4],[-3,-3],[3,-3],[0,-7],[-1,-6],[1,-6],[-2,-5],[2,-5],[-3,-4],[3,-4],[-4,-3],[-3,-2],[4,-3],[3,-2],[0,-8],[-1,-7],[1,-7],[-3,-5],[3,-5],[-4,-4],[4,-4],[-4,-2],[4,-2],[-1,-8],[1,-8],[-3,-6],[-4,-5],[3,-6],[4,-5],[-5,-4],[5,-4],[-5,-2],[-4,-1],[5,-2],[4,-1],[-4,-6],[4,-6],[-6,-4],[6,-4],[-4,-7],[-5,-6],[4,-7],[5,-6]], // 2 daisy
+      [[0,-1],[-1,0],[1,0],[0,-2],[-1,-1],[1,-1],[0,-3],[-1,-2],[1,-2],[-2,-1],[2,-1],[0,-4],[-1,-3],[1,-3],[-2,-2],[2,-2],[-3,-1],[3,-1],[0,-5],[-1,-4],[1,-4],[-2,-3],[2,-3],[-3,-2],[3,-2],[-4,-1],[-3,0],[4,-1],[3,0],[0,-6],[-1,-5],[1,-5],[-2,-4],[2,-4],[-3,-3],[3,-3],[-4,-2],[4,-2],[0,-7],[-1,-6],[1,-6],[-2,-5],[2,-5],[-3,-4],[3,-4],[-4,-3],[4,-3],[-5,-2],[5,-2],[0,-8],[-1,-7],[1,-7],[-2,-6],[2,-6],[-3,-5],[3,-5],[-4,-4],[4,-4],[-5,-3],[5,-3],[0,-9],[-1,-8],[1,-8],[-2,-7],[2,-7],[-3,-6],[3,-6],[-4,-5],[4,-5],[-5,-4],[5,-4],[-6,-3],[6,-3],[-1,-9],[1,-9],[-2,-8],[2,-8],[-3,-7],[3,-7],[-4,-6],[4,-6],[-5,-5],[5,-5],[-1,-10],[-2,-9],[1,-10],[2,-9],[-3,-8],[3,-8],[-4,-7],[4,-7],[-5,-6],[5,-6],[-6,-5],[6,-5],[-3,-9],[3,-9],[-4,-8],[4,-8],[-5,-7],[5,-7],[-3,-10],[-4,-9],[3,-10],[4,-9],[-5,-8],[5,-8],[-6,-7],[6,-7]], // 3 sunflower
+      [[0,-1],[-1,0],[1,0],[0,-2],[-1,-1],[1,-1],[0,-3],[-1,-2],[1,-2],[-2,-1],[2,-1],[0,-4],[-1,-3],[1,-3],[-2,-2],[2,-2],[0,-5],[-1,-4],[1,-4],[-2,-3],[2,-3],[-3,-2],[3,-2],[0,-6],[-1,-5],[1,-5],[-2,-4],[2,-4],[-3,-3],[3,-3],[0,-7],[-1,-6],[1,-6],[-2,-5],[2,-5],[-3,-4],[3,-4],[-4,-3],[4,-3],[0,-8],[-1,-7],[1,-7],[-2,-6],[2,-6],[-3,-5],[3,-5],[-4,-4],[4,-4],[-3,-6],[3,-6],[-4,-5],[4,-5],[-3,-7],[-4,-6],[3,-7],[4,-6],[-4,-7],[4,-7],[-4,-8],[4,-8]], // 4 tulip
+      [[0,-1],[-1,0],[1,0],[0,-2],[-1,-1],[1,-1],[0,-3],[-1,-2],[1,-2],[0,-4],[-1,-3],[1,-3],[-2,-2],[2,-2],[0,-5],[-1,-4],[1,-4],[0,-6],[-1,-5],[1,-5],[-2,-4],[2,-4],[0,-7],[-1,-6],[1,-6],[0,-8],[-1,-7],[1,-7],[-2,-6],[2,-6],[0,-9],[0,-10],[-1,-9],[1,-9]], // 5 lavender
+      [[0,-1],[0,-2],[0,-3],[0,-4],[1,-3],[0,-5],[2,-3],[0,-6],[2,-2],[0,-7],[-1,-6],[3,-2],[2,-1],[0,-8],[-2,-6],[4,-2],[3,-1],[2,0],[0,-9],[-2,-5],[4,-1],[1,-9],[-3,-5],[-2,-4],[4,0],[1,-10],[-4,-5],[-3,-4],[-2,-3],[2,-10],[-4,-4],[3,-10],[-4,-3],[4,-10],[4,-9],[4,-8],[3,-8],[5,-8],[4,-7],[3,-7],[5,-7],[3,-6],[5,-6]], // 6 bluebell
+      [[0,-1],[-1,0],[1,0],[0,-2],[-1,-1],[1,-1],[-2,0],[2,0],[0,-3],[-1,-2],[1,-2],[-2,-1],[2,-1],[0,-4],[-1,-3],[1,-3],[0,-5],[-1,-4],[1,-4],[0,-6],[-1,-5],[1,-5],[-2,-4],[2,-4],[0,-7],[-1,-6],[1,-6],[-2,-5],[2,-5],[-3,-4],[3,-4],[0,-8],[-1,-7],[1,-7],[-2,-6],[2,-6],[-3,-5],[3,-5],[-4,-4],[4,-4],[0,-9],[-1,-8],[1,-8],[-3,-6],[3,-6],[-4,-5],[4,-5],[-5,-4],[-4,-3],[5,-4],[4,-3],[0,-10],[-1,-9],[1,-9],[-4,-6],[4,-6],[-5,-5],[5,-5],[-6,-4],[-5,-3],[6,-4],[5,-3],[-1,-10],[1,-10],[-2,-9],[2,-9],[-4,-7],[-5,-6],[4,-7],[5,-6],[-6,-3],[-5,-2],[6,-3],[5,-2],[-2,-10],[2,-10],[-5,-7],[-6,-6],[5,-7],[6,-6],[-5,-8],[-6,-7],[5,-8],[6,-7]], // 7 cosmos
     ];
     // The bed is Wall, not Stone and not bare soil: soil is a powder, so an unsupported
     // planter falls the moment the capture's sim starts and takes the whole plant with it.
-    // The row lives in the empty bottom band because a five-wide head needs real room —
-    // the old right-hand strip could not fit these without the heads touching. It sits WEST
-    // of x=72 on purpose: the sand pile and the stardust/pollen exhibits above that column
-    // fall to the floor once the capture's sim starts, and they buried the first attempt.
+    // The row lives in the empty bottom band because a head needs real room. Heads are 13
+    // wide since 2026-10-29, so eight no longer fit WEST of x=72, where they have to start:
+    // the sand pile and the stardust/pollen exhibits above that column fall to the floor once
+    // the capture's sim starts, and they buried the first attempt. Four stand there; the
+    // other four stand in two short beds further east, either side of x 150-184, where the
+    // wet wall above drips onto the floor.
     line(0, 69, 135, material.Wall);
+    line(114, 148, 135, material.Wall);
+    line(185, 213, 135, material.Wall);
     // Crown and petal energies sit below CROWN_RESERVE and above the shed floor on
     // purpose, so the exhibit cannot open extra petals or drop them while the page runs.
     const plant = (bx, by, variant, stalk, leaves) => {
@@ -232,25 +236,25 @@ export function materialShowcaseScript() {
     // An unopened bud is a lone crown with too little budget left to open.
     plant(6, 134, 2, 4, [[-1, 2]]);
     setCell(6, 129, material.Flower, 90, 20, flag.Rooted, 2);
-    // Heads are SEVEN cells wide now (dx -3..3), so the old seven-cell step put neighbours
-    // edge to edge with no gap and the row read as one continuous band. Step eight leaves a
-    // one-column gap. The row cannot simply spread rightward instead: the sand pile owns
-    // column 72 onward, which is why this starts at 12 and the bud/spent pair moved left.
-    bloom(12, 134, 0, 5, [[-1, 2], [1, 4]], 95, 200);        // cornflower
-    bloom(20, 134, 1, 5, [[1, 2], [-1, 4]], 95, 200);        // poppy
-    bloom(28, 134, 2, 5, [[-1, 2], [1, 4]], 95, 200);        // daisy
-    bloom(36, 134, 3, 6, [[1, 2], [-1, 4]], 95, 200);        // sunflower
-    bloom(44, 134, 4, 5, [[-1, 2], [1, 4]], 95, 200);        // tulip
-    bloom(52, 134, 5, 5, [[1, 2], [-1, 4]], 95, 200);        // lavender
-    bloom(60, 134, 6, 5, [[-1, 2], [1, 4]], 95, 200);        // bluebell
+    // Heads are up to 13 cells wide (dx -6..6), so plants stand 14 apart: one column of gap.
+    // A stalk is seven cells, the shortest a plant grows, with a leaf on every segment but the
+    // top one, alternating sides, as the sim unfurls them.
+    const LEAVES = [[-1, 1], [1, 2], [-1, 3], [1, 4], [-1, 5], [1, 6]];
+    bloom(17, 134, 0, 7, LEAVES, 95, 200);        // cornflower
+    bloom(31, 134, 1, 7, LEAVES, 95, 200);        // poppy
+    bloom(45, 134, 2, 7, LEAVES, 95, 200);        // daisy
+    bloom(59, 134, 3, 7, LEAVES, 95, 200);        // sunflower
+    bloom(121, 134, 4, 7, LEAVES, 95, 200);       // tulip
+    bloom(135, 134, 5, 7, LEAVES, 95, 200);       // lavender
+    bloom(192, 134, 6, 7, LEAVES, 95, 200);       // bluebell
     // Cosmos: the COMMON spent case, and the one a bare-crown test gets wrong. Its crown
     // is under POLLEN_RESERVE so it renders as husk, while its petals sit at the shed
     // floor of 45 and hold — measured on a real garden, a head runs its budget to zero
     // by ~1200 ticks but almost always keeps a stubborn petal or two hanging on.
-    bloom(68, 134, 7, 5, [[1, 2], [-1, 4]], 20, 3700, 2);    // cosmos, spent and shedding
+    bloom(206, 134, 7, 7, LEAVES, 20, 3700, 2);   // cosmos, spent and shedding
     // A seed the sunflower set from pollen, sailing east off it on the breeze: it reads as a
     // plain seed, and the flags are what make it glide.
-    setCell(40, 130, material.Seed, 40, 0, flag.Windborne | flag.DriftEast, 3);
+    setCell(67, 122, material.Seed, 40, 0, flag.Windborne | flag.DriftEast, 3);
 
     // The two rocks, side by side on one shelf: sandstone on the left, the stone lava cools
     // into on the right. Sandstone is what the slow world makes when a flooded sand bed

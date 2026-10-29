@@ -902,14 +902,17 @@ const scenarios = [
     // the difference; only asserting the milestones can.
     name: "a plant's whole life, bud to shed petals",
     // A head holds its petals for PETAL_SHED_AGE (3600) ticks, so the first falls near 3800.
-    w: 40, h: 24, seed: 777, ticks: 4400,
+    // Heads are up to 13 across and 11 tall (2026-10-29): the board is tall enough for one on
+    // an eleven-cell stalk, and the planters far enough apart that one head's shed petals do
+    // not drift under the other's.
+    w: 64, h: 32, seed: 777, ticks: 4400,
     paint(p) {
-      for (let x = 0; x < 40; x++) p(x, 21, 1, M.Wall);
-      for (const wall of [2, 17, 22, 37]) for (let y = 14; y < 21; y++) p(wall, y, 1, M.Wall);
-      p(9, 19, 1, M.Soil);  p(9, 16, 1, M.Seed);  p(9, 13, 2, M.Water);
+      for (let x = 0; x < 64; x++) p(x, 29, 1, M.Wall);
+      for (const wall of [4, 20, 43, 59]) for (let y = 22; y < 29; y++) p(wall, y, 1, M.Wall);
+      p(12, 27, 1, M.Soil); p(12, 24, 1, M.Seed); p(12, 21, 2, M.Water);
       // The cosmic arm covers BLOOM_ENERGY_COSMIC and the cosmic bloom timings, which no
       // other parity scenario reaches.
-      p(29, 19, 1, M.Soil); p(29, 16, 1, M.Seed); p(29, 13, 2, M.Moonwater);
+      p(51, 27, 1, M.Soil); p(51, 24, 1, M.Seed); p(51, 21, 2, M.Moonwater);
     },
     observe(seen, cells, w, h) {
       const kindAt = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : cells[(y * w + x) * STRIDE]);
@@ -920,7 +923,7 @@ const scenarios = [
           const k = kindAt(x, y);
           const at = (y * w + x) * STRIDE;
           // Each planter is one plant, so its species is whatever its head is.
-          const planter = x < 20 ? "plain" : "cosmic";
+          const planter = x < 32 ? "plain" : "cosmic";
           if (k === 19) {
             head++;
             if (cells[at + 6] & 4) cosmicHead++;
@@ -1697,7 +1700,7 @@ const scenarios = [
     // here on purpose, so retuning either shape has to come through this scenario too; every
     // other bloom scenario stays blind to which shape a species has.
     name: "a tulip opens a cup and a bluebell nods",
-    w: 30, h: 20, seed: 4646, ticks: 1200,
+    w: 34, h: 20, seed: 4646, ticks: 1200,
     cells(w, h) {
       const bytes = new Uint8Array(w * h * STRIDE);
       const put = (x, y, kind, variant = 0, energy = 0, flags = 0, age = 30) => {
@@ -1719,7 +1722,7 @@ const scenarios = [
         const open = shape.filter(([dx, dy]) => cells[at(cx + dx, 12 + dy)] === M.Flower && cells[at(cx + dx, 12 + dy) + 1] === variant).length;
         seen[`open${variant}`] = Math.max(seen[`open${variant}`] ?? 0, open);
         // A petal of this plant anywhere its new shape has none.
-        for (let y = 2; y <= 16; y++) for (let x = cx - 4; x <= cx + 4; x++) {
+        for (let y = 2; y <= 16; y++) for (let x = cx - 6; x <= cx + 6; x++) {
           if (cells[at(x, y)] !== M.Flower || cells[at(x, y) + 1] !== variant || (x === cx && y === 12)) continue;
           if (!shape.some(([dx, dy]) => cx + dx === x && 12 + dy === y)) seen.stray = `${x - cx},${y - 12} on variant ${variant}`;
         }
@@ -1731,6 +1734,81 @@ const scenarios = [
         if ((seen[`open${variant}`] ?? 0) < shape.length - 1) return `variant ${variant} opened ${seen[`open${variant}`] ?? 0} of its ${shape.length} cells`;
       }
       if (seen.stray) return `a petal opened off the new shape, at ${seen.stray}`;
+      return null;
+    },
+  },
+  {
+    // Neighbouring heads take turns (2026-10-29): two crowns on stalks seven apart, inside each
+    // other's reach. One opens; the other waits with its whole budget and no pollen, and opens
+    // once the first has shed. Byte parity alone would pass if neither engine waited at all,
+    // so the scene asserts the turn: never both open, and the second does open.
+    name: "neighbouring heads take turns to open",
+    w: 40, h: 24, seed: 5151, ticks: 6000,
+    cells(w, h) {
+      const bytes = new Uint8Array(w * h * STRIDE);
+      const put = (x, y, kind, variant = 0, energy = 0, flags = 0, age = 30) => {
+        const o = (y * w + x) * STRIDE;
+        bytes[o] = kind; bytes[o + 1] = variant; bytes[o + 2] = age;
+        bytes[o + 4] = energy & 255; bytes[o + 5] = energy >> 8; bytes[o + 6] = flags & 255; bytes[o + 7] = flags >> 8;
+      };
+      for (let x = 0; x < w; x++) { put(x, 22, M.Wall); put(x, 23, M.Wall); }
+      for (const [cx, variant] of TURN_CROWNS) {
+        for (let y = 14; y <= 21; y++) put(cx, y, M.Stem, variant, 20);
+        put(cx, 13, M.Flower, variant, 250, CELL_FLAG.Rooted, 20);
+      }
+      return bytes;
+    },
+    paint() {},
+    observe(seen, cells, w) {
+      const at = (x, y) => (y * w + x) * STRIDE;
+      const open = TURN_CROWNS.map(([cx]) => [[0, -1], [-1, 0], [1, 0]].some(([dx, dy]) => cells[at(cx + dx, 13 + dy)] === M.Flower));
+      if (open[0] && open[1]) seen.bothOpen = (seen.bothOpen ?? 0) + 1;
+      if (seen.first === undefined && (open[0] || open[1])) seen.first = open[0] ? 0 : 1;
+      if (seen.first !== undefined && open[1 - seen.first]) seen.secondOpened = true;
+      if (seen.first !== undefined && !seen.secondOpened) {
+        const [cx] = TURN_CROWNS[1 - seen.first];
+        seen.waitingEnergy = Math.min(seen.waitingEnergy ?? 255, cells[at(cx, 13) + 4] | (cells[at(cx, 13) + 5] << 8));
+      }
+    },
+    expect(seen) {
+      if (seen.first === undefined) return "neither head opened";
+      if (seen.bothOpen) return `both heads were open together on ${seen.bothOpen} ticks`;
+      if ((seen.waitingEnergy ?? 0) < 250) return `the waiting bud spent its budget down to ${seen.waitingEnergy}`;
+      if (!seen.secondOpened) return "the waiting bud never opened after its neighbour shed";
+      return null;
+    },
+  },
+  {
+    // A neighbour's petal touching a bud does not open it (review, 2026-10-29): a poppy beside a
+    // moonlit sunflower bud on a stalk three taller. Read as the bud's own, the poppy's petal
+    // made the bud look open: the poppy stalled half-open and the bud drained without opening.
+    name: "a neighbour's petal touching a bud does not open it",
+    w: 40, h: 24, seed: 2, ticks: 8000,
+    cells(w, h) {
+      const bytes = new Uint8Array(w * h * STRIDE);
+      const put = (x, y, kind, variant = 0, energy = 0, flags = 0, age = 30) => {
+        const o = (y * w + x) * STRIDE;
+        bytes[o] = kind; bytes[o + 1] = variant; bytes[o + 2] = age;
+        bytes[o + 4] = energy & 255; bytes[o + 5] = energy >> 8; bytes[o + 6] = flags & 255; bytes[o + 7] = flags >> 8;
+      };
+      for (let x = 0; x < w; x++) { put(x, 22, M.Wall); put(x, 23, M.Wall); }
+      for (const [cx, cy, variant, flags] of TOUCHING_CROWNS) {
+        for (let y = cy + 1; y <= 21; y++) put(cx, y, M.Stem, variant, 20);
+        put(cx, cy, M.Flower, variant, 250, CELL_FLAG.Rooted | flags, 20);
+      }
+      return bytes;
+    },
+    paint() {},
+    observe(seen, cells, w) {
+      for (const [cx, cy, variant, , shape] of TOUCHING_CROWNS) {
+        const open = shape.filter(([dx, dy]) => cells[((cy + dy) * w + cx + dx) * STRIDE] === M.Flower && cells[((cy + dy) * w + cx + dx) * STRIDE + 1] === variant).length;
+        seen[`peak${variant}`] = Math.max(seen[`peak${variant}`] ?? 0, open);
+      }
+    },
+    expect(seen) {
+      for (const [, , variant, , shape] of TOUCHING_CROWNS) {
+        if ((seen[`peak${variant}`] ?? 0) < shape.length - 1) return `variant ${variant} opened only ${seen[`peak${variant}`] ?? 0} of ${shape.length}`;
+      }
       return null;
     },
   },
@@ -1959,14 +2037,26 @@ const scenarios = [
 
 // BLOOM_SHAPES 0 (cornflower) and 5 (lavender) from sim/src/lib.rs, for the cut-bloom scenario.
 const CUT_BLOOM_SHAPES = {
-  0: [[-2, -2], [-1, -2], [1, -2], [2, -2], [-3, -1], [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [3, -1], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0], [-2, 1], [2, 1]],
-  5: [[0, -1], [-1, -2], [1, -2], [0, -3], [-1, -4], [1, -4], [0, -5]],
+  0: [[0, -1], [-1, 0], [1, 0], [0, -2], [-1, -1], [1, -1], [0, -3], [-1, -2], [1, -2], [0, -4], [-1, -3], [1, -3], [-2, -2], [2, -2], [0, -5], [-1, -4], [1, -4], [-2, -3], [2, -3], [0, -6], [-1, -5], [1, -5], [-2, -4], [2, -4], [-3, -3], [3, -3], [0, -7], [-1, -6], [1, -6], [-2, -5], [2, -5], [-3, -4], [3, -4], [0, -8], [-1, -7], [1, -7], [-2, -6], [2, -6], [-3, -5], [3, -5], [-4, -4], [4, -4], [-1, -8], [1, -8], [-2, -7], [2, -7], [-3, -6], [3, -6], [-4, -5], [4, -5], [-1, -9], [-2, -8], [1, -9], [2, -8], [-3, -7], [3, -7], [-4, -6], [4, -6], [-5, -5], [5, -5], [-3, -8], [3, -8], [-4, -7], [4, -7], [-3, -9], [-4, -8], [3, -9], [4, -8], [-5, -7], [5, -7]],
+  5: [[0, -1], [-1, 0], [1, 0], [0, -2], [-1, -1], [1, -1], [0, -3], [-1, -2], [1, -2], [0, -4], [-1, -3], [1, -3], [-2, -2], [2, -2], [0, -5], [-1, -4], [1, -4], [0, -6], [-1, -5], [1, -5], [-2, -4], [2, -4], [0, -7], [-1, -6], [1, -6], [0, -8], [-1, -7], [1, -7], [-2, -6], [2, -6], [0, -9], [0, -10], [-1, -9], [1, -9]],
 };
 
-// The tulip cup and the nodding bluebell, BLOOM_SHAPES 4 and 6, as [crown x, variant, shape].
+// The tulip cup and the nodding bluebell, BLOOM_SHAPES 4 and 6, as [crown x, variant, shape]. The
+// crowns stand 16 apart, out of each other's reach (HEAD_REACH_X), so neither waits its turn.
+// Two crowns seven apart for the turn-taking scenario, as [crown x, variant]: a sunflower and
+// a cosmos, the two widest heads.
+const TURN_CROWNS = [[14, 3], [21, 7]];
+
+// A poppy and a moonlit sunflower three cells taller, seven apart, as [crown x, crown y, variant,
+// flags, shape]: the poppy's petal reaches the sunflower's bud.
+const TOUCHING_CROWNS = [
+  [10, 13, 1, 0, [[0, -1], [-1, 0], [1, 0], [0, -2], [-1, -1], [1, -1], [-2, 0], [2, 0], [0, -3], [-1, -2], [1, -2], [-2, -1], [2, -1], [-3, 0], [3, 0], [0, -4], [-1, -3], [1, -3], [-2, -2], [2, -2], [-3, -1], [3, -1], [0, -5], [-1, -4], [1, -4], [-2, -3], [2, -3], [-3, -2], [3, -2], [-4, -1], [4, -1], [-1, -5], [1, -5], [-2, -4], [2, -4], [-3, -3], [3, -3], [-4, -2], [4, -2], [-3, -4], [3, -4], [-4, -3], [4, -3], [-5, -2], [5, -2], [-4, -4], [4, -4], [-5, -3], [5, -3], [-4, -5], [-5, -4], [4, -5], [5, -4], [-6, -3], [6, -3], [-5, -5], [-6, -4], [5, -5], [6, -4], [-5, -6], [-6, -5], [5, -6], [6, -5], [-6, -6], [6, -6]]],
+  [17, 10, 3, CELL_FLAG.Cosmic, [[0, -1], [-1, 0], [1, 0], [0, -2], [-1, -1], [1, -1], [0, -3], [-1, -2], [1, -2], [-2, -1], [2, -1], [0, -4], [-1, -3], [1, -3], [-2, -2], [2, -2], [-3, -1], [3, -1], [0, -5], [-1, -4], [1, -4], [-2, -3], [2, -3], [-3, -2], [3, -2], [-4, -1], [-3, 0], [4, -1], [3, 0], [0, -6], [-1, -5], [1, -5], [-2, -4], [2, -4], [-3, -3], [3, -3], [-4, -2], [4, -2], [0, -7], [-1, -6], [1, -6], [-2, -5], [2, -5], [-3, -4], [3, -4], [-4, -3], [4, -3], [-5, -2], [5, -2], [0, -8], [-1, -7], [1, -7], [-2, -6], [2, -6], [-3, -5], [3, -5], [-4, -4], [4, -4], [-5, -3], [5, -3], [0, -9], [-1, -8], [1, -8], [-2, -7], [2, -7], [-3, -6], [3, -6], [-4, -5], [4, -5], [-5, -4], [5, -4], [-6, -3], [6, -3], [-1, -9], [1, -9], [-2, -8], [2, -8], [-3, -7], [3, -7], [-4, -6], [4, -6], [-5, -5], [5, -5], [-1, -10], [-2, -9], [1, -10], [2, -9], [-3, -8], [3, -8], [-4, -7], [4, -7], [-5, -6], [5, -6], [-6, -5], [6, -5], [-3, -9], [3, -9], [-4, -8], [4, -8], [-5, -7], [5, -7], [-3, -10], [-4, -9], [3, -10], [4, -9], [-5, -8], [5, -8], [-6, -7], [6, -7]]],
+];
+
 const RESHAPED_HEADS = [
-  [8, 4, [[0, -1], [-1, -1], [1, -1], [-1, 0], [1, 0], [-2, -1], [2, -1], [0, -2], [-1, -2], [1, -2], [-2, -2], [2, -2], [0, -3], [-2, -3], [2, -3]]],
-  [20, 6, [[0, -1], [0, -2], [0, -3], [1, -4], [2, -4], [3, -3], [1, -3], [1, -2], [3, -2], [3, -1], [-1, -3], [-1, -2]]],
+  [8, 4, [[0, -1], [-1, 0], [1, 0], [0, -2], [-1, -1], [1, -1], [0, -3], [-1, -2], [1, -2], [-2, -1], [2, -1], [0, -4], [-1, -3], [1, -3], [-2, -2], [2, -2], [0, -5], [-1, -4], [1, -4], [-2, -3], [2, -3], [-3, -2], [3, -2], [0, -6], [-1, -5], [1, -5], [-2, -4], [2, -4], [-3, -3], [3, -3], [0, -7], [-1, -6], [1, -6], [-2, -5], [2, -5], [-3, -4], [3, -4], [-4, -3], [4, -3], [0, -8], [-1, -7], [1, -7], [-2, -6], [2, -6], [-3, -5], [3, -5], [-4, -4], [4, -4], [-3, -6], [3, -6], [-4, -5], [4, -5], [-3, -7], [-4, -6], [3, -7], [4, -6], [-4, -7], [4, -7], [-4, -8], [4, -8]]],
+  [24, 6, [[0, -1], [0, -2], [0, -3], [0, -4], [1, -3], [0, -5], [2, -3], [0, -6], [2, -2], [0, -7], [-1, -6], [3, -2], [2, -1], [0, -8], [-2, -6], [4, -2], [3, -1], [2, 0], [0, -9], [-2, -5], [4, -1], [1, -9], [-3, -5], [-2, -4], [4, 0], [1, -10], [-4, -5], [-3, -4], [-2, -3], [2, -10], [-4, -4], [3, -10], [-4, -3], [4, -10], [4, -9], [4, -8], [3, -8], [5, -8], [4, -7], [3, -7], [5, -7], [3, -6], [5, -6]]],
 ];
 
 // PARITY_ONLY=<text> runs just the scenarios whose name contains it. It exists for

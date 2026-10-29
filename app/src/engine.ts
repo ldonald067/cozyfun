@@ -500,7 +500,7 @@ class JsSandboxEngine implements SandboxEngine {
       // and 90 on the global clock. See lib.rs.
       const cellIndex = idx / CELL_STRIDE;
       const slowed =
-        (kind === MATERIAL.Flower && age % BLOOM_CLOCK !== 0) ||
+        (kind === MATERIAL.Flower && (age % BLOOM_CLOCK !== 0 || this.isWaitingBud(idx, next))) ||
         (kind === MATERIAL.Water && this.ticks % WATER_CHILL !== 0) ||
         (kind === MATERIAL.Ember &&
           readU16(next, idx + 4) >= EMBER_CRACK_FLOOR &&
@@ -1564,6 +1564,53 @@ class JsSandboxEngine implements SandboxEngine {
     return open(old[target]) && open(next[target]) && this.move(idx, nx, ny, cell, old, next);
   }
 
+  // Another head open within reach of a crown at (x, y), last tick or already this one: a
+  // rooted crown with a petal beside it, or one of another species with any petal of its head
+  // still on. See head_in_reach in lib.rs.
+  private headInReach(x: number, y: number, variant: number, old: Uint8Array, next: Uint8Array) {
+    for (let cy = Math.max(0, y - HEAD_REACH_Y); cy <= Math.min(this.h - 1, y + HEAD_REACH_Y); cy++) {
+      for (let cx = Math.max(0, x - HEAD_REACH_X); cx <= Math.min(this.w - 1, x + HEAD_REACH_X); cx++) {
+        if (cx === x && cy === y) continue;
+        const at = this.index(cx, cy);
+        for (const cells of [old, next]) {
+          if (cells[at] !== MATERIAL.Flower || !(readU16(cells, at + 6) & CELL_FLAG.Rooted)) continue;
+          if (this.ownPetalBeside(cx, cy, cells[at + 1], cells) || (cells[at + 1] !== variant && this.headStillOn(cx, cy, cells[at + 1], cells))) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  // Whether any petal of the head on the crown at (x, y) is still on.
+  private headStillOn(x: number, y: number, variant: number, cells: Uint8Array) {
+    return BLOOM_SHAPES[variant & 7].some(([dx, dy]) => {
+      if (!this.inBounds(x + dx, y + dy)) return false;
+      const petal = this.index(x + dx, y + dy);
+      return cells[petal] === MATERIAL.Flower && cells[petal + 1] === variant;
+    });
+  }
+
+  // Whether the crown at (x, y) has a petal of its own beside it: one of its species, on a face
+  // its head opens. See own_petal_beside in lib.rs.
+  private ownPetalBeside(x: number, y: number, variant: number, cells: Uint8Array) {
+    const shape = BLOOM_SHAPES[variant & 7];
+    for (const [dx, dy] of CROWN_FACES) {
+      if (!this.inBounds(x + dx, y + dy) || !shape.some(([sx, sy]) => sx === dx && sy === dy)) continue;
+      const petal = this.index(x + dx, y + dy);
+      if (cells[petal] === MATERIAL.Flower && cells[petal + 1] === variant) return true;
+    }
+    return false;
+  }
+
+  // A bud waiting its turn: a rooted crown with no petal open yet and the budget to open.
+  // Not a frozen one, or its frost would never lift. See is_waiting_bud in lib.rs.
+  private isWaitingBud(idx: number, cells: Uint8Array) {
+    const flags = readU16(cells, idx + 6);
+    if (cells[idx] !== MATERIAL.Flower || !(flags & CELL_FLAG.Rooted) || flags & CELL_FLAG.Frozen || readU16(cells, idx + 4) <= CROWN_RESERVE) return false;
+    const cell = idx / CELL_STRIDE;
+    return !this.ownPetalBeside(cell % this.w, Math.floor(cell / this.w), cells[idx + 1], cells);
+  }
+
   private stem(idx: number, x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
     if (next[idx] !== MATERIAL.Stem || readU16(next, idx + 6) & CELL_FLAG.Frozen) return;
     if (!this.stemHasFooting(x, y, old)) {
@@ -1702,17 +1749,21 @@ class JsSandboxEngine implements SandboxEngine {
     // unfurling petals into the open air around it, one per beat, so a bloom is watched
     // opening rather than appearing whole. Petals are never rooted, so only the crown
     // ever opens and a head cannot run away.
-    if (flags & CELL_FLAG.Rooted && energy > CROWN_RESERVE && age > 12 && this.chance(cosmic ? 8 : 12)) {
+    // It waits while another head is open within reach, so neighbours take turns.
+    if (flags & CELL_FLAG.Rooted && energy > CROWN_RESERVE && age > 12 && !this.headInReach(x, y, cell[1], old, next) && this.chance(cosmic ? 2 : 3)) {
       const petal = this.nextPetalSite(x, y, cell[1], old, next);
       if (petal >= 0) {
+        // A head's arc starts when it opens, not when its bud formed. See lib.rs.
+        if (!this.ownPetalBeside(x, y, cell[1], old)) writeU16(next, idx + 2, 0);
         writeCellBytes(next, petal, MATERIAL.Flower, cell[1], PETAL_ENERGY, 0, cosmic ? CELL_FLAG.Cosmic : 0);
         writeU16(next, idx + 4, Math.max(0, readU16(next, idx + 4) - PETAL_COST));
       }
     }
 
     // Pollen leaves from any open face. Straight up alone would silence a finished bloom
-    // outright, because the crown is walled in by its own petals.
-    if (energy > POLLEN_RESERVE && age > 24 && this.chance(cosmic ? 90 : 200)) {
+    // outright, because the crown is walled in by its own petals. A bud makes none: one
+    // waiting its turn would spend the budget it opens with.
+    if (energy > POLLEN_RESERVE && age > 24 && (!(flags & CELL_FLAG.Rooted) || this.ownPetalBeside(x, y, cell[1], old)) && this.chance(cosmic ? 90 : 200)) {
       const face = this.openFace(x, y, (cell[1] + age) % FACE_OFFSETS.length, old, next);
       if (face >= 0) {
         writeCellBytes(next, face, MATERIAL.Pollen, cell[1], 150, 0, cosmic ? CELL_FLAG.Cosmic : 0);
@@ -1938,6 +1989,8 @@ const SPARK_DOWN = 4;
 // before its corners is rounder at every stage of opening, and the renderer can tell a
 // crown from a bud as soon as the first petal lands. Opening diagonally first left a
 // one-petal bloom rendering as two separate buds.
+// The faces of a crown a petal of its own can sit on: never below, where its stalk stands.
+const CROWN_FACES: ReadonlyArray<readonly [number, number]> = [[0, -1], [-1, 0], [1, 0]];
 const FACE_OFFSETS: ReadonlyArray<readonly [number, number]> = [
   [0, -1],
   [-1, 0],
@@ -1996,33 +2049,31 @@ const SCATTER_REACH = 14;
 
 // A seed will not germinate this close to an existing plant. Without it every cell of a
 // watered bed sprouts and the meadow becomes one solid wall of blooms with no silhouette.
-// Five keeps a clear gap between heads now that a head is itself five cells across.
+// It keeps stalks seven apart; heads are wider (up to 13), so neighbours take turns. See lib.rs.
 const PLANT_SPACING = 6;
+// A bud waits while another head is open this close. See lib.rs.
+const HEAD_REACH_X = 12;
+const HEAD_REACH_Y = 10;
 
-// Per-plant bloom silhouettes, chosen by the plant's variant exactly as its hue is.
-// Offsets are relative to the crown, which always sits directly above the stalk tip, and
-// are opened in listed order. Mirrors BLOOM_SHAPES in sim/src/lib.rs.
-// One species per plant, chosen by `variant & 7` — the same number that picks its hue in
-// the renderer. Petals are listed in opening order and every offset touches one already
-// placed. Mirrors BLOOM_SHAPES in sim/src/lib.rs.
+// Per-plant bloom silhouettes, chosen by `variant & 7`. Offsets are relative to the crown, at
+// the bottom of the head, and open in listed order. Mirrors BLOOM_SHAPES in sim/src/lib.rs.
 export const BLOOM_SHAPES: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [
-  // 0 Cornflower -- see sim/src/lib.rs for the shape reasoning.
-  [[-2, -2], [-1, -2], [1, -2], [2, -2], [-3, -1], [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [3, -1], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0], [-2, 1], [2, 1]],
-  // 1 Poppy -- see sim/src/lib.rs for the shape reasoning.
-  [[-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0], [-3, 1], [-2, 1], [2, 1], [3, 1]],
-  // 2 Daisy -- see sim/src/lib.rs for the shape reasoning.
-  [[0, -2], [-2, -1], [0, -1], [2, -1], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0], [-2, 1], [2, 1]],
-  // 3 Sunflower -- see sim/src/lib.rs for the shape reasoning.
-  [[0, -3], [-2, -2], [-1, -2], [0, -2], [1, -2], [2, -2], [-3, -1], [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1], [3, -1], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0], [-1, 1], [1, 1]],
-  // 4 Tulip -- see sim/src/lib.rs for the shape reasoning.
-  [[0, -1], [-1, -1], [1, -1], [-1, 0], [1, 0], [-2, -1], [2, -1], [0, -2], [-1, -2], [1, -2], [-2, -2], [2, -2], [0, -3], [-2, -3], [2, -3]],
-  // 5 Lavender -- see sim/src/lib.rs for the shape reasoning.
-  [[0, -1], [-1, -2], [1, -2], [0, -3], [-1, -4], [1, -4], [0, -5]],
-  // 6 Bluebell -- see sim/src/lib.rs for the shape reasoning.
-  [[0, -1], [0, -2], [0, -3], [1, -4], [2, -4], [3, -3], [1, -3], [1, -2], [3, -2], [3, -1], [-1, -3], [-1, -2]],
-  // 7 Cosmos -- see sim/src/lib.rs for the shape reasoning.
-  [[-2, -1], [-1, -1], [1, -1], [2, -1], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0], [-2, 1], [-1, 1], [1, 1], [2, 1]],
-
+  // 0 Cornflower
+  [[0, -1], [-1, 0], [1, 0], [0, -2], [-1, -1], [1, -1], [0, -3], [-1, -2], [1, -2], [0, -4], [-1, -3], [1, -3], [-2, -2], [2, -2], [0, -5], [-1, -4], [1, -4], [-2, -3], [2, -3], [0, -6], [-1, -5], [1, -5], [-2, -4], [2, -4], [-3, -3], [3, -3], [0, -7], [-1, -6], [1, -6], [-2, -5], [2, -5], [-3, -4], [3, -4], [0, -8], [-1, -7], [1, -7], [-2, -6], [2, -6], [-3, -5], [3, -5], [-4, -4], [4, -4], [-1, -8], [1, -8], [-2, -7], [2, -7], [-3, -6], [3, -6], [-4, -5], [4, -5], [-1, -9], [-2, -8], [1, -9], [2, -8], [-3, -7], [3, -7], [-4, -6], [4, -6], [-5, -5], [5, -5], [-3, -8], [3, -8], [-4, -7], [4, -7], [-3, -9], [-4, -8], [3, -9], [4, -8], [-5, -7], [5, -7]],
+  // 1 Poppy
+  [[0, -1], [-1, 0], [1, 0], [0, -2], [-1, -1], [1, -1], [-2, 0], [2, 0], [0, -3], [-1, -2], [1, -2], [-2, -1], [2, -1], [-3, 0], [3, 0], [0, -4], [-1, -3], [1, -3], [-2, -2], [2, -2], [-3, -1], [3, -1], [0, -5], [-1, -4], [1, -4], [-2, -3], [2, -3], [-3, -2], [3, -2], [-4, -1], [4, -1], [-1, -5], [1, -5], [-2, -4], [2, -4], [-3, -3], [3, -3], [-4, -2], [4, -2], [-3, -4], [3, -4], [-4, -3], [4, -3], [-5, -2], [5, -2], [-4, -4], [4, -4], [-5, -3], [5, -3], [-4, -5], [-5, -4], [4, -5], [5, -4], [-6, -3], [6, -3], [-5, -5], [-6, -4], [5, -5], [6, -4], [-5, -6], [-6, -5], [5, -6], [6, -5], [-6, -6], [6, -6]],
+  // 2 Daisy
+  [[0, -1], [-1, 0], [1, 0], [0, -2], [-1, -1], [1, -1], [0, -3], [-1, -2], [1, -2], [0, -4], [-1, -3], [1, -3], [0, -5], [-1, -4], [1, -4], [-2, -3], [2, -3], [0, -6], [-1, -5], [1, -5], [-2, -4], [2, -4], [-3, -3], [3, -3], [0, -7], [-1, -6], [1, -6], [-2, -5], [2, -5], [-3, -4], [3, -4], [-4, -3], [-3, -2], [4, -3], [3, -2], [0, -8], [-1, -7], [1, -7], [-3, -5], [3, -5], [-4, -4], [4, -4], [-4, -2], [4, -2], [-1, -8], [1, -8], [-3, -6], [-4, -5], [3, -6], [4, -5], [-5, -4], [5, -4], [-5, -2], [-4, -1], [5, -2], [4, -1], [-4, -6], [4, -6], [-6, -4], [6, -4], [-4, -7], [-5, -6], [4, -7], [5, -6]],
+  // 3 Sunflower
+  [[0, -1], [-1, 0], [1, 0], [0, -2], [-1, -1], [1, -1], [0, -3], [-1, -2], [1, -2], [-2, -1], [2, -1], [0, -4], [-1, -3], [1, -3], [-2, -2], [2, -2], [-3, -1], [3, -1], [0, -5], [-1, -4], [1, -4], [-2, -3], [2, -3], [-3, -2], [3, -2], [-4, -1], [-3, 0], [4, -1], [3, 0], [0, -6], [-1, -5], [1, -5], [-2, -4], [2, -4], [-3, -3], [3, -3], [-4, -2], [4, -2], [0, -7], [-1, -6], [1, -6], [-2, -5], [2, -5], [-3, -4], [3, -4], [-4, -3], [4, -3], [-5, -2], [5, -2], [0, -8], [-1, -7], [1, -7], [-2, -6], [2, -6], [-3, -5], [3, -5], [-4, -4], [4, -4], [-5, -3], [5, -3], [0, -9], [-1, -8], [1, -8], [-2, -7], [2, -7], [-3, -6], [3, -6], [-4, -5], [4, -5], [-5, -4], [5, -4], [-6, -3], [6, -3], [-1, -9], [1, -9], [-2, -8], [2, -8], [-3, -7], [3, -7], [-4, -6], [4, -6], [-5, -5], [5, -5], [-1, -10], [-2, -9], [1, -10], [2, -9], [-3, -8], [3, -8], [-4, -7], [4, -7], [-5, -6], [5, -6], [-6, -5], [6, -5], [-3, -9], [3, -9], [-4, -8], [4, -8], [-5, -7], [5, -7], [-3, -10], [-4, -9], [3, -10], [4, -9], [-5, -8], [5, -8], [-6, -7], [6, -7]],
+  // 4 Tulip
+  [[0, -1], [-1, 0], [1, 0], [0, -2], [-1, -1], [1, -1], [0, -3], [-1, -2], [1, -2], [-2, -1], [2, -1], [0, -4], [-1, -3], [1, -3], [-2, -2], [2, -2], [0, -5], [-1, -4], [1, -4], [-2, -3], [2, -3], [-3, -2], [3, -2], [0, -6], [-1, -5], [1, -5], [-2, -4], [2, -4], [-3, -3], [3, -3], [0, -7], [-1, -6], [1, -6], [-2, -5], [2, -5], [-3, -4], [3, -4], [-4, -3], [4, -3], [0, -8], [-1, -7], [1, -7], [-2, -6], [2, -6], [-3, -5], [3, -5], [-4, -4], [4, -4], [-3, -6], [3, -6], [-4, -5], [4, -5], [-3, -7], [-4, -6], [3, -7], [4, -6], [-4, -7], [4, -7], [-4, -8], [4, -8]],
+  // 5 Lavender
+  [[0, -1], [-1, 0], [1, 0], [0, -2], [-1, -1], [1, -1], [0, -3], [-1, -2], [1, -2], [0, -4], [-1, -3], [1, -3], [-2, -2], [2, -2], [0, -5], [-1, -4], [1, -4], [0, -6], [-1, -5], [1, -5], [-2, -4], [2, -4], [0, -7], [-1, -6], [1, -6], [0, -8], [-1, -7], [1, -7], [-2, -6], [2, -6], [0, -9], [0, -10], [-1, -9], [1, -9]],
+  // 6 Bluebell
+  [[0, -1], [0, -2], [0, -3], [0, -4], [1, -3], [0, -5], [2, -3], [0, -6], [2, -2], [0, -7], [-1, -6], [3, -2], [2, -1], [0, -8], [-2, -6], [4, -2], [3, -1], [2, 0], [0, -9], [-2, -5], [4, -1], [1, -9], [-3, -5], [-2, -4], [4, 0], [1, -10], [-4, -5], [-3, -4], [-2, -3], [2, -10], [-4, -4], [3, -10], [-4, -3], [4, -10], [4, -9], [4, -8], [3, -8], [5, -8], [4, -7], [3, -7], [5, -7], [3, -6], [5, -6]],
+  // 7 Cosmos
+  [[0, -1], [-1, 0], [1, 0], [0, -2], [-1, -1], [1, -1], [-2, 0], [2, 0], [0, -3], [-1, -2], [1, -2], [-2, -1], [2, -1], [0, -4], [-1, -3], [1, -3], [0, -5], [-1, -4], [1, -4], [0, -6], [-1, -5], [1, -5], [-2, -4], [2, -4], [0, -7], [-1, -6], [1, -6], [-2, -5], [2, -5], [-3, -4], [3, -4], [0, -8], [-1, -7], [1, -7], [-2, -6], [2, -6], [-3, -5], [3, -5], [-4, -4], [4, -4], [0, -9], [-1, -8], [1, -8], [-3, -6], [3, -6], [-4, -5], [4, -5], [-5, -4], [-4, -3], [5, -4], [4, -3], [0, -10], [-1, -9], [1, -9], [-4, -6], [4, -6], [-5, -5], [5, -5], [-6, -4], [-5, -3], [6, -4], [5, -3], [-1, -10], [1, -10], [-2, -9], [2, -9], [-4, -7], [-5, -6], [4, -7], [5, -6], [-6, -3], [-5, -2], [6, -3], [5, -2], [-2, -10], [2, -10], [-5, -7], [-6, -6], [5, -7], [6, -6], [-5, -8], [-6, -7], [5, -8], [6, -7]],
 ];
 
 // Growth may push up through standing water as well as through open air. A watered garden
@@ -2051,11 +2102,11 @@ function isGrowable(kind: number) {
 // BLOOM_CLOCK ticks rather than every tick, so the open → dust → wilt sequence lasts
 // tens of seconds while its budget stays under the 255 the scene-import clamp assumes.
 const BLOOM_CLOCK = 8;
-const BLOOM_ENERGY = 200;
-const BLOOM_ENERGY_COSMIC = 250;
-const CROWN_RESERVE = 100;
+const BLOOM_ENERGY = 250;
+const BLOOM_ENERGY_COSMIC = 255;
+const CROWN_RESERVE = 40;
 const PETAL_ENERGY = 150;
-const PETAL_COST = 2;
+const PETAL_COST = 1;
 const POLLEN_RESERVE = 40;
 const POLLEN_COST = 15;
 const PETAL_SHED_AGE = 3600;
