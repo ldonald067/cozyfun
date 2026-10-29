@@ -1,9 +1,9 @@
 # Handoff — where the work is, and what to do next
 
 *Rewritten at each handoff, never appended to. Shipped work lives in `git log`, whose commit
-messages carry each batch's measurements. Written 2026-10-28: lava is thick (the owner's
-call on the old item 1), the sound audit's findings are fixed and gated (item 4 waits on the
-owner's ears), and `interaction:audit` passes all 176 checks.*
+messages carry each batch's measurements. Written 2026-10-28 (evening): fallen petals fall in
+their flower's colour, four rules no check could see now have one, sound (item 2) waits on the
+owner's ears, and `interaction:audit` passes all 179 checks.*
 
 ## Keep chats lean
 
@@ -24,19 +24,7 @@ The owner hits usage limits early.
    leaves in two greens with a lit edge on cooler stems. The bluebell is the darkest head at
    play size; the owner saw that in the filmstrip and shipped it. The images in
    `.tmp/flowers-ref/` are stock art to look at, never to ship or commit.
-2. **Fallen petals in their flower's colour** needs a sim change first: a shed petal becomes a
-   Pollen cell identical to a pollen puff, so the renderer cannot tell them apart.
-3. **Rules no audit check can see yet.**
-   - A hot ember's hiss is a rate (1 roll in 2, was 1 in 6): the doused-log check still
-     passes 15 of 16 seeds at the old odds, with a cloud half the size.
-   - `flower.pollen` "more often when cosmic" is a rate too; one check cannot see it without
-     comparing two gardens inside it.
-   - A crack's length: cracks are held 1 tick in 32 (`EMBER_CRACK_CLOCK`); the audit sees a
-     crack glowing 10 s after it caught, not how long it lasts (26 s, `.tmp/log/measure.mjs`).
-   - `lava.scorches` "thaws" is unreachable by touch: a pool kept against an ice wall barely
-     melts it, because a stone crust forms between them. A check for it passed 0 of 16 seeds
-     and was not kept.
-4. **Sound: the owner's ears on the 2026-10-28 retune.** Everything the audit found is fixed
+2. **Sound: the owner's ears on the 2026-10-28 retune.** Everything the audit found is fixed
    and gated by `npm run audio:levels`: the mix is -25 to -28 dBFS RMS at default sliders (was
    -41) through a makeup gain and a limiter; a room's own beds are heard 10-18 dB under the
    featured one (rooms used to change the mix by 0.1 dB); each cue group spans under 6 dB and
@@ -56,6 +44,13 @@ The owner hits usage limits early.
 - The sim runs about 24 ticks a second at 120 Hz, against 20 at 60 Hz.
 - One watering grows a minimum plant: most stay at the 4-cell stalk, and over half leafless.
 - The `water.boils` scene is really a quench (fixture debt).
+- **Fallen petals** (2026-10-28) were shown to the owner with the commit, as a filmstrip
+  (`.tmp/petals/petals-sheet.png`): drawn at the spent head's fade (0.4 toward grey), browning
+  as they lie, with no glow and no moonlit tint. The bluebell's and cornflower's read dim at
+  night, as their heads do. Tune only on the owner's word; the fade is in `shedPetalColor`.
+- Lava melting ICE stays out of reach by touch: the melt quenches the lava into a crust
+  between them. `lava.scorches` "thaws" is witnessed on frosted masonry instead, with the ice
+  erased first; the scene says so.
 - The landing poster has not been tested in Safari/WebKit.
 - `test:browser`'s "a garden planted in the app actually blooms" timed out once in five runs
   on 2026-10-28 (90 s wall clock; the brush lands at wall-clock times, so the bed differs run
@@ -126,12 +121,14 @@ All by the owner, after seeing pictures or measurements:
 
 ## Where the checks stand
 
-`npm run interaction:audit` passes 176 checks, bound to all 118 role ids, on the audit's seed
+`npm run interaction:audit` passes 179 checks, bound to all 118 role ids, on the audit's seed
 (2026-10-28). These pass on fewer than 32 of 32 seeds:
 
 - **31:** `fire.thaws`, both `oil.ignites` checks, `meteor.trail`'s fanned-trail check,
-  `fungus.fairyring`, `stem.burns`, and `lava.quenched` "water never deletes the lava it
-  meets" (thick lava creeps toward the splash, and on one seed never meets it).
+  `fungus.fairyring`, `stem.burns`, `lava.quenched` "water never deletes the lava it
+  meets" (thick lava creeps toward the splash, and on one seed never meets it), and
+  `ember.quenched`'s doused-log cloud, now 80 cells so it sees the hiss's odds (one seed
+  peaks at 71; at the old 1 in 6 the biggest is 74).
 - **30:** `ice.condenses` "takes the steam's heat" (thick lava creeps the gap to the ice, and
   is late on two seeds).
 - **29:** `fire.dries`'s ember check.
@@ -201,13 +198,20 @@ not this list.
 
 - **Filmstrips:** `.tmp/film/film.mjs <scene> [seed]` draws the base build above the working
   tree through the real engine and renderer (glow approximated) into `.tmp/film/<scene>.png`;
-  scenes are in `.tmp/film/scenes.mjs`. Refresh the base first, it is still the pre-heat
-  `79761a6`: `rm -rf .tmp/film/base && mkdir -p .tmp/film/base && git archive HEAD app/src | tar -x -C .tmp/film/base`.
+  scenes are in `.tmp/film/scenes.mjs`. Refresh the base first, it is `43d9292` (before
+  the petals): `rm -rf .tmp/film/base && mkdir -p .tmp/film/base && git archive HEAD app/src | tar -x -C .tmp/film/base`.
 - **Sabotage:** `.tmp/halves/sabotages.mjs` holds find/replace edits on `app/src/engine.ts`,
   one per rule half, both ways where a rule has two sides; keep the dice (leave the `chance()`
   roll). `.tmp/halves/sab.mjs <name> [seeds] [id,id]` plays every check against one sabotage
   and counts only seeds the clean mirror passes. Launch parallel runs about 12 s apart: they
   share the `halves-base` compile.
+- **Rates and witnesses:** `.tmp/batch2/` — `candidates.mjs` (checks with a `stat` per run),
+  `try.mjs <candidate> <seeds> [sabotage,...]` (distributions and verdicts on the JS mirror,
+  live and sabotaged), `board.mjs` (print a candidate's board). How the four 2026-10-28
+  thresholds were chosen: measure both sides, then pick a round number between them.
+- **Fallen petals:** `.tmp/petals/` — `sweep.mjs` (worst petal-vs-night and petal-vs-puff
+  over every reachable state), `where.mjs` (when and where petals fall in a film scene),
+  `one.mjs <roleRegex> [seed...]` (one check's raw numbers on the wasm).
 - **The burning log:** `.tmp/log/` — `variant.mjs` (candidates patch `main`'s engine; `live`
   and `sab-*` the working tree), `measure.mjs` (seconds lit / glowing / char), `film.mjs`,
   `sheet.py`, `checks.mjs <roleRegex> <seeds> [variant,...]`.

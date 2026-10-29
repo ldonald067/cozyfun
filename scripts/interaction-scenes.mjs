@@ -1456,6 +1456,36 @@ export const CHECKS = [
     paint: (p) => { p(25, 25, 4, M.Wall); },
     act: (p, t) => { if (t === 20) p(25, 16, 4, M.Water, 55); if (t === 100) p(16, 25, 4, M.Lava, 55); },
     outcome: (g, before) => g.gained(M.Wall, F.Scorched, before).filter((i) => before.kindOf(i) === M.Wall) },
+  { m: "Lava", covers: "lava.scorches", role: "thaws frosted masonry it touches", w: 40, h: 30, seed: 87, ticks: 900,
+    // A wall bar soaked, frosted by a dab of ice on its top, the ice cleared with the eraser
+    // dragged along the bar, then lava poured onto the frosted bricks. Lava melting ICE stays
+    // out of reach by touch: a pool kept against an ice wall barely melts it, because the melt
+    // quenches the lava into a stone crust between them (0 of 16, not kept), and lava poured on
+    // this bar with the ice still on it crusts the same way. So this witnesses the frost.
+    //
+    // A thaw is a painted brick, frosted last tick and touching lava, that lava warmed (its 72
+    // heat: up 60 or more) and unfrosted, or cracked to stone, counted while it stays thawed;
+    // contrast is against the frosted wall. The hearth also thaws a brick beside a hot one, but
+    // only clears the flag: "lost its frost beside lava" still counted 6-13 bricks with lava's
+    // thaw taken out of the JS mirror, and this counts none. 32 of 32, 4-11 bricks, contrast
+    // 179 or more; 0 of 32 with lava's thaw taken out.
+    paint: (p) => { for (let x = 8; x <= 26; x++) p(x, 20, 0, M.Wall); },
+    act: (p, t) => {
+      if (t === 1) p(17, 15, 3, M.Water, 60);
+      if (t === 60) p(20, 17, 1, M.Ice);
+      if (t === 200) { p(17, 14, 3, M.Empty); for (let x = 10; x <= 24; x++) p(x, 17, 1, M.Empty); }
+      if (t === 210) p(17, 13, 2, M.Lava, 55);
+    },
+    outcome: (g, before, memo, prev) => {
+      memo.thawed ??= new Set();
+      for (let i = 0; i < g.size; i++) {
+        if (before.kindOf(i) !== M.Wall || prev.kindOf(i) !== M.Wall || !prev.hasFlag(i, F.Frozen)) continue;
+        if (!touching(prev, i, (k) => k === M.Lava)) continue;
+        const warmed = g.kindOf(i) === M.Wall && !g.hasFlag(i, F.Frozen) && g.energyAt(i) >= prev.energyAt(i) + 60;
+        if (warmed || g.kindOf(i) === M.Stone) { memo.thawed.add(i); memo.against ??= prev; }
+      }
+      return [...memo.thawed].filter((i) => (g.kindOf(i) === M.Wall && !g.hasFlag(i, F.Frozen)) || g.kindOf(i) === M.Stone);
+    } },
   { m: "Ice", covers: "ice.pauses", role: "pauses life in frozen dormancy", w: 30, h: 26, seed: 88, ticks: 2500,
     absent: true,
     // Ice set right on the seed bed. Perched two cells up it never chilled the seed, which
@@ -1569,6 +1599,35 @@ export const CHECKS = [
   { m: "Flower", covers: "flower.pollen", role: "puffs pollen from the head's open rim", w: 40, h: 34, seed: 99, ticks: 5000,
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
     outcome: (g, before) => g.appeared(M.Pollen, before) },
+  { m: "Flower", covers: "flower.pollen", role: "a moonlit garden puffs pollen more often than a plain one", w: 60, h: 34, seed: 99, ticks: 3000,
+    // Two plantings a wall apart, one watered with water and one with moonwater, which grows a
+    // moonlit plant. A single garden cannot see this rate: a bloom puffing more is as much its
+    // budget as its odds. A puff is pollen born this tick (a cell written this tick reads age 0)
+    // that is not a shed petal, counted per side against the head cells that could have puffed
+    // last tick: budget over POLLEN_RESERVE, past 24 ticks, an open face. The witness is the
+    // moonlit side's pollen once each side has puffed 20 times and its rate is 1.5 times the
+    // plain one. 32 of 32, at 1.8-3.0 times (the rule is 1 roll in 90 against 1 in 200); 0 of
+    // 32 with a moonlit head puffing at the plain odds, at 0.7-1.3.
+    paint: (p) => {
+      for (let y = 6; y <= 29; y++) p(30, y, 0, M.Wall);
+      p(15, 28, 4, M.Soil); p(15, 23, 3, M.Seed); p(15, 18, 3, M.Water);
+      p(45, 28, 4, M.Soil); p(45, 23, 3, M.Seed); p(45, 18, 3, M.Moonwater);
+    },
+    outcome: (g, before, memo, prev) => {
+      const age = (grid, i) => grid.cells[i * STRIDE + 2] | (grid.cells[i * STRIDE + 3] << 8);
+      const side = (grid, i) => (grid.xyOf(i)[0] < 30 ? 0 : 1);
+      memo.puffs ??= [0, 0];
+      memo.open ??= [0, 0];
+      for (const i of prev.all(M.Flower)) {
+        if (prev.energyAt(i) <= 41 || age(prev, i) < 24) continue;
+        if (touching(prev, i, (k) => k === M.Empty)) memo.open[side(prev, i)]++;
+      }
+      for (const i of g.all(M.Pollen)) if (age(g, i) === 0 && !g.hasFlag(i, F.Rooted)) memo.puffs[side(g, i)]++;
+      if (memo.puffs[0] < 20 || memo.puffs[1] < 20) return [];
+      const [plain, moonlit] = memo.puffs.map((n, k) => n / memo.open[k]);
+      if (moonlit < 1.5 * plain) return [];
+      return g.all(M.Pollen).filter((i) => side(g, i) === 1 && !g.hasFlag(i, F.Rooted));
+    } },
   { m: "Flower", covers: "flower.wilts", role: "sheds spent petals, leaving the crown as a seed head", w: 40, h: 40, seed: 100, ticks: 9000,
     paint: (p) => { p(20, 34, 4, M.Soil); p(20, 29, 3, M.Seed); p(20, 24, 3, M.Water); },
     outcome: (g, before, memo) => {
@@ -1804,9 +1863,12 @@ export const CHECKS = [
     } },
   { m: "Ember", covers: "ember.glows", role: "a burnt log smoulders in glowing cracks", w: 30, h: 26, seed: 137, ticks: 900,
     // The glow check's own scene. The witness is ember still glowing (60, where the renderer
-    // shows heat and no ash) 10 s after its cell caught, with no flame, lava or meteor beside it
+    // shows heat and no ash) 20 s after its cell caught, with no flame, lava or meteor beside it
     // now, so it was not relit. Without cracks a log was dark 7 s after it lit, so nothing here
     // could pass: this is the ember's slow crack arc (`EMBER_CRACK_CLOCK`) and nothing else.
+    // It was 10 s, which cannot see the arc's length. By this test a crack's longest glow is
+    // 23.9-24.4 s at the clock of 32, 13.9-14.0 s at 16 and 4.3 s with no hold, on every one of
+    // 32 seeds. 32 of 32, 13 cells shown 4-7 s; 0 of 32 at 16, and 0 with the hold taken out.
     paint: (p) => { p(15, 20, 4, M.Wood); p(15, 16, 1, M.Fire); },
     outcome: (g, before, memo) => {
       memo.t = (memo.t ?? 0) + 1;
@@ -1815,7 +1877,7 @@ export const CHECKS = [
       for (let i = 0; i < g.size; i++) {
         if (g.kindOf(i) !== M.Ember) { memo.lit.delete(i); continue; }
         if (!memo.lit.has(i)) memo.lit.set(i, memo.t);
-        if (memo.t - memo.lit.get(i) < 10 * TICKS_PER_SECOND || g.energyAt(i) < 60) continue;
+        if (memo.t - memo.lit.get(i) < 20 * TICKS_PER_SECOND || g.energyAt(i) < 60) continue;
         const [x, y] = g.xyOf(i);
         let heat = false;
         for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
@@ -1872,13 +1934,14 @@ export const CHECKS = [
     } },
   { m: "Ember", covers: "ember.quenched", role: "a burning log doused hisses up a cloud of steam", w: 30, h: 26, seed: 110, ticks: 600,
     // The scene above, watched for its steam: a hot ember meeting water hisses (1 roll in 2) and
-    // each wisp billows. The witness is steam in a body of 24 or more cells: 16 of 16 seeds,
-    // 0 of 16 before billowing (biggest 9) and 0 of 16 with the billow taken out (22). The
-    // hiss's odds are a rate this cannot see alone: at the old 1 in 6 it still passes 15 of 16,
-    // with the biggest cloud about half the size (60 cells against 120).
+    // each wisp billows. The witness is steam in a body of 80 or more cells. It was 24, which
+    // could not see the hiss's odds: at the old 1 in 6 that passed 15 of 16. Over 32 seeds the
+    // biggest cloud is 71-153 cells at 1 in 2 (one seed under 85) and 26-74 at 1 in 6, so 80
+    // is the hiss and not the dice: 31 of 32, shown 1.5-3 s; 0 of 32 at 1 in 6, with the hiss
+    // taken out (biggest 3), before billowing (9) and with the billow taken out (22).
     paint: (p) => { p(15, 20, 4, M.Wood); p(15, 16, 1, M.Fire); },
     act: (p, t) => { if (t === 40) p(15, 13, 4, M.Water); },
-    outcome: (g) => steamInBodies(g, 24) },
+    outcome: (g) => steamInBodies(g, 80) },
 
   { m: "Fungus", covers: "fungus.overtakes", role: "overtakes old or wet moss", w: 30, h: 26, seed: 111, ticks: 3000,
     paint: (p) => { p(15, 20, 4, M.Moss); p(15, 16, 1, M.Fungus); p(15, 13, 2, M.Water); },
