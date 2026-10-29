@@ -44,8 +44,10 @@ const KIND_NAME = [];
 for (const [name, id] of Object.entries(M)) KIND_NAME[id] = name.toLowerCase();
 
 // Long enough for a painted seed to grow, bloom, and spend itself, and for a lit log
-// to burn down to cold char — i.e. long enough to be a scene somebody played in.
-const PLAY_IN_TICKS = 2400;
+// to burn down to cold char — i.e. long enough to be a scene somebody played in. A head
+// is spent only past PETAL_SHED_AGE (3600 since 2026-10-29), and the slow steps run on
+// the board as it was left, so a shorter play-in leaves nothing for the night to sow.
+const PLAY_IN_TICKS = 4400;
 
 // Perceptual-ish colour distance, matching material-contrast.mjs and interaction-audit.mjs
 // so "how different do these look" means one thing across every gate.
@@ -213,6 +215,23 @@ if (day.visible <= hour.visible) {
   failures.push(
     `a day away (${day.visible} cells) is no more visible than an hour away (${hour.visible}).\n` +
       `    The absence curve has flattened, so the game no longer rewards actually being away.`,
+  );
+}
+
+// 3a. The night itself sowed. New columns below are counted against a control that skipped
+//     the slow world, but the two branches' dice part ways, so catch-up alone can stand a
+//     plant in a column the control's did not: at a 2400-tick play-in, with no head yet
+//     spent, this scene still showed four new columns (review, 2026-10-29).
+const seedsIn = (cells) => {
+  let n = 0;
+  for (let i = 0; i < W * H; i++) if (cells[i * STRIDE] === M.Seed) n++;
+  return n;
+};
+if (seedsIn(day.afterSlowSteps) <= seedsIn(playedIn)) {
+  failures.push(
+    `a day's slow steps sowed nothing (${seedsIn(playedIn)} seeds left, ${seedsIn(day.afterSlowSteps)} after the night).\n` +
+      `    No head in the scene was spent when the player left, so any new plant below came\n` +
+      `    from catch-up dice, not from the night.`,
   );
 }
 

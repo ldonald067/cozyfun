@@ -315,6 +315,27 @@ function wholeHeads(g, variant) {
   return out;
 }
 
+// Every plant standing under a rooted crown: its stalk (the run of Stem straight under the
+// crown), its leaves (Stem beside that run, not itself standing on Stem) and its head (Flower
+// of its species within the widest silhouette's reach of the crown).
+function grownPlants(g) {
+  const plants = [];
+  for (const crown of g.all(M.Flower)) {
+    if (!g.hasFlag(crown, F.Rooted)) continue;
+    const [x, cy] = g.xyOf(crown), variant = g.cells[crown * STRIDE + 1];
+    const stalk = [], leaves = [], head = [];
+    for (let y = cy + 1; y < g.h && g.kindAt(x, y) === M.Stem; y++) {
+      stalk.push(y * g.w + x);
+      for (const lx of [x - 1, x + 1]) if (g.kindAt(lx, y) === M.Stem && g.kindAt(lx, y + 1) !== M.Stem) leaves.push(y * g.w + lx);
+    }
+    for (let y = cy - 5; y <= cy + 1; y++) for (let hx = x - 3; hx <= x + 3; hx++) {
+      if (g.kindAt(hx, y) === M.Flower && g.cells[(y * g.w + hx) * STRIDE + 1] === variant) head.push(y * g.w + hx);
+    }
+    plants.push({ crown, stalk, leaves, head, age: g.cells[crown * STRIDE + 2] | (g.cells[crown * STRIDE + 3] << 8) });
+  }
+  return plants;
+}
+
 // The flame stem.burns sweeps over its garden. Its witness skips stalks under these strokes,
 // because a stalk the brush painted over did not catch.
 const STEM_FLAMES = Array.from({ length: 9 }, (_, k) => [14 + 4 * k, 14]);
@@ -766,10 +787,10 @@ export const CHECKS = [
   { m: "Seed", covers: "seed.germinates", role: "grows taller fed cosmic", w: 220, h: 40, seed: 169, ticks: 4000,
     // A seed row on a soil bed the shipped board's width, watered with moonwater. A sprout's
     // height is fixed by its variant, and a cosmic one gets a segment more, so only a cosmic
-    // variant-3 seed reaches eight cells. The witness is a column of eight stalk cells or more.
-    // 32 of 32, 8 cells at the least; 0 of 32 with no cosmic segment in the JS mirror, and 0 of
-    // 32 watered with plain water. Only one seed in four is variant 3: 60 cells wide, it passed
-    // 21 of 32.
+    // variant-3 seed reaches eleven cells; a plain stalk stops at ten. The witness is a column
+    // of eleven stalk cells or more. 31 of 32 (the miss grew no cosmic variant-3 plant); 0 of 32
+    // with no cosmic segment in the JS mirror. Only one seed in four is variant 3: 60 cells
+    // wide, it passed 21 of 32. Before the taller stalk (2026-10-29) the bar was eight.
     paint: (p) => {
       for (let x = 8; x <= 212; x++) { p(x, 34, 1, M.Soil); p(x, 31, 0, M.Seed); }
       for (let x = 14; x <= 212; x += 12) p(x, 24, 2, M.Moonwater);
@@ -781,7 +802,7 @@ export const CHECKS = [
         for (let y = 0; y <= g.h; y++) {
           const i = y * g.w + x;
           if (y < g.h && g.kindOf(i) === M.Stem) run.push(i);
-          else { if (run.length >= 8) tall.push(...run); run = []; }
+          else { if (run.length >= 11) tall.push(...run); run = []; }
         }
       }
       return tall;
@@ -801,6 +822,17 @@ export const CHECKS = [
     paint: wideMeadow, outcome: (g) => wholeHeads(g, 4) },
   { m: "Flower", covers: "flower.opens", role: "nods a bluebell's bells off a bent scape", w: 220, h: 48, seed: 26, ticks: 1500,
     paint: wideMeadow, outcome: (g) => wholeHeads(g, 6) },
+  { m: "Flower", covers: "flower.opens", role: "a watered bed stays in bloom for minutes", w: 220, h: 48, seed: 27, ticks: 3200,
+    // The owner's pick from a filmstrip (2026-10-29): a head holds its petals for
+    // PETAL_SHED_AGE, so a bed watered once is in full bloom for about three minutes, where it
+    // was about one and bare by two. The witness is twelve heads, each opened two minutes ago
+    // or more and still at least five cells. Over 32 seeds the bed holds 21 to 26 such heads;
+    // with petals letting go at the old age (1200) it holds 3 at the most.
+    paint: wideMeadow,
+    outcome: (g) => {
+      const held = grownPlants(g).filter((pl) => pl.age >= 2400 && pl.head.length >= 5);
+      return held.length >= 12 ? held.flatMap((pl) => pl.head) : [];
+    } },
   { m: "Pollen", covers: "pollen.drifts", role: "is released by a mature flower", w: 40, h: 34, seed: 24, ticks: 5000,
     paint: (p) => { p(20, 28, 4, M.Soil); p(20, 23, 3, M.Seed); p(20, 18, 3, M.Water); },
     outcome: (g, before) => g.appeared(M.Pollen, before) },
@@ -827,6 +859,17 @@ export const CHECKS = [
       const [x, y] = g.xyOf(i);
       return g.kindAt(x - 1, y) === M.Stem || g.kindAt(x + 1, y) === M.Stem;
     }) },
+  { m: "Stem", covers: "stem.climbs", role: "grows a tall stalk with a leaf on most rows", w: 220, h: 48, seed: 28, ticks: 1500,
+    // The owner's pick from the same filmstrip: a stalk of 7 to 10 cells with a leaf on every
+    // segment, where it was 4 to 7 with a leaf on every other. The witness is fourteen plants
+    // at least seven cells tall and leafed on all but three of their rows: the top row grows
+    // the crown instead, and the base row sits in the bed. Over 32 seeds 19 to 24 plants do;
+    // at the old height 9 at the most, and with a leaf on every other segment none.
+    paint: wideMeadow,
+    outcome: (g) => {
+      const leafy = grownPlants(g).filter((pl) => pl.stalk.length >= 7 && pl.leaves.length >= pl.stalk.length - 3);
+      return leafy.length >= 14 ? leafy.flatMap((pl) => [...pl.stalk, ...pl.leaves]) : [];
+    } },
   { m: "Moss", covers: "moss.spreads", role: "bursts across a narrow gap when well watered", w: 40, h: 30, seed: 162, ticks: 1500,
     // Two wood planks with a one-cell gap (the brush paints a plus, so the left plank's centres
     // stop at x=8 and the right's start at x=12), moss on the left, watered. The witness is moss
@@ -1606,8 +1649,11 @@ export const CHECKS = [
     // that is not a shed petal, counted per side against the head cells that could have puffed
     // last tick: budget over POLLEN_RESERVE, past 24 ticks, an open face. The witness is the
     // moonlit side's pollen once each side has puffed 20 times and its rate is 1.5 times the
-    // plain one. 32 of 32, at 1.8-3.0 times (the rule is 1 roll in 90 against 1 in 200); 0 of
-    // 32 with a moonlit head puffing at the plain odds, at 0.7-1.3.
+    // plain one. 30 of 32, at 1.75-3.4 times (the rule is 1 roll in 90 against 1 in 200); 0 of
+    // 32 with a moonlit head puffing at the plain odds, at 0.7-1.3. On the two misses (seeds
+    // 22 and 26) the plain planting puffs 18 times, short of the 20 waited for, at 3.0-3.4
+    // times the rate; before the taller stalk (2026-10-29) the same two scraped past at 20 and
+    // 22.
     paint: (p) => {
       for (let y = 6; y <= 29; y++) p(30, y, 0, M.Wall);
       p(15, 28, 4, M.Soil); p(15, 23, 3, M.Seed); p(15, 18, 3, M.Water);

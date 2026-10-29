@@ -1,9 +1,9 @@
 # Handoff — where the work is, and what to do next
 
 *Rewritten at each handoff, never appended to. Shipped work lives in `git log`, whose commit
-messages carry each batch's measurements. Written 2026-10-29: the painted night sky (B2) is
-built with the owner's outline fix (B), the 32-seed list is retaken, and sound (item 2) still
-waits on the owner's ears.*
+messages carry each batch's measurements. Written 2026-10-29: the owner called the sound
+retune fine, and the fuller garden (A + B: taller, leafier plants whose heads hold for about
+three minutes) is built from their pick off a filmstrip.*
 
 ## Keep chats lean
 
@@ -21,32 +21,23 @@ The owner hits usage limits early.
 ## What to do next
 
 1. **Flowers, only if the owner asks.** Left from the reference sheet `.tmp/flowers-ref/3.png`:
-   leaves in two greens with a lit edge on cooler stems. The bluebell is the darkest head at
+   leaves in two greens with a lit edge on cooler stems. Leaves are cells on every segment now,
+   so that is drawing only. The bluebell is the darkest head at
    play size; the owner saw that in the filmstrip and shipped it. The images in
    `.tmp/flowers-ref/` are stock art to look at, never to ship or commit.
-2. **Sound: the owner's ears on the 2026-10-28 retune.** Everything the audit found is fixed
-   and gated by `npm run audio:levels`: the mix is -25 to -28 dBFS RMS at default sliders (was
-   -41) through a makeup gain and a limiter; a room's own beds are heard 10-18 dB under the
-   featured one (rooms used to change the mix by 0.1 dB); each cue group spans under 6 dB and
-   sits 0-7 dB under the rain bed (painting oil was 14 dB under the rest, every cue 10-20 dB
-   under the bed); a click on half of all noise cues
-   (up to -3 dBFS) is gone; painting rockets and a wellspring has a cue (both were silent);
-   Desk Radio replaces the native beds once its player is up instead of playing over them,
-   and Master and Mute reach it. Listen to `.tmp/audio-fix/{before,after}-*.wav` (20 s each:
-   beds, then painting, then reaction cues) before tuning further; `audio:levels` holds the
-   bands. If the owner wants rain under the radio after all, it is `setDeskRadioOn` in
-   `controller.ts`.
-3. **Painting water itself (A2), only if the owner asks.** The night sky (B2) shipped
+2. **Painting water itself (A2), only if the owner asks.** The night sky (B2) shipped
    2026-10-29; A2 from the same mock (`.tmp/pixel-review/watercolour2-sheet.png`) paints
    water, moonwater, steam and smoke as washes and needs a moving mock before anyone decides.
    Painting fire, lava or oil lost their identity (crust, flicker, sheen) and was ruled out.
+3. **A spent garden, only if the owner asks.** A bed watered once is bare stalks with one-cell
+   seed heads from about four minutes on, for good; rain re-sows it through glided seeds, but
+   nothing re-blooms a standing plant. `.tmp/garden/arc.mjs` measures a bed's bloom over time.
 
 ## Open questions, accepted unless the owner says otherwise
 
 - A dormant wellspring blocks only non-sources.
 - A meteor shock's scorch is often brief (26 of 32 seeds).
 - The sim runs about 24 ticks a second at 120 Hz, against 20 at 60 Hz.
-- One watering grows a minimum plant: most stay at the 4-cell stalk, and over half leafless.
 - The `water.boils` scene is really a quench (fixture debt).
 - **Fallen petals** (2026-10-28) were shown to the owner with the commit, as a filmstrip
   (`.tmp/petals/petals-sheet.png`): drawn at the spent head's fade (0.4 toward grey), browning
@@ -66,6 +57,23 @@ The owner hits usage limits early.
 ## Decisions already made — do not relitigate
 
 All by the owner, after seeing pictures or measurements:
+
+- **The fuller garden** (2026-10-29): A + B from `.tmp/garden/garden-sheet.png`. A stalk is 7
+  to 10 cells (budget 365 + 55 per variant step, cosmic one more) with a leaf on every segment,
+  alternating sides; a head holds its petals for `PETAL_SHED_AGE` 3600, so a bed watered once
+  is in full bloom for about three minutes, where it was one, and bare by four, where it was
+  two. The same age is when a crown is a spent seed head, so the night sows only from heads
+  that had gone to seed when the player left: about four minutes after blooming, where it was
+  two. `slow-world:audit` plays in 4400 ticks for that and asserts the night itself sowed (at
+  2400 it passed on catch-up dice alone; review). A stalk's budget, up to 585, now survives a
+  scene load; both loaders cut it to 255, and a stalk saved mid-climb came back five cells. Measured first, the premise it was offered on was wrong: plants were already 4 to 7
+  cells with 1-2 leaves and 10-16% leafless, not mostly 4-cell and over half leafless.
+
+- **Sound** (2026-10-29): the 2026-10-28 retune is fine as it stands. `npm run audio:levels`
+  holds its bands: the mix at -25 to -28 dBFS RMS at default sliders, a room's own beds 10-18
+  dB under the featured one, each cue group within 6 dB and 0-7 dB under the rain bed. Desk
+  Radio replaces the native beds once its player is up; rain under the radio would be
+  `setDeskRadioOn` in `controller.ts`.
 
 - **The painted night** (2026-10-29): B2, a still watercolour wash (deep blue, indigo,
   violet, dried tide lines, paper grain) behind crisp pixels, matched to the mock's measured
@@ -146,19 +154,21 @@ All by the owner, after seeing pictures or measurements:
 
 ## Where the checks stand
 
-`npm run interaction:audit` passes 179 checks, bound to all 118 role ids, on the audit's seed
-(2026-10-29, with the night wash). Retaken over 32 seeds on 2026-10-29 at `a19b507` (before
-the wash), these pass on fewer than 32:
+`npm run interaction:audit` passes 181 checks, bound to all 118 role ids, on the audit's seed
+(2026-10-29, with the fuller garden). Retaken over 32 seeds on 2026-10-29 at `a19b507` (before
+the wash), with the plant checks retaken on the fuller garden, these pass on fewer than 32:
 
-- **31:** `seed.germinates` grows taller fed cosmic, `meteor.impacts`, `meteor.trail`'s fanned
-  trail, `moonwater.bursts`, `fire.thaws`, `lava.quenched` "water never deletes the lava it
-  meets", `pollen.seeds`, `stem.burns`, `ember.quenched`'s doused-log cloud, and both
-  `oil.ignites` checks.
+- **31:** `seed.germinates` grows taller fed cosmic (its bar is 11 cells now, the height only a
+  moonlit plant reaches), `meteor.impacts`, `meteor.trail`'s fanned trail, `moonwater.bursts`,
+  `fire.thaws`, `lava.quenched` "water never deletes the lava it meets", `ember.quenched`'s
+  doused-log cloud, both `oil.ignites` checks, and `stem.footing`'s stalk check (was 27).
 - **30:** `ice.condenses` "takes the steam's heat", `flower.opens` "opens a tulip into a cup",
-  `meteor.shocked`.
-- **29:** `flower.opens` "nods a bluebell's bells".
-- **27:** `fire.dries`'s ember check, `stem.footing`'s stalk check.
+  `meteor.shocked`, and `flower.pollen` "a moonlit garden puffs pollen more often" (was 32: the
+  plain planting puffs 18 times on two seeds, short of 20; the scene says so).
+- **27:** `fire.dries`'s ember check.
 - **25:** `meteor.vitrifies`.
+
+The fuller garden lifted `pollen.seeds` and `stem.burns` to 32 and the bluebell from 29 to 32.
 
 Against the 2026-10-17 list: `fungus.fairyring` now passes 32 of 32, `fire.dries`'s ember
 check fell from 29 to 27, and eight checks are new to it. Nobody has looked at why; each batch
@@ -238,6 +248,10 @@ not this list.
   `try.mjs <candidate> <seeds> [sabotage,...]` (distributions and verdicts on the JS mirror,
   live and sabotaged), `board.mjs` (print a candidate's board). How the four 2026-10-28
   thresholds were chosen: measure both sides, then pick a round number between them.
+- **The garden:** `.tmp/garden/` — `measure.mjs` (stalk heights, leaves, heads per plant;
+  `KIND=brush` for a bed painted with the app's brush), `arc.mjs` (a bed's bloom over time),
+  `variants.py` + `film.mjs` + `sheet.py` (the filmstrip the owner picked from), `thresh.mjs`
+  (the new checks' raw numbers, live and sabotaged), `moonpuff.mjs` (the moonlit-pollen tally).
 - **The night sky:** `.tmp/nightsky/` — `wash.mjs` (paint and time the wash alone),
   `seeds.mjs` (violet and deep coverage per seed), `corr.mjs` (feature size per period),
   `rings.mjs` (each species' outline against every wash cell), `heads.mjs` (every head on

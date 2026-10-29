@@ -228,7 +228,7 @@ export function materialShowcaseScript() {
     // A spent seed head, drawn under the sim's own test: rooted, past PETAL_SHED_AGE,
     // budget below POLLEN_RESERVE. Those three terms are also what makes it sow at wake.
     plant(2, 134, 2, 4, [[1, 2]]);
-    setCell(2, 129, material.Flower, 0, 1400, flag.Rooted, 2);
+    setCell(2, 129, material.Flower, 0, 3800, flag.Rooted, 2);
     // An unopened bud is a lone crown with too little budget left to open.
     plant(6, 134, 2, 4, [[-1, 2]]);
     setCell(6, 129, material.Flower, 90, 20, flag.Rooted, 2);
@@ -247,7 +247,7 @@ export function materialShowcaseScript() {
     // is under POLLEN_RESERVE so it renders as husk, while its petals sit at the shed
     // floor of 45 and hold — measured on a real garden, a head runs its budget to zero
     // by ~1200 ticks but almost always keeps a stubborn petal or two hanging on.
-    bloom(68, 134, 7, 5, [[1, 2], [-1, 4]], 20, 1300, 2);    // cosmos, spent and shedding
+    bloom(68, 134, 7, 5, [[1, 2], [-1, 4]], 20, 3700, 2);    // cosmos, spent and shedding
     // A seed the sunflower set from pollen, sailing east off it on the breeze: it reads as a
     // plain seed, and the flags are what make it glide.
     setCell(40, 130, material.Seed, 40, 0, flag.Windborne | flag.DriftEast, 3);

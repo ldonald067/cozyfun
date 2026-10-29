@@ -422,7 +422,8 @@ class JsSandboxEngine implements SandboxEngine {
       }
       sanitized[idx] = kind;
       sanitized[idx + 1] &= 7;
-      writeU16(sanitized, idx + 4, Math.min(readU16(sanitized, idx + 4), 255));
+      // Every energy is held to 255 but a stalk's growth budget. See lib.rs.
+      writeU16(sanitized, idx + 4, Math.min(readU16(sanitized, idx + 4), kind === MATERIAL.Stem ? STEM_BUDGET_MAX : 255));
       writeU16(sanitized, idx + 6, readU16(sanitized, idx + 6) & CELL_FLAG_MASK);
     }
     this.cells.set(sanitized);
@@ -1522,10 +1523,8 @@ class JsSandboxEngine implements SandboxEngine {
       // stalk that can never climb, wasting the bed's whole surface.
       const openAbove = aboveIdx >= 0 && isGrowable(old[aboveIdx]);
       if (openAbove && age > 30 && energy > 70 && !this.plantNearby(x, y, old, next) && this.chance(cosmic ? 4 : 8)) {
-        // Each segment costs 55, so this is a 4-to-7 cell stalk. The old 130 base could
-        // bloom after a single segment, leaving a head almost on the ground with no room
-        // for leaves.
-        writeCellBytes(next, idx, MATERIAL.Stem, cell[1], 200 + (cell[1] & 3) * 55 + (cosmic ? 55 : 0), 0, CELL_FLAG.Rooted | (cosmic ? CELL_FLAG.Cosmic : 0));
+        // Each segment costs 55, so this is a 7-to-10 cell stalk. See lib.rs.
+        writeCellBytes(next, idx, MATERIAL.Stem, cell[1], STEM_BUDGET + (cell[1] & 3) * 55 + (cosmic ? 55 : 0), 0, CELL_FLAG.Rooted | (cosmic ? CELL_FLAG.Cosmic : 0));
         return;
       }
     }
@@ -1624,15 +1623,13 @@ class JsSandboxEngine implements SandboxEngine {
     });
   }
 
-  // Leaves unfurl in alternating pairs as the stalk climbs, so a grown plant reads as a
-  // plant instead of a bare pole. Placement is a pure function of height — no RNG — so it
-  // cannot desynchronise the two engines. Leaf energy stays under the growth threshold,
-  // so a leaf never climbs a stalk of its own.
+  // Leaves unfurl as the stalk climbs, so a grown plant reads as a plant instead of a bare
+  // pole. Placement is a pure function of height — no RNG — so it cannot desynchronise the
+  // two engines. Leaf energy stays under the growth threshold, so a leaf never climbs a
+  // stalk of its own.
   private unfurlLeaf(x: number, y: number, cell: Uint8Array, old: Uint8Array, next: Uint8Array) {
-    // Every other segment, alternating sides. Spacing them any further apart left the
-    // shortest stalks — the common case — with no leaves at all.
-    if (y % 2 !== 0) return;
-    const lx = Math.floor(y / 2) % 2 === 0 ? x - 1 : x + 1;
+    // One on every segment, alternating sides. See lib.rs.
+    const lx = y % 2 === 0 ? x - 1 : x + 1;
     if (!this.inBounds(lx, y)) return;
     const leaf = this.index(lx, y);
     if (!isGrowable(old[leaf]) || !isGrowable(next[leaf])) return;
@@ -2061,7 +2058,10 @@ const PETAL_ENERGY = 150;
 const PETAL_COST = 2;
 const POLLEN_RESERVE = 40;
 const POLLEN_COST = 15;
-const PETAL_SHED_AGE = 1200;
+const PETAL_SHED_AGE = 3600;
+// A sprouting stalk's height budget, 55 a segment. See lib.rs.
+const STEM_BUDGET = 365;
+const STEM_BUDGET_MAX = STEM_BUDGET + 4 * 55;
 // Heat: water holds and shares it, and ice has a temperature. See lib.rs.
 const HEAT_SHARE = 8;
 const WATER_CHILL = 16;

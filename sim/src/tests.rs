@@ -1312,6 +1312,89 @@ fn a_climbing_stalk_unfurls_side_leaves() {
 }
 
 #[test]
+fn a_watered_seed_grows_a_seven_to_ten_cell_stalk_leafed_on_every_segment() {
+    // The owner's pick (2026-10-29): each of the four budgets, a seed on soil with open sides,
+    // grows a stalk of seven cells plus one per budget step, with a leaf on every row but the
+    // top, alternating sides. The top row grows the crown instead of another segment.
+    for variant in 0..4u8 {
+        let mut u = Universe::new(16, 40, 7);
+        set_cell_state(&mut u, 8, 30, Material::Seed, 40, 180, FLAG_WET);
+        let seed = u.idx(8, 30);
+        u.cells[seed].variant = variant;
+        set_cell(&mut u, 8, 31, Material::Soil);
+        for (x, y) in [(7, 31), (9, 31), (7, 32), (8, 32), (9, 32)] {
+            set_cell(&mut u, x, y, Material::Wall);
+        }
+        let mut crown = None;
+        for _ in 0..1500 {
+            u.tick();
+            crown = (0..30u32).find(|&y| kind_at(&u, 8, y) == Material::Flower as u8 && flags_at(&u, 8, y) & FLAG_ROOTED != 0);
+            if crown.is_some() {
+                break;
+            }
+        }
+        let crown = crown.unwrap_or_else(|| panic!("variant {variant} never bloomed"));
+        let rows: Vec<u32> = (crown + 1..=30).take_while(|&y| kind_at(&u, 8, y) == Material::Stem as u8).collect();
+        assert_eq!(rows.len(), 7 + usize::from(variant), "variant {variant}'s stalk height");
+        for &y in &rows[1..] {
+            let side = if y % 2 == 0 { 7 } else { 9 };
+            assert_eq!(kind_at(&u, side, y), Material::Stem as u8, "variant {variant} has no leaf at row {y}");
+        }
+    }
+}
+
+#[test]
+fn a_stalk_saved_while_it_grows_reloads_its_whole_budget() {
+    // `load_cells` held every energy to 255, and a stalk sprouts with 365 to 585, so a stalk
+    // saved in the seconds it climbs came back five cells tall. Its budget now survives the
+    // load; anything else is still held to 255.
+    let mut u = Universe::new(16, 24, 7);
+    for x in 0..16 {
+        set_cell(&mut u, x, 22, Material::Wall);
+    }
+    set_cell(&mut u, 8, 21, Material::Soil);
+    set_cell_state(&mut u, 8, 20, Material::Stem, 0, STEM_BUDGET_MAX, FLAG_ROOTED | FLAG_COSMIC);
+    set_cell_state(&mut u, 2, 21, Material::Seed, 0, 400, 0);
+    let bytes: Vec<u8> = u
+        .cells
+        .iter()
+        .flat_map(|c| {
+            let mut b = vec![c.kind, c.variant];
+            b.extend_from_slice(&c.age.to_le_bytes());
+            b.extend_from_slice(&c.energy.to_le_bytes());
+            b.extend_from_slice(&c.flags.to_le_bytes());
+            b
+        })
+        .collect();
+    let mut reloaded = Universe::new(16, 24, 7);
+    assert!(reloaded.load_cells(&bytes), "the saved board should load");
+    assert_eq!(energy_at(&reloaded, 8, 20), STEM_BUDGET_MAX, "the stalk's budget was cut on load");
+    assert_eq!(energy_at(&reloaded, 2, 21), 255, "any other energy is still held to 255");
+    for _ in 0..200 {
+        reloaded.tick();
+    }
+    let height = (0..=20u32).rev().take_while(|&y| kind_at(&reloaded, 8, y) == Material::Stem as u8).count();
+    assert_eq!(height, 11, "the reloaded stalk should climb its whole budget");
+}
+
+#[test]
+fn a_head_still_holds_its_petals_two_minutes_after_opening() {
+    // Pairs with `a_spent_petal_sheds_as_a_drifting_mote`. A spent petal (budget under
+    // POLLEN_RESERVE) two minutes old hangs on for the next minute: a head now holds its
+    // petals for PETAL_SHED_AGE, about three minutes. At 1200 it let go within seconds.
+    let mut u = Universe::new(16, 16, 9);
+    let (dx, dy) = BLOOM_SHAPES[0][0];
+    set_cell_state(&mut u, 8, 6, Material::Flower, 30, 0, FLAG_ROOTED);
+    set_cell(&mut u, 8, 7, Material::Wall);
+    let petal = ((8 + dx) as u32, (6 + dy) as u32);
+    set_cell_state(&mut u, petal.0, petal.1, Material::Flower, 2400, 20, 0);
+    for _ in 0..1100 {
+        u.tick();
+    }
+    assert_eq!(kind_at(&u, petal.0, petal.1), Material::Flower as u8, "a two-minute-old petal let go");
+}
+
+#[test]
 fn a_leaf_rides_on_the_stalk_it_clings_to() {
     // Held: the stalk beside the leaf has its own footing, so the leaf stays put.
     let mut u = Universe::new(16, 16, 7);

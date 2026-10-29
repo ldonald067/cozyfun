@@ -901,7 +901,8 @@ const scenarios = [
     // moss inside 100 ticks, so no seed there ever germinated. Byte-equality cannot tell
     // the difference; only asserting the milestones can.
     name: "a plant's whole life, bud to shed petals",
-    w: 40, h: 24, seed: 777, ticks: 2400,
+    // A head holds its petals for PETAL_SHED_AGE (3600) ticks, so the first falls near 3800.
+    w: 40, h: 24, seed: 777, ticks: 4400,
     paint(p) {
       for (let x = 0; x < 40; x++) p(x, 21, 1, M.Wall);
       for (const wall of [2, 17, 22, 37]) for (let y = 14; y < 21; y++) p(wall, y, 1, M.Wall);
@@ -967,7 +968,7 @@ const scenarios = [
   {
     // The slow world's scatter arm. It needs a crown that has actually lived out its
     // bloom, so this scene grows one from a painted seed and then leaves for a night
-    // at tick 2200 — by which point the crown is past PETAL_SHED_AGE with an empty
+    // at tick 4000 — by which point the crown is past PETAL_SHED_AGE with an empty
     // budget. The remaining ticks play forward what it sowed, exactly as the app
     // does at wake.
     //
@@ -975,8 +976,8 @@ const scenarios = [
     // counts as sowable ground: requiring bare soil would have made this rule
     // unreachable in the one scene that most obviously wants it.
     name: "a garden bed left overnight",
-    w: 48, h: 28, seed: 777, ticks: 2400,
-    slowSteps: [{ at: 2200, count: 10 }],
+    w: 48, h: 28, seed: 777, ticks: 4200,
+    slowSteps: [{ at: 4000, count: 10 }],
     paint(p) {
       for (let x = 0; x < 48; x++) p(x, 25, 1, M.Wall);
       for (let x = 4; x <= 43; x++) p(x, 24, 1, M.Soil);
@@ -991,16 +992,16 @@ const scenarios = [
         else if (cells[o] === M.Flower && cells[o + 6] & 2) {
           const age = cells[o + 2] + cells[o + 3] * 256;
           const energy = cells[o + 4] + cells[o + 5] * 256;
-          if (age > 1200 && energy < 40) spentCrown++;
+          if (age > 3600 && energy < 40) spentCrown++;
         }
       }
       // `compare` runs once before the slow steps and again after each of them, all
-      // labelled with the same tick, so the first reading at 2200 is the "before".
-      if (tick === 2200 && seen.seedsBeforeNight === undefined) {
+      // labelled with the same tick, so the first reading at 4000 is the "before".
+      if (tick === 4000 && seen.seedsBeforeNight === undefined) {
         seen.seedsBeforeNight = seeds;
         seen.spentCrowns = spentCrown;
       }
-      if (tick >= 2200) seen.maxSeedsAfterNight = Math.max(seen.maxSeedsAfterNight ?? 0, seeds);
+      if (tick >= 4000) seen.maxSeedsAfterNight = Math.max(seen.maxSeedsAfterNight ?? 0, seeds);
     },
     expect(seen) {
       if (!seen.spentCrowns) return "no plant ever reached a spent seed head, so nothing could sow";
@@ -1009,6 +1010,33 @@ const scenarios = [
       }
       return null;
     },
+  },
+  {
+    // A stalk saved while it grows keeps its whole budget through the load path a saved or
+    // imported scene takes. Both loaders clamped every energy to 255, so a stalk saved in the
+    // seconds it climbs came back five cells tall whatever its seed was; byte parity could not
+    // see that, because both engines cut it the same way. The cosmic variant-3 sprout here
+    // starts at the most any stalk carries (585) and must climb to its full eleven cells.
+    name: "a stalk saved while it grows reloads its whole budget",
+    w: 16, h: 24, seed: 4242, ticks: 200,
+    cells(w, h) {
+      const bytes = new Uint8Array(w * h * STRIDE);
+      const put = (x, y, kind, energy = 0, flags = 0, variant = 0) => {
+        const o = (y * w + x) * STRIDE;
+        bytes[o] = kind; bytes[o + 1] = variant; bytes[o + 4] = energy & 255; bytes[o + 5] = energy >> 8; bytes[o + 6] = flags;
+      };
+      for (let x = 0; x < w; x++) { put(x, 22, M.Wall); put(x, 23, M.Wall); }
+      put(8, 21, M.Soil);
+      put(8, 20, M.Stem, 585, CELL_FLAG.Rooted | CELL_FLAG.Cosmic, 3);
+      return bytes;
+    },
+    paint() {},
+    observe(seen, cells, w) {
+      let run = 0;
+      for (let y = 20; y >= 0 && cells[(y * w + 8) * STRIDE] === M.Stem; y--) run++;
+      seen.tallest = Math.max(seen.tallest ?? 0, run);
+    },
+    expect: (seen) => (seen.tallest === 11 ? null : `the reloaded stalk climbed ${seen.tallest} cells, not its budget's 11`),
   },
   {
     // Steam venting out from UNDER a lid. The heat buffer's byproduct is emitted straight

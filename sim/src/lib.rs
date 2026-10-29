@@ -103,6 +103,10 @@ const SEED_SOAK_LOSS: u16 = 20;
 /// watered bed sprouts and the meadow becomes one solid wall of blooms with no silhouette.
 /// Five keeps a clear gap between heads now that a head is itself five cells across.
 const PLANT_SPACING: i32 = 6;
+/// A sprouting stalk's height budget. Each segment costs 55, so 365 is seven cells; a
+/// seed's variant adds up to three more and a cosmic one one more (`STEM_BUDGET_MAX`).
+const STEM_BUDGET: u16 = 365;
+const STEM_BUDGET_MAX: u16 = STEM_BUDGET + 4 * 55;
 
 /// Per-plant bloom silhouettes, chosen by the plant's variant exactly as its hue is.
 /// Offsets are relative to the crown, which always sits directly above the stalk tip, and
@@ -161,8 +165,8 @@ const BLOOM_SHAPES: [&[(i32, i32)]; 8] = [
 /// 90 energy at 1/tick — about four and a half seconds of life — which is why an
 /// untended flower emitted one or two pollen motes at most and then sat inert
 /// forever. Slowing the clock buys a watchable open → dust → wilt arc while
-/// keeping every material's energy under 255, which is what the scene-import
-/// clamp in `load_cells` assumes.
+/// keeping a bloom's energy under 255, which is what the scene-import clamp in
+/// `load_cells` holds every material but a stalk to.
 const BLOOM_CLOCK: u16 = 8;
 const BLOOM_ENERGY: u16 = 200;
 const BLOOM_ENERGY_COSMIC: u16 = 250;
@@ -179,7 +183,10 @@ const PETAL_COST: u16 = 2;
 /// Below this a bloom is spent: no more pollen, and petals may start to let go.
 const POLLEN_RESERVE: u16 = 40;
 const POLLEN_COST: u16 = 15;
-const PETAL_SHED_AGE: u16 = 1200;
+/// A head holds its petals this long. At 1200 a watered bed was in full bloom for about a
+/// minute and bare by two; at 3600 it is full for about three and bare by four (the owner's
+/// pick from a filmstrip, 2026-10-29). It is also when a crown counts as a spent seed head.
+const PETAL_SHED_AGE: u16 = 3600;
 /// Heat that shows (the owner's items 6 and 7, 2026-10-20). Water's energy is its temperature
 /// and, since this batch, ice's energy is its warmth. Before it, a flame could not warm a pool
 /// (water lost 2 a tick, everywhere), ice froze any water under 120 within a second, and only
@@ -467,7 +474,10 @@ impl Universe {
                     kind,
                     variant: chunk[1] & 7,
                     age: u16::from_le_bytes([chunk[2], chunk[3]]),
-                    energy: u16::from_le_bytes([chunk[4], chunk[5]]).min(255),
+                    // Every energy is held to 255 but a stalk's: its growth budget runs to
+                    // STEM_BUDGET_MAX, and clamping it cut a stalk saved mid-growth to five cells.
+                    energy: u16::from_le_bytes([chunk[4], chunk[5]])
+                        .min(if kind == Material::Stem as u8 { STEM_BUDGET_MAX } else { 255 }),
                     flags: u16::from_le_bytes([chunk[6], chunk[7]]) & FLAG_MASK,
                 }
             };
@@ -2202,10 +2212,10 @@ impl Universe {
                     next[idx] = Cell::new(
                         Material::Stem as u8,
                         cell.variant,
-                        // Each segment costs 55, so this is a 4-to-7 cell stalk. The old
-                        // 130 base could bloom after a single segment, which left a head
-                        // sitting almost on the ground with no room for leaves.
-                        200 + u16::from(cell.variant & 3) * 55 + if cosmic { 55 } else { 0 },
+                        // Each segment costs 55, so this is a 7-to-10 cell stalk. At 200 it
+                        // was 4 to 7, and a watered bed read as a lawn with heads on it; the
+                        // owner picked the taller plant from a filmstrip (2026-10-29).
+                        STEM_BUDGET + u16::from(cell.variant & 3) * 55 + if cosmic { 55 } else { 0 },
                     );
                     next[idx].flags = FLAG_ROOTED | if cosmic { FLAG_COSMIC } else { 0 };
                     return;
@@ -2357,17 +2367,14 @@ impl Universe {
         })
     }
 
-    /// Leaves unfurl in alternating pairs as the stalk climbs, so a grown plant
-    /// reads as a plant instead of a bare pole. Placement is a pure function of
-    /// height — no RNG — so it cannot desynchronise the two engines. Leaf energy
-    /// stays under the growth threshold, so a leaf never climbs a stalk of its own.
+    /// Leaves unfurl as the stalk climbs, so a grown plant reads as a plant instead
+    /// of a bare pole. Placement is a pure function of height — no RNG — so it
+    /// cannot desynchronise the two engines. Leaf energy stays under the growth
+    /// threshold, so a leaf never climbs a stalk of its own.
     fn unfurl_leaf(&self, x: i32, y: i32, cell: Cell, old: &[Cell], next: &mut [Cell]) {
-        // Every other segment, alternating sides. Spacing them any further apart left
-        // the shortest stalks — the common case — with no leaves at all.
-        if y % 2 != 0 {
-            return;
-        }
-        let lx = if (y / 2) % 2 == 0 { x - 1 } else { x + 1 };
+        // One on every segment, alternating sides. Every other segment gave a grown
+        // plant one or two leaves, and a sixth of a bed none.
+        let lx = if y % 2 == 0 { x - 1 } else { x + 1 };
         if !self.in_bounds(lx, y) {
             return;
         }

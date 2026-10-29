@@ -67,7 +67,7 @@ const RING_FROM_SKY = 120;
 // stops pollinating, when its petals let go, and — in `slow_step` — when it sows. The
 // renderer reads them so a seed head is drawn under exactly the condition that makes it
 // one; if these move in the sim, they must move here or the picture starts lying.
-export const PETAL_SHED_AGE = 1200;
+export const PETAL_SHED_AGE = 3600;
 export const POLLEN_RESERVE = 40;
 
 type Species = { readonly light: Rgb; readonly dark: Rgb; readonly eye: Rgb | null };

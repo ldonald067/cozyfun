@@ -1131,7 +1131,7 @@ function assertFloor(label, floor, worst, detail) {
   assertFloor("a head's outline is darker than the head it edges (luminance)", 40, edge,
     `worst at ${edgeAt}. A ring as bright as its petal reads as one more petal, and the head changes shape.`);
   let bare = 0, bareAt = null;
-  for (let v = 0; v < 8; v++) for (const p of POSITIONS) for (const [stage, crown] of [["bud", [90, 20]], ["seed head", [0, 1400]]]) {
+  for (let v = 0; v < 8; v++) for (const p of POSITIONS) for (const [stage, crown] of [["bud", [90, 20]], ["seed head", [0, shape.PETAL_SHED_AGE + 200]]]) {
     const cells = head(v, 0, p, 0, false, crown);
     for (const t of TIMES) for (const [x, y] of besideFlowers(cells, false)) for (const behind of NIGHTS) {
       const d = redmean(colourAt(cells, x, y, t, behind), behind);
