@@ -474,6 +474,11 @@ input:focus-visible {
   image-rendering: pixelated;
 }
 
+/* Already a whole multiple of the board, nearest-neighbour; the browser only scales it down. */
+.display-canvas {
+  image-rendering: auto;
+}
+
 .glow-canvas {
   image-rendering: auto;
   filter: blur(16px) saturate(1.35);

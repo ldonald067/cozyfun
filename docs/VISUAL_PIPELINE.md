@@ -4,7 +4,8 @@ The sandbox renders as a grid of cells, but the grid does not need to look flat.
 
 ## Layers
 
-- Base canvas: crisp pixel data for the simulation.
+- Base canvas: crisp pixel data for the simulation, always one pixel a cell (220x140), which every export, capture and audit reads.
+- Display canvas: what is shown instead of the base under the "smooth" fit — the base blown up nearest-neighbour to the next whole multiple, which the browser scales down to fill the tray. Where the board sits, and which of the two is shown, is `rendering/pixelFit.ts`: every cell must reach the screen at one size, and `npm run pixels:even` measures that on screen. Below 2x, where it keeps at least 90% of the board, the base is shown instead at a whole number of device pixels a cell, centred ("snap"); everywhere else the fit smooths.
 - Glow canvas: blurred additive-feeling light for fire, lava, ember, steam, stardust, meteor, moonwater, pollen, flowers, cosmic moss, and firework sparks. Four materials reach it only in a particular state — an attuned wellspring, a lit rocket grain, glass while the vitrify flash is still cooling (`age < 70`), and constellation-etched stone — so `hasGlow` is a predicate over `(kind, flags, energy, age)`, not a set membership test.
 - Motes canvas: full-screen room dust, separate from the simulation.
 

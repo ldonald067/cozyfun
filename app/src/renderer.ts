@@ -7,6 +7,8 @@ type RenderTargets = {
   base: HTMLCanvasElement;
   glow: HTMLCanvasElement;
   motes: HTMLCanvasElement;
+  /** Shown instead of `base` under the "smooth" board fit (rendering/pixelFit.ts); hidden otherwise. */
+  display?: HTMLCanvasElement | null;
 };
 
 export function renderSandbox(engine: SandboxEngine, targets: RenderTargets, time: number) {
@@ -54,6 +56,16 @@ export function renderSandbox(engine: SandboxEngine, targets: RenderTargets, tim
   baseCtx.putImageData(base, 0, 0);
   glowCtx.clearRect(0, 0, width, height);
   glowCtx.putImageData(glow, 0, 0);
+  // The base stays 220x140 for every reader (exports, QA, audits). Under the smooth fit it is
+  // blown up nearest-neighbour to a whole multiple here, and the browser scales that down.
+  const display = targets.display;
+  if (display && !display.hidden) {
+    const displayCtx = display.getContext("2d", { alpha: false });
+    if (displayCtx) {
+      displayCtx.imageSmoothingEnabled = false;
+      displayCtx.drawImage(targets.base, 0, 0, display.width, display.height);
+    }
+  }
   drawMotes(targets.motes, time);
 }
 

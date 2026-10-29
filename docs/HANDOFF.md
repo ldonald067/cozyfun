@@ -36,6 +36,13 @@ The owner hits usage limits early.
    beds, then painting, then reaction cues) before tuning further; `audio:levels` holds the
    bands. If the owner wants rain under the radio after all, it is `setDeskRadioOn` in
    `controller.ts`.
+3. **A painted night sky behind the pixels, if the owner wants it next.** Mocked 2026-10-28
+   (`.tmp/pixel-review/watercolour2-sheet.png`, option B2): every pixel stays crisp on a calm
+   indigo and violet wash in the landing poster's language. It cost at most 6 L of edge
+   contrast (soil 52 to 47, lava 42 to 39). Building it needs empty cells transparent in the
+   base canvas (they are opaque today) and the same backdrop in the postcard, clip and
+   visual-qa composites. Painting water itself (A2) needs a moving mock before anyone decides;
+   painting fire, lava or oil lost their identity (crust, flicker, sheen) and was ruled out.
 
 ## Open questions, accepted unless the owner says otherwise
 
@@ -59,6 +66,13 @@ The owner hits usage limits early.
 ## Decisions already made — do not relitigate
 
 All by the owner, after seeing pictures or measurements:
+
+- **Even pixels** (2026-10-28): every cell reaches the screen at one size and square
+  (`rendering/pixelFit.ts`, gated by `npm run pixels:even`). From 2x up the board smooths down
+  from the next whole multiple; below 2x it snaps to whole pixels only where that keeps 90% of
+  the tray, and smooths elsewhere. Snapping everywhere below 2x was shown at 960 wide (72% of
+  the tray inside a 94 px band where painting did nothing) and not picked; a frame that hugs
+  the board was shown and not picked.
 
 - **Lava is thick** (2026-10-28, the owner: "lava should flow like lava, so not even"). It
   falls like any liquid; lava with lava on top is pushed aside one cell; surface lava creeps

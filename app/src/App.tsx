@@ -43,6 +43,7 @@ import {
   type SceneSnapshotMetadata
 } from "./storage";
 import { exportClip, exportPostcard, renderSandbox } from "./renderer";
+import { fitBoard } from "./rendering/pixelFit";
 import { BUILD_COMMIT } from "./buildStamp";
 import { catchUpRemaining, nextCatchUpChunk, wakeTerrarium } from "./slowWorld";
 import { claimWins, openOwnerChannel, type OwnerChannel } from "./windowOwnership";
@@ -165,6 +166,8 @@ export function App() {
   const baseCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const glowCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const motesCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const displayCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const trayRef = useRef<HTMLDivElement | null>(null);
   const pointerDownRef = useRef(false);
   const lastPaintCellRef = useRef<{ x: number; y: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -307,7 +310,7 @@ export function App() {
       const base = baseCanvasRef.current;
       const glow = glowCanvasRef.current;
       const motes = motesCanvasRef.current;
-      if (base && glow && motes) renderSandbox(engine, { base, glow, motes }, time);
+      if (base && glow && motes) renderSandbox(engine, { base, glow, motes, display: displayCanvasRef.current }, time);
 
       frames++;
       if (time - lastFpsAt > 500) {
@@ -321,6 +324,44 @@ export function App() {
     frame = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frame);
   }, [audio, engine, paused]);
+
+  // Every cell reaches the screen at one size: see rendering/pixelFit.ts. Refit whenever the
+  // tray resizes or the pixel density changes (browser zoom, or a window moved to another screen).
+  useEffect(() => {
+    const tray = trayRef.current;
+    const base = baseCanvasRef.current;
+    const glow = glowCanvasRef.current;
+    const display = displayCanvasRef.current;
+    if (!engine || !tray || !base || !glow || !display) return;
+    let densityQuery: MediaQueryList | null = null;
+    const refit = () => {
+      const dpr = window.devicePixelRatio || 1;
+      const box = tray.getBoundingClientRect();
+      const fit = fitBoard(box.width - tray.clientLeft * 2, box.height - tray.clientTop * 2, engine.width(), engine.height(), dpr);
+      if (!fit) return;
+      for (const canvas of [base, glow, display]) {
+        Object.assign(canvas.style, { inset: "auto", left: `${fit.left}px`, top: `${fit.top}px`, width: `${fit.width}px`, height: `${fit.height}px` });
+      }
+      const smooth = fit.mode === "smooth";
+      display.hidden = !smooth;
+      base.style.visibility = smooth ? "hidden" : "";
+      if (smooth && (display.width !== engine.width() * fit.scale || display.height !== engine.height() * fit.scale)) {
+        display.width = engine.width() * fit.scale;
+        display.height = engine.height() * fit.scale;
+      }
+      tray.dataset.boardFit = fit.mode;
+      densityQuery?.removeEventListener("change", refit);
+      densityQuery = window.matchMedia(`(resolution: ${dpr}dppx)`);
+      densityQuery.addEventListener("change", refit);
+    };
+    const observer = new ResizeObserver(refit);
+    observer.observe(tray);
+    refit();
+    return () => {
+      observer.disconnect();
+      densityQuery?.removeEventListener("change", refit);
+    };
+  }, [engine]);
 
   const groupedMaterials = useMemo<Record<string, MaterialDef[]>>(
     () => ({
@@ -769,6 +810,7 @@ export function App() {
 
         <section className="sandbox-stage">
           <div
+            ref={trayRef}
             className="tray"
             data-testid="sandbox-tray"
             onPointerDown={handlePointerDown}
@@ -777,6 +819,7 @@ export function App() {
             onPointerCancel={handlePointerUp}
           >
             <canvas ref={baseCanvasRef} className="sandbox-canvas base-canvas" />
+            <canvas ref={displayCanvasRef} className="sandbox-canvas display-canvas" aria-hidden="true" hidden />
             <canvas ref={glowCanvasRef} className="sandbox-canvas glow-canvas" />
             <div className="glass-sheen" aria-hidden="true" />
           </div>

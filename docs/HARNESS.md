@@ -7,7 +7,7 @@ Harness engineering means improving the feedback loops around the sandbox so goo
 The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `scripts/` that adds repo-local tool paths; the wrappers run the same underlying steps.
 
 - `npm run build`: builds Rust/WASM, copies the WASM into `app/public/sim`, and builds the Vite app.
-- `npm run check`: the full local gate, in order — material identity audit, material contrast floor, renderer probe, site-icon freshness, Rust sim tests, production build, WASM smoke, JS fallback smoke, cross-engine parity, interaction reachability, slow-world visibility, subpath build, audio reactions, field notes, browser smoke, audio QA, and visual QA. (This list had silently lost the renderer probe and field notes, which is the argument for the next sentence.) If you are listing the stages anywhere, take the list from `package.json` rather than from memory.
+- `npm run check`: the full local gate, in order — material identity audit, material contrast floor, renderer probe, site-icon freshness, Rust sim tests, production build, WASM smoke, JS fallback smoke, cross-engine parity, interaction reachability, slow-world visibility, subpath build, audio reactions, field notes, browser smoke, pixel grid, audio QA, and visual QA. (This list had silently lost the renderer probe and field notes, which is the argument for the next sentence.) If you are listing the stages anywhere, take the list from `package.json` rather than from memory.
 - **`cargo build` is not `npm run build:sim`.** Parity reads the wasm from
   `app/public/sim/`, which `scripts/copy-wasm.mjs` writes — and only `npm run build:sim`
   runs it. Building the crate directly leaves a stale binary there, so parity compares your
@@ -497,6 +497,37 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
 - `npm run qa:live`: `deploy:verify`, then browser and visual QA against `COZY_QA_URL`. This
   is the whole "does production work" question in one command; the local gate structurally
   cannot answer it.
+
+- `npm run pixels:even`: paints a grid of one-cell Wall lines and measures them **on
+  screen, in device pixels**, at nine window sizes and densities (1x at 960, 1024, 1280, 1440
+  and 1920 wide, 1.5x, 2x at 1280 and 1440, and a 3x phone). Every line must cover the same
+  width (spread under 0.5 device px), cells must be square to 0.6%, and the board must keep
+  at least 90% of the tray.
+
+  It exists because the board was never drawn at a whole number of pixels a cell: 3.14 px at
+  1024 wide, 3.2 at 1280, 3.93 at 1440. Nearest-neighbour at a fractional scale drew a
+  one-cell line 3 px wide four times in five and 4 px the fifth, so ten identical flower stems
+  drew at two widths, and cells were 2% wider than tall besides. Nothing saw it, because
+  visual QA composites at exactly 4.0 px a cell — the one scale no player gets. On the build
+  before the fix this gate failed all eight cases with a spread of exactly 1.0.
+
+  It reads where the board landed off the pattern itself and never asks how it was sized, so
+  it holds whichever fit `rendering/pixelFit.ts` picks: a whole number of device pixels a cell
+  ("snap", spread 0.00), or a smoothed scale-down from the next whole multiple ("smooth").
+  Snapping everywhere below 2x was built first, and this gate's own "board kept" column, with
+  the browser smoke's garden failing to plant, showed what it cost: 72% of the tray at 960 wide
+  (2.79 px a cell snapped to 2), inside a 94 px band where painting did nothing, and 78% at
+  1440. So a snap now has to keep 90% of the board or the fit smooths instead, and from 2x up
+  it always smooths. Every scan must find exactly the lines painted, so it cannot pass on a
+  pattern it failed to find.
+
+  Review (2026-10-28) found two ways the first version could pass a broken board. Lines every
+  third cell could all land on one phase of a repeating width error (at 10/3 px a cell widths
+  run 3, 4, 3, and every third line is 4), so the lines now sit at gaps of 3 or 4 along a
+  Beatty sequence, which visits every phase of every period. And "lines across match lines
+  down" allowed 0.35 px, while the 2% stretch it named was 0.06 px a cell; squareness is now
+  a sub-pixel pitch over the whole pattern. With the old drawing forced back on, the gate fails
+  all nine cases on both counts: spread 1.00, cells 1.3-2.7% wider than tall.
 
 - `npm run visual:qa`: captures deterministic material scenes, room backdrops, and responsive layout metrics into `.tmp/visual-qa`.
 
