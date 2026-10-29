@@ -29,9 +29,6 @@ The owner hits usage limits early.
    2026-10-29; A2 from the same mock (`.tmp/pixel-review/watercolour2-sheet.png`) paints
    water, moonwater, steam and smoke as washes and needs a moving mock before anyone decides.
    Painting fire, lava or oil lost their identity (crust, flicker, sheen) and was ruled out.
-3. **A spent garden, only if the owner asks.** A bed watered once is bare stalks with one-cell
-   seed heads from about four minutes on, for good; rain re-sows it through glided seeds, but
-   nothing re-blooms a standing plant. `.tmp/garden/arc.mjs` measures a bed's bloom over time.
 
 ## Open questions, accepted unless the owner says otherwise
 
@@ -58,6 +55,15 @@ The owner hits usage limits early.
 
 All by the owner, after seeing pictures or measurements:
 
+- **A spent garden stays as it is** (2026-10-29, from `.tmp/garden/rebloom-sheet.png`).
+  Watering it again already brings it back: water feeds a flower's energy, so a spent head
+  opens again, and a bed gone to seed reopened 22 of ~24 heads within 30 s and held them
+  about 3.5 minutes. The rain room's rain is too light to do it (about 1 head in 5 minutes).
+  Not picked: any fresh water on a plant waking it (about 3 heads in 5 minutes of rain), and
+  plants withering after going to seed so their seeds regrow (about 13 heads at its peak, the
+  seed-head stage mostly gone). Prototypes in `.tmp/garden/rebloom.py`, numbers from
+  `rearc.mjs`, film from `refilm.mjs`. A re-watering has to be poured above the plants: the
+  brush writes over whatever it covers.
 - **The fuller garden** (2026-10-29): A + B from `.tmp/garden/garden-sheet.png`. A stalk is 7
   to 10 cells (budget 365 + 55 per variant step, cosmic one more) with a leaf on every segment,
   alternating sides; a head holds its petals for `PETAL_SHED_AGE` 3600, so a bed watered once
