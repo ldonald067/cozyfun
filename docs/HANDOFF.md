@@ -1,9 +1,9 @@
 # Handoff — where the work is, and what to do next
 
 *Rewritten at each handoff, never appended to. Shipped work lives in `git log`, whose commit
-messages carry each batch's measurements. Written 2026-10-28 (evening): fallen petals fall in
-their flower's colour, four rules no check could see now have one, sound (item 2) waits on the
-owner's ears, and `interaction:audit` passes all 179 checks.*
+messages carry each batch's measurements. Written 2026-10-29: the painted night sky (B2) is
+built with the owner's outline fix (B), the 32-seed list is retaken, and sound (item 2) still
+waits on the owner's ears.*
 
 ## Keep chats lean
 
@@ -36,13 +36,10 @@ The owner hits usage limits early.
    beds, then painting, then reaction cues) before tuning further; `audio:levels` holds the
    bands. If the owner wants rain under the radio after all, it is `setDeskRadioOn` in
    `controller.ts`.
-3. **A painted night sky behind the pixels, if the owner wants it next.** Mocked 2026-10-28
-   (`.tmp/pixel-review/watercolour2-sheet.png`, option B2): every pixel stays crisp on a calm
-   indigo and violet wash in the landing poster's language. It cost at most 6 L of edge
-   contrast (soil 52 to 47, lava 42 to 39). Building it needs empty cells transparent in the
-   base canvas (they are opaque today) and the same backdrop in the postcard, clip and
-   visual-qa composites. Painting water itself (A2) needs a moving mock before anyone decides;
-   painting fire, lava or oil lost their identity (crust, flicker, sheen) and was ruled out.
+3. **Painting water itself (A2), only if the owner asks.** The night sky (B2) shipped
+   2026-10-29; A2 from the same mock (`.tmp/pixel-review/watercolour2-sheet.png`) paints
+   water, moonwater, steam and smoke as washes and needs a moving mock before anyone decides.
+   Painting fire, lava or oil lost their identity (crust, flicker, sheen) and was ruled out.
 
 ## Open questions, accepted unless the owner says otherwise
 
@@ -58,7 +55,10 @@ The owner hits usage limits early.
 - Lava melting ICE stays out of reach by touch: the melt quenches the lava into a crust
   between them. `lava.scorches` "thaws" is witnessed on frosted masonry instead, with the ice
   erased first; the scene says so.
-- The landing poster has not been tested in Safari/WebKit.
+- The landing poster has not been tested in Safari/WebKit, and neither has the night wash
+  behind the board (an alpha base canvas over a canvas, then `mix-blend-mode: screen` glow).
+- The wash paints once at mount, 30-40 ms in Node; it has not been timed on a phone.
+- The wash is one fixed painting (seeds 14/2/3 in `nightWash.ts`), the same in every room.
 - `test:browser`'s "a garden planted in the app actually blooms" timed out once in five runs
   on 2026-10-28 (90 s wall clock; the brush lands at wall-clock times, so the bed differs run
   to run). A second sighting should make it a harness fix, not a rerun.
@@ -66,6 +66,17 @@ The owner hits usage limits early.
 ## Decisions already made — do not relitigate
 
 All by the owner, after seeing pictures or measurements:
+
+- **The painted night** (2026-10-29): B2, a still watercolour wash (deep blue, indigo,
+  violet, dried tide lines, paper grain) behind crisp pixels, matched to the mock's measured
+  statistics (`rendering/nightWash.ts`). Open air is transparent in the base canvas; lit and
+  outlined air are overlays. Harnesses measure air against `washAt(x, y)`, held within 2
+  levels of the painted cell by `renderer:probe`. Head outlines are option B
+  (`.tmp/nightsky/outline-options.png`): as picked on the dark sky, and on indigo or violet a
+  ring gives back only as much of its violet push as keeps it 120 from the sky. Option A (the
+  sky shows through every ring) left the bluebell's outline 75 from the violet wash and was
+  not picked. Cost, measured: cold char against the tray 296 to 239; outline darker than head
+  46 to 42 (floor 40). `.tmp/nightsky/night-sky-before-after.png` is the board.
 
 - **Even pixels** (2026-10-28): every cell reaches the screen at one size and square
   (`rendering/pixelFit.ts`, gated by `npm run pixels:even`). From 2x up the board smooths down
@@ -136,20 +147,23 @@ All by the owner, after seeing pictures or measurements:
 ## Where the checks stand
 
 `npm run interaction:audit` passes 179 checks, bound to all 118 role ids, on the audit's seed
-(2026-10-28). These pass on fewer than 32 of 32 seeds:
+(2026-10-29, with the night wash). Retaken over 32 seeds on 2026-10-29 at `a19b507` (before
+the wash), these pass on fewer than 32:
 
-- **31:** `fire.thaws`, both `oil.ignites` checks, `meteor.trail`'s fanned-trail check,
-  `fungus.fairyring`, `stem.burns`, `lava.quenched` "water never deletes the lava it
-  meets" (thick lava creeps toward the splash, and on one seed never meets it), and
-  `ember.quenched`'s doused-log cloud, now 80 cells so it sees the hiss's odds (one seed
-  peaks at 71; at the old 1 in 6 the biggest is 74).
-- **30:** `ice.condenses` "takes the steam's heat" (thick lava creeps the gap to the ice, and
-  is late on two seeds).
-- **29:** `fire.dries`'s ember check.
-- **27:** `stem.footing`'s stalk check.
+- **31:** `seed.germinates` grows taller fed cosmic, `meteor.impacts`, `meteor.trail`'s fanned
+  trail, `moonwater.bursts`, `fire.thaws`, `lava.quenched` "water never deletes the lava it
+  meets", `pollen.seeds`, `stem.burns`, `ember.quenched`'s doused-log cloud, and both
+  `oil.ignites` checks.
+- **30:** `ice.condenses` "takes the steam's heat", `flower.opens` "opens a tulip into a cup",
+  `meteor.shocked`.
+- **29:** `flower.opens` "nods a bluebell's bells".
+- **27:** `fire.dries`'s ember check, `stem.footing`'s stalk check.
+- **25:** `meteor.vitrifies`.
 
-The full 32-seed list was last taken on 2026-10-17; each batch since re-measured only the
-checks it moved. Retake it before relying on it.
+Against the 2026-10-17 list: `fungus.fairyring` now passes 32 of 32, `fire.dries`'s ember
+check fell from 29 to 27, and eight checks are new to it. Nobody has looked at why; each batch
+since 10-17 re-measured only the checks it moved, so nothing says these moved recently rather
+than went unmeasured.
 
 ## The design canvas
 
@@ -157,7 +171,8 @@ checks it moved. Retake it before relying on it.
 the owner) holds the eight flower species, life stages, weather states, the interaction roster
 marked shows / thin / reads weak / half hidden, and a ranked shortlist of eight upgrades with
 each one's status. Seven have shipped (the burning log last, 2026-10-28) and one was dropped (lava
-thawing ice across a gap); the canvas itself still marks the log open. The "Flowers with more depth" board holds the four outline
+thawing ice across a gap); the canvas itself still marks the log open, and the night sky
+(2026-10-29) is not on it. Editing it means following the Design type's own `SKILL.md`. The "Flowers with more depth" board holds the four outline
 candidates. To edit the canvas, read it first (`Artifact` read of the URL, then the file by
 `path`) and publish to the same URL: a publish against a stale version is refused.
 
@@ -223,6 +238,10 @@ not this list.
   `try.mjs <candidate> <seeds> [sabotage,...]` (distributions and verdicts on the JS mirror,
   live and sabotaged), `board.mjs` (print a candidate's board). How the four 2026-10-28
   thresholds were chosen: measure both sides, then pick a round number between them.
+- **The night sky:** `.tmp/nightsky/` — `wash.mjs` (paint and time the wash alone),
+  `seeds.mjs` (violet and deep coverage per seed), `corr.mjs` (feature size per period),
+  `rings.mjs` (each species' outline against every wash cell), `heads.mjs` (every head on
+  each tone, the sheet the owner picked B from).
 - **Fallen petals:** `.tmp/petals/` — `sweep.mjs` (worst petal-vs-night and petal-vs-puff
   over every reachable state), `where.mjs` (when and where petals fall in a film scene),
   `one.mjs <roleRegex> [seed...]` (one check's raw numbers on the wasm).

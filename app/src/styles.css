@@ -442,7 +442,8 @@ input:focus-visible {
   overflow: hidden;
   touch-action: none;
   cursor: crosshair;
-  background: #090e14;
+  /* The wash's deep tone (rendering/nightWash.ts), for any sliver the wash canvas leaves. */
+  background: #080c1c;
   box-shadow:
     0 34px 120px rgba(0, 0, 0, 0.62),
     0 0 0 1px var(--tray-highlight),
@@ -472,6 +473,12 @@ input:focus-visible {
 
 .base-canvas {
   image-rendering: pixelated;
+}
+
+/* The night wash: soft by nature, so the browser may smooth it as it scales. */
+.wash-canvas {
+  image-rendering: auto;
+  pointer-events: none;
 }
 
 /* Already a whole multiple of the board, nearest-neighbour; the browser only scales it down. */

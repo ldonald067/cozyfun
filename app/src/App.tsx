@@ -42,7 +42,8 @@ import {
   type SceneSnapshotContext,
   type SceneSnapshotMetadata
 } from "./storage";
-import { exportClip, exportPostcard, renderSandbox } from "./renderer";
+import { exportClip, exportPostcard, paintWashCanvas, renderSandbox } from "./renderer";
+import { washMarginFor } from "./rendering/nightWash";
 import { fitBoard } from "./rendering/pixelFit";
 import { BUILD_COMMIT } from "./buildStamp";
 import { catchUpRemaining, nextCatchUpChunk, wakeTerrarium } from "./slowWorld";
@@ -167,6 +168,7 @@ export function App() {
   const glowCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const motesCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const displayCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const washCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const trayRef = useRef<HTMLDivElement | null>(null);
   const pointerDownRef = useRef(false);
   const lastPaintCellRef = useRef<{ x: number; y: number } | null>(null);
@@ -332,16 +334,33 @@ export function App() {
     const base = baseCanvasRef.current;
     const glow = glowCanvasRef.current;
     const display = displayCanvasRef.current;
-    if (!engine || !tray || !base || !glow || !display) return;
+    const wash = washCanvasRef.current;
+    if (!engine || !tray || !base || !glow || !display || !wash) return;
     let densityQuery: MediaQueryList | null = null;
     const refit = () => {
       const dpr = window.devicePixelRatio || 1;
       const box = tray.getBoundingClientRect();
-      const fit = fitBoard(box.width - tray.clientLeft * 2, box.height - tray.clientTop * 2, engine.width(), engine.height(), dpr);
+      const boxWidth = box.width - tray.clientLeft * 2;
+      const boxHeight = box.height - tray.clientTop * 2;
+      const fit = fitBoard(boxWidth, boxHeight, engine.width(), engine.height(), dpr);
       if (!fit) return;
       for (const canvas of [base, glow, display]) {
         Object.assign(canvas.style, { inset: "auto", left: `${fit.left}px`, top: `${fit.top}px`, width: `${fit.width}px`, height: `${fit.height}px` });
       }
+      // The wash runs past the board on every side, so a snapped board's margin inside the frame
+      // is the same sky, continuous with the sky behind the board. It is repainted only when a
+      // frame needs more sky than it has.
+      const cell = fit.width / engine.width();
+      const need = washMarginFor(boxWidth, boxHeight, fit.left, fit.top, fit.width, fit.height, cell);
+      if (!(Number(wash.dataset.margin) >= need)) paintWashCanvas(wash, engine.width(), engine.height(), need);
+      const margin = Number(wash.dataset.margin);
+      Object.assign(wash.style, {
+        inset: "auto",
+        left: `${fit.left - margin * cell}px`,
+        top: `${fit.top - margin * cell}px`,
+        width: `${(engine.width() + margin * 2) * cell}px`,
+        height: `${(engine.height() + margin * 2) * cell}px`
+      });
       const smooth = fit.mode === "smooth";
       display.hidden = !smooth;
       base.style.visibility = smooth ? "hidden" : "";
@@ -668,8 +687,8 @@ export function App() {
   }
 
   async function handlePostcard() {
-    if (!engine || !baseCanvasRef.current || !glowCanvasRef.current) return;
-    await exportPostcard(engine, baseCanvasRef.current, glowCanvasRef.current, {
+    if (!engine || !baseCanvasRef.current || !glowCanvasRef.current || !washCanvasRef.current) return;
+    await exportPostcard(engine, { base: baseCanvasRef.current, glow: glowCanvasRef.current, wash: washCanvasRef.current }, {
       sceneTitle: activeSceneEnvironment.title,
       moodTitle: activeMood.title,
       soundSource: soundSourceLabel
@@ -678,9 +697,9 @@ export function App() {
   }
 
   async function handleClip() {
-    if (!engine || !baseCanvasRef.current || !glowCanvasRef.current) return;
+    if (!engine || !baseCanvasRef.current || !glowCanvasRef.current || !washCanvasRef.current) return;
     setStatus("recording clip");
-    const exported = await exportClip(engine, baseCanvasRef.current, glowCanvasRef.current, {
+    const exported = await exportClip(engine, { base: baseCanvasRef.current, glow: glowCanvasRef.current, wash: washCanvasRef.current }, {
       sceneTitle: activeSceneEnvironment.title,
       moodTitle: activeMood.title,
       soundSource: soundSourceLabel
@@ -818,6 +837,7 @@ export function App() {
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
           >
+            <canvas ref={washCanvasRef} className="sandbox-canvas wash-canvas" aria-hidden="true" />
             <canvas ref={baseCanvasRef} className="sandbox-canvas base-canvas" />
             <canvas ref={displayCanvasRef} className="sandbox-canvas display-canvas" aria-hidden="true" hidden />
             <canvas ref={glowCanvasRef} className="sandbox-canvas glow-canvas" />

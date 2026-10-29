@@ -1,6 +1,7 @@
 import { CELL_FLAG, GLOW_MATERIALS, MATERIAL, MATERIAL_BY_ID, POLLEN_PETAL, type MaterialId } from "../materials";
-import { clampColor, hexToRgb, type Rgb } from "./color";
-import { applyShapeLanguage, emptyCellColor, FIREWORK_HUES, WELLSPRING_TINTS } from "./shapeLanguage";
+import { clampColor, hexToRgb, mixRgb, type Rgb } from "./color";
+import { washAt } from "./nightWash";
+import { airColor, applyShapeLanguage, FIREWORK_HUES, WELLSPRING_TINTS } from "./shapeLanguage";
 
 export function colorForCell(options: {
   kind: number;
@@ -14,9 +15,15 @@ export function colorForCell(options: {
   height: number;
   x: number;
   y: number;
+  /** What open air shows. The night wash at (x, y) unless given; the renderer leaves air clear instead. */
+  backdrop?: Rgb;
 }): Rgb {
   const { kind, variant, age, energy, flags, time, cells, width, height, x, y } = options;
-  if (kind === MATERIAL.Empty) return emptyCellColor(cells, width, height, x, y, time);
+  if (kind === MATERIAL.Empty) {
+    const behind = options.backdrop ?? washAt(x, y);
+    const [r, g, b, a] = airColor(cells, width, height, x, y, time, behind);
+    return mixRgb(behind, [r, g, b], a / 255);
+  }
 
   const material = MATERIAL_BY_ID.get(kind as MaterialId);
   if (!material) return [255, 0, 255];

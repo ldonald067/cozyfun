@@ -1,7 +1,8 @@
 import { CELL_FLAG, CELL_STRIDE, MATERIAL, MATERIAL_BY_ID, POLLEN_PETAL, WELLSPRING_TAUGHT, type MaterialId } from "../materials";
-import { adjustRgb, hexToRgb, mixRgb, type Rgb } from "./color";
+import { adjustRgb, hexToRgb, mixRgb, type Rgb, type Rgba } from "./color";
 import { cardinalNeighborCount, contactInfo, edgeInfo, hasNearbyKind, kindAt, readU16, sameKind, sameLiquid } from "./cells";
 import { hashCell } from "./hash";
+import { washAt } from "./nightWash";
 
 export type ShapeContext = {
   kind: number;
@@ -55,6 +56,12 @@ const BLUEBELL_SCAPE: Rgb = [70, 124, 84];
 // A head's outline is a deep shade of the plant's own colour, pushed toward this violet the
 // way a pixel-art shadow shifts hue rather than going grey.
 const HEAD_RING_SHADE: Rgb = [44, 12, 64];
+// A ring lets 0.3 of the night behind it through.
+const HEAD_RING_OPACITY = 0.7;
+const RING_ALPHA = Math.round(HEAD_RING_OPACITY * 255) / 255;
+// How far (redmean) a ring stays from the sky it is drawn on: the worst any ring reached on the
+// old flat night, measured by renderer:probe before the wash.
+const RING_FROM_SKY = 120;
 
 // Mirrored from `sim/src/lib.rs` (and `app/src/engine.ts`), where they decide when a crown
 // stops pollinating, when its petals let go, and — in `slow_step` — when it sows. The
@@ -90,24 +97,32 @@ export const SPECIES: readonly Species[] = [
 // stays in the cluster. Orange was tried first and lands 81 from the poppy; magenta is the
 // one direction with real room.
 
-export function emptyCellColor(cells: Uint8Array, width: number, height: number, x: number, y: number, time: number): Rgb {
-  const background: Rgb = [9, 14, 20];
+// Open air is the night wash behind the board (nightWash.ts), so air draws nothing of its own
+// unless something lights it or edges it: then it is a colour laid OVER the wash at an opacity,
+// which is what each of these was as a mix into the old flat night, to within a level (the
+// opacity is stored as a byte: 0.7 is 179/255).
+const CLEAR_AIR: Rgba = [0, 0, 0, 0];
+
+const overlay = (color: Rgb, opacity: number): Rgba => [color[0], color[1], color[2], Math.round(Math.max(0, Math.min(1, opacity)) * 255)];
+
+/** `backdrop` is the night this air is seen against; left out, the wash at (x, y). */
+export function airColor(cells: Uint8Array, width: number, height: number, x: number, y: number, time: number, backdrop?: Rgb): Rgba {
   if (kindAt(cells, width, height, x, y + 1) === MATERIAL.Ember) {
     const emberEnergy = readU16(cells, ((y + 1) * width + x) * 8 + 4);
     if (emberEnergy > 90) {
       const hash = hashCell(x, y, 3);
       const spark = Math.sin(time * 0.03 + hash * 1.7 + x * 0.9);
       if (spark > 0.92 && (hash & 3) === 0) {
-        return mixRgb(background, [255, 196, 90], 0.62);
+        return overlay([255, 196, 90], 0.62);
       }
     }
   }
   if (kindAt(cells, width, height, x, y + 1) === MATERIAL.Meteor) {
     const flicker = (Math.sin(time * 0.02 + x * 1.3) + 1) * 0.5;
-    return mixRgb(background, [255, 170, 80], 0.2 + flicker * 0.14);
+    return overlay([255, 170, 80], 0.2 + flicker * 0.14);
   }
   if (kindAt(cells, width, height, x, y + 2) === MATERIAL.Meteor) {
-    return mixRgb(background, [255, 150, 70], 0.1);
+    return overlay([255, 150, 70], 0.1);
   }
   const directions = [
     [0, -1],
@@ -130,11 +145,20 @@ export function emptyCellColor(cells: Uint8Array, width: number, height: number,
     const hash = hashCell(x, y, i);
     if ((hash & 3) === 0) {
       const twinkle = (Math.sin(time * 0.018 + hash * 0.0001) + 1) * 0.5;
-      return mixRgb(background, [255, 214, 138], 0.24 + twinkle * 0.16);
+      return overlay([255, 214, 138], 0.24 + twinkle * 0.16);
     }
   }
-  if (petal >= 0) return headRing(cells[petal + 1], readU16(cells, petal + 6), background);
-  return background;
+  if (petal >= 0) return overlay(headRing(cells[petal + 1], readU16(cells, petal + 6), backdrop ?? washAt(x, y)), HEAD_RING_OPACITY);
+  return CLEAR_AIR;
+}
+
+// Redmean, the colour distance renderer:probe and material:contrast measure in.
+function redmean([r1, g1, b1]: Rgb, [r2, g2, b2]: Rgb) {
+  const rm = (r1 + r2) / 2;
+  const dr = r1 - r2;
+  const dg = g1 - g2;
+  const db = b1 - b2;
+  return Math.sqrt((2 + rm / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rm) / 256) * db * db);
 }
 
 // A head's outline (the owner's pick from the design canvas, 2026-10-22): open air touching a
@@ -146,12 +170,34 @@ export function emptyCellColor(cells: Uint8Array, width: number, height: number,
 // moonlight, and gone into the night when charred, since a burnt head has no lit edge. The
 // states stack in `flowerColor`'s order, so frost on a charred petal frosts its ring too
 // (review: the ring stayed black, 20 from the night, round a petal drawn as pale frost).
-function headRing(variant: number, flags: number, background: Rgb): Rgb {
-  let ring = mixRgb(SPECIES[variant & 7].dark, HEAD_RING_SHADE, 0.42);
+//
+// The shade's violet push is the outline's depth on a dark night and its undoing on a bright
+// one: where the wash lays indigo or violet behind a blue, red or magenta head, a ring pushed
+// toward violet sinks into the sky (the bluebell's measured 75 from the violet wash, against 128
+// from the old night). So a ring gives back just as much of the push as keeps it RING_FROM_SKY
+// from the sky behind it, and no more. Distance is not linear in the mix (interpolating left a
+// bluebell ring at 117.9, review), so the give-back is searched for on the colour as composited. On the deep night, where the old flat night was, every
+// ring is the one the owner picked; a pale or golden head never needs to give any back, and
+// keeps the push that holds its ring darker than its petals.
+function headRing(variant: number, flags: number, behind: Rgb): Rgb {
+  const own = SPECIES[variant & 7].dark;
+  const pushed = mixRgb(own, HEAD_RING_SHADE, 0.42);
+  const fromSky = (giveBack: number) => redmean(mixRgb(behind, mixRgb(pushed, own, giveBack), RING_ALPHA), behind);
+  let ring = pushed;
+  if (fromSky(0) < RING_FROM_SKY && fromSky(1) > fromSky(0)) {
+    let enough = 1;
+    let short = 0;
+    for (let step = 0; step < 8; step++) {
+      const mid = (enough + short) / 2;
+      if (fromSky(mid) >= RING_FROM_SKY) enough = mid;
+      else short = mid;
+    }
+    ring = mixRgb(pushed, own, enough);
+  }
   if (flags & CELL_FLAG.Cosmic) ring = mixRgb(ring, STARLIGHT, 0.4);
   if (flags & CELL_FLAG.Scorched) ring = mixRgb(CHAR, BLACK, 0.3);
   if (flags & CELL_FLAG.Frozen) ring = mixRgb(FROST, ring, 0.55);
-  return mixRgb(ring, background, 0.3);
+  return ring;
 }
 
 export function applyShapeLanguage(context: ShapeContext): Rgb {
@@ -590,7 +636,7 @@ export const WELLSPRING_TINTS: Record<number, Rgb> = {
 function wellspringColor({ color, variant, energy, flags, time, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
   const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Wellspring);
-  // Dark basalt, lifted just enough to silhouette against the #091018 sky. It used to
+  // Dark basalt, lifted just enough to silhouette against the night (a flat #091018 then). It used to
   // be slate-BLUE, which was the whole problem: the block's own colour sat in the same
   // hue family as the water it pours, so an attuned spring measured 77 redmean from its
   // own fountain and disappeared into it. A near-neutral dark body means the remembered

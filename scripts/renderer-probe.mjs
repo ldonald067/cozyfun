@@ -39,6 +39,7 @@ const note = (line) => { if (!quiet) console.log(line); };
 const app = compileApp("probe-renderer", ["rendering/materialColor.ts", "materials.ts"]);
 const { colorForCell } = app.load("rendering/materialColor");
 const shape = app.load("rendering/shapeLanguage");
+const nightWash = app.load("rendering/nightWash");
 const { MATERIAL, CELL_FLAG, WELLSPRING_TAUGHT } = app.load("materials");
 
 // ------------------------------------------------------------------ the mirrored constants
@@ -104,7 +105,23 @@ const VARIANT_MODULUS = 8;
 }
 
 // ------------------------------------------------------------------------ rendered distance
-const NIGHT = [9, 14, 20]; // the tray's own background, #091018
+// The night is not one colour any more: open air shows the watercolour wash (nightWash.ts). A
+// floor "against the night" is held against every tone it reaches on the 220x140 board, as
+// cells see it: its darkest and brightest cells, and its most violet and most indigo.
+// WASH_TONES is every distinct colour the wash takes on that board, for a check cheap enough to
+// sweep all of them.
+const WASH_TONES = (() => {
+  const seen = new Map();
+  for (let y = 0; y < 140; y++) for (let x = 0; x < 220; x++) { const c = nightWash.washAt(x, y); seen.set(c.join(), c); }
+  return [...seen.values()];
+})();
+const NIGHTS = (() => {
+  const tones = WASH_TONES;
+  const luma = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  const pick = (score) => tones.reduce((a, b) => (score(b) > score(a) ? b : a));
+  const picked = [pick((c) => -luma(c)), pick(luma), pick(([r, g]) => r - g), pick(([r, , b]) => b - r)];
+  return picked.filter((c, i) => picked.findIndex((d) => d.join() === c.join()) === i);
+})();
 const redmean = ([r1, g1, b1], [r2, g2, b2]) => {
   const rm = (r1 + r2) / 2, dr = r1 - r2, dg = g1 - g2, db = b1 - b2;
   return Math.round(Math.sqrt((2 + rm / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rm) / 256) * db * db));
@@ -129,14 +146,15 @@ function grid(w, h) {
     paint(put);
     return cells;
   };
-  const colourAt = (cells, x, y, time) => {
+  // `backdrop` is the night an air cell is seen against; left out, the wash at (x, y).
+  const colourAt = (cells, x, y, time, backdrop) => {
     const o = (y * w + x) * STRIDE;
     return colorForCell({
       kind: cells[o], variant: cells[o + 1],
       age: cells[o + 2] | (cells[o + 3] << 8),
       energy: cells[o + 4] | (cells[o + 5] << 8),
       flags: cells[o + 6] | (cells[o + 7] << 8),
-      time, cells, width: w, height: h, x, y,
+      time, cells, width: w, height: h, x, y, backdrop,
     });
   };
   return { width: w, height: h, board, colourAt };
@@ -172,6 +190,29 @@ const crown = (variant, energy, age) => board((put) => {
 const crownColour = (variant, energy, age, time) => colourAt(crown(variant, energy, age), 12, 2, time);
 
 const checks = [];
+
+// What a harness measures air against (`washAt`, at a cell's centre) must be the wash a player
+// sees there. They are two code paths over the same fields: the bitmap interpolates them between
+// cell centres and adds grain. A cell's mean on the bitmap must sit within 2 levels of washAt in
+// every channel, or every "against the night" number below is measured against a sky no screen
+// shows.
+{
+  const painted = nightWash.paintNightWash(220, 140), s = nightWash.WASH_PX_PER_CELL;
+  let worst = 0, at = null;
+  for (let y = 0; y < 140; y++) for (let x = 0; x < 220; x++) {
+    const mean = [0, 0, 0];
+    for (let j = 0; j < s; j++) for (let i = 0; i < s; i++) {
+      const o = ((painted.board.y + y * s + j) * painted.width + painted.board.x + x * s + i) * 4;
+      for (let c = 0; c < 3; c++) mean[c] += painted.data[o + c] / (s * s);
+    }
+    const want = nightWash.washAt(x, y);
+    const off = Math.max(...mean.map((m, c) => Math.abs(m - want[c])));
+    if (off > worst) { worst = off; at = `cell (${x},${y}): painted ${mean.map(Math.round)}, measured ${want}`; }
+  }
+  if (worst > 2) failures.push(`the night wash on screen is ${worst.toFixed(1)} levels off the one harnesses measure, at ${at}`);
+  else checks.push({ label: `the wash harnesses measure is the wash on screen (worst ${worst.toFixed(1)} levels off)`, floor: 0, worst: 0, detail: "" });
+}
+
 // The heads the sim grows, read ONCE out of the engine: the shape check just below holds
 // them to the sim and the showcase, and the flower checks further down build their heads
 // from them.
@@ -249,9 +290,9 @@ function assertFloor(label, floor, worst, detail) {
 //    while every other element in the roster sits 185-578 from the night.
 {
   let worst = Infinity, at = null;
-  for (let e = 0; e <= shape.COLD_CHAR_ENERGY; e++) for (const t of TIMES) {
-    const d = redmean(bedMean(e, 0, t), NIGHT);
-    if (d < worst) { worst = d; at = `energy ${e}, time ${t}`; }
+  for (let e = 0; e <= shape.COLD_CHAR_ENERGY; e++) for (const t of TIMES) for (const night of NIGHTS) {
+    const d = redmean(bedMean(e, 0, t), night);
+    if (d < worst) { worst = d; at = `energy ${e}, time ${t}, night ${night}`; }
   }
   assertFloor("cold char vs the empty tray", 120, worst,
     `worst at ${at}. A hearth that burns out must read as spent, not erased.`);
@@ -689,7 +730,7 @@ function assertFloor(label, floor, worst, detail) {
   for (const [x, y] of CELLS) for (const e of [0, 60, 120]) for (const a of [0, 40, 200])
     for (const v of [0, 1, 2, 3]) for (const t of TIMES)
       rivals.push({ name: "stardust", c: colourAt(lone(MATERIAL.Stardust, x, y, e, a, v), x, y, t) });
-  rivals.push({ name: "the night sky", c: NIGHT });
+  for (const night of NIGHTS) rivals.push({ name: `the night sky (${night})`, c: night });
 
   let worst = Infinity, at = null;
   for (const r of rocks) for (const v of rivals) {
@@ -1062,17 +1103,26 @@ function assertFloor(label, floor, worst, detail) {
     STATES.push([["wet", "frozen", "moonlit", "charred"].filter((_, i) => m & (1 << i)).join("+") || "plain", flags.reduce((a, f) => a | f, 0)]);
   }
   let night = Infinity, nightAt = null, edge = Infinity, edgeAt = null;
+  // A ring's colour depends only on its species, its petal's state and the sky behind it, so its
+  // distance from the sky is swept over every distinct tone of the wash, at one placement. The
+  // four picked tones missed the true minimum (119 reported, 117.9 on one cell; review).
+  for (let v = 0; v < 8; v++) for (const [state, flags] of STATES) {
+    const cells = head(v, flags, POSITIONS[0], 90, true, [95, 200]);
+    const [x, y] = besideFlowers(cells, true)[0];
+    for (const behind of WASH_TONES) {
+      const d = redmean(colourAt(cells, x, y, 0, behind), behind);
+      if (d < night) { night = d; nightAt = `species ${v}, ${state}, night ${behind}`; }
+    }
+  }
   for (let v = 0; v < 8; v++) for (const [state, flags] of STATES) for (const p of POSITIONS) for (const e of [90, 60, 40]) {
     const cells = head(v, flags, p, e, true, [95, 200]);
     for (const t of TIMES) {
       const petals = ENGINE_BLOOM_SHAPES[v].map(([dx, dy]) => luma(colourAt(cells, p[0] + dx, p[1] + dy, t)));
       const headLuma = petals.reduce((a, b) => a + b, 0) / petals.length;
-      for (const [x, y] of besideFlowers(cells, true)) {
-        const ring = colourAt(cells, x, y, t);
-        const d = redmean(ring, NIGHT);
-        if (d < night) { night = d; nightAt = `species ${v}, ${state}, crown at ${p}, petal energy ${e}, cell (${x},${y})`; }
+      for (const [x, y] of besideFlowers(cells, true)) for (const behind of NIGHTS) {
+        const ring = colourAt(cells, x, y, t, behind);
         const step = Math.round(headLuma - luma(ring));
-        if (step < edge) { edge = step; edgeAt = `species ${v}, ${state}, crown at ${p}, petal energy ${e}, ring (${x},${y})`; }
+        if (step < edge) { edge = step; edgeAt = `species ${v}, ${state}, crown at ${p}, petal energy ${e}, ring (${x},${y}), night ${behind}`; }
       }
     }
   }
@@ -1083,8 +1133,8 @@ function assertFloor(label, floor, worst, detail) {
   let bare = 0, bareAt = null;
   for (let v = 0; v < 8; v++) for (const p of POSITIONS) for (const [stage, crown] of [["bud", [90, 20]], ["seed head", [0, 1400]]]) {
     const cells = head(v, 0, p, 0, false, crown);
-    for (const t of TIMES) for (const [x, y] of besideFlowers(cells, false)) {
-      const d = redmean(colourAt(cells, x, y, t), NIGHT);
+    for (const t of TIMES) for (const [x, y] of besideFlowers(cells, false)) for (const behind of NIGHTS) {
+      const d = redmean(colourAt(cells, x, y, t, behind), behind);
       if (d > bare) { bare = d; bareAt = `species ${v}, ${stage}, crown at ${p}, cell (${x},${y})`; }
     }
   }
@@ -1102,7 +1152,7 @@ if (!quiet) {
     const verdict = c.floor === null ? `(cap 24)` : `(floor ${c.floor})`;
     console.log(`  ${String(c.worst).padStart(4)}  ${verdict.padEnd(12)} ${c.label}`);
   }
-  console.log("\nDistances are redmean through the real renderer, against the #091018 tray.");
+  console.log("\nDistances are redmean through the real renderer; air is seen against the night wash's darkest, brightest, most violet and most indigo cells (a head's outline: against every tone the wash takes).");
 }
 
 if (failures.length) {

@@ -252,6 +252,8 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
 - `npm run icons:check`: fails when the committed site icons no longer match `scripts/make-favicon.mjs`. The generator colours the cornflower from `SPECIES[0]` and the Stem entry — **imported, not copied** — so a renderer or materials palette edit changes the icon, and this is what says so. Regenerate with `npm run icons`. Without it the generator and its committed output are simply two sources of truth wearing one coat.
 - `npm run renderer:probe`: calls the **shipped renderer as a pure function** and asserts the state pairs the design depends on, over the whole range the sim can produce rather than at one sample. `colorForCell` needs no browser, no capture and no sim, so this asks it directly and reports the WORST case over energy, age, species and a full time sweep.
 
+  Since the painted night (2026-10-29) open air is not one colour, so every floor "against the night" is held against the wash's darkest, brightest, most violet and most indigo cells, and `colorForCell` takes a `backdrop` to pin which. A head's outline is held against every distinct tone the wash takes, since four picked tones missed its true minimum by 2. It also holds the two wash code paths together: `washAt`, what every harness measures air against, must sit within 2 levels of the cell the bitmap paints. On its first run that check found 3.1 levels between them, where a tide line crossed part of a cell and `washAt` sampled only the centre.
+
   It exists because capture-based measurement misled a review three times in one pass, always the same way — comfortable numbers for things that were invisible, invisible numbers for things that were fine. A 10x10px box around one 4px cell is ~85% night sky, and read a bud and a spent seed head as 5-8 apart when the cells were 52-66. The showcase is a LIVE scene, so its "wet char" row is not reliably wet by the shutter: it measured 6 and then 30 redmean from dry char while the renderer was producing 30 and then 127. A photograph is the wrong instrument for a question about a pure function.
 
   It also closes a gap **four independent reviewers found**: the renderer mirrors `PETAL_SHED_AGE`, `POLLEN_RESERVE` and `COLD_CHAR_ENERGY` so a seed head is drawn under exactly the condition that makes it one, and ash is full exactly when the sim calls an ember out — but parity only compares Rust with `engine.ts`, and neither knew a third copy existed. The probe parses all three sources and fails when they disagree.
@@ -502,7 +504,12 @@ The root npm scripts are the entrypoints. Each has a Windows `.ps1` wrapper in `
   screen, in device pixels**, at nine window sizes and densities (1x at 960, 1024, 1280, 1440
   and 1920 wide, 1.5x, 2x at 1280 and 1440, and a 3x phone). Every line must cover the same
   width (spread under 0.5 device px), cells must be square to 0.6%, and the board must keep
-  at least 90% of the tray.
+  at least 90% of the tray. The night wash must reach every edge of the frame, so a snapped
+  board's margin is sky rather than a flat band: at those nine, and at 24 more sizes from a
+  280 px phone to 2560 wide at 1x and 2x, read off two rects with no screenshot. A fixed
+  16-cell margin fell 1 px short at 293 wide (review), which the sweep fails. The scan hides the wash, as it hides the glow
+  and the glass sheen: its grain moved the local floor a line is measured against, and with it
+  shown, snapped 3 px lines read 3.00-3.60 wide.
 
   It exists because the board was never drawn at a whole number of pixels a cell: 3.14 px at
   1024 wide, 3.2 at 1280, 3.93 at 1440. Nearest-neighbour at a fractional scale drew a

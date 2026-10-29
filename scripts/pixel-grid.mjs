@@ -59,6 +59,12 @@ const CASES = [
   { label: "390x820 @3x phone", width: 390, height: 820, dsf: 3, mobile: true }
 ];
 
+// The night wash must reach the frame at every size, not only the nine above: the margin a
+// snapped board leaves on its loose axis grows as the tray narrows (16.5 cells at 293 px wide,
+// past the 16 first painted; review). Cheap, since it reads two rects and takes no screenshot.
+const WASH_SWEEP = [280, 293, 320, 360, 414, 600, 768, 900, 1100, 1366, 1600, 2560].flatMap((width) =>
+  [1, 2].map((dsf) => ({ label: `${width} @${dsf}x`, width, height: Math.round(width * 0.75), dsf, mobile: width < 768 })));
+
 // Vertical one-cell lines in one band, horizontal ones in another, never touching. Wall never
 // moves, so the pattern is what the shutter sees.
 const V_BAND = { x0: 10, x1: 209, y0: 20, y1: 50 };
@@ -130,16 +136,24 @@ async function measure(cdp, testCase) {
   const box = await evaluate(cdp, `(() => {
     const tray = document.querySelector('[data-testid="sandbox-tray"]');
     const r = tray.getBoundingClientRect();
-    return { x: r.x + tray.clientLeft, y: r.y + tray.clientTop, width: tray.clientWidth, height: tray.clientHeight, dpr: devicePixelRatio };
+    // The night wash must reach every edge of the frame, a snapped board's margin included, or
+    // the margin draws a flat band round a painted sky: the CSS px it falls short on any side.
+    const w = document.querySelector('.wash-canvas').getBoundingClientRect();
+    const x = r.x + tray.clientLeft, y = r.y + tray.clientTop;
+    const washShort = Math.max(0, w.left - x, w.top - y, x + tray.clientWidth - w.right, y + tray.clientHeight - w.bottom);
+    return { x, y, width: tray.clientWidth, height: tray.clientHeight, dpr: devicePixelRatio, washShort };
   })()`);
-  // The glass sheen and the glow sit over the board; hide them so the scan reads the grid.
-  await evaluate(cdp, `(document.querySelectorAll('.glass-sheen, .glow-canvas').forEach((el) => { el.style.visibility = 'hidden'; }), true)`);
+  // The glass sheen and the glow sit over the board, and the night wash under it; hide all
+  // three so the scan reads the grid. The wash is not cells: its grain and tide lines move the
+  // "local background" a line is measured against (with it shown, 3 px snapped lines read
+  // 3.00-3.60 wide), while the cells' size on screen is the same either way.
+  await evaluate(cdp, `(document.querySelectorAll('.glass-sheen, .glow-canvas, .wash-canvas').forEach((el) => { el.style.visibility = 'hidden'; }), true)`);
   await sleep(150);
   const shot = await cdp.send("Page.captureScreenshot", {
     format: "png", fromSurface: true,
     clip: { x: box.x, y: box.y, width: box.width, height: box.height, scale: 1 }
   });
-  await evaluate(cdp, `(document.querySelectorAll('.glass-sheen, .glow-canvas').forEach((el) => { el.style.visibility = ''; }), true)`);
+  await evaluate(cdp, `(document.querySelectorAll('.glass-sheen, .glow-canvas, .wash-canvas').forEach((el) => { el.style.visibility = ''; }), true)`);
 
   // Where the board landed is read off the pattern on screen, never from how it was sized:
   // the top of the first band is cell row V_BAND.y0, the bottom of the last is the last
@@ -188,7 +202,7 @@ async function measure(cdp, testCase) {
     max: Math.max(...values)
   });
   return {
-    ...testCase, dpr: box.dpr, trayCss: [box.width, box.height],
+    ...testCase, dpr: box.dpr, trayCss: [box.width, box.height], washShort: box.washShort,
     v: stats(vertical), h: stats(horizontal),
     perScan: { v: vertical.length / scanned.scans[0], h: horizontal.length / scanned.scans[1] },
     aspect: scanned.pitchAcross / scanned.pitchDown,
@@ -201,6 +215,7 @@ async function main() {
   const target = await startAppTarget(distDir);
   const browser = await startBrowser({ profilePrefix: "cozy-pixel-grid-", windowSize: "1440,1080" });
   const results = [];
+  const washSweep = [];
   try {
     const cdp = await connectToFirstPage(browser.debugPort);
     await cdp.send("Page.enable");
@@ -214,6 +229,19 @@ async function main() {
     await evaluate(cdp, `document.querySelector('[aria-label="Pause simulation"]').click(), true`);
     await sleep(300);
     for (const testCase of CASES) results.push(await measure(cdp, testCase));
+    for (const testCase of WASH_SWEEP) {
+      await cdp.send("Emulation.setDeviceMetricsOverride", {
+        width: testCase.width, height: testCase.height, deviceScaleFactor: testCase.dsf, mobile: testCase.mobile
+      });
+      await sleep(400);
+      washSweep.push({ label: testCase.label, short: await evaluate(cdp, `(() => {
+        const tray = document.querySelector('[data-testid="sandbox-tray"]').getBoundingClientRect();
+        const t = document.querySelector('[data-testid="sandbox-tray"]');
+        const w = document.querySelector('.wash-canvas').getBoundingClientRect();
+        const x = tray.x + t.clientLeft, y = tray.y + t.clientTop;
+        return Math.max(0, w.left - x, w.top - y, x + t.clientWidth - w.right, y + t.clientHeight - w.bottom);
+      })()`) });
+    }
   } finally {
     await browser.close();
     await target.close();
@@ -235,7 +263,11 @@ async function main() {
     if (spreadH > SPREAD_LIMIT) failures.push(`${r.label}: one-cell lines run ${r.h.min.toFixed(2)}-${r.h.max.toFixed(2)} device px tall (spread ${spreadH.toFixed(2)} > ${SPREAD_LIMIT})`);
     if (Math.abs(r.aspect - 1) > ASPECT_LIMIT) failures.push(`${r.label}: cells are ${((r.aspect - 1) * 100).toFixed(2)}% wider than tall`);
     if (r.kept < KEPT_FLOOR) failures.push(`${r.label}: the board keeps ${(r.kept * 100).toFixed(0)}% of the tray, under ${KEPT_FLOOR * 100}%`);
+    if (r.washShort > 0.5) failures.push(`${r.label}: the night wash stops ${r.washShort.toFixed(1)} CSS px short of the frame (WASH_MARGIN in rendering/nightWash.ts)`);
   }
+  const washWorst = washSweep.reduce((a, b) => (b.short > a.short ? b : a), { short: 0, label: "none" });
+  console.log(`night wash against the frame, ${washSweep.length} more sizes: worst ${washWorst.short.toFixed(1)} CSS px short (${washWorst.label})`);
+  for (const w of washSweep) if (w.short > 0.5) failures.push(`${w.label}: the night wash stops ${w.short.toFixed(1)} CSS px short of the frame`);
   assert(failures.length === 0, `uneven pixels:\n  ${failures.join("\n  ")}`);
   console.log("pixel grid: every cell reaches the screen at one size, in every case");
 }

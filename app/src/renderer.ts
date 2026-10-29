@@ -1,7 +1,9 @@
 import type { SandboxEngine } from "./engine";
-import { CELL_STRIDE } from "./materials";
+import { CELL_STRIDE, MATERIAL } from "./materials";
 import { readU16 } from "./rendering/cells";
 import { colorForCell, glowColorFor, glowIntensity, hasGlow } from "./rendering/materialColor";
+import { paintNightWash } from "./rendering/nightWash";
+import { airColor } from "./rendering/shapeLanguage";
 
 type RenderTargets = {
   base: HTMLCanvasElement;
@@ -18,7 +20,8 @@ export function renderSandbox(engine: SandboxEngine, targets: RenderTargets, tim
   ensureCanvasSize(targets.glow, width, height);
   ensureCanvasSize(targets.motes, targets.motes.clientWidth || 800, targets.motes.clientHeight || 500);
 
-  const baseCtx = targets.base.getContext("2d", { alpha: false });
+  // Open air is left clear, so the night wash behind the board shows through it.
+  const baseCtx = targets.base.getContext("2d", { alpha: true });
   const glowCtx = targets.glow.getContext("2d", { alpha: true });
   if (!baseCtx || !glowCtx) return;
 
@@ -36,6 +39,14 @@ export function renderSandbox(engine: SandboxEngine, targets: RenderTargets, tim
     const energy = readU16(cells, cellOffset + 4);
     const flags = readU16(cells, cellOffset + 6);
     const pixelOffset = i * 4;
+    if (kind === MATERIAL.Empty) {
+      const air = airColor(cells, width, height, x, y, time);
+      base.data[pixelOffset] = air[0];
+      base.data[pixelOffset + 1] = air[1];
+      base.data[pixelOffset + 2] = air[2];
+      base.data[pixelOffset + 3] = air[3];
+      continue;
+    }
     const color = colorForCell({ kind, variant, age, energy, flags, time, cells, width, height, x, y });
 
     base.data[pixelOffset] = color[0];
@@ -60,14 +71,18 @@ export function renderSandbox(engine: SandboxEngine, targets: RenderTargets, tim
   // blown up nearest-neighbour to a whole multiple here, and the browser scales that down.
   const display = targets.display;
   if (display && !display.hidden) {
-    const displayCtx = display.getContext("2d", { alpha: false });
+    const displayCtx = display.getContext("2d", { alpha: true });
     if (displayCtx) {
       displayCtx.imageSmoothingEnabled = false;
+      displayCtx.clearRect(0, 0, display.width, display.height);
       displayCtx.drawImage(targets.base, 0, 0, display.width, display.height);
     }
   }
   drawMotes(targets.motes, time);
 }
+
+/** The canvases a capture composites: the wash behind, the board's pixels, the glow over them. */
+export type BoardLayers = { base: HTMLCanvasElement; glow: HTMLCanvasElement; wash: HTMLCanvasElement };
 
 export type PostcardOptions = {
   sceneTitle: string;
@@ -75,7 +90,36 @@ export type PostcardOptions = {
   soundSource: string;
 };
 
-export async function exportPostcard(engine: SandboxEngine, base: HTMLCanvasElement, glow: HTMLCanvasElement, options: PostcardOptions) {
+/**
+ * Paint the night wash into the canvas behind the board, with `margin` cells of sky round it. It
+ * is still, so this runs only when the frame needs more sky; `data-board` records where the board
+ * sits in it, for captures that draw the two together.
+ */
+export function paintWashCanvas(canvas: HTMLCanvasElement, cols: number, rows: number, margin: number) {
+  const wash = paintNightWash(cols, rows, margin);
+  canvas.width = wash.width;
+  canvas.height = wash.height;
+  const ctx = canvas.getContext("2d", { alpha: false });
+  if (!ctx) return;
+  ctx.putImageData(new ImageData(wash.data, wash.width, wash.height), 0, 0);
+  const { x, y, width, height } = wash.board;
+  canvas.dataset.board = `${x},${y},${width},${height}`;
+  canvas.dataset.margin = String(margin);
+}
+
+/** The board's part of the wash, into a capture's scene rectangle, under the base. */
+function drawWash(ctx: CanvasRenderingContext2D, wash: HTMLCanvasElement, dx: number, dy: number, dw: number, dh: number) {
+  const [x, y, width, height] = (wash.dataset.board ?? "").split(",").map(Number);
+  if (!(width > 0 && height > 0)) return;
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(wash, x, y, width, height, dx, dy, dw, dh);
+  ctx.restore();
+}
+
+export async function exportPostcard(engine: SandboxEngine, layers: BoardLayers, options: PostcardOptions) {
+  const { base, glow, wash } = layers;
   const scale = 3;
   const width = base.width * scale;
   const height = base.height * scale;
@@ -100,6 +144,7 @@ export async function exportPostcard(engine: SandboxEngine, base: HTMLCanvasElem
   ctx.fill();
   ctx.strokeStyle = "rgba(255, 224, 170, 0.18)";
   ctx.stroke();
+  drawWash(ctx, wash, margin, margin, width, height);
   ctx.drawImage(base, margin, margin, width, height);
   // Glow blooms additively over the base, matching the live .glow-canvas layer.
   ctx.save();
@@ -126,9 +171,10 @@ export async function exportPostcard(engine: SandboxEngine, base: HTMLCanvasElem
   await downloadCanvas(card, `${exportSlug(options.sceneTitle)}-${dateStamp()}.png`, "image/png");
 }
 
-export async function exportClip(engine: SandboxEngine, base: HTMLCanvasElement, glow: HTMLCanvasElement, options: PostcardOptions) {
+export async function exportClip(engine: SandboxEngine, layers: BoardLayers, options: PostcardOptions) {
   if (!("MediaRecorder" in window) || !("captureStream" in HTMLCanvasElement.prototype)) return false;
 
+  const { base } = layers;
   const scale = 3;
   const canvas = document.createElement("canvas");
   canvas.width = base.width * scale;
@@ -167,7 +213,7 @@ export async function exportClip(engine: SandboxEngine, base: HTMLCanvasElement,
 
   await new Promise<void>((resolve) => {
     const draw = (time: number) => {
-      drawClipFrame(ctx, canvas, base, glow, engine, options);
+      drawClipFrame(ctx, canvas, layers, engine, options);
       if (time - started >= duration) {
         resolve();
         return;
@@ -206,14 +252,14 @@ function downloadBlob(blob: Blob, filename: string) {
 function drawClipFrame(
   ctx: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
-  base: HTMLCanvasElement,
-  glow: HTMLCanvasElement,
+  { base, glow, wash }: BoardLayers,
   engine: SandboxEngine,
   options: PostcardOptions
 ) {
   const sceneHeight = canvas.height - 74;
   ctx.fillStyle = "#0d121b";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  drawWash(ctx, wash, 0, 0, canvas.width, sceneHeight);
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(base, 0, 0, canvas.width, sceneHeight);
   // Glow blooms additively over the base, matching the live .glow-canvas layer.

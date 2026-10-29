@@ -1,4 +1,6 @@
 export type Rgb = [number, number, number];
+/** A colour laid over what is behind it; alpha 0-255, as ImageData stores it. */
+export type Rgba = [number, number, number, number];
 
 export function clampColor(value: number) {
   return Math.max(0, Math.min(255, Math.round(value)));

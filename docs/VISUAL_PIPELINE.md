@@ -4,7 +4,8 @@ The sandbox renders as a grid of cells, but the grid does not need to look flat.
 
 ## Layers
 
-- Base canvas: crisp pixel data for the simulation, always one pixel a cell (220x140), which every export, capture and audit reads.
+- Wash canvas: the painted night behind the board (`rendering/nightWash.ts`, the owner's B2, 2026-10-29), a still watercolour of deep blue, indigo and violet with dried tide lines and paper grain, painted at 4 px a cell with at least 16 cells of sky past each edge, and more when the frame leaves a wider margin (`washMarginFor`), so a snapped board's margin is sky too. Postcard, clip and visual QA draw the board's part of it under the base. Harnesses measure air against `washAt(x, y)`, the same pixels averaged per cell.
+- Base canvas: crisp pixel data for the simulation, always one pixel a cell (220x140), which every export, capture and audit reads. Open air is transparent in it; a lit or outlined air cell (ember sparks, a meteor's halo, stardust's twinkle, a head's outline) is a colour laid over the wash at an opacity.
 - Display canvas: what is shown instead of the base under the "smooth" fit — the base blown up nearest-neighbour to the next whole multiple, which the browser scales down to fill the tray. Where the board sits, and which of the two is shown, is `rendering/pixelFit.ts`: every cell must reach the screen at one size, and `npm run pixels:even` measures that on screen. Below 2x, where it keeps at least 90% of the board, the base is shown instead at a whole number of device pixels a cell, centred ("snap"); everywhere else the fit smooths.
 - Glow canvas: blurred additive-feeling light for fire, lava, ember, steam, stardust, meteor, moonwater, pollen, flowers, cosmic moss, and firework sparks. Four materials reach it only in a particular state — an attuned wellspring, a lit rocket grain, glass while the vitrify flash is still cooling (`age < 70`), and constellation-etched stone — so `hasGlow` is a predicate over `(kind, flags, energy, age)`, not a set membership test.
 - Motes canvas: full-screen room dust, separate from the simulation.
@@ -248,13 +249,22 @@ Shape language is intentionally procedural:
   size: open air touching a petal is drawn in the plant's dark colour pushed toward a deep
   violet (a hue-shifted shadow, not grey) and a third of the way to the night, which takes the
   spread to **133** and draws a head nine cells wide instead of seven. It lives in
-  `emptyCellColor`, read in the same neighbour pass as stardust's twinkle: 0.15 ms a frame on the
+  `airColor`, read in the same neighbour pass as stardust's twinkle: 0.15 ms a frame on the
   full board, against 0.42 ms for a loop of its own. Only petals are ringed, never a rooted
   crown, so a bud and a seed head stay one cell on a stalk, and the ring follows the petal's
   weather (frosted, silvered by moonlight, gone into the dark when charred). Every petal colour,
   and so every flower gate above, is untouched. `renderer:probe` gate 13 holds the ring at least
   110 from the night (120 swept), 40 darker than its head's mean petal (46), and absent round a
-  bud and a seed head. The comparison is with the head's mean, not the petal it touches: a
+  bud and a seed head. On the painted night (2026-10-29) that floor is held against the wash's
+  brightest and most violet cells as well as its darkest: there the violet push sank the
+  bluebell's, poppy's and cosmos's rings into the sky (75 from the violet wash). So a ring gives
+  back only as much of its push as keeps it 120 from the sky behind it (`RING_FROM_SKY`); on the
+  deep night every ring is the one picked, and a pale or golden head never gives any back, since
+  the push is what holds its ring darker than its petals (unpushed, a wet sunflower's ring came
+  within 3 of its head). The owner picked this over rings the sky shows through, from
+  `.tmp/nightsky/outline-options.png`. Swept over every tone the wash takes: 120 from the
+  night, 42 darker than the head.
+  The comparison is with the head's mean, not the petal it touches: a
   poppy's blotch and a sunflower's disc reach the rim and are darker than the ring, as a mark
   should be. Three other candidates were drawn and not picked: lighting each head from above
   (spread 118, hard to see at play size, and the daisy's white undersides go grey), a deep rim

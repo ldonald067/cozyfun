@@ -180,16 +180,20 @@ async function saveSandboxComposite(cdp, fileName) {
     `(() => {
       const base = document.querySelector(".base-canvas");
       const glow = document.querySelector(".glow-canvas");
-      if (!base || !glow) return null;
+      const wash = document.querySelector(".wash-canvas");
+      if (!base || !glow || !wash) return null;
+      const [wx, wy, ww, wh] = (wash.dataset.board ?? "").split(",").map(Number);
+      if (!(ww > 0 && wh > 0)) return null;
       const scale = 4;
       const canvas = document.createElement("canvas");
       canvas.width = base.width * scale;
       canvas.height = base.height * scale;
       const context = canvas.getContext("2d");
       if (!context) return null;
+      // Open air is clear in the base: the night wash behind it is what players see there.
+      context.imageSmoothingQuality = "high";
+      context.drawImage(wash, wx, wy, ww, wh, 0, 0, canvas.width, canvas.height);
       context.imageSmoothingEnabled = false;
-      context.fillStyle = "#091018";
-      context.fillRect(0, 0, canvas.width, canvas.height);
       context.drawImage(base, 0, 0, canvas.width, canvas.height);
       // Glow blooms additively over the base, mirroring the live .glow-canvas layer
       // in styles.css (screen blend, blur 16px, saturate 1.35, opacity 0.9) so a
