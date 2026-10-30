@@ -2,8 +2,8 @@
 
 *Rewritten at each handoff, never appended to. Shipped work lives in `git log`, whose commit
 messages carry each batch's measurements. Written 2026-10-30, after water learned to move
-(`7f97074`, `b8127a4`): a calm body with drifting currents, depth as real absorption, and
-streams that stretch and whiten as they fall. Nothing else is in flight.*
+(`7f97074`, `b8127a4`) and heat became one scale (`1d56966`): fire, lava, embers, smoke and steam
+drawn as the real thing. Nothing else is in flight.*
 
 ## Keep chats lean
 
@@ -27,11 +27,12 @@ The owner hits usage limits early.
 ## What to do next
 
 **The owner's direction (2026-10-30): "a mix of realism but still pixel art" for every element,
-one batch at a time, in this order.** (1) Heat: fire, ember, lava, smoke, steam. (2) Moonwater, oil.
-(3) Solids: stone, sand, soil, ice, glass, wood, wall. (4) Living things. (5) Stardust, meteor, rocket,
+one batch at a time, in this order.** (1) Heat: fire, ember, lava, smoke, steam, DONE. (2) Moonwater,
+oil, NEXT. (3) Solids: stone, sand, soil, ice, glass, wood, wall. (4) Living things. (5) Stardust, meteor, rocket,
 spark. The recipe is water's: pick the one or two things that make the real material look real, draw
-only those in the cells the sim already makes, show a MOVING side-by-side (`.tmp/water/tune.mjs` with
-`sheet.py`), and gate it from painted materials. Most interactions improve with their materials; the
+only those in the cells the sim already makes, show a MOVING side-by-side (`.tmp/heat2/film.mjs` with
+`sheet.py`), gate it from painted materials, and set each floor between the build and a sabotage
+(`.tmp/heat2/sab.py`). Do not skip the sabotages: every batch so far had a check that passed on nothing. Most interactions improve with their materials; the
 one shared idea left is light that fades with distance. Fire, lava and oil must keep their flicker,
 crust and sheen: an earlier painted pass lost them and was ruled out. Time it on a phone early, because
 each batch adds cost.
@@ -64,6 +65,11 @@ each batch adds cost.
   heaps under a pour and levels in about 15 s; that is how it moves, not how it is drawn, and changing
   it is a sim decision the owner has not taken. Moonwater is unchanged.
 - Water's cost was timed in Node only: 9.3 to 12.5 ms a frame on a board two-thirds deep water.
+- **Heat's edges** (2026-10-30). Smoke from a fire and steam off water are still dotted columns: the
+  sim emits them a cell at a time, and only a sim change makes a plume, as steam's puffs did. Fire's
+  tray swatch keeps the old palette colour; only the board changed. Spark, meteor and rocket are not on
+  the heat scale yet. Heat's last fixes passed the gate and sabotages but had no fresh review. Timed
+  in Node only: 8.3 to 7.2 ms a frame on a board of lava, smoke and fire, cheaper than before.
 - **Big heads, the edges of taking turns** (2026-10-29). A bud waits for a neighbour of another
   species until its last petal has gone, but for one of its own species only until the petals
   round that crown have gone: two heads of one species cannot be told apart cell by cell, and
@@ -100,6 +106,9 @@ each batch adds cost.
 
 All by the owner, after seeing pictures or measurements:
 
+- **Heat is one scale** (2026-10-30), from a moving side-by-side (`.tmp/heat2/heat-tuned.gif`).
+  `docs/VISUAL_PIPELINE.md` has the rules. Lava is mostly dark skin with heat breaking through: bright
+  all over read as a heater and as fire. A log keeps the glowing cracks picked on 2026-10-28.
 - **Water moves, and behaves like real water** (2026-10-30), from a moving side-by-side
   (`.tmp/water/currents-tuned.gif`): "currents" over a painted wash and today's look, then depth and
   streaks retuned on the owner's word. `docs/VISUAL_PIPELINE.md` has the rules and their reasons.
@@ -320,8 +329,11 @@ publish against a stale version is refused.
 Nothing backs these up. Each script's header gives its purpose and arguments; read the header,
 not this list.
 
-- **Water:** `.tmp/water/` — `tune.mjs` + `sheet.py` (three looks, moving, the template for each new
-  batch: `base` and `prev` are `git archive` copies of `app/src`), `mock.mjs` (the first mock; its streaks
+- **Heat:** `.tmp/heat2/` — `film.mjs` + `sheet.py` (today against the build, moving, the template for
+  each new batch: `base` is a `git archive` copy of `app/src`), `sab.py` (sabotage table; it edits the
+  real renderer and a hard kill leaves it broken, so diff against `shapeLanguage.keep.ts`), `perf.mjs`,
+  `lavaenergy.mjs` (how lava's energy falls in play).
+- **Water:** `.tmp/water/` — `tune.mjs` + `sheet.py` (three looks, moving), `mock.mjs` (the first mock; its streaks
   never drew), `sab.py` (sabotage table; it edits the real renderer and a hard kill leaves it broken,
   so diff against `shapeLanguage.keep.ts`), `airdark.mjs` (airborne water on real pours), `perf.mjs`.
 - **Filmstrips:** `.tmp/film/film.mjs <scene> [seed]` draws the base build above the working
