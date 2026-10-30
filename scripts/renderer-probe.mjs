@@ -1173,7 +1173,10 @@ function assertFloor(label, floor, worst, detail) {
 {
   const { createFallbackEngine } = compileApp("probe-engine", ["engine.ts", "materials.ts"]).load("engine");
   const W = 96, H = 56, POUR_ENDS = 480, SETTLED = 1600;
-  const FALL_FLOOR = 110, SURFACE_FLOOR = 100, BODY_FLOOR = 70, BODY_STEP_CAP = 55;
+  const FALL_FLOOR = 80, SURFACE_FLOOR = 100, BODY_FLOOR = 70, BODY_STEP_CAP = 55;
+  // Real water, the owner's word (2026-10-30). Depth is absorption, so a tone falls fast and then
+  // flattens; a stream whitens as it falls and its strands stretch as gravity spreads them.
+  const DEEP_GAP_FLOOR = 40, DEEP_NIGHT_FLOOR = 120, WHITENS_FLOOR = 12, STRETCH_FLOOR = 1.3, FLASH_CAP = 0.75, STRIPE_CAP = 8, STREAM_DARK_FLOOR = 85, MASS_DARK = 70, MASS_DARK_CAP = 0.02;
   // Foam is the one bright water that holds still: a glint or a dash passes, and the plain body
   // never gets this bright. A brightness bar alone sat above the foam it was hunting (185-207).
   const FOAM_LUM = 150, FOAM_SWING = 30;
@@ -1257,6 +1260,119 @@ function assertFloor(label, floor, worst, detail) {
     if (inBottle < 200) failures.push(`the sealed bottle holds ${inBottle} cells of water: the scene has leaked, so it proves nothing.`);
     b.dispose();
   }
+  // Depth, from a painted pond: the tone per row, averaged over the clock and the width.
+  const d = createFallbackEngine(W, H, 21);
+  for (let x = 30; x <= 90; x++) d.paint(x, 52, 0, MATERIAL.Wall, 100);
+  for (let y = 16; y <= 52; y++) { d.paint(30, y, 0, MATERIAL.Wall, 100); d.paint(90, y, 0, MATERIAL.Wall, 100); }
+  for (let x = 33; x <= 87; x++) for (let y = 22; y <= 50; y++) d.paint(x, y, 0, MATERIAL.Water, 100);
+  for (let t = 0; t < 400; t++) d.tick();
+  const pond = d.getCellBytes();
+  let surface = 0;
+  for (let y = 1; y < H && !surface; y++) if (pond[(y * W + 60) * 8] === MATERIAL.Water) surface = y;
+  const toneAt = (depth) => { let sum = 0, n = 0; for (let x = 40; x <= 80; x += 3) { const tones = clockOf(pond, x, surface + depth); sum += tones.reduce((a, c) => a + lum(c), 0); n += tones.length; } return sum / n; };
+  const [near, middle, far] = [toneAt(3), toneAt(11), toneAt(23)];
+  let deepNight = Infinity;
+  for (const tone of clockOf(pond, 60, surface + 23)) for (const behind of [nightWash.WASH_DEEP, nightWash.WASH_INDIGO, nightWash.WASH_VIOLET]) deepNight = Math.min(deepNight, redmean(tone, behind));
+  d.dispose();
+  // A tall fall: the stream, row by row, by what the cells are and where they are.
+  const f = createFallbackEngine(W, H, 22);
+  for (let x = 4; x <= 30; x++) f.paint(x, 6, 0, MATERIAL.Wall, 100);
+  for (let y = 2; y <= 6; y++) f.paint(4, y, 0, MATERIAL.Wall, 100);
+  for (let x = 20; x <= 70; x++) f.paint(x, 52, 0, MATERIAL.Wall, 100);
+  for (let y = 34; y <= 52; y++) { f.paint(20, y, 0, MATERIAL.Wall, 100); f.paint(70, y, 0, MATERIAL.Wall, 100); }
+  for (let x = 23; x <= 67; x++) for (let y = 38; y <= 50; y++) f.paint(x, y, 0, MATERIAL.Water, 100);
+  let whitens = -Infinity, stretch = 0, frames = 0, flash = 0, stripe = Infinity, stripeSeen = 0, streamDark = Infinity, streamCells = 0;
+  const part = { upper: { sum: 0, cells: 0 }, lower: { sum: 0, cells: 0 } };
+  const avg = (r) => r.reduce((a, v) => a + v, 0) / r.length;
+  // A thread has gaps, so one frame is not enough of a stream to judge: this reads several.
+  for (let t = 1; t <= 400; t++) {
+    if (t % 3 === 0) f.paint(12, 1, 1, MATERIAL.Water, 100);
+    f.tick();
+    if (t < 240 || t % 2) continue;
+    const stream = f.getCellBytes();
+    // Every water cell in the open air, clumps included: nothing up here is deep.
+    for (let y = 10; y < 33; y++) for (let x = 26; x < 44; x++) {
+      if (stream[(y * W + x) * 8] !== MATERIAL.Water) continue;
+      streamCells++;
+      streamDark = Math.min(streamDark, avg(clockOf(stream, x, y).slice(0, 8).map(lum)));
+    }
+    if (t < 300 || t % 10) continue;
+    const rows = { upper: [], lower: [] };
+    for (let y = 10; y < 33; y++) for (let x = 26; x < 40; x++) {
+      if (stream[(y * W + x) * 8] !== MATERIAL.Water) continue;
+      rows[y < 21 ? "upper" : "lower"].push(clockOf(stream, x, y).map(lum));
+      break;
+    }
+    if (rows.upper.length < 5 || rows.lower.length < 5) continue;
+    frames++;
+    for (const name of ["upper", "lower"]) {
+      part[name].sum += rows[name].reduce((a, r) => a + avg(r), 0);
+      part[name].cells += rows[name].length;
+    }
+    // The pond under the stream against the pond beside it, on the same rows.
+    const fellAt = (() => { for (let x = 26; x < 40; x++) if (stream[(30 * W + x) * 8] === MATERIAL.Water) return x; return -1; })();
+    if (fellAt >= 0) {
+      const mean = (x, y) => avg(clockOf(stream, x, y).map(lum));
+      let under = 0, beside = 0;
+      // Close neighbours: a heap under a fall is real depth, and it is broad. A stripe is narrow.
+      for (let y = 42; y <= 48; y++) { under += mean(fellAt, y); beside += (mean(fellAt - 3, y) + mean(fellAt + 3, y)) / 2; }
+      stripe = Math.min(stripe, (under - beside) / 7);
+      stripeSeen++;
+    }
+  }
+  if (frames >= 5) whitens = part.lower.sum / part.lower.cells - part.upper.sum / part.upper.cells;
+  // Gravity, on a thread with no gaps: the painted stream above proves a stream gets its fall, and
+  // its gaps would make this count noise. Strands spread out as they drop, and they run.
+  const TW = 21, TH = 52, thread = new Uint8Array(TW * TH * 8);
+  const lay = (x, y) => { thread[(y * TW + x) * 8] = MATERIAL.Water; };
+  for (let x = 6; x <= 14; x++) lay(x, 0);
+  for (let y = 1; y < TH - 1; y++) lay(10, y);
+  const lineOf = (from, to, c) => { const line = []; for (let y = from; y < to; y++) line.push(lum(colorForCell({ kind: MATERIAL.Water, variant: 0, age: 0, energy: 0, flags: 0, time: CLOCK[c], cells: thread, width: TW, height: TH, x: 10, y }))); return line; };
+  // Peaks, not a brightness bar: the stream whitens along this stretch, so one bar misses its top.
+  const strands = (from, to) => { let peaks = 0; CLOCK.forEach((_, c) => { const line = lineOf(from, to, c); for (let i = 1; i < line.length - 1; i++) if (line[i] > line[i - 1] && line[i] >= line[i + 1] && line[i] - Math.min(...line.slice(Math.max(0, i - 3), i + 4)) > 8) peaks++; }); return peaks; };
+  const [above, below] = [strands(5, 20), strands(25, 40)];
+  stretch = above / Math.max(1, below);
+  CLOCK.forEach((_, c) => { const line = lineOf(25, 40, c); const bar = Math.min(...line) + 25; flash = Math.max(flash, line.filter((v) => v > bar).length / line.length); });
+  // Clumps in a stream, near enough the lip for a column to reach the pool above. Sizes up to what
+  // a held brush drops: the sim makes these, and nothing about one is the bottom of a lake.
+  for (const tall of [2, 4, 8, 12]) {
+    for (let x = 9; x <= 11; x++) for (let y = 12; y < 40; y++) { if (x !== 10) thread[(y * TW + x) * 8] = 0; }
+    for (let x = 9; x <= 11; x++) for (let y = 12; y < 12 + tall; y++) lay(x, y);
+    for (let y = 12; y < 12 + tall; y++) for (let c = 0; c < CLOCK.length; c += 4) streamDark = Math.min(streamDark, lum(colorForCell({ kind: MATERIAL.Water, variant: 0, age: 0, energy: 0, flags: 0, time: CLOCK[c], cells: thread, width: TW, height: TH, x: 10, y })));
+  }
+  // A held big brush, painted as the app paints water. Its body stays a mass in the air, so this
+  // measures the share of that drawn as dark as the deep end of a pond.
+  const mass = createFallbackEngine(W, H, 23);
+  for (let x = 2; x < W - 2; x++) mass.paint(x, H - 3, 0, MATERIAL.Wall, 100);
+  let aloft = 0, aloftDark = 0;
+  for (let t = 1; t <= 120; t++) {
+    if (t % 3 === 0) mass.paint(48, 8, 12, MATERIAL.Water, 55);
+    mass.tick();
+    if (t < 30 || t % 10) continue;
+    const cells = mass.getCellBytes();
+    for (let y = 2; y < 40; y++) for (let x = 2; x < W - 2; x++) {
+      if (cells[(y * W + x) * 8] !== MATERIAL.Water) continue;
+      let down = y + 1;
+      while (down < H && cells[(down * W + x) * 8] === MATERIAL.Water) down++;
+      if (down >= H || cells[(down * W + x) * 8] !== MATERIAL.Empty) continue;
+      aloft++;
+      if (lum(clockOf(cells, x, y)[0]) < MASS_DARK) aloftDark++;
+    }
+  }
+  mass.dispose();
+  const aloftShare = aloft ? aloftDark / aloft : 1;
+  f.dispose();
+  note(`Water's depth and fall: luminance ${near.toFixed(0)} near, ${middle.toFixed(0)} middle, ${far.toFixed(0)} deep; deepest ${deepNight} off the night; stream ${whitens.toFixed(0)} brighter in its lower half, ${stretch.toFixed(2)}x more strands high on a thread than low on it, at most ${(flash * 100).toFixed(0)}% of its low stretch lit at once, darkest of ${streamCells} airborne cells ${streamDark.toFixed(0)}, ${(aloftShare * 100).toFixed(2)}% of ${aloft} cells of a held brush's mass drawn deep; the pond under it ${stripe.toFixed(0)} off the pond beside it.`);
+  if (!(near - far >= DEEP_GAP_FLOOR)) failures.push(`deep water: luminance ${near.toFixed(0)} near the surface and ${far.toFixed(0)} deep, gap under ${DEEP_GAP_FLOOR}. Depth has stopped showing.`);
+  if (!(near - middle > middle - far)) failures.push(`deep water falls ${(near - middle).toFixed(0)} then ${(middle - far).toFixed(0)}: absorption is fast near the surface and flattens. This is a straight fade.`);
+  if (!(deepNight >= DEEP_NIGHT_FLOOR)) failures.push(`deep water is ${deepNight} off the night sky, floor ${DEEP_NIGHT_FLOOR}. The bottom of a pond has sunk into the sky.`);
+  if (!(whitens >= WHITENS_FLOOR)) failures.push(`a falling stream is only ${whitens.toFixed(0)} brighter in its lower half, floor ${WHITENS_FLOOR}. It has stopped taking on air.`);
+  if (!(flash > 0 && flash <= FLASH_CAP)) failures.push(`${(flash * 100).toFixed(0)}% of a stream's lower half lit at once, cap ${FLASH_CAP * 100}%. It is flashing as one, not running.`);
+  if (!(stripeSeen >= 3 && Number.isFinite(stripe))) failures.push(`the pond under a stream was compared on ${stripeSeen} frames: this check has seen nothing.`);
+  if (!(stripe >= -STRIPE_CAP)) failures.push(`the pond under a stream is ${stripe.toFixed(0)} darker than the pond beside it, cap ${STRIPE_CAP}: the stream is counting as depth.`);
+  if (!(aloft >= 500 && aloftShare <= MASS_DARK_CAP)) failures.push(`${(aloftShare * 100).toFixed(1)}% of ${aloft} cells of a falling mass draw as deep as a pond's floor, cap ${MASS_DARK_CAP * 100}%.`);
+  if (!(streamCells >= 200 && streamDark >= STREAM_DARK_FLOOR)) failures.push(`the darkest of ${streamCells} airborne water cells is ${streamDark.toFixed(0)}, floor ${STREAM_DARK_FLOOR}: water in the air is drawing as deep water.`);
+  if (!(stretch >= STRETCH_FLOOR)) failures.push(`a falling stream has ${stretch.toFixed(2)}x more strands a row near the lip than below, floor ${STRETCH_FLOOR}. Gravity has stopped stretching them.`);
   note(`\nWater on a painted pour, worst of 3 seeds: falling swing ${worst.fall.toFixed(0)} (floor ${FALL_FLOOR}), surface ${worst.surface.toFixed(0)} (floor ${SURFACE_FLOOR}), body ${worst.body.toFixed(0)} (floor ${BODY_FLOOR}), body step ${worst.step.toFixed(0)} (cap ${BODY_STEP_CAP}), foam ${worst.foamPour} cells under a pour, ${worst.foamSettled} on the settled pond, ${worst.foamBottle} in a sealed bottle.`);
   if (!(worst.fall >= FALL_FLOOR)) failures.push(`falling water: mean swing over the clock ${worst.fall.toFixed(0)}, floor ${FALL_FLOOR}. A stream has stopped showing its streaks.`);
   if (!(worst.surface >= SURFACE_FLOOR)) failures.push(`a pond's surface: mean swing ${worst.surface.toFixed(0)}, floor ${SURFACE_FLOOR}. Glints have stopped travelling.`);

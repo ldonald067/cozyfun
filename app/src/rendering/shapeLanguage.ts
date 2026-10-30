@@ -1616,9 +1616,16 @@ const STARDUST_SHEEN: Rgb[] = [
 // Plain water moves as a body, not cell by cell: the owner's pick from a moving mock of a pour
 // (2026-10-30, "currents"). None of this is sim state. It reads neighbours and the clock, so a
 // still pond keeps drifting, and it is drawn under the contact tints so every cue stays on top.
-const WATER_SHALLOW: Rgb = [78, 146, 228];
-const WATER_DEEP: Rgb = [42, 92, 176];
-const WATER_DEPTH_CELLS = 8;
+// Depth is absorption, as in real water: red goes first, then green, and blue last, so a tone
+// falls fast near the surface and flattens toward deep blue. A straight fade reads as a gradient.
+const WATER_DEPTH_CELLS = 20;
+const WATER_SHALLOW: Rgb = [104, 184, 232];
+const WATER_DEEP: Rgb = [10, 40, 112];
+const WATER_ABSORPTION: Rgb = [0.22, 0.13, 0.07];
+const WATER_DEPTH_TONE: Rgb[] = Array.from({ length: WATER_DEPTH_CELLS + 2 }, (_, depth) =>
+  WATER_SHALLOW.map((c, i) => Math.round(WATER_DEEP[i] + (c - WATER_DEEP[i]) * Math.exp(-WATER_ABSORPTION[i] * depth))) as Rgb);
+// A stream is at its whitest after this fall.
+const WATER_WHITE_CELLS = 20;
 
 // Open air beside a one-wide column. Without it the still neck of a sealed bottle read as a
 // stream: dashes down the neck and foam at its foot, for ever.
@@ -1626,6 +1633,58 @@ function threadBesideAir(cells: Uint8Array, width: number, height: number, x: nu
   const left = kindAt(cells, width, height, x - 1, y);
   const right = kindAt(cells, width, height, x + 1, y);
   return left !== MATERIAL.Water && right !== MATERIAL.Water && (left === MATERIAL.Empty || right === MATERIAL.Empty);
+}
+
+// How far this water has fallen, followed back up its thread to where it left a body, with no
+// limit: at a limit, every cell below shares one strand position and a tall stream flashes. A thread
+// wanders a column either way as it falls, so a walk straight up lost it within a few cells and
+// no stream ever reached its fast, white end. Up to three empty rows are allowed: about four rows
+// in ten of a thread are empty at any moment, and stopping at a gap reset most of it to no fall.
+function fallDistance(cells: Uint8Array, width: number, height: number, x: number, y: number) {
+  let fallen = 0;
+  let gaps = 0;
+  let column = x;
+  for (let up = y - 1; up >= 0; up--, fallen++) {
+    if (kindAt(cells, width, height, column, up) !== MATERIAL.Water) {
+      if (kindAt(cells, width, height, column - 1, up) === MATERIAL.Water) column--;
+      else if (kindAt(cells, width, height, column + 1, up) === MATERIAL.Water) column++;
+      else if (kindAt(cells, width, height, column, up) === MATERIAL.Empty && ++gaps < 4) continue;
+      else break;
+    }
+    gaps = 0;
+    if (kindAt(cells, width, height, column - 1, up) === MATERIAL.Water && kindAt(cells, width, height, column + 1, up) === MATERIAL.Water) break;
+  }
+  return fallen;
+}
+
+function airBeside(cells: Uint8Array, width: number, height: number, x: number, y: number) {
+  return kindAt(cells, width, height, x - 1, y) === MATERIAL.Empty || kindAt(cells, width, height, x + 1, y) === MATERIAL.Empty
+    || kindAt(cells, width, height, x - 2, y) === MATERIAL.Empty || kindAt(cells, width, height, x + 2, y) === MATERIAL.Empty;
+}
+
+// Depth is distance to air, up or down, up to the deepest tone. Counting only upward drew a falling
+// mass as the bottom of a lake: on a held brush a fifth of the water in the air came out darker than
+// any stream should. Now such a mass is pale at both ends and only its core darkens, as a thick
+// body of water does. It reads every other row past eight, where the tone barely changes.
+// Open air beside the column ends the count, sampled every fourth row: without that, a clump in a
+// stream read up to the pool the stream left, and a stream on a pond drew a dark stripe through it.
+function waterDepth(cells: Uint8Array, width: number, height: number, x: number, y: number) {
+  let depth = 1;
+  while (depth < WATER_DEPTH_CELLS) {
+    const next = depth + (depth < 8 ? 1 : 2);
+    const row = y - next + 1;
+    if (kindAt(cells, width, height, x, row) !== MATERIAL.Water) break;
+    if (next % 4 === 0 && airBeside(cells, width, height, x, row)) break;
+    depth = next;
+  }
+  // Shallow tones are fine in the air, and past ten cells the tone has flattened, so no need to look.
+  if (depth < 6) return depth;
+  for (let below = 1; below < Math.min(depth, 10); below++) {
+    const kind = kindAt(cells, width, height, x, y + below);
+    if (kind === MATERIAL.Empty) return below;
+    if (kind !== MATERIAL.Water) break;
+  }
+  return depth;
 }
 
 function fallsInto(cells: Uint8Array, width: number, height: number, x: number, y: number) {
@@ -1641,8 +1700,15 @@ function waterCurrent(out: Rgb, time: number, cells: Uint8Array, width: number, 
   // up, and its clumps read as tumbling water without a search along every row.
   const below = kindAt(cells, width, height, x, y + 1);
   if (below === MATERIAL.Empty || (!top && below === MATERIAL.Water && threadBesideAir(cells, width, height, x, y))) {
-    const dash = ((y - Math.floor(time / 60) + hashCell(x, 0) % 6) % 6 + 6) % 6;
-    return dash < 2 ? mixRgb(out, [205, 238, 255], dash === 0 ? 0.5 : 0.25) : out;
+    // Gravity: the strand pattern runs through the square root of the distance fallen, so strands
+    // leave the lip short and slow, then stretch and quicken. Each has a bright head and a fading
+    // tail, and the stream takes on air, going whiter, as it drops.
+    const fallen = fallDistance(cells, width, height, x, y);
+    const drop = Math.min(1, fallen / WATER_WHITE_CELLS);
+    const strand = 2.4 * Math.sqrt(fallen + 1) - time / 160 + (hashCell(x >> 3, 0) % 97) / 97;
+    const head = strand - Math.floor(strand);
+    const aerated = mixRgb(out, [226, 240, 250], 0.06 + 0.64 * drop);
+    return head > 0.6 ? mixRgb(aerated, [240, 250, 255], ((head - 0.6) / 0.4) * (0.3 + 0.5 * drop)) : aerated;
   }
   // Foam only under water that is really falling. A one-cell bump is common on a settled
   // surface, so a thread must be two cells tall, or a settled pond would foam for ever.
@@ -1654,14 +1720,17 @@ function waterCurrent(out: Rgb, time: number, cells: Uint8Array, width: number, 
     const glint = ((x - Math.floor(time / 140)) % 13 + 13) % 13;
     return glint < 2 ? mixRgb(out, [235, 248, 255], glint === 0 ? 0.55 : 0.3) : out;
   }
-  let depth = 1;
-  while (depth < WATER_DEPTH_CELLS && kindAt(cells, width, height, x, y - depth - 1) === MATERIAL.Water) depth++;
+  const depth = waterDepth(cells, width, height, x, y);
+  const deep = depth / WATER_DEPTH_CELLS;
   // The speckle has to go first: over a per-cell palette these bands were not visible at all.
-  const calm = mixRgb(out, mixRgb(WATER_SHALLOW, WATER_DEEP, depth / WATER_DEPTH_CELLS), 0.6);
+  // It goes further with depth, or the bright palette holds the deep end up.
+  const calm = mixRgb(out, WATER_DEPTH_TONE[depth], 0.6 + 0.3 * deep);
   const wobble = Math.sin(y * 0.7 + x * 0.15 + time * 0.0018) * 1.6;
   const band = (Math.floor((x + y * 0.5 + wobble + time / 220) / 3) % 4 + 4) % 4;
-  if (band === 0) return mixRgb(calm, [160, 212, 252], 0.3);
-  return band === 2 ? mixRgb(calm, [24, 60, 120], 0.22) : calm;
+  // Light fades with depth as well, so the current dims toward the bottom and never leaves it.
+  const light = 1 - 0.65 * deep;
+  if (band === 0) return mixRgb(calm, [160, 212, 252], 0.3 * light);
+  return band === 2 ? mixRgb(calm, [24, 60, 120], 0.22 * light) : calm;
 }
 
 function liquidColor({ kind, color, variant, energy, flags, time, cells, width, height, x, y }: ShapeContext) {
