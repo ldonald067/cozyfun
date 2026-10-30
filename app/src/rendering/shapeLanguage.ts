@@ -1613,6 +1613,57 @@ const STARDUST_SHEEN: Rgb[] = [
   [178, 112, 255]
 ];
 
+// Plain water moves as a body, not cell by cell: the owner's pick from a moving mock of a pour
+// (2026-10-30, "currents"). None of this is sim state. It reads neighbours and the clock, so a
+// still pond keeps drifting, and it is drawn under the contact tints so every cue stays on top.
+const WATER_SHALLOW: Rgb = [78, 146, 228];
+const WATER_DEEP: Rgb = [42, 92, 176];
+const WATER_DEPTH_CELLS = 8;
+
+// Open air beside a one-wide column. Without it the still neck of a sealed bottle read as a
+// stream: dashes down the neck and foam at its foot, for ever.
+function threadBesideAir(cells: Uint8Array, width: number, height: number, x: number, y: number) {
+  const left = kindAt(cells, width, height, x - 1, y);
+  const right = kindAt(cells, width, height, x + 1, y);
+  return left !== MATERIAL.Water && right !== MATERIAL.Water && (left === MATERIAL.Empty || right === MATERIAL.Empty);
+}
+
+function fallsInto(cells: Uint8Array, width: number, height: number, x: number, y: number) {
+  const above = kindAt(cells, width, height, x, y - 1);
+  if (above === MATERIAL.Water) return kindAt(cells, width, height, x, y - 2) === MATERIAL.Water && threadBesideAir(cells, width, height, x, y - 1);
+  return above === MATERIAL.Empty && kindAt(cells, width, height, x, y - 2) === MATERIAL.Water;
+}
+
+function waterCurrent(out: Rgb, time: number, cells: Uint8Array, width: number, height: number, x: number, y: number, top: boolean, left: boolean, right: boolean) {
+  // In the air, or inside a one-wide thread. Reading only "air below" lost every cell of a
+  // stream that had caught up with the cell ahead of it. Water above as well, or a one-cell bump
+  // on a settled surface would count as a thread. A broad pour is not traced: it falls broken
+  // up, and its clumps read as tumbling water without a search along every row.
+  const below = kindAt(cells, width, height, x, y + 1);
+  if (below === MATERIAL.Empty || (!top && below === MATERIAL.Water && threadBesideAir(cells, width, height, x, y))) {
+    const dash = ((y - Math.floor(time / 60) + hashCell(x, 0) % 6) % 6 + 6) % 6;
+    return dash < 2 ? mixRgb(out, [205, 238, 255], dash === 0 ? 0.5 : 0.25) : out;
+  }
+  // Foam only under water that is really falling. A one-cell bump is common on a settled
+  // surface, so a thread must be two cells tall, or a settled pond would foam for ever.
+  if ((left || right) && (fallsInto(cells, width, height, x, y)
+    || (top && (fallsInto(cells, width, height, x - 1, y) || fallsInto(cells, width, height, x + 1, y))))) {
+    return mixRgb(out, [240, 250, 255], 0.6);
+  }
+  if (top) {
+    const glint = ((x - Math.floor(time / 140)) % 13 + 13) % 13;
+    return glint < 2 ? mixRgb(out, [235, 248, 255], glint === 0 ? 0.55 : 0.3) : out;
+  }
+  let depth = 1;
+  while (depth < WATER_DEPTH_CELLS && kindAt(cells, width, height, x, y - depth - 1) === MATERIAL.Water) depth++;
+  // The speckle has to go first: over a per-cell palette these bands were not visible at all.
+  const calm = mixRgb(out, mixRgb(WATER_SHALLOW, WATER_DEEP, depth / WATER_DEPTH_CELLS), 0.6);
+  const wobble = Math.sin(y * 0.7 + x * 0.15 + time * 0.0018) * 1.6;
+  const band = (Math.floor((x + y * 0.5 + wobble + time / 220) / 3) % 4 + 4) % 4;
+  if (band === 0) return mixRgb(calm, [160, 212, 252], 0.3);
+  return band === 2 ? mixRgb(calm, [24, 60, 120], 0.22) : calm;
+}
+
 function liquidColor({ kind, color, variant, energy, flags, time, cells, width, height, x, y }: ShapeContext) {
   const top = !sameLiquid(cells, width, height, x, y - 1, kind);
   const left = sameLiquid(cells, width, height, x - 1, y, kind);
@@ -1625,7 +1676,8 @@ function liquidColor({ kind, color, variant, energy, flags, time, cells, width, 
   const earthContact = contactInfo(cells, width, height, x, y, EARTH_CONTACT_KINDS);
   const oilContact = contactInfo(cells, width, height, x, y, OIL_KINDS);
   let out = color;
-  if (kind === MATERIAL.Water && hasNearbyKind(cells, width, height, x, y, EMBER_KINDS)) {
+  const sooty = kind === MATERIAL.Water && hasNearbyKind(cells, width, height, x, y, EMBER_KINDS);
+  if (sooty) {
     // Charcoal ink: water running over char picks up a sooty murk.
     out = mixRgb(out, [31, 29, 27], 0.32);
   }
@@ -1678,6 +1730,9 @@ function liquidColor({ kind, color, variant, energy, flags, time, cells, width, 
   if (top) out = mixRgb(out, kind === MATERIAL.Moonwater ? [238, 250, 255] : [166, 226, 255], kind === MATERIAL.Moonwater ? 0.54 : 0.44);
   if (!bottom) out = mixRgb(out, [24, 58, 106], kind === MATERIAL.Moonwater ? 0.1 : 0.2);
   if (!left || !right) out = mixRgb(out, [20, 56, 96], kind === MATERIAL.Moonwater ? 0.08 : 0.12);
+  // Hot and sooty water keep their own cues: the calm would wash out the bubbles and the murk.
+  const flowing = kind === MATERIAL.Water && energy <= 120 && !sooty;
+  if (flowing) out = waterCurrent(out, time, cells, width, height, x, y, top, left, right);
   if (heatContact.count > 0) {
     out = mixRgb(out, [226, 245, 255], kind === MATERIAL.Moonwater ? 0.34 : 0.28);
     if (top || heatContact.top) out = mixRgb(out, [255, 255, 255], 0.18);
@@ -1693,7 +1748,7 @@ function liquidColor({ kind, color, variant, energy, flags, time, cells, width, 
       if (top || ripple || hash % 11 === 0) out = mixRgb(out, [156, 171, 136], 0.28);
     }
   }
-  if ((left || right) && (ripple || hash % 29 === 0)) out = adjustRgb(out, 24 + Math.sin(time * 0.005 + variant) * 10);
+  if (!flowing && (left || right) && (ripple || hash % 29 === 0)) out = adjustRgb(out, 24 + Math.sin(time * 0.005 + variant) * 10);
   if (kind === MATERIAL.Moonwater) {
     const moonPulse = (Math.sin(time * 0.006 + hash * 0.0004) + 1) * 0.5;
     const crescent = (top && (x + hash) % 5 <= 1) || (!left && y % 3 === 0) || (!right && y % 4 === 0);

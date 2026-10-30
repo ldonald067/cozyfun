@@ -1164,6 +1164,109 @@ function assertFloor(label, floor, worst, detail) {
   }
 }
 
+// --------------------------------------------------------------------- water that moves
+// Currents are drawn from the clock and from neighbours, so a pure-function sweep would prove
+// only that the formula runs. The mock the owner picked from tested for a material that does
+// not exist, so its falling streaks never drew and nothing said so. This plays a painted pour
+// on the real engine and judges by the pixels, by where a cell IS, never by the renderer's own
+// reading of it: take any one of the four away and this fails.
+{
+  const { createFallbackEngine } = compileApp("probe-engine", ["engine.ts", "materials.ts"]).load("engine");
+  const W = 96, H = 56, POUR_ENDS = 480, SETTLED = 1600;
+  const FALL_FLOOR = 110, SURFACE_FLOOR = 100, BODY_FLOOR = 70, BODY_STEP_CAP = 55;
+  // Foam is the one bright water that holds still: a glint or a dash passes, and the plain body
+  // never gets this bright. A brightness bar alone sat above the foam it was hunting (185-207).
+  const FOAM_LUM = 150, FOAM_SWING = 30;
+  const lum = ([r, g, b]) => r * 0.3 + g * 0.59 + b * 0.11;
+  const CLOCK = Array.from({ length: 64 }, (_, i) => 1000 + i * 60);
+  const worst = { fall: Infinity, surface: Infinity, body: Infinity, step: 0, foamPour: Infinity, foamSettled: 0, foamBottle: 0 };
+  const clockOf = (cells, x, y) => CLOCK.map((time) => { const o = (y * W + x) * 8; return colorForCell({ kind: cells[o], variant: cells[o + 1], age: cells[o + 2] | (cells[o + 3] << 8),
+    energy: cells[o + 4] | (cells[o + 5] << 8), flags: cells[o + 6] | (cells[o + 7] << 8), time, cells, width: W, height: H, x, y }); });
+  const isFoam = (tones, swing) => swing < FOAM_SWING && Math.min(...tones.map(lum)) > FOAM_LUM;
+  for (const seed of [11, 12, 13]) {
+    const e = createFallbackEngine(W, H, seed);
+    const paint = (x, y, r, m) => e.paint(x, y, r, m, 100);
+    for (let x = 4; x <= 40; x++) paint(x, 20, 0, MATERIAL.Wall);
+    for (let y = 15; y <= 20; y++) paint(4, y, 0, MATERIAL.Wall);
+    for (let x = 30; x <= 90; x++) paint(x, 52, 0, MATERIAL.Wall);
+    for (let y = 36; y <= 52; y++) { paint(30, y, 0, MATERIAL.Wall); paint(90, y, 0, MATERIAL.Wall); }
+    let foamPour = 0, fall = Infinity;
+    for (let t = 1; t <= SETTLED; t++) {
+      if (t <= POUR_ENDS && t % 3 === 0) paint(12, 8, 1, MATERIAL.Water);
+      e.tick();
+      const sample = t === SETTLED || (t >= 400 && t <= POUR_ENDS && t % 8 === 0);
+      if (!sample) continue;
+      const cells = e.getCellBytes();
+      const kind = (x, y) => (x < 0 || y < 0 || x >= W || y >= H ? -1 : cells[(y * W + x) * 8]);
+      const water = (x, y) => kind(x, y) === MATERIAL.Water;
+      const seen = { fall: [], surface: [], body: [] };
+      let foam = 0, steps = 0, stepCount = 0;
+      for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+        if (!water(x, y)) continue;
+        const tones = clockOf(cells, x, y);
+        const swing = Math.max(...tones.map((c) => redmean(tones[0], c)));
+        const foamy = isFoam(tones, swing);
+        if (foamy) foam++;
+        const sideways = water(x - 1, y) || water(x + 1, y);
+        if (kind(x, y + 1) === MATERIAL.Empty || (!sideways && water(x, y - 1) && water(x, y + 1))) seen.fall.push(swing);
+        else if (foamy) continue;
+        else if (!water(x, y - 1)) seen.surface.push(swing);
+        else if (sideways) {
+          seen.body.push(swing);
+          if (water(x + 1, y) && water(x, y - 1) && water(x + 1, y - 1)) { steps += redmean(tones[0], clockOf(cells, x + 1, y)[0]); stepCount++; }
+        }
+      }
+      if (t === SETTLED) {
+        worst.foamSettled = Math.max(worst.foamSettled, foam);
+        const mean = (a) => a.reduce((n, v) => n + v, 0) / (a.length || 1);
+        worst.surface = Math.min(worst.surface, seen.surface.length < 20 ? 0 : mean(seen.surface));
+        worst.body = Math.min(worst.body, seen.body.length < 100 ? 0 : mean(seen.body));
+        worst.step = Math.max(worst.step, stepCount < 100 ? Infinity : steps / stepCount);
+      } else {
+        foamPour = Math.max(foamPour, foam);
+        const mean = seen.fall.reduce((n, v) => n + v, 0) / (seen.fall.length || 1);
+        if (seen.fall.length >= 10) fall = Math.min(fall, mean);
+      }
+    }
+    worst.foamPour = Math.min(worst.foamPour, foamPour);
+    // A seed that never showed ten falling cells is a failure, not a pass by omission: left at
+    // Infinity, this gate could not see the bug it exists for.
+    worst.fall = Math.min(worst.fall, Number.isFinite(fall) ? fall : 0);
+    e.dispose();
+
+    // A sealed bottle: still water with walls for neighbours, a one-cell neck on a reservoir.
+    const b = createFallbackEngine(W, H, seed);
+    const put = (x, y, m) => b.paint(x, y, 0, m, 100);
+    for (let x = 18; x <= 42; x++) for (let y = 31; y <= 46; y++) put(x, y, MATERIAL.Water);
+    for (let y = 20; y <= 28; y++) put(30, y, MATERIAL.Water);
+    for (let y = 19; y <= 29; y++) { put(28, y, MATERIAL.Wall); put(32, y, MATERIAL.Wall); }
+    put(30, 18, MATERIAL.Wall);
+    for (let x = 16; x <= 28; x++) put(x, 29, MATERIAL.Wall);
+    for (let x = 32; x <= 44; x++) put(x, 29, MATERIAL.Wall);
+    for (let x = 16; x <= 44; x++) put(x, 48, MATERIAL.Wall);
+    for (let y = 29; y <= 48; y++) { put(16, y, MATERIAL.Wall); put(44, y, MATERIAL.Wall); }
+    for (let t = 0; t < 300; t++) b.tick();
+    const sealed = b.getCellBytes();
+    let inBottle = 0;
+    for (let y = 19; y < 48; y++) for (let x = 17; x < 44; x++) {
+      if (sealed[(y * W + x) * 8] !== MATERIAL.Water) continue;
+      inBottle++;
+      const tones = clockOf(sealed, x, y);
+      if (isFoam(tones, Math.max(...tones.map((c) => redmean(tones[0], c))))) worst.foamBottle++;
+    }
+    if (inBottle < 200) failures.push(`the sealed bottle holds ${inBottle} cells of water: the scene has leaked, so it proves nothing.`);
+    b.dispose();
+  }
+  note(`\nWater on a painted pour, worst of 3 seeds: falling swing ${worst.fall.toFixed(0)} (floor ${FALL_FLOOR}), surface ${worst.surface.toFixed(0)} (floor ${SURFACE_FLOOR}), body ${worst.body.toFixed(0)} (floor ${BODY_FLOOR}), body step ${worst.step.toFixed(0)} (cap ${BODY_STEP_CAP}), foam ${worst.foamPour} cells under a pour, ${worst.foamSettled} on the settled pond, ${worst.foamBottle} in a sealed bottle.`);
+  if (!(worst.fall >= FALL_FLOOR)) failures.push(`falling water: mean swing over the clock ${worst.fall.toFixed(0)}, floor ${FALL_FLOOR}. A stream has stopped showing its streaks.`);
+  if (!(worst.surface >= SURFACE_FLOOR)) failures.push(`a pond's surface: mean swing ${worst.surface.toFixed(0)}, floor ${SURFACE_FLOOR}. Glints have stopped travelling.`);
+  if (!(worst.body >= BODY_FLOOR)) failures.push(`a pond's body: mean swing ${worst.body.toFixed(0)}, floor ${BODY_FLOOR}. The current has stopped drifting.`);
+  if (!(worst.step <= BODY_STEP_CAP)) failures.push(`a pond's body: neighbouring cells step ${worst.step.toFixed(0)}, cap ${BODY_STEP_CAP}. The speckle is back, and bands do not read through it.`);
+  if (worst.foamPour < 1) failures.push("no foam under a pour: nothing marks where falling water lands.");
+  if (worst.foamSettled > 0) failures.push(`${worst.foamSettled} cells of foam on a settled pond: foam has to mean water is landing there.`);
+  if (worst.foamBottle > 0) failures.push(`${worst.foamBottle} cells of foam in a sealed bottle: still water between walls is not falling.`);
+}
+
 if (!quiet) {
   console.log("\nRendered state pairs, worst case over a full energy/age/species/time sweep:");
   for (const c of checks) {
