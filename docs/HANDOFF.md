@@ -10,7 +10,7 @@ drawn as the real thing. Nothing else is in flight.*
 The owner hits usage limits early.
 
 - **Read deep docs in ranges.** `grep -n` for the section you need, then read only those
-  lines. `VISUAL_PIPELINE.md` is 87 KB, `HARNESS.md` 68 KB, `MATERIAL_AUDIT.md` 46 KB.
+  lines. `VISUAL_PIPELINE.md` is 98 KB, `HARNESS.md` 76 KB, `MATERIAL_AUDIT.md` 46 KB.
 - **Measure narrowly.** `npm run audit:drift -- --seeds 32 --per-seed --only <ids>` takes a
   couple of minutes; all checks at 8 seeds against `main` takes about five. Keep `--only` to
   about six ids: the cache file is named after the list, and 17 ids made the name too long
@@ -27,33 +27,71 @@ The owner hits usage limits early.
 ## What to do next
 
 **The owner's direction (2026-10-30): "a mix of realism but still pixel art" for every element,
-one batch at a time, in this order.** (1) Heat: fire, ember, lava, smoke, steam, DONE. (2) Moonwater,
-oil, NEXT. (3) Solids: stone, sand, soil, ice, glass, wood, wall. (4) Living things. (5) Stardust, meteor, rocket,
-spark. The recipe is water's: pick the one or two things that make the real material look real, draw
-only those in the cells the sim already makes, show a MOVING side-by-side (`.tmp/heat2/film.mjs` with
-`sheet.py`), gate it from painted materials, and set each floor between the build and a sabotage
-(`.tmp/heat2/sab.py`). Do not skip the sabotages: every batch so far had a check that passed on nothing. Most interactions improve with their materials; the
-one shared idea left is light that fades with distance. Fire, lava and oil must keep their flicker,
-crust and sheen: an earlier painted pass lost them and was ruled out. Time it on a phone early, because
-each batch adds cost.
+one batch at a time.** They chose it on seeing the tuned water, and they decide from pictures that
+move. Water and heat are live. Start here:
 
-0. **Flowers, only if the owner asks.** Left from the reference sheet `.tmp/flowers-ref/3.png`:
-   leaves in two greens with a lit edge on cooler stems. Leaves are cells on every segment now,
-   so that is drawing only. The bluebell is the darkest head at
-   play size; the owner saw that in the filmstrip and shipped it. The images in
-   `.tmp/flowers-ref/` are stock art to look at, never to ship or commit.
-2. **Painting water itself (A2), only if the owner asks.** The night sky (B2) shipped
-   2026-10-29; A2 from the same mock (`.tmp/pixel-review/watercolour2-sheet.png`) paints
-   water, moonwater, steam and smoke as washes and needs a moving mock before anyone decides.
-   Painting fire, lava or oil lost their identity (crust, flicker, sheen) and was ruled out.
-3. **Loose ends the big heads left**, small and measurable, worth offering:
-   - Retake `flower.pollen` "a moonlit garden puffs pollen more often" over 32 seeds on big
-     heads (last taken on the fuller garden, 30/32; buds now puff nothing while they wait).
-   - Time the renderer on a phone (Node: 5.6 ms a full-board frame, `.tmp/bighead/perf.mjs`).
-   - Give the showcase a frozen and a scorched big head beside plain ones, so the strengthened
-     weather shows in the maintained capture (review; space is the problem, see its layout
-     note in `scripts/material-showcase.mjs`).
-   - Bring the design canvas up to date (below).
+1. **Time the renderer on a phone first.** Nothing has been: not the big heads, the night wash, water
+   or heat. Node says 9.3 to 12.5 ms on a board two-thirds deep water, and 7.2 ms on lava, smoke and
+   fire. Each batch adds to or takes from this, so know the budget before spending more of it. A phone
+   is the owner's to run; ask, and give them a board to paint.
+2. **Batch 2: moonwater and oil.** Both unmeasured ideas until a mock says otherwise:
+   - **Moonwater** gets water's depth, in its own hue. It is deliberately outside `waterCurrent` today
+     (`flowing` is plain water only), and it already has crescents, a pulse and life and oil tints to
+     keep. Water sits beside it in one body (`sameLiquid`), so look at the two mixed, not just apart.
+   - **Oil** must keep its sheen. Real film colour follows thickness, so a pool and a thin slick could
+     differ. The cosmic sheen stays the LAST thing oil gets: tints laid over it washed it out to 30,
+     and `renderer:probe` sweeps every neighbour a slick can have. Keep the petrol film on soil.
+3. **Batches after that, in order:** solids (stone, sand, soil, ice, glass, wood, wall), living things
+   (moss, fungus, flowers, stems, seeds, pollen; already detailed, so small changes), then stardust,
+   meteor, rocket and spark (the last three onto the heat scale, `heatColor`). One shared idea is left
+   for interactions: light that fades with distance, so fire lights nearby water and stone.
+
+**The recipe, which has held for two batches:**
+
+1. Pick the one or two things that make the real material look real. Draw only those, in the cells
+   the sim already makes, reading neighbours and the clock. No sim change without asking.
+2. Keep what makes it itself. Fire's flicker, lava's crust and oil's sheen were lost by an earlier
+   painted pass, which was ruled out. A new look that reads as a neighbour has failed, as the first
+   lava did by reading as a heater and as fire.
+3. Branch, build for real rather than in a mock, and film it: refresh the base with
+   `rm -rf .tmp/heat2/base && mkdir -p .tmp/heat2/base && git archive HEAD app/src | tar -x -C .tmp/heat2/base`,
+   give `.tmp/heat2/film.mjs` a scene for the batch, and run `sheet.py`. Look at crops: stream and fire
+   flaws only showed up close. Test the app's real gesture, a brush at density 55 (`PAINT_DENSITY`), as
+   well as a neat scene: a held big brush found a fifth of falling water drawn as a lake floor.
+4. Gate it in `renderer:probe` from painted materials, and require a minimum of cells seen, because
+   every batch had a check that passed on nothing (`Infinity` passes a floor). Then sabotage each half
+   with `.tmp/heat2/sab.py` and set each floor between the two numbers. A check a sabotage does not
+   move gets rewritten or deleted. The script edits the real renderer and a hard kill leaves it broken,
+   as one did: diff against `shapeLanguage.keep.ts` afterwards.
+5. Compare frames close together too. Two gates that rewarded change over seconds counted a one-frame
+   flash as motion.
+6. Keep table colours whole numbers: fractional ones slowed every `mixRgb` by about 2 ms.
+7. Show the owner the moving side-by-side. If a claim about it turns out false, say so plainly: the
+   water mock's streaks never drew. Then the gate once, `/adversarial-review`, ship on their word.
+
+**Small loose ends, worth offering:**
+
+- Retake `flower.pollen` "a moonlit garden puffs pollen more often" over 32 seeds on big heads (last
+  taken on the fuller garden, 30/32; buds now puff nothing while they wait).
+- Give the showcase a frozen and a scorched big head beside plain ones, so the strengthened weather
+  shows in the maintained capture (space is the problem: see the layout note in
+  `scripts/material-showcase.mjs`).
+- Heat's last fixes passed the gate and sabotages but had no fresh review, and water's last fixes
+  neither.
+- Bring the design canvas up to date (below).
+
+**Only if the owner asks:**
+
+- **Water spreading faster.** It heaps under a pour. That is how it moves, not how it is drawn, and
+  changing it would shift many measured interactions.
+- **Real plumes.** Smoke from a fire and steam off water are dotted columns because the sim emits them
+  a cell at a time; steam's puffs show the kind of sim change it would take.
+- **Flowers.** Left from the reference sheet `.tmp/flowers-ref/3.png`: leaves in two greens with a lit
+  edge on cooler stems. Leaves are cells on every segment now, so that is drawing only. The images in
+  `.tmp/flowers-ref/` are stock art to look at, never to ship or commit.
+
+Painting water as a smooth wash (A2) is closed: the owner picked pixel currents over it from a moving
+mock. It remains open only for steam and smoke, and heat has since given those a look of their own.
 
 ## Open questions, accepted unless the owner says otherwise
 
@@ -81,8 +119,6 @@ each batch adds cost.
 - The showcase has no frozen or scorched flower head, before or after the big heads (review,
   2026-10-29): the strengthened weather is measured by `renderer:probe` and was judged by the
   owner from `.tmp/bighead/states-sheet-2.png`, not from the maintained capture.
-- The big heads' rendering was timed in Node only: 5.6 ms a full-board frame against 5.9 ms
-  for the old heads (`.tmp/bighead/perf.mjs`). Not timed on a phone.
 - A dormant wellspring blocks only non-sources.
 - A meteor shock's scorch is often brief (26 of 32 seeds).
 - The sim runs about 24 ticks a second at 120 Hz, against 20 at 60 Hz.
@@ -274,7 +310,7 @@ the owner) holds the eight flower species, life stages, weather states, the inte
 marked shows / thin / reads weak / half hidden, and a ranked shortlist of eight upgrades with
 each one's status. Seven have shipped (the burning log last, 2026-10-28) and one was dropped
 (lava thawing ice across a gap). It is out of date: it still marks the log open, and the night
-sky, the fuller garden and the big heads (all 2026-10-29) are not on it; its flower species
+sky, the fuller garden, the big heads, water and heat are not on it; its flower species
 are the old small heads. Editing it means following the Design type's own `SKILL.md`. The
 "Flowers with more depth" board holds the four outline candidates. To edit the canvas, read it
 first (`Artifact` read of the URL, then the file by `path`) and publish to the same URL: a
@@ -317,7 +353,8 @@ publish against a stale version is refused.
 - **For a design choice, show the owner a rendered picture** (a filmstrip or the canvas) and
   explain it plainly. They decide from the picture, not from seed counts, and ask for a
   filmstrip before anything ships.
-- **Close each batch with `/adversarial-review`** (Codex). It has caught a real problem in
+- **Close each batch with `/adversarial-review`** (Codex). The session scratchpad is wiped when the
+  app restarts, so rebuild prompts rather than assuming they are still there. It has caught a real problem in
   every batch. Pick lenses by what the diff touches: Parity for an engine change, Perceptual
   for the renderer, Drift for a new rule. Codex has its own usage limit and can stop
   mid-review: check each reviewer's output exists, and rerun the missing ones. Keep review
