@@ -1383,6 +1383,115 @@ function assertFloor(label, floor, worst, detail) {
   if (worst.foamBottle > 0) failures.push(`${worst.foamBottle} cells of foam in a sealed bottle: still water between walls is not falling.`);
 }
 
+// ------------------------------------------------------------------- heat, as heat behaves
+// Colour is temperature, on one scale shared by fire, lava and embers (the owner's "realism but
+// still pixel art", 2026-10-30). Each must also keep what makes it itself: flicker, crust, grain.
+{
+  const { createFallbackEngine } = compileApp("probe-heat", ["engine.ts", "materials.ts"]).load("engine");
+  const lum = ([r, g, b]) => r * 0.3 + g * 0.59 + b * 0.11;
+  const avg = (r) => r.reduce((a, v) => a + v, 0) / (r.length || 1);
+  const W = 96, H = 72;
+  const colourOf = (cells, x, y, time) => { const o = (y * W + x) * 8; return colorForCell({ kind: cells[o], variant: cells[o + 1], age: cells[o + 2] | (cells[o + 3] << 8),
+    energy: cells[o + 4] | (cells[o + 5] << 8), flags: cells[o + 6] | (cells[o + 7] << 8), time, cells, width: W, height: H, x, y }); };
+  const e = createFallbackEngine(W, H, 31);
+  const p = (x, y, r, m, d = 100) => e.paint(x, y, r, m, d);
+  for (let x = 2; x <= 94; x++) p(x, 68, 0, MATERIAL.Stone);
+  for (let x = 10; x <= 30; x++) for (let y = 60; y <= 66; y++) p(x, y, 0, MATERIAL.Wood);
+  for (let y = 52; y <= 68; y++) { p(50, y, 0, MATERIAL.Stone); p(90, y, 0, MATERIAL.Stone); }
+  for (let x = 53; x <= 87; x++) for (let y = 56; y <= 66; y++) p(x, y, 0, MATERIAL.Lava);
+  const tips = [], inner = [], fireSwing = [];
+  let crust = [], body = [], bodySwing = [], steps = [], cracks = 0;
+  for (let t = 1; t <= 260; t++) {
+    if (t >= 90 && t % 3 === 0) p(20, 56, 4, MATERIAL.Fire, 55);
+    e.tick();
+    if (t < 120 || t % 20) continue;
+    const c = e.getCellBytes();
+    const at = (x, y) => (x < 0 || y < 0 || x >= W || y >= H ? -1 : c[(y * W + x) * 8]);
+    for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+      const k = at(x, y);
+      if (k === MATERIAL.Fire) {
+        const l = [0, 45, 90, 135, 180, 225, 270, 315].map((ms) => colourOf(c, x, y, 1000 + ms));
+        (at(x, y - 1) !== MATERIAL.Fire ? tips : at(x, y - 2) === MATERIAL.Fire ? inner : []).push(avg(l.map(lum)));
+        fireSwing.push(Math.max(...l.map((q) => redmean(l[0], q))));
+      } else if (k === MATERIAL.Lava && t === 260) {
+        const a = colourOf(c, x, y, 2000);
+        const shallow = at(x, y - 1) !== MATERIAL.Lava || at(x, y - 2) !== MATERIAL.Lava;
+        if (shallow) { crust.push(lum(a)); if (lum(a) > 130) cracks++; continue; }
+        if (at(x - 1, y) !== MATERIAL.Lava || at(x + 1, y) !== MATERIAL.Lava || at(x, y + 1) !== MATERIAL.Lava) continue;
+        body.push(lum(a));
+        if (at(x + 1, y + 1) === MATERIAL.Lava && at(x + 2, y) === MATERIAL.Lava) steps.push(redmean(a, colourOf(c, x + 1, y, 2000)));
+        bodySwing.push(Math.max(...[3000, 6000, 9000, 12000].map((ms) => redmean(a, colourOf(c, x, y, 2000 + ms)))));
+      }
+    }
+  }
+  e.dispose();
+  // Licks run up: a flame now looks like the row below it a moment ago, not the row above.
+  const FW = 9, FH = 40, flame = new Uint8Array(FW * FH * 8);
+  for (let y = 1; y < FH; y++) flame[(y * FW + 4) * 8] = MATERIAL.Fire;
+  const lickAt = (y, time) => lum(colorForCell({ kind: MATERIAL.Fire, variant: 0, age: 100, energy: 0, flags: 0, time, cells: flame, width: FW, height: FH, x: 4, y }));
+  let up = 0, down = 0;
+  for (let y = 10; y < 34; y++) for (let t = 0; t < 40; t++) { up += Math.abs(lickAt(y, t * 70) - lickAt(y + 1, t * 70 - 45)); down += Math.abs(lickAt(y, t * 70) - lickAt(y - 1, t * 70 - 45)); }
+  // Smoke pales as it rises, and thin vapour lets the sky through.
+  const sky = [];
+  for (let y = 0; y < 60; y += 3) for (let x = 0; x < 90; x += 3) sky.push([x, y, lum(nightWash.washAt(x, y))]);
+  sky.sort((a, b) => a[2] - b[2]);
+  const [dimX, dimY] = sky[0], [litX, litY] = sky[sky.length - 1];
+  const puff = (age, kind, x, y) => { const c = new Uint8Array(W * H * 8); const o = (y * W + x) * 8; c[o] = kind; c[o + 2] = age; return colorForCell({ kind, variant: 0, age, energy: 0, flags: 0, time: 0, cells: c, width: W, height: H, x, y }); };
+  const smokeRise = lum(puff(170, MATERIAL.Smoke, dimX, dimY)) - lum(puff(10, MATERIAL.Smoke, dimX, dimY));
+  const seeThrough = (lum(puff(170, MATERIAL.Smoke, litX, litY)) - lum(puff(170, MATERIAL.Smoke, dimX, dimY))) / Math.max(1, sky[sky.length - 1][2] - sky[0][2]);
+  // A log keeps its grain at full heat, and a hot coal outshines a warm one.
+  const coals = (energy, time) => { const out = []; for (let x = 2; x < 40; x++) { const c = new Uint8Array(W * H * 8); for (let y = 8; y < 13; y++) for (let i = 0; i < W; i++) { const o = (y * W + i) * 8; c[o] = MATERIAL.Ember; c[o + 4] = energy; } out.push(lum(colorForCell({ kind: MATERIAL.Ember, variant: 0, age: 0, energy, flags: 0, time, cells: c, width: W, height: H, x, y: 10 }))); } return out; };
+  const hot = coals(220, 1000), warm = coals(90, 1000);
+  // A log's held cracks (energy 66-90 in the sim, on the grain) have to show against the char.
+  const crackOverChar = avg(coals(80, 1000)) - avg(coals(30, 1000));
+  // Grain is what stays put: the bed's heat wave averages out over its own period (2094 ms), so
+  // this cannot be satisfied by the wave. Worst of three heats, or it says nothing about a dying log.
+  const grain = Math.min(...[90, 160, 220].map((energy) => {
+    const phases = Array.from({ length: 12 }, (_, i) => coals(energy, 1000 + (i * 2094) / 12));
+    const held = phases[0].map((_, x) => avg(phases.map((line) => line[x])));
+    return Math.max(...held) - Math.min(...held);
+  }));
+  // All of lava dims as it cools, crust and cracks with it. And nothing in it may jump: watched
+  // 16 ms apart over several seconds, a plate or a vein has to move, not flash.
+  const LW = 40, LH = 14, pool = new Uint8Array(LW * LH * 8);
+  const setPool = (energy) => { for (let y = 4; y < 12; y++) for (let x = 2; x < 38; x++) { const o = (y * LW + x) * 8; pool[o] = MATERIAL.Lava; pool[o + 4] = energy; } };
+  const lavaAt = (x, y, energy, time) => colorForCell({ kind: MATERIAL.Lava, variant: 0, age: 0, energy, flags: 0, time, cells: pool, width: LW, height: LH, x, y });
+  const poolMean = (energy, rows) => { setPool(energy); const out = []; for (let t = 0; t < 8; t++) for (let x = 3; x < 37; x++) for (const y of rows) out.push(lum(lavaAt(x, y, energy, 1000 + t * 900))); return avg(out); };
+  const crustCools = poolMean(230, [4, 5]) - poolMean(70, [4, 5]);
+  const bodyCools = poolMean(230, [8, 9]) - poolMean(70, [8, 9]);
+  setPool(230);
+  let lavaJump = 0;
+  for (let t = 0; t < 400; t++) for (let x = 3; x < 37; x += 2) for (const y of [4, 5, 8, 10]) lavaJump = Math.max(lavaJump, redmean(lavaAt(x, y, 230, 1000 + t * 16), lavaAt(x, y, 230, 1016 + t * 16)));
+  const measured = {
+    insideOverTip: avg(inner) - avg(tips), fireSwing: avg(fireSwing), licksUp: down / Math.max(1, up),
+    crustUnderBody: avg(body) - avg(crust), crackShare: cracks / Math.max(1, crust.length), lavaStep: avg(steps), lavaChurn: avg(bodySwing),
+    smokeRise, seeThrough, grain, hotOverWarm: avg(hot) - avg(warm), crustCools, bodyCools, lavaJump, crackOverChar,
+  };
+  note(`\nHeat on painted scenes: ${inner.length} inner and ${tips.length} tip flame cells, ${body.length} lava body and ${crust.length} crust cells. ${Object.entries(measured).map(([k, v]) => `${k} ${v.toFixed(2)}`).join(", ")}.`);
+  // Each between the build and the same thing sabotaged (2026-10-30): `.tmp/heat2/sab.py`.
+  const LAVA_STEP_CAP = 60, CRACK_CAP = 0.35, LAVA_JUMP_CAP = 90;
+  const FLOORS = [
+    ["insideOverTip", 55, "A flame's inside has to outshine its tips (81 built, 30 at one heat)."],
+    ["fireSwing", 165, "Fire has stopped flickering (235 built, 101 without licks)."],
+    ["licksUp", 4, "Licks have stopped running up the flame (13 built, 1.3 sideways)."],
+    ["crustUnderBody", 46, "Lava has lost its crust (59 built, 34 without)."],
+    ["lavaChurn", 80, "Lava has stopped churning (166 built, 0 frozen)."],
+    ["smokeRise", 0, "Smoke has stopped paling as it rises (6 built, -15)."],
+    ["seeThrough", 0.5, "Thin vapour has stopped showing the sky (0.70 built, 0.29 fading to flat dark)."],
+    ["grain", 19, "A bed has gone flat: nothing in it stays put once the heat wave averages out (26 built, 13 flat orange, 3 without flecks)."],
+    ["crackOverChar", 8, "A log's held cracks no longer show against the char (15 built)."],
+    ["crustCools", 8, "Lava's crust has stopped dimming as it cools (19 built, 0)."],
+    ["bodyCools", 25, "Lava's body has stopped dimming as it cools (45 built, 0)."],
+    ["crackShare", 0.05, "Lava's crust has no glowing cracks (0.24 built, 0)."],
+    ["hotOverWarm", 55, "A hot coal has to outshine a warm one (82 built, 28)."],
+  ];
+  if (inner.length < 100 || tips.length < 100 || body.length < 200 || crust.length < 40) failures.push("the heat scene saw too little fire or lava to judge.");
+  for (const [name, floor, why] of FLOORS) if (!(measured[name] >= floor)) failures.push(`heat: ${name} ${measured[name].toFixed(2)}, floor ${floor}. ${why}`);
+  if (!(measured.lavaStep <= LAVA_STEP_CAP)) failures.push(`heat: lava's neighbouring cells step ${measured.lavaStep.toFixed(0)}, cap ${LAVA_STEP_CAP}. The confetti is back.`);
+  if (!(measured.lavaJump <= LAVA_JUMP_CAP)) failures.push(`heat: lava jumps ${measured.lavaJump.toFixed(0)} between frames 16 ms apart, cap ${LAVA_JUMP_CAP}. Something is flashing instead of moving.`);
+  if (!(measured.crackShare <= CRACK_CAP)) failures.push(`heat: ${(measured.crackShare * 100).toFixed(0)}% of lava's crust is lit, cap ${CRACK_CAP * 100}%. It has stopped being a crust.`);
+}
+
 if (!quiet) {
   console.log("\nRendered state pairs, worst case over a full energy/age/species/time sweep:");
   for (const c of checks) {

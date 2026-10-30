@@ -498,17 +498,34 @@ function pollenColor(context: ShapeContext) {
   return mixRgb([9, 14, 20], out, 0.55 + fade * 0.45);
 }
 
-function fireColor({ color, variant, age, energy, flags, time, cells, width, height, x, y }: ShapeContext) {
+// Everything hot shares one scale, as in real life: colour IS temperature. Black-red, deep red,
+// orange, yellow, white. Fire, lava and embers each read their own heat off it, which is what
+// makes them one family, and each keeps its own shape: flicker, crust, grain.
+const HEAT_STOPS: [number, Rgb][] = [[0, [20, 10, 12]], [0.25, [120, 24, 14]], [0.5, [226, 74, 20]], [0.7, [255, 146, 40]], [0.85, [255, 214, 96]], [1, [255, 246, 205]]];
+const HEAT_STEPS = 63;
+const HEAT_RAMP: Rgb[] = Array.from({ length: HEAT_STEPS + 1 }, (_, i) => {
+  const t = i / HEAT_STEPS;
+  const upper = HEAT_STOPS.findIndex(([at]) => at >= t);
+  if (upper <= 0) return HEAT_STOPS[0][1];
+  const [fromAt, from] = HEAT_STOPS[upper - 1];
+  const [toAt, to] = HEAT_STOPS[upper];
+  return from.map((c, k) => Math.round(c + (to[k] - c) * ((t - fromAt) / (toAt - fromAt)))) as Rgb;
+});
+const heatColor = (heat: number) => HEAT_RAMP[Math.round(Math.max(0, Math.min(1, heat)) * HEAT_STEPS)];
+
+function fireColor({ age, energy, flags, variant, time, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
   const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Fire);
   const wetContact = contactInfo(cells, width, height, x, y, COOL_LIQUID_KINDS);
-  const flicker = Math.sin(time * 0.024 + hash * 1.1 + y * 0.8);
-  const tongue = (x + (hash & 3) + Math.floor(time * 0.02)) % 3;
-  let out = mixRgb(color, [255, 240, 168], 0.2 + Math.max(0, flicker) * 0.2);
-  if (age < 12 || energy > 200) out = mixRgb(out, [255, 250, 214], 0.45);
-  if (edge.top) out = tongue === 0 ? mixRgb(out, [9, 14, 20], 0.6) : mixRgb(out, [255, 238, 150], 0.5);
-  if ((edge.left || edge.right) && tongue === 2) out = mixRgb(out, [9, 14, 20], 0.3);
-  if (edge.bottom) out = mixRgb(out, [255, 118, 36], 0.4);
+  // A flame is hottest inside and coolest at its tips, so heat follows the fire above this cell.
+  let inside = 0;
+  while (inside < 4 && kindAt(cells, width, height, x, y - inside - 1) === MATERIAL.Fire) inside++;
+  // Licks run UP the flame, not along it.
+  const lick = Math.sin(time * 0.02 + y * 0.9 + (hashCell(x >> 1, 0) % 13));
+  const young = age < 12 || energy > 200 ? 0.14 : 0;
+  let out = heatColor(0.52 + inside * 0.09 + lick * 0.13 + young);
+  // A tip that has cooled past glowing is gone: the flame's outline breaks up against the night.
+  if (edge.top && lick < -0.55) out = mixRgb(out, [9, 14, 20], 0.6);
   if (wetContact.count > 0) out = mixRgb(out, [196, 231, 255], wetContact.top ? 0.34 : 0.26);
   if (hash % 17 === 0) out = [255, 248, 205];
   // A slick stardust gave a sheen burns like a firework, in the shell's colours. Keyed on the
@@ -518,24 +535,32 @@ function fireColor({ color, variant, age, energy, flags, time, cells, width, hei
   return out;
 }
 
-function lavaColor({ color, variant, energy, time, cells, width, height, x, y }: ShapeContext) {
-  const hash = hashCell(x >> 1, y >> 1, variant);
-  const fine = hashCell(x, y, variant);
+function lavaColor({ energy, time, cells, width, height, x, y }: ShapeContext) {
   const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Lava);
   const cooling = hasNearbyKind(cells, width, height, x, y, COOL_LIQUID_KINDS);
-  const pulse = (Math.sin(time * 0.004 + hash * 0.7) + 1) * 0.5;
-  const crusted = edge.top || cooling || (fine % 6 === 0 && edge.count > 0);
-  const seam = ((x + (hash & 3)) & 3) === 0 || ((x ^ y) + fine) % 9 === 0;
-  let out = mixRgb(color, [40, 13, 11], 0.4);
-  out = mixRgb(out, [255, 96, 26], (0.1 + pulse * 0.14) * (energy > 0 ? energy / 255 : 1));
-  if (crusted) {
-    out = mixRgb(out, [24, 16, 18], cooling ? 0.72 : 0.58);
-    if (seam && !cooling) out = mixRgb(out, [255, 158, 54], 0.7 + pulse * 0.15);
-    if (seam && cooling) out = mixRgb(out, [214, 120, 70], 0.4);
-  } else if (seam) {
-    out = mixRgb(out, [255, 190, 80], 0.42 + pulse * 0.2);
+  // Mostly dark skin with heat breaking through, hotter further in, and slowly churning: a calm
+  // body rather than a per-cell speckle, which read as confetti and never moved. Bright all over
+  // it read as a heater, and as fire.
+  let inside = 0;
+  while (inside < 6 && kindAt(cells, width, height, x, y - inside - 1) === MATERIAL.Lava) inside++;
+  const churn = Math.sin(x * 0.35 + Math.sin(y * 0.5 + time * 0.0007) * 2 + time * 0.0009);
+  const veins = Math.abs(Math.sin(x * 0.27 + y * 0.13 + time * 0.0005) + Math.sin(y * 0.41 - x * 0.09 - time * 0.0004));
+  // Lava's energy is how far it has cooled, and all of it dims on the way to stone, crust included.
+  const dimmed = 0.5 + (energy / 255) * 0.5;
+  // Veins and cracks cross-fade as they move. A hard threshold made them flash on in a single frame.
+  const vein = Math.max(0, Math.min(1, (0.42 - veins) / 0.24));
+  const body = 0.34 + inside * 0.035 + churn * 0.08;
+  let out = heatColor((body + (0.62 + inside * 0.03 - body) * vein) * dimmed);
+  // The crust is two rows deep: dark plates of uneven width that creep, with the heat showing through
+  // the cracks between them. A seam stays clear of a plate's ends, so a crack never jumps.
+  if (inside < 2 || cooling) {
+    const drift = x + (y >> 1) + time / 1400;
+    const seam = 2 + hashCell(Math.floor(drift / 7), y >> 2) % 4;
+    const crack = Math.max(0, Math.min(1, 1.6 - Math.abs(drift % 7 - seam)));
+    const skin = mixRgb(heatColor(0.12), [24, 16, 18], cooling ? 0.7 : 0.4);
+    out = crack > 0 ? mixRgb(skin, heatColor((cooling ? 0.3 : 0.72 + churn * 0.08) * dimmed), crack) : skin;
   }
-  if (edge.bottom || edge.left || edge.right) out = mixRgb(out, [30, 12, 12], 0.35);
+  if (edge.bottom || edge.left || edge.right) out = mixRgb(out, [30, 12, 12], 0.3);
   return out;
 }
 
@@ -838,12 +863,9 @@ function rocketColor({ color, variant, energy, time, x, y }: ShapeContext) {
   return out;
 }
 
-function vaporColor({ kind, color, variant, age, cells, width, height, x, y }: ShapeContext) {
+function vaporColor({ kind, color, variant, age, time, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
   const sameNeighbors = cardinalNeighborCount(cells, width, height, x, y, kind);
-  const localX = (x + (hash & 1)) & 3;
-  const localY = (y + ((hash >> 3) & 1)) & 3;
-  const rim = localX === 0 || localY === 0 || localX === 3 || localY === 3;
   const edge = sameNeighbors < 3;
   const fade = Math.max(0, 1 - age / (kind === MATERIAL.Steam ? 155 : 210));
   const hotContact = contactInfo(cells, width, height, x, y, HOT_LIGHT_KINDS);
@@ -852,16 +874,16 @@ function vaporColor({ kind, color, variant, age, cells, width, height, x, y }: S
   const cosmic = cosmicContact.count > 0;
 
   const steam = kind === MATERIAL.Steam;
-  let out = steam ? mixRgb(color, [219, 226, 231], 0.34) : mixRgb(color, [86, 88, 92], 0.34);
-  if (edge) out = mixRgb(out, [9, 14, 20], steam ? 0.22 : 0.44);
-  else out = adjustRgb(out, steam ? 16 : 4);
-  if (rim) out = mixRgb(out, [9, 14, 20], steam ? 0.1 : 0.32);
-  if (!rim && hash % 5 === 0) out = mixRgb(out, steam ? [239, 250, 253] : [169, 173, 174], steam ? 0.5 : 0.28);
-  if (localY === 3 || hash % 7 === 0) out = mixRgb(out, steam ? [126, 167, 184] : [54, 53, 50], steam ? 0.16 : 0.34);
-  if (!steam && hash % 11 === 0) out = mixRgb(out, [42, 38, 35], 0.28);
+  // Young smoke is dense and sooty and pales as it rises; steam starts white and only thins. A soft
+  // billow rolls up through either, in place of a fixed speckle that never moved.
+  const billow = Math.sin(y * 0.6 + x * 0.3 + time * 0.0025 + (hash & 3) * 0.4);
+  let out: Rgb = steam ? [226, 234, 238] : mixRgb([66, 62, 60], [134, 136, 140], 1 - fade);
+  out = mixRgb(out, steam ? [255, 255, 255] : [168, 170, 172], Math.max(0, billow) * 0.2);
+  if (edge) out = mixRgb(out, steam ? [188, 208, 220] : [54, 52, 54], 0.3);
   if (warm) out = mixRgb(out, [255, 183, 116], steam ? (hotContact.bottom ? 0.24 : 0.18) : 0.1);
   if (cosmic) out = mixRgb(out, [178, 186, 255], steam ? (cosmicContact.bottom ? 0.28 : 0.22) : 0.12);
-  return mixRgb([9, 14, 20], out, steam ? 0.58 + fade * 0.38 : 0.44 + fade * 0.34);
+  // Thin vapour is see-through: it fades into the sky behind it, not into a flat dark.
+  return mixRgb(washAt(x, y), out, steam ? 0.58 + fade * 0.38 : 0.5 + fade * 0.42);
 }
 
 function seedColor({ color, variant, age, energy, flags, cells, width, height, x, y }: ShapeContext) {
@@ -1398,9 +1420,11 @@ function emberColor({ variant, energy, flags, time, cells, width, height, x, y }
     if (edge.top && (hash & 7) === 3) out = mixRgb(out, [222, 216, 208], ashed * 0.4);
   }
   if (heat > 0.05) {
-    const pulse = (Math.sin(time * 0.008 + hash * 0.7 + x + y) + 1) * 0.5;
-    out = mixRgb(out, [255, 120, 40], heat * (0.4 + pulse * 0.3));
-    if ((hash & 7) === 0) out = mixRgb(out, [255, 208, 120], heat * 0.7);
+    // Coals breathe: a slow wave of heat crosses the bed, on the same scale as the fire that lit it.
+    const pulse = (Math.sin(time * 0.003 + x * 0.5 + y * 0.3) + 1) * 0.5;
+    // The char stays in the mix, so a log keeps the glowing cracks along its grain at full heat.
+    out = mixRgb(out, heatColor(0.22 + heat * 0.42 + pulse * 0.18), Math.min(0.85, heat * (0.5 + pulse * 0.4)));
+    if ((hash & 7) === 0) out = mixRgb(out, heatColor(0.5 + heat * 0.4), heat * 0.6);
   } else if (!(flags & CELL_FLAG.Wet) && (hash % 13 === 0 || hash % 17 === 0)) {
     // Idle life: cold dry char keeps a memory of fire. A few scattered cells wink a dim
     // orange on a slow cycle — far below live ember so a dead hearth never reads as lit,
