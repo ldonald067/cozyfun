@@ -1,9 +1,11 @@
 # Handoff — where the work is, and what to do next
 
 *Rewritten at each handoff, never appended to. Shipped work lives in `git log`, whose commit
-messages carry each batch's measurements. Written 2026-10-29: big flower heads (up to 13
-cells across, each drawn in its own tones) that bloom in two waves are built from the owner's
-picks off a close-up and a filmstrip, with the weather on them strengthened at their word.*
+messages carry each batch's measurements. Written 2026-10-29, after the big flower heads
+shipped (`9f2d83b`: heads up to 13 cells across, drawn in their own tones, blooming in two
+waves; live, `deploy:verify` and `qa:live` green). The same day shipped the fuller garden
+(`5ce735a`), and the owner settled sound (fine as it is) and spent gardens (left as they are).
+Nothing is in flight: `main` is clean and matches the live site.*
 
 ## Keep chats lean
 
@@ -15,8 +17,14 @@ The owner hits usage limits early.
   couple of minutes; all checks at 8 seeds against `main` takes about five. Keep `--only` to
   about six ids: the cache file is named after the list, and 17 ids made the name too long
   for macOS (ENAMETOOLONG).
-- **Run the full gate (`npm run check`, about 8 minutes) once per batch**, not after every
-  edit.
+- **Run the full gate (`npm run check`) once per batch**, not after every edit. It was about
+  8 minutes before the big heads; the flower checks now play 6,000-7,200 ticks (a second wave
+  opens about four minutes in), so the audit, the drift tool and the gate all run longer.
+- **Do not fan out long runs.** A 32-seed `.tmp/halves/sab.mjs` pass over `flower.opens` plays
+  every seed twice (clean and sabotaged); six at once ran for well over half an hour. Run two
+  at most, and prefer a script's raw numbers (`.tmp/bighead/thresh.mjs`) to a full verdict run
+  when the gap is already measured. Anything importing `scripts/interaction-scenes.mjs`
+  recompiles `.tmp/audit-renderer` on load, so two started together can crash each other.
 
 ## What to do next
 
@@ -29,6 +37,14 @@ The owner hits usage limits early.
    2026-10-29; A2 from the same mock (`.tmp/pixel-review/watercolour2-sheet.png`) paints
    water, moonwater, steam and smoke as washes and needs a moving mock before anyone decides.
    Painting fire, lava or oil lost their identity (crust, flicker, sheen) and was ruled out.
+3. **Loose ends the big heads left**, small and measurable, worth offering:
+   - Retake `flower.pollen` "a moonlit garden puffs pollen more often" over 32 seeds on big
+     heads (last taken on the fuller garden, 30/32; buds now puff nothing while they wait).
+   - Time the renderer on a phone (Node: 5.6 ms a full-board frame, `.tmp/bighead/perf.mjs`).
+   - Give the showcase a frozen and a scorched big head beside plain ones, so the strengthened
+     weather shows in the maintained capture (review; space is the problem, see its layout
+     note in `scripts/material-showcase.mjs`).
+   - Bring the design canvas up to date (below).
 
 ## Open questions, accepted unless the owner says otherwise
 
@@ -45,7 +61,6 @@ The owner hits usage limits early.
   owner from `.tmp/bighead/states-sheet-2.png`, not from the maintained capture.
 - The big heads' rendering was timed in Node only: 5.6 ms a full-board frame against 5.9 ms
   for the old heads (`.tmp/bighead/perf.mjs`). Not timed on a phone.
-
 - A dormant wellspring blocks only non-sources.
 - A meteor shock's scorch is often brief (26 of 32 seeds).
 - The sim runs about 24 ticks a second at 120 Hz, against 20 at 60 Hz.
@@ -105,8 +120,9 @@ All by the owner, after seeing pictures or measurements:
   that had gone to seed when the player left: about four minutes after blooming, where it was
   two. `slow-world:audit` plays in 4400 ticks for that and asserts the night itself sowed (at
   2400 it passed on catch-up dice alone; review). A stalk's budget, up to 585, now survives a
-  scene load; both loaders cut it to 255, and a stalk saved mid-climb came back five cells. Measured first, the premise it was offered on was wrong: plants were already 4 to 7
-  cells with 1-2 leaves and 10-16% leafless, not mostly 4-cell and over half leafless.
+  scene load; both loaders cut it to 255, and a stalk saved mid-climb came back five cells.
+  Measured first, the premise it was offered on was wrong: plants were already 4 to 7 cells
+  with 1-2 leaves and 10-16% leafless, not mostly 4-cell and over half leafless.
 
 - **Sound** (2026-10-29): the 2026-10-28 retune is fine as it stands. `npm run audio:levels`
   holds its bands: the mix at -25 to -28 dBFS RMS at default sliders, a room's own beds 10-18
@@ -166,11 +182,13 @@ All by the owner, after seeing pictures or measurements:
   deep; only a spring's oil fades, so a spring holds a low, speckled mound of about 7% of the
   board. Thinning every moving oil cell was approved first and withdrawn: it emptied open
   slicks within 30 s. A thin slick on soil shows a petrol film.
-- **Flowers** (2026-10-19, 10-22): species marks, weather drawn as what it is, readable life
-  stages; moonlight keeps each species. Seed heads stay dry and speciesless except the poppy's
-  capsule and the sunflower's disc. Depth comes from an own-hue outline round each head, not
-  lighting from above, a dark rim inside the head, or petals drawn inside the cell. The tulip
-  is a cup and the bluebell nods.
+- **Flowers** (2026-10-19, 10-22): weather drawn as what it is, readable life stages;
+  moonlight keeps each species. Seed heads stay dry and speciesless except the poppy's capsule
+  and the sunflower's disc. Depth comes from an own-hue outline round each head, not lighting
+  from above or petals drawn inside a cell. The tulip is a cup and the bluebell nods. The big
+  heads (2026-10-29, above) superseded the small heads' per-species marks and the rule against
+  a dark rim inside the head: each big head's design has its own rim, and the outline ring
+  sits outside it.
 - **The poster** (2026-10-18/19): a loose, wet watercolour with watercolour rain and lightning
   and two living jars, a garden and a bug jar. Keep visual changes to it painterly and animated
   with transform/opacity only.
@@ -226,11 +244,13 @@ than went unmeasured.
 **"Flowers and Interactions"** (https://claude.ai/artifact/9DB9Smb5oY65EfpdKJkXkS, private to
 the owner) holds the eight flower species, life stages, weather states, the interaction roster
 marked shows / thin / reads weak / half hidden, and a ranked shortlist of eight upgrades with
-each one's status. Seven have shipped (the burning log last, 2026-10-28) and one was dropped (lava
-thawing ice across a gap); the canvas itself still marks the log open, and the night sky
-(2026-10-29) is not on it. Editing it means following the Design type's own `SKILL.md`. The "Flowers with more depth" board holds the four outline
-candidates. To edit the canvas, read it first (`Artifact` read of the URL, then the file by
-`path`) and publish to the same URL: a publish against a stale version is refused.
+each one's status. Seven have shipped (the burning log last, 2026-10-28) and one was dropped
+(lava thawing ice across a gap). It is out of date: it still marks the log open, and the night
+sky, the fuller garden and the big heads (all 2026-10-29) are not on it; its flower species
+are the old small heads. Editing it means following the Design type's own `SKILL.md`. The
+"Flowers with more depth" board holds the four outline candidates. To edit the canvas, read it
+first (`Artifact` read of the URL, then the file by `path`) and publish to the same URL: a
+publish against a stale version is refused.
 
 ## How a witness gets checked
 
@@ -283,8 +303,10 @@ not this list.
 
 - **Filmstrips:** `.tmp/film/film.mjs <scene> [seed]` draws the base build above the working
   tree through the real engine and renderer (glow approximated) into `.tmp/film/<scene>.png`;
-  scenes are in `.tmp/film/scenes.mjs`. Refresh the base first, it is `43d9292` (before
-  the petals): `rm -rf .tmp/film/base && mkdir -p .tmp/film/base && git archive HEAD app/src | tar -x -C .tmp/film/base`.
+  scenes are in `.tmp/film/scenes.mjs`. Its base is stale (`43d9292`, before the petals); refresh
+  it before use: `rm -rf .tmp/film/base && mkdir -p .tmp/film/base && git archive HEAD app/src | tar -x -C .tmp/film/base`.
+  `.tmp/bighead/film.mjs [seed]` does the same for a watered bed over seven minutes, with
+  `.tmp/bighead/base` (`7937e21`, before the big heads) as its base.
 - **Sabotage:** `.tmp/halves/sabotages.mjs` holds find/replace edits on `app/src/engine.ts`,
   one per rule half, both ways where a rule has two sides; keep the dice (leave the `chance()`
   roll). `.tmp/halves/sab.mjs <name> [seeds] [id,id]` plays every check against one sabotage
