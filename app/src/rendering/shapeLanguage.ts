@@ -1650,6 +1650,19 @@ const WATER_DEPTH_TONE: Rgb[] = Array.from({ length: WATER_DEPTH_CELLS + 2 }, (_
   WATER_SHALLOW.map((c, i) => Math.round(WATER_DEEP[i] + (c - WATER_DEEP[i]) * Math.exp(-WATER_ABSORPTION[i] * depth))) as Rgb);
 // A stream is at its whitest after this fall.
 const WATER_WHITE_CELLS = 20;
+// Moonwater absorbs the same way toward indigo, keeping red longer than water does and giving up
+// green first, so a deep pool goes violet where a deep pond goes navy.
+const MOONWATER_SHALLOW: Rgb = [176, 182, 248];
+const MOONWATER_DEEP: Rgb = [44, 26, 122];
+const MOONWATER_ABSORPTION: Rgb = [0.13, 0.2, 0.07];
+const MOONWATER_DEPTH_TONE: Rgb[] = Array.from({ length: WATER_DEPTH_CELLS + 2 }, (_, depth) =>
+  MOONWATER_SHALLOW.map((c, i) => Math.round(MOONWATER_DEEP[i] + (c - MOONWATER_DEEP[i]) * Math.exp(-MOONWATER_ABSORPTION[i] * depth))) as Rgb);
+// Oil's film follows its thickness, as a real one does: light splits on a thin slick into the
+// interference order, gold through magenta and blue to green, and a pool is too thick to split it.
+const OIL_FILM: Rgb[] = [[176, 150, 74], [168, 92, 104], [124, 76, 152], [62, 96, 168], [48, 136, 136], [104, 150, 84]];
+const OIL_THIN_CELLS = 2;
+// A pool under its skin: amber just below the surface, where light still gets in, then black.
+const OIL_BODY: Rgb[] = [[56, 46, 24], [30, 26, 16], [9, 11, 10]];
 
 // Open air beside a one-wide column. Without it the still neck of a sealed bottle read as a
 // stream: dashes down the neck and foam at its foot, for ever.
@@ -1692,12 +1705,13 @@ function airBeside(cells: Uint8Array, width: number, height: number, x: number, 
 // body of water does. It reads every other row past eight, where the tone barely changes.
 // Open air beside the column ends the count, sampled every fourth row: without that, a clump in a
 // stream read up to the pool the stream left, and a stream on a pond drew a dark stripe through it.
-function waterDepth(cells: Uint8Array, width: number, height: number, x: number, y: number) {
+function waterDepth(cells: Uint8Array, width: number, height: number, x: number, y: number, moon = false) {
   let depth = 1;
   while (depth < WATER_DEPTH_CELLS) {
     const next = depth + (depth < 8 ? 1 : 2);
     const row = y - next + 1;
-    if (kindAt(cells, width, height, x, row) !== MATERIAL.Water) break;
+    const above = kindAt(cells, width, height, x, row);
+    if (above !== MATERIAL.Water && !(moon && above === MATERIAL.Moonwater)) break;
     if (next % 4 === 0 && airBeside(cells, width, height, x, row)) break;
     depth = next;
   }
@@ -1706,7 +1720,7 @@ function waterDepth(cells: Uint8Array, width: number, height: number, x: number,
   for (let below = 1; below < Math.min(depth, 10); below++) {
     const kind = kindAt(cells, width, height, x, y + below);
     if (kind === MATERIAL.Empty) return below;
-    if (kind !== MATERIAL.Water) break;
+    if (kind !== MATERIAL.Water && !(moon && kind === MATERIAL.Moonwater)) break;
   }
   return depth;
 }
@@ -1757,6 +1771,36 @@ function waterCurrent(out: Rgb, time: number, cells: Uint8Array, width: number, 
   return band === 2 ? mixRgb(calm, [24, 60, 120], 0.22 * light) : calm;
 }
 
+// Moonwater's body, water's depth in its own hue. The bands run slower than water's and the other
+// way, so the two read apart in one pool. In the air and at the surface it keeps its crescents.
+function moonwaterCurrent(out: Rgb, time: number, cells: Uint8Array, width: number, height: number, x: number, y: number, top: boolean) {
+  if (top || kindAt(cells, width, height, x, y + 1) === MATERIAL.Empty) return out;
+  const depth = waterDepth(cells, width, height, x, y, true);
+  const deep = depth / WATER_DEPTH_CELLS;
+  const calm = mixRgb(out, MOONWATER_DEPTH_TONE[depth], 0.6 + 0.3 * deep);
+  const wobble = Math.sin(y * 0.7 - x * 0.15 + time * 0.0011) * 1.6;
+  const band = (Math.floor((x - y * 0.5 + wobble - time / 380) / 3) % 4 + 4) % 4;
+  const light = 1 - 0.65 * deep;
+  if (band === 0) return mixRgb(calm, [222, 214, 255], 0.3 * light);
+  return band === 2 ? mixRgb(calm, [46, 28, 118], 0.22 * light) : calm;
+}
+
+// Oil cells in this cell's column, up to one past thin: a slick lying on water or ground is one
+// or two cells, and only a pool goes further.
+function oilThickness(cells: Uint8Array, width: number, height: number, x: number, y: number) {
+  let thick = 1;
+  while (thick <= OIL_THIN_CELLS && kindAt(cells, width, height, x, y + thick) === MATERIAL.Oil) thick++;
+  return thick;
+}
+
+// Long lazy swirls, not cell noise: a film's thickness changes slowly across a slick. The two
+// waves drift against each other so the colours slide and fold rather than scroll.
+function oilFilm(x: number, y: number, time: number) {
+  const swirl = Math.sin(x * 0.11 + time * 0.00035) + 0.6 * Math.sin(x * 0.037 - time * 0.00021 + 1.3);
+  const phase = (x * 0.05 + y * 0.2 + swirl * 1.3) % OIL_FILM.length;
+  return OIL_FILM[Math.floor(phase + OIL_FILM.length) % OIL_FILM.length];
+}
+
 function liquidColor({ kind, color, variant, energy, flags, time, cells, width, height, x, y }: ShapeContext) {
   const top = !sameLiquid(cells, width, height, x, y - 1, kind);
   const left = sameLiquid(cells, width, height, x - 1, y, kind);
@@ -1798,15 +1842,22 @@ function liquidColor({ kind, color, variant, energy, flags, time, cells, width, 
     if (!bottom) out = mixRgb(out, [3, 7, 7], 0.48);
     if (sheen) out = mixRgb(out, nearHeat ? [218, 132, 78] : [166, 158, 93], nearHeat ? 0.36 : 0.34);
     if (hash % 17 === 0 && (top || left || right)) out = mixRgb(out, [214, 192, 116], 0.24);
+    const onDarkGround = top && !bottom && !nearHeat && DARK_GROUND_KINDS.has(kindAt(cells, width, height, x, y + 1));
+    if (top) {
+      // Not on dark ground: gold and rose sit too close to soil's browns, and the slick that
+      // smothers a garden has to stay the one you can see.
+      if (!nearHeat && !onDarkGround) out = mixRgb(out, oilFilm(x, y, time), oilThickness(cells, width, height, x, y) <= OIL_THIN_CELLS ? 0.62 : 0.3);
+    } else {
+      const under = kindAt(cells, width, height, x, y - 2) !== MATERIAL.Oil ? 0 : kindAt(cells, width, height, x, y - 3) !== MATERIAL.Oil ? 1 : 2;
+      out = mixRgb(out, OIL_BODY[under], 0.7);
+    }
     if (nearHeat) out = mixRgb(out, heatContact.top ? [240, 158, 82] : [95, 49, 30], heatContact.top ? 0.42 : 0.28);
     if (lifeContact.count > 0) out = mixRgb(out, [19, 24, 18], lifeContact.bottom ? 0.38 : 0.24);
     // A thin slick on soil shows its film, as a real one does on wet asphalt. Poured oil rests one
     // cell deep, and that sheet sat within the 45 floor of the soil under it on most cells: the
     // slick that smothers a garden was the one slick you could not see. Only a cell that is both
     // the surface and lying on the ground takes it, so a deeper pool on soil looks as it did.
-    if (top && !bottom && !nearHeat && DARK_GROUND_KINDS.has(kindAt(cells, width, height, x, y + 1))) {
-      out = mixRgb(out, [70, 150, 170], 0.55);
-    }
+    if (onDarkGround) out = mixRgb(out, [70, 150, 170], 0.55);
     if (frozen) out = mixRgb(out, [158, 190, 190], 0.44);
     if (flags & CELL_FLAG.Cosmic) {
       // Stardust's sheen: a rainbow film over the WHOLE slick, not the faint green-violet
@@ -1826,6 +1877,7 @@ function liquidColor({ kind, color, variant, energy, flags, time, cells, width, 
   // Hot and sooty water keep their own cues: the calm would wash out the bubbles and the murk.
   const flowing = kind === MATERIAL.Water && energy <= 120 && !sooty;
   if (flowing) out = waterCurrent(out, time, cells, width, height, x, y, top, left, right);
+  if (kind === MATERIAL.Moonwater) out = moonwaterCurrent(out, time, cells, width, height, x, y, top);
   if (heatContact.count > 0) {
     out = mixRgb(out, [226, 245, 255], kind === MATERIAL.Moonwater ? 0.34 : 0.28);
     if (top || heatContact.top) out = mixRgb(out, [255, 255, 255], 0.18);

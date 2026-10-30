@@ -28,20 +28,14 @@ The owner hits usage limits early.
 
 **The owner's direction (2026-10-30): "a mix of realism but still pixel art" for every element,
 one batch at a time.** They chose it on seeing the tuned water, and they decide from pictures that
-move. Water and heat are live. Start here:
+move. Water, heat, moonwater and oil are live. Start here:
 
-1. **Time the renderer on a phone first.** Nothing has been: not the big heads, the night wash, water
-   or heat. Node says 9.3 to 12.5 ms on a board two-thirds deep water, and 7.2 ms on lava, smoke and
-   fire. Each batch adds to or takes from this, so know the budget before spending more of it. A phone
-   is the owner's to run; ask, and give them a board to paint.
-2. **Batch 2: moonwater and oil.** Both unmeasured ideas until a mock says otherwise:
-   - **Moonwater** gets water's depth, in its own hue. It is deliberately outside `waterCurrent` today
-     (`flowing` is plain water only), and it already has crescents, a pulse and life and oil tints to
-     keep. Water sits beside it in one body (`sameLiquid`), so look at the two mixed, not just apart.
-   - **Oil** must keep its sheen. Real film colour follows thickness, so a pool and a thin slick could
-     differ. The cosmic sheen stays the LAST thing oil gets: tints laid over it washed it out to 30,
-     and `renderer:probe` sweeps every neighbour a slick can have. Keep the petrol film on soil.
-3. **Batches after that, in order:** solids (stone, sand, soil, ice, glass, wood, wall), living things
+1. **Time the renderer on a phone first.** Nothing has been. The owner runs it: one tap at
+   https://claude.ai/artifact/QVEjvASjjeMfFrrygyfQkv (source `.tmp/phoneperf/`, rebuild after a renderer
+   change). On the Mac: 9.1 ms deep water, 6.2 lava, smoke and fire, 2.5 a played garden. Know the budget
+   before spending more of it.
+2. **Next batch: solids** (stone, sand, soil, ice, glass, wood, wall). The film template is `.tmp/moonoil/` (`film.mjs`, `sheet.py`, `sab.py`, `perf.mjs`).
+3. **Batches after that, in order:** living things
    (moss, fungus, flowers, stems, seeds, pollen; already detailed, so small changes), then stardust,
    meteor, rocket and spark (the last three onto the heat scale, `heatColor`). One shared idea is left
    for interactions: light that fades with distance, so fire lights nearby water and stone.

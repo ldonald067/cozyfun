@@ -1492,6 +1492,115 @@ function assertFloor(label, floor, worst, detail) {
   if (!(measured.crackShare <= CRACK_CAP)) failures.push(`heat: ${(measured.crackShare * 100).toFixed(0)}% of lava's crust is lit, cap ${CRACK_CAP * 100}%. It has stopped being a crust.`);
 }
 
+// ---------------------------------------------------------------- moonwater's depth, oil's film
+// The owner's "realism but still pixel art" (2026-10-30). Moonwater takes water's absorption in its
+// own hue and oil's colour follows its thickness. Painted, played, judged by pixels and by where a
+// cell IS: deep or shallow is counted here from the board, never read back from the renderer.
+{
+  const { createFallbackEngine } = compileApp("probe-liquids", ["engine.ts", "materials.ts"]).load("engine");
+  const lum = ([r, g, b]) => r * 0.3 + g * 0.59 + b * 0.11;
+  const avg = (r) => r.reduce((a, v) => a + v, 0) / (r.length || 1);
+  const meanColour = (r) => [0, 1, 2].map((i) => avg(r.map((c) => c[i])));
+  const W = 160, H = 72;
+  const e = createFallbackEngine(W, H, 41);
+  const p = (x, y, r, m, d = 100) => e.paint(x, y, r, m, d);
+  for (let x = 2; x <= 157; x++) p(x, 68, 0, MATERIAL.Wall);
+  for (const wall of [2, 34, 66, 96, 125, 157]) for (let y = 30; y <= 68; y++) p(wall, y, 0, MATERIAL.Wall);
+  // Moonwater, moonwater under water, an oil pool, a pond for a slick, and deep water to compare.
+  for (let y = 36; y <= 66; y += 2) for (let x = 5; x <= 31; x += 2) p(x, y, 1, MATERIAL.Moonwater);
+  for (let y = 36; y <= 66; y += 2) for (let x = 37; x <= 63; x += 2) p(x, y, 1, y < 54 ? MATERIAL.Water : MATERIAL.Moonwater);
+  for (let y = 44; y <= 66; y += 2) for (let x = 69; x <= 93; x += 2) p(x, y, 1, MATERIAL.Oil);
+  for (let y = 58; y <= 66; y += 2) for (let x = 99; x <= 123; x += 2) p(x, y, 1, MATERIAL.Water);
+  for (let y = 36; y <= 66; y += 2) for (let x = 128; x <= 154; x += 2) p(x, y, 1, MATERIAL.Water);
+  for (let t = 1; t <= 300; t++) {
+    if (t >= 100 && t < 124 && t % 6 === 0) p(104 + (t % 18), 40, 2, MATERIAL.Oil, 55);
+    e.tick();
+  }
+  const c = e.getCellBytes();
+  const at = (x, y) => (x < 0 || y < 0 || x >= W || y >= H ? -1 : c[(y * W + x) * 8]);
+  const colourOf = (x, y, time) => { const o = (y * W + x) * 8; return colorForCell({ kind: c[o], variant: c[o + 1], age: c[o + 2] | (c[o + 3] << 8), energy: c[o + 4] | (c[o + 5] << 8),
+    flags: c[o + 6] | (c[o + 7] << 8), time, cells: c, width: W, height: H, x, y }); };
+  // Liquid above a cell, moonwater and water as one body: the board's depth, not the renderer's.
+  const liquidAbove = (x, y) => { let n = 0; while (at(x, y - n - 1) === MATERIAL.Moonwater || at(x, y - n - 1) === MATERIAL.Water) n++; return n; };
+  const oilAbove = (x, y) => { let n = 0; while (at(x, y - n - 1) === MATERIAL.Oil) n++; return n; };
+  const inside = (x, y) => at(x - 1, y) !== MATERIAL.Empty && at(x + 1, y) !== MATERIAL.Empty && at(x - 1, y) !== MATERIAL.Wall && at(x + 1, y) !== MATERIAL.Wall;
+  const CLOCK = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => 2000 + i * 900);
+  const seen = { moonShallow: [], moonDeep: [], moonUnderWater: [], waterDeep: [], moonSwing: [], moonTop: [], moonBody: [], poolSkin: [], poolDeep: [], poolTop: [], slick: [], oilBusy: [], oilSlides: [], moonLeft: [], moonRight: [], poolWarm: [] };
+  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+    const k = at(x, y);
+    if (k === MATERIAL.Moonwater) {
+      const depth = liquidAbove(x, y), mixed = x > 34;
+      if (depth === 0) { if (!mixed) seen.moonTop.push(avg(CLOCK.map((t) => lum(colourOf(x, y, t))))); continue; }
+      if (!inside(x, y)) continue;
+      const tones = CLOCK.map((t) => colourOf(x, y, t));
+      if (mixed) { if (depth >= 14) seen.moonUnderWater.push(avg(tones.map(lum))); continue; }
+      seen.moonBody.push(avg(tones.map(lum)));
+      seen.moonSwing.push(Math.max(...tones.map((q) => redmean(tones[0], q))));
+      if (depth >= 2 && depth <= 4) seen.moonShallow.push(avg(tones.map(lum)));
+      if (depth >= 15) seen.moonDeep.push(meanColour(tones));
+      // Bands travel: 760 ms is two cells of drift, so the later frame matches this one shifted
+      // the way they run. Moonwater's run right, against water's. Swing alone cannot see which.
+      if (inside(x - 2, y) && inside(x + 2, y) && at(x - 2, y) === MATERIAL.Moonwater && at(x + 2, y) === MATERIAL.Moonwater) for (const t of CLOCK) {
+        const now = colourOf(x, y, t);
+        seen.moonRight.push(redmean(now, colourOf(x + 2, y, t + 760)));
+        seen.moonLeft.push(redmean(now, colourOf(x - 2, y, t + 760)));
+      }
+    } else if (k === MATERIAL.Water && x > 125 && liquidAbove(x, y) >= 15 && inside(x, y)) {
+      seen.waterDeep.push(meanColour(CLOCK.map((t) => colourOf(x, y, t))));
+    } else if (k === MATERIAL.Oil && x > 66 && x < 96) {
+      const under = oilAbove(x, y);
+      if (under === 0) seen.poolTop.push(x);
+      else if (under === 1) { const skin = colourOf(x, y, 2000); seen.poolSkin.push(lum(skin)); seen.poolWarm.push(skin[0] - skin[2]); }
+      else if (under >= 3) seen.poolDeep.push(lum(colourOf(x, y, 2000)));
+    } else if (k === MATERIAL.Oil && x > 96 && x < 125 && oilAbove(x, y) === 0 && at(x, y + 1) === MATERIAL.Water) {
+      seen.slick.push(x);
+    }
+  }
+  // Across a surface at one moment, cells a band apart: a film has colours in it, a skin does not.
+  const across = (xs, row) => { const out = []; for (const x of xs) { const y = row(x); if (y < 0) continue; for (const d of [8, 14, 20]) if (xs.includes(x + d) && row(x + d) >= 0) out.push(...CLOCK.map((t) => redmean(colourOf(x, y, t), colourOf(x + d, row(x + d), t)))); } return out; };
+  const surfaceRow = (x) => { for (let y = 1; y < H - 1; y++) if (at(x, y) === MATERIAL.Oil) return y; return -1; };
+  const slickSpread = avg(across(seen.slick, surfaceRow)), poolSpread = avg(across(seen.poolTop, surfaceRow));
+  // A film slides. Frames 50 ms apart over ten seconds: a cell changes colour as a band passes it,
+  // and a slick that changes on many frames has turned to noise or lost its slow drift.
+  for (const x of seen.slick) { let last = colourOf(x, surfaceRow(x), 3000), moved = 0; for (let i = 1; i <= 200; i++) { const now = colourOf(x, surfaceRow(x), 3000 + i * 50); if (redmean(last, now) > 30) moved++; last = now; } seen.oilBusy.push(moved / 200); }
+  // And it does slide: half a minute on, the same cell is a different colour.
+  for (const x of seen.slick) for (const t of CLOCK) seen.oilSlides.push(redmean(colourOf(x, surfaceRow(x), t), colourOf(x, surfaceRow(x), t + 30000)));
+  e.dispose();
+  const moonDeep = meanColour(seen.moonDeep), waterDeep = meanColour(seen.waterDeep);
+  const measured = {
+    moonFalls: avg(seen.moonShallow) - lum(moonDeep),
+    moonFromWater: redmean(moonDeep, waterDeep),
+    moonFromNight: WASH_TONES.reduce((n, w) => Math.min(n, redmean(moonDeep, w)), Infinity),
+    moonOneBody: avg(seen.moonShallow) - avg(seen.moonUnderWater),
+    moonCurrent: avg(seen.moonSwing),
+    moonTop: avg(seen.moonTop) - avg(seen.moonBody),
+    moonRuns: avg(seen.moonLeft) - avg(seen.moonRight),
+    slickSpread, slickOverPool: slickSpread - poolSpread, poolFilm: poolSpread, oilSlides: avg(seen.oilSlides),
+    poolAmber: avg(seen.poolSkin) - avg(seen.poolDeep), poolWarm: avg(seen.poolWarm),
+  };
+  const oilBusy = avg(seen.oilBusy);
+  note(`\nLiquids on painted scenes: ${seen.moonDeep.length} deep and ${seen.moonShallow.length} shallow moonwater, ${seen.moonUnderWater.length} under water, ${seen.waterDeep.length} deep water, ${seen.slick.length} slick and ${seen.poolTop.length} pool surface cells, ${seen.poolSkin.length} skin and ${seen.poolDeep.length} deep oil. ${Object.entries(measured).map(([k, v]) => `${k} ${v.toFixed(1)}`).join(", ")}, oilBusy ${oilBusy.toFixed(3)}.`);
+  // Each between the build and the same thing sabotaged (2026-10-30): `.tmp/moonoil/sab.py`.
+  const FLOORS = [
+    ["moonFalls", 30, "Moonwater has lost its depth (58 built, 1 flat)."],
+    ["moonFromWater", 90, "Deep moonwater has gone to water's navy (108 built, 72 on water's tones)."],
+    ["moonFromNight", 150, "Deep moonwater is sinking into the night (244 built, 139 toward black)."],
+    ["moonOneBody", 30, "Moonwater under water no longer counts the water above it (59 built, 3)."],
+    ["moonCurrent", 50, "Moonwater's body has stopped drifting (70 built, 32 with still bands)."],
+    ["moonTop", 96, "Moonwater's surface has lost its crescents (100 built, 93 without)."],
+    ["moonRuns", 6, "Moonwater's bands no longer run against water's (15 built, 0 still, -12 reversed)."],
+    ["slickSpread", 35, "A thin slick has lost its colours (69 built, 8 without the film, 4 in one colour)."],
+    ["slickOverPool", 8, "A pool shows the same film as a slick: colour has stopped following thickness (26 built, -6)."],
+    ["poolFilm", 34, "A pool's skin has lost its faint film (44 built, 27 without). A slick wins slickOverPool by more when this is gone, so that floor cannot say so."],
+    ["oilSlides", 40, "A slick's film has stopped sliding (83 built, 0 frozen)."],
+    ["poolAmber", 12, "A pool no longer falls from its skin to black (26 built, 0)."],
+    ["poolWarm", 12, "The band under a pool's skin has lost its amber (24 built, 2 in grey, which poolAmber cannot see)."],
+  ];
+  for (const [name, floor, why] of FLOORS) if (!(measured[name] >= floor)) failures.push(`liquids: ${name} ${measured[name].toFixed(1)}, floor ${floor}. ${why}`);
+  if (!(oilBusy <= 0.05)) failures.push(`liquids: a slick changes colour on ${(oilBusy * 100).toFixed(1)}% of frames, cap 5%. A film slides, it does not flicker (1.4% built, 14.6% at ten times the speed).`);
+  if (seen.moonDeep.length < 100 || seen.moonShallow.length < 30 || seen.moonUnderWater.length < 30 || seen.waterDeep.length < 100 || seen.slick.length < 12 || seen.poolTop.length < 12 || seen.poolSkin.length < 12 || seen.poolDeep.length < 40) failures.push("the liquid scene saw too little moonwater or oil to judge.");
+}
+
 if (!quiet) {
   console.log("\nRendered state pairs, worst case over a full energy/age/species/time sweep:");
   for (const c of checks) {
