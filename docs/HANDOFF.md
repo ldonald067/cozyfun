@@ -1,11 +1,9 @@
 # Handoff — where the work is, and what to do next
 
 *Rewritten at each handoff, never appended to. Shipped work lives in `git log`, whose commit
-messages carry each batch's measurements. Written 2026-10-29, after the big flower heads
-shipped (`9f2d83b`: heads up to 13 cells across, drawn in their own tones, blooming in two
-waves; live, `deploy:verify` and `qa:live` green). The same day shipped the fuller garden
-(`5ce735a`), and the owner settled sound (fine as it is) and spent gardens (left as they are).
-Nothing is in flight: `main` is clean and matches the live site.*
+messages carry each batch's measurements. Written 2026-10-30, after water learned to move
+(`7f97074`, `b8127a4`): a calm body with drifting currents, depth as real absorption, and
+streams that stretch and whiten as they fall. Nothing else is in flight.*
 
 ## Keep chats lean
 
@@ -28,7 +26,17 @@ The owner hits usage limits early.
 
 ## What to do next
 
-1. **Flowers, only if the owner asks.** Left from the reference sheet `.tmp/flowers-ref/3.png`:
+**The owner's direction (2026-10-30): "a mix of realism but still pixel art" for every element,
+one batch at a time, in this order.** (1) Heat: fire, ember, lava, smoke, steam. (2) Moonwater, oil.
+(3) Solids: stone, sand, soil, ice, glass, wood, wall. (4) Living things. (5) Stardust, meteor, rocket,
+spark. The recipe is water's: pick the one or two things that make the real material look real, draw
+only those in the cells the sim already makes, show a MOVING side-by-side (`.tmp/water/tune.mjs` with
+`sheet.py`), and gate it from painted materials. Most interactions improve with their materials; the
+one shared idea left is light that fades with distance. Fire, lava and oil must keep their flicker,
+crust and sheen: an earlier painted pass lost them and was ruled out. Time it on a phone early, because
+each batch adds cost.
+
+0. **Flowers, only if the owner asks.** Left from the reference sheet `.tmp/flowers-ref/3.png`:
    leaves in two greens with a lit edge on cooler stems. Leaves are cells on every segment now,
    so that is drawing only. The bluebell is the darkest head at
    play size; the owner saw that in the filmstrip and shipped it. The images in
@@ -48,6 +56,14 @@ The owner hits usage limits early.
 
 ## Open questions, accepted unless the owner says otherwise
 
+- **Water's edges** (2026-10-30). A broad pour is not traced, so on the default brush about 27% of
+  airborne cells take the strand and the rest are clumps. A thick falling mass darkens in its core,
+  1.5% of a held radius-12 brush's airborne water, on purpose. A one-wide stream walled on both sides
+  draws as still water. Bands and glints always drift the same way, because the renderer cannot tell
+  which way a cell moved. Streams keep a toothed edge, because cells hop columns in the sim. Water
+  heaps under a pour and levels in about 15 s; that is how it moves, not how it is drawn, and changing
+  it is a sim decision the owner has not taken. Moonwater is unchanged.
+- Water's cost was timed in Node only: 9.3 to 12.5 ms a frame on a board two-thirds deep water.
 - **Big heads, the edges of taking turns** (2026-10-29). A bud waits for a neighbour of another
   species until its last petal has gone, but for one of its own species only until the petals
   round that crown have gone: two heads of one species cannot be told apart cell by cell, and
@@ -84,6 +100,9 @@ The owner hits usage limits early.
 
 All by the owner, after seeing pictures or measurements:
 
+- **Water moves, and behaves like real water** (2026-10-30), from a moving side-by-side
+  (`.tmp/water/currents-tuned.gif`): "currents" over a painted wash and today's look, then depth and
+  streaks retuned on the owner's word. `docs/VISUAL_PIPELINE.md` has the rules and their reasons.
 - **Big heads in two waves** (2026-10-29), from a close-up of our own eight designs against the
   old heads (`.tmp/bighead/tweak-sheet.png`) and a filmstrip of a watered bed
   (`.tmp/bighead/bighead-sheet.png`). Heads are up to 13 cells across and 11 tall, crown at the
@@ -301,6 +320,10 @@ publish against a stale version is refused.
 Nothing backs these up. Each script's header gives its purpose and arguments; read the header,
 not this list.
 
+- **Water:** `.tmp/water/` — `tune.mjs` + `sheet.py` (three looks, moving, the template for each new
+  batch: `base` and `prev` are `git archive` copies of `app/src`), `mock.mjs` (the first mock; its streaks
+  never drew), `sab.py` (sabotage table; it edits the real renderer and a hard kill leaves it broken,
+  so diff against `shapeLanguage.keep.ts`), `airdark.mjs` (airborne water on real pours), `perf.mjs`.
 - **Filmstrips:** `.tmp/film/film.mjs <scene> [seed]` draws the base build above the working
   tree through the real engine and renderer (glow approximated) into `.tmp/film/<scene>.png`;
   scenes are in `.tmp/film/scenes.mjs`. Its base is stale (`43d9292`, before the petals); refresh
