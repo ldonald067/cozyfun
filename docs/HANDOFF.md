@@ -29,15 +29,24 @@ The owner hits usage limits early.
 one batch at a time.** They chose it on seeing the tuned water, and they decide from pictures that
 move. Water, heat, moonwater, oil and the solids are live. Start here:
 
-1. **Next batch: living things** (moss, fungus, flowers, stems, seeds, pollen; already detailed, so
+1. **First: walls in weather.** A wet, frozen or cosmic wall loses its bricks under the overlay; a
+   scorched one keeps them. `node .tmp/solids/states.mjs` then `python3 .tmp/solids/states.py` writes
+   `.tmp/solids/states.png`, where the wall column shows it (each material plain, wet, frozen, scorched,
+   cosmic; today on the left). Stone had the same fault and the fix to start from is at the end of
+   `stoneColor`: the structure is drawn again over the weather. The walls' overlays are in `wallColor`, and
+   each has a reason in its comment. Condensation was made into beads because a flat wash measured a delta
+   of 37, so the beads must still read as beads over the mortar. Gate it the way `crackWet` and
+   `crackCosmic` are gated in the probe's solids block, sabotage it, and show the owner the wall column
+   before and after. Renderer only.
+2. **Next batch: living things** (moss, fungus, flowers, stems, seeds, pollen; already detailed, so
    small changes). The film template is `.tmp/solids/` (`film.mjs`, `sheet.py`, `sab.py`, `perf.mjs`,
    `states.mjs`, `board.mjs`).
-2. **After that:** stardust, meteor, rocket and spark (the last three onto the heat scale, `heatColor`).
+3. **After that:** stardust, meteor, rocket and spark (the last three onto the heat scale, `heatColor`).
    One shared idea is left for interactions: light that fades with distance, so fire lights nearby
    water and stone.
 
-**The phone timing is parked on the owner's word (2026-10-31), not done.** No phone has ever run the
-renderer. The one reading pasted back came from the Claude desktop app on the Mac, so it says nothing
+**The phone timing stays open on the owner's word (2026-10-31).** It is not done and is not next: leave
+it until they bring it up. No phone has ever run the renderer. The one reading pasted back came from the Claude desktop app on the Mac, so it says nothing
 about a phone. The timer at https://claude.ai/artifact/QVEjvASjjeMfFrrygyfQkv (source `.tmp/phoneperf/`)
 now warns on a computer and prints `device: phone` or `NOT A PHONE`. Its phone branch has only been run
 against device strings, not on a device, and it is built at `f65549b`, before the solids: rebuild and
@@ -98,8 +107,7 @@ mock. It remains open only for steam and smoke, and heat has since given those a
 ## Open questions, accepted unless the owner says otherwise
 
 - **Solids' edges** (2026-10-31). A stone's pattern is keyed on position, so a falling stone slides
-  through it for a moment; it was looked at in the film. Wet, frozen and cosmic walls still lose their
-  bricks under the overlay, as they did before; only stone's cracks were kept through weather. Wood's
+  through it for a moment; it was looked at in the film. Wood's
   grain is upright even on a sideways beam, because sideways shares soil's axis and the probe scores
   that zero. Ice's top-edge glint was built and deleted: 244 to 252, too faint to see. The showcase has
   no big stone or wood face; `.tmp/solids/full-board.png` is where those were judged.
