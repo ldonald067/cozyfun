@@ -1,9 +1,8 @@
 # Handoff — where the work is, and what to do next
 
 *Rewritten at each handoff, never appended to. Shipped work lives in `git log`, whose commit
-messages carry each batch's measurements. Written 2026-10-30, after water learned to move
-(`7f97074`, `b8127a4`) and heat became one scale (`1d56966`): fire, lava, embers, smoke and steam
-drawn as the real thing. Nothing else is in flight.*
+messages carry each batch's measurements. Written 2026-10-31, after the solids batch: stone, sand,
+soil, ice, glass, wood and wall drawn as the real thing. Nothing else is in flight.*
 
 ## Keep chats lean
 
@@ -28,17 +27,23 @@ The owner hits usage limits early.
 
 **The owner's direction (2026-10-30): "a mix of realism but still pixel art" for every element,
 one batch at a time.** They chose it on seeing the tuned water, and they decide from pictures that
-move. Water, heat, moonwater and oil are live. Start here:
+move. Water, heat, moonwater, oil and the solids are live. Start here:
 
-1. **Time the renderer on a phone first.** Nothing has been. The owner runs it: one tap at
-   https://claude.ai/artifact/QVEjvASjjeMfFrrygyfQkv (source `.tmp/phoneperf/`, rebuild after a renderer
-   change). On the Mac: 9.1 ms deep water, 6.2 lava, smoke and fire, 2.5 a played garden. Know the budget
-   before spending more of it.
-2. **Next batch: solids** (stone, sand, soil, ice, glass, wood, wall). The film template is `.tmp/moonoil/` (`film.mjs`, `sheet.py`, `sab.py`, `perf.mjs`).
-3. **Batches after that, in order:** living things
-   (moss, fungus, flowers, stems, seeds, pollen; already detailed, so small changes), then stardust,
-   meteor, rocket and spark (the last three onto the heat scale, `heatColor`). One shared idea is left
-   for interactions: light that fades with distance, so fire lights nearby water and stone.
+1. **Next batch: living things** (moss, fungus, flowers, stems, seeds, pollen; already detailed, so
+   small changes). The film template is `.tmp/solids/` (`film.mjs`, `sheet.py`, `sab.py`, `perf.mjs`,
+   `states.mjs`, `board.mjs`).
+2. **After that:** stardust, meteor, rocket and spark (the last three onto the heat scale, `heatColor`).
+   One shared idea is left for interactions: light that fades with distance, so fire lights nearby
+   water and stone.
+
+**The phone timing is parked on the owner's word (2026-10-31), not done.** No phone has ever run the
+renderer. The one reading pasted back came from the Claude desktop app on the Mac, so it says nothing
+about a phone. The timer at https://claude.ai/artifact/QVEjvASjjeMfFrrygyfQkv (source `.tmp/phoneperf/`)
+now warns on a computer and prints `device: phone` or `NOT A PHONE`. Its phone branch has only been run
+against device strings, not on a device, and it is built at `f65549b`, before the solids: rebuild and
+republish before asking. It must be opened on the phone, signed in to the owner's account, because the
+page is private. On the Mac, in a real browser at `f65549b`: 9.2 ms deep water, 6.8 lava, smoke and fire,
+7.7 moonwater and oil, 3.5 a played garden. The solids add a one-off 24 ms at load, also unmeasured on a phone.
 
 **The recipe, which has held for two batches:**
 
@@ -48,18 +53,21 @@ move. Water, heat, moonwater and oil are live. Start here:
    painted pass, which was ruled out. A new look that reads as a neighbour has failed, as the first
    lava did by reading as a heater and as fire.
 3. Branch, build for real rather than in a mock, and film it: refresh the base with
-   `rm -rf .tmp/heat2/base && mkdir -p .tmp/heat2/base && git archive HEAD app/src | tar -x -C .tmp/heat2/base`,
-   give `.tmp/heat2/film.mjs` a scene for the batch, and run `sheet.py`. Look at crops: stream and fire
+   `rm -rf .tmp/solids/base && mkdir -p .tmp/solids/base && git archive HEAD app/src | tar -x -C .tmp/solids/base`,
+   give `.tmp/solids/film.mjs` a scene for the batch, and run `sheet.py`. Look at crops: stream and fire
    flaws only showed up close. Test the app's real gesture, a brush at density 55 (`PAINT_DENSITY`), as
    well as a neat scene: a held big brush found a fifth of falling water drawn as a lake floor.
 4. Gate it in `renderer:probe` from painted materials, and require a minimum of cells seen, because
    every batch had a check that passed on nothing (`Infinity` passes a floor). Then sabotage each half
-   with `.tmp/heat2/sab.py` and set each floor between the two numbers. A check a sabotage does not
+   with `.tmp/solids/sab.py` and set each floor between the two numbers. A check a sabotage does not
    move gets rewritten or deleted. The script edits the real renderer and a hard kill leaves it broken,
    as one did: diff against `shapeLanguage.keep.ts` afterwards.
 5. Compare frames close together too. Two gates that rewarded change over seconds counted a one-frame
    flash as motion.
 6. Keep table colours whole numbers: fractional ones slowed every `mixRgb` by about 2 ms.
+   A shape wider than a cell's neighbours goes in a tile in `rendering/solidFields.ts`, looked up per
+   cell. Check it at the full 220x140 board and on a 16x12 dab: a film scene of neat medium blocks
+   hid both a tile showing four times and a small mound landing on a blank patch.
 7. Show the owner the moving side-by-side. If a claim about it turns out false, say so plainly: the
    water mock's streaks never drew. Then the gate once, `/adversarial-review`, ship on their word.
 
@@ -89,6 +97,12 @@ mock. It remains open only for steam and smoke, and heat has since given those a
 
 ## Open questions, accepted unless the owner says otherwise
 
+- **Solids' edges** (2026-10-31). A stone's pattern is keyed on position, so a falling stone slides
+  through it for a moment; it was looked at in the film. Wet, frozen and cosmic walls still lose their
+  bricks under the overlay, as they did before; only stone's cracks were kept through weather. Wood's
+  grain is upright even on a sideways beam, because sideways shares soil's axis and the probe scores
+  that zero. Ice's top-edge glint was built and deleted: 244 to 252, too faint to see. The showcase has
+  no big stone or wood face; `.tmp/solids/full-board.png` is where those were judged.
 - **Water's edges** (2026-10-30). A broad pour is not traced, so on the default brush about 27% of
   airborne cells take the strand and the rest are clumps. A thick falling mass darkens in its core,
   1.5% of a held radius-12 brush's airborne water, on purpose. A one-wide stream walled on both sides
@@ -135,6 +149,12 @@ mock. It remains open only for steam and smoke, and heat has since given those a
 ## Decisions already made — do not relitigate
 
 All by the owner, after seeing pictures or measurements:
+
+- **Solids break the way solids break** (2026-10-31), from a moving side-by-side
+  (`.tmp/solids/solids.gif`) and `.tmp/solids/full-board.png`. `docs/VISUAL_PIPELINE.md` has the rules.
+  Stone is broken faces with cracks on about half their edges, wood upright grain round knots, ice a
+  pale rim deepening to blue with long fractures, sand a sunny and a shaded slope with quartz glints,
+  soil dark topsoil over paler earth with pebbles, a wall's block one tone, glass a sheen that jogs.
 
 - **Heat is one scale** (2026-10-30), from a moving side-by-side (`.tmp/heat2/heat-tuned.gif`).
   `docs/VISUAL_PIPELINE.md` has the rules. Lava is mostly dark skin with heat breaking through: bright
@@ -360,8 +380,12 @@ publish against a stale version is refused.
 Nothing backs these up. Each script's header gives its purpose and arguments; read the header,
 not this list.
 
-- **Heat:** `.tmp/heat2/` — `film.mjs` + `sheet.py` (today against the build, moving, the template for
-  each new batch: `base` is a `git archive` copy of `app/src`), `sab.py` (sabotage table; it edits the
+- **Solids:** `.tmp/solids/` — `film.mjs` + `sheet.py` (today against the build, moving, the template for
+  each new batch), `states.mjs` + `states.py` (each solid plain, wet, frozen, scorched, cosmic),
+  `board.mjs` (a full board, for tiles), `sab.py` (the sabotage table; it edits the real renderer and
+  `solidFields.ts`, and a hard kill leaves them broken, so diff against the two `*.keep.ts`), `perf.mjs`.
+- **Heat:** `.tmp/heat2/` — `film.mjs` + `sheet.py` (today against the build, moving, used for heat:
+  `base` is a `git archive` copy of `app/src`), `sab.py` (sabotage table; it edits the
   real renderer and a hard kill leaves it broken, so diff against `shapeLanguage.keep.ts`), `perf.mjs`,
   `lavaenergy.mjs` (how lava's energy falls in play).
 - **Water:** `.tmp/water/` — `tune.mjs` + `sheet.py` (three looks, moving), `mock.mjs` (the first mock; its streaks

@@ -1601,6 +1601,165 @@ function assertFloor(label, floor, worst, detail) {
   if (seen.moonDeep.length < 100 || seen.moonShallow.length < 30 || seen.moonUnderWater.length < 30 || seen.waterDeep.length < 100 || seen.slick.length < 12 || seen.poolTop.length < 12 || seen.poolSkin.length < 12 || seen.poolDeep.length < 40) failures.push("the liquid scene saw too little moonwater or oil to judge.");
 }
 
+// ------------------------------------------------------------------------ solids, as solids break
+// The owner's "realism but still pixel art" (2026-10-31): every solid here is measured from the
+// brush, by where a cell IS on the board. Stone, wood and ice draw from tiles, so two more questions
+// are asked of a whole clean board: whether a tile shows twice, and whether a small piece lands on
+// a blank patch. The first full board had four copies of every knot, and spreading the shapes out
+// to cure that left a player's small mound with no crack on it.
+{
+  const { createFallbackEngine } = compileApp("probe-solids", ["engine.ts", "materials.ts"]).load("engine");
+  const lum = ([r, g, b]) => r * 0.3 + g * 0.59 + b * 0.11;
+  const avg = (r) => r.reduce((a, v) => a + v, 0) / (r.length || 1);
+  const meanColour = (r) => [0, 1, 2].map((i) => avg(r.map((c) => c[i])));
+  const W = 300, H = 90, T = 5000;
+  const e = createFallbackEngine(W, H, 51);
+  const p = (x, y, r, m, d = 100) => e.paint(x, y, r, m, d);
+  for (let x = 0; x < W; x++) p(x, 88, 0, MATERIAL.Wall);
+  for (let y = 30; y <= 88; y++) { p(200, y, 0, MATERIAL.Wall); p(248, y, 0, MATERIAL.Wall); }
+  const fill = (x0, x1, y0, y1, m) => { for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) p(x, y, 0, m); };
+  fill(4, 60, 48, 85, MATERIAL.Stone); fill(66, 112, 44, 74, MATERIAL.Wood); fill(118, 150, 50, 85, MATERIAL.Ice);
+  fill(205, 243, 62, 85, MATERIAL.Soil); fill(254, 296, 50, 85, MATERIAL.Wall);
+  for (let t = 1; t <= 140; t++) { if (t <= 34) p(176, 30, 4, MATERIAL.Sand, 55); e.tick(); }
+  const c = e.getCellBytes();
+  e.dispose();
+  const at = (x, y) => (x < 0 || y < 0 || x >= W || y >= H ? -1 : c[(y * W + x) * 8]);
+  const colourOf = (x, y, time = T, flagsOr = 0) => { const o = (y * W + x) * 8; return colorForCell({ kind: c[o], variant: c[o + 1], age: c[o + 2] | (c[o + 3] << 8),
+    energy: c[o + 4] | (c[o + 5] << 8), flags: (c[o + 6] | (c[o + 7] << 8)) | flagsOr, time, cells: c, width: W, height: H, x, y }); };
+  const inside = (x, y, kind, m) => { for (let dy = -m; dy <= m; dy++) for (let dx = -m; dx <= m; dx++) if (at(x + dx, y + dy) !== kind) return false; return true; };
+  const region = (x0, x1, y0, y1, kind, m) => { const out = []; for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (inside(x, y, kind, m)) out.push([x, y]); return out; };
+  // Cells darker (sign -1) or lighter than the cells around them, which is what a line is.
+  const standouts = (cells, read, by, sign) => {
+    const near = (x, y) => { let t = 0, n = 0; for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) { const v = read(x + dx, y + dy); if (v !== undefined) { t += v; n++; } } return t / n; };
+    return cells.filter(([x, y]) => (read(x, y) - near(x, y)) * sign > by);
+  };
+  const joinedShare = (found) => { const key = new Set(found.map(([x, y]) => x * 1000 + y));
+    return found.filter(([x, y]) => [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]].some(([a, b]) => key.has((x + a) * 1000 + y + b))).length / Math.max(1, found.length); };
+  const reader = (cells) => { const L = new Map(cells.map(([x, y]) => [x * 1000 + y, lum(colourOf(x, y))])); return (x, y) => L.get(x * 1000 + y); };
+
+  // Stone: faces you could put a hand on, and cracks that run.
+  const stone = region(4, 60, 48, 85, MATERIAL.Stone, 2), stoneL = reader(stone);
+  const blocks = new Map();
+  for (const [x, y] of stone) { const k = (x >> 3) * 1000 + (y >> 3); (blocks.get(k) ?? blocks.set(k, []).get(k)).push(stoneL(x, y)); }
+  const faceSteps = [];
+  for (const [k, v] of blocks) { const right = blocks.get(k + 1000); if (right && v.length === 64 && right.length === 64) faceSteps.push(Math.abs(avg(v) - avg(right))); }
+  const cracks = standouts(stone, stoneL, 22, -1);
+  // Weather lies on the rock: the same cracks, read under a wet and a cosmic skin.
+  const crackKeys = new Set(cracks.map(([x, y]) => x * 1000 + y));
+  const uncracked = stone.filter(([x, y]) => !crackKeys.has(x * 1000 + y));
+  const underWeather = (flag) => avg(uncracked.map(([x, y]) => lum(colourOf(x, y, T, flag)))) - avg(cracks.map(([x, y]) => lum(colourOf(x, y, T, flag))));
+
+  // Wood: lines that run up the board and bend round something.
+  const wood = region(66, 112, 44, 74, MATERIAL.Wood, 2), woodL = reader(wood);
+  const step = (dx, dy) => avg(wood.filter(([x, y]) => woodL(x + dx, y + dy) !== undefined).map(([x, y]) => Math.abs(woodL(x, y) - woodL(x + dx, y + dy))));
+
+  // Ice: light goes further into a thick block, so it deepens to blue, with long white planes in it.
+  const iceRim = region(112, 156, 44, 87, MATERIAL.Ice, 0).filter(([x, y]) => !inside(x, y, MATERIAL.Ice, 1));
+  const iceDeep = region(118, 150, 50, 85, MATERIAL.Ice, 8), iceBody = region(118, 150, 50, 85, MATERIAL.Ice, 2), iceL = reader(iceBody);
+  const planes = standouts(iceBody, iceL, 24, 1);
+
+  // Sand: the slope facing the light against the one facing away, a few grains in.
+  const skin = new Map();
+  for (let x = 150; x < 200; x++) for (let y = 0; y < 86; y++) if (at(x, y) === MATERIAL.Sand) { skin.set(x, y); break; }
+  const peak = [...skin].reduce((a, b) => (b[1] < a[1] ? b : a));
+  const slope = (side) => { const out = []; for (const [x, y] of skin) if ((x - peak[0]) * side > 3) for (let d = 1; d <= 3; d++) if (at(x, y + d) === MATERIAL.Sand) out.push(lum(colourOf(x, y + d))); return out; };
+  const sunny = slope(-1), shady = slope(1);
+  const surfaceGrains = [...skin].filter(([x]) => Math.abs(x - peak[0]) > 3);
+  const CLOCK = Array.from({ length: 40 }, (_, i) => 1000 + i * 100);
+  const lit = surfaceGrains.filter(([x, y]) => { const l = CLOCK.map((t) => lum(colourOf(x, y, t))); return Math.max(...l) - Math.min(...l) > 30; });
+  const glints = lit.length / Math.max(1, surfaceGrains.length);
+  let glintJump = 0;
+  for (let t = 0; t < 150; t++) for (const [x, y] of lit) glintJump = Math.max(glintJump, redmean(colourOf(x, y, 1000 + t * 16), colourOf(x, y, 1016 + t * 16)));
+
+  // Soil: dark with rot on top, paler and stonier under it, counted from the surface of each column.
+  const soilTop = [], soilDeep = [];
+  for (let x = 208; x <= 240; x++) { let top = -1; for (let y = 40; y < 88; y++) if (at(x, y) === MATERIAL.Soil) { top = y; break; }
+    if (top < 0) continue; for (let y = top + 1; y <= 85; y++) if (at(x, y) === MATERIAL.Soil && inside(x, y, MATERIAL.Soil, 0)) (y <= top + 2 ? soilTop : y >= top + 6 && at(x - 1, y) === MATERIAL.Soil && at(x + 1, y) === MATERIAL.Soil ? soilDeep : []).push([x, y]); }
+
+  // Wall: a block is one piece, so tone changes between blocks more than inside them.
+  const toneByBlock = new Map();
+  for (const [x, y] of region(254, 296, 50, 85, MATERIAL.Wall, 2)) { const off = ((y >> 2) & 1) * 2, bx = (x + off) & 7, by = y & 3; if (bx < 2 || by < 2) continue;
+    const k = ((x + off) >> 3) * 1000 + (y >> 2); (toneByBlock.get(k) ?? toneByBlock.set(k, []).get(k)).push(lum(colourOf(x, y))); }
+  const blockMeans = [...toneByBlock.values()].filter((v) => v.length >= 8).map(avg);
+  const blockSpread = Math.sqrt(avg(blockMeans.map((m) => (m - avg(blockMeans)) ** 2)));
+  const inBlock = avg([...toneByBlock.values()].filter((v) => v.length >= 8).map((v) => Math.sqrt(avg(v.map((l) => (l - avg(v)) ** 2)))));
+
+  // Clean boards, the size of the play grid: neighbours, and small pieces of them, never edges.
+  const FW = 220, FH = 140;
+  const flat = (kind) => { const cells = new Uint8Array(FW * FH * 8); for (let y = 0; y < FH; y++) for (let x = 0; x < FW; x++) { const o = (y * FW + x) * 8; cells[o] = kind; cells[o + 1] = (x * 7 + y * 3) & 7; cells[o + 2] = 90; } return cells; };
+  const flatL = (kind) => { const cells = flat(kind), out = new Float32Array(FW * FH); for (let y = 0; y < FH; y++) for (let x = 0; x < FW; x++) { const o = (y * FW + x) * 8; out[y * FW + x] = lum(colorForCell({ kind, variant: cells[o + 1], age: 90, energy: 0, flags: 0, time: T, cells, width: FW, height: FH, x, y })); } return out; };
+  // Of the cells that stand out, the share with one standing out a tile's width away, at the worst of
+  // several widths both ways: a review halved wood's tile to 128 and a check of one width still passed.
+  // Only those cells, because a plain body matches itself anywhere and ice is mostly plain body.
+  const flatMean = (L) => L.reduce((a, v) => a + v, 0) / L.length;
+  const SHIFTS = [[32, 0], [64, 0], [96, 0], [128, 0], [160, 0], [0, 32], [0, 64], [0, 96]];
+  const repeats = (L, by, sign) => { const mean = flatMean(L); return Math.max(...SHIFTS.map(([sx, sy]) => { let same = 0, n = 0; for (let y = 8; y < FH - 8 - sy; y++) for (let x = 8; x < FW - 8 - sx; x++) { if ((L[y * FW + x] - mean) * sign <= by) continue; n++; if ((L[(y + sy) * FW + x + sx] - mean) * sign > by) same++; } return same / Math.max(1, n); })); };
+  // Share of 16x12 pieces, about what a dab leaves, that show `need` cells standing out from the piece.
+  const showing = (L, by, sign, need) => { let hit = 0, n = 0; for (let y = 8; y + 12 < FH - 8; y += 9) for (let x = 8; x + 16 < FW - 8; x += 11) { n++; const v = []; for (let j = 0; j < 12; j++) for (let i = 0; i < 16; i++) v.push(L[(y + j) * FW + x + i]); const middle = [...v].sort((a, b) => a - b)[v.length >> 1]; if (v.filter((l) => (l - middle) * sign > by).length >= need) hit++; } return hit / n; };
+  const flatStone = flatL(MATERIAL.Stone), flatWood = flatL(MATERIAL.Wood), flatIce = flatL(MATERIAL.Ice);
+  const woodFlatMean = flatMean(flatWood);
+  let knotBlocks = 0;
+  for (let y = 8; y < FH - 8; y++) for (let x = 8; x < FW - 8; x++) if ([0, 1, FW, FW + 1].every((o) => flatWood[y * FW + x + o] < woodFlatMean - 42)) knotBlocks++;
+  // Glass's sheen is a diagonal that jogs: which diagonal is brightest, four rows at a time.
+  const flatGlass = flatL(MATERIAL.Glass), sheens = [];
+  for (let group = 3; group < 30; group++) { let best = 0, top = -1; for (let k = 0; k < 11; k++) { let t = 0; for (let y = group * 4; y < group * 4 + 4; y++) for (let x = 8; x < 200; x++) if ((x + y + k) % 11 === 0) t += flatGlass[y * FW + x]; if (t > top) { top = t; best = k; } } sheens.push(best); }
+  const sheenJog = sheens.slice(1).filter((k, i) => k !== sheens[i]).length / (sheens.length - 1);
+  // A pebble is a stone in the earth, so it is told by being grey, not by being bright: soil's beds
+  // are bright enough to pass for one, and a count by brightness did not notice the pebbles go.
+  const flatSoil = flat(MATERIAL.Soil);
+  let pebbles = 0;
+  for (let y = 8; y < FH - 8; y++) for (let x = 8; x < FW - 8; x++) { const [r, g, b] = colorForCell({ kind: MATERIAL.Soil, variant: flatSoil[(y * FW + x) * 8 + 1], age: 90, energy: 0, flags: 0, time: T, cells: flatSoil, width: FW, height: FH, x, y }); if (r - b < 42 && g > 88) pebbles++; }
+  const waterDeep = (() => { const cells = flat(MATERIAL.Water), out = []; for (let x = 40; x < 120; x += 3) out.push(colorForCell({ kind: MATERIAL.Water, variant: 1, age: 90, energy: 0, flags: 0, time: T, cells, width: FW, height: FH, x, y: 90 })); return out; })();
+
+  const measured = {
+    faceStep: avg(faceSteps), crackShare: cracks.length / Math.max(1, stone.length), crackJoined: joinedShare(cracks), crackWet: underWeather(CELL_FLAG.Wet), crackCosmic: underWeather(CELL_FLAG.Cosmic),
+    grainUpright: step(1, 0) / Math.max(0.01, step(0, 1)), knotBlocks,
+    iceRimOverDeep: avg(iceRim.map(([x, y]) => lum(colourOf(x, y)))) - avg(iceDeep.map(([x, y]) => lum(colourOf(x, y)))),
+    iceBlue: avg(iceDeep.map(([x, y]) => { const q = colourOf(x, y); return q[2] - q[0]; })), planeShare: planes.length / Math.max(1, iceBody.length), planeJoined: joinedShare(planes),
+    iceFromWater: redmean(meanColour(iceDeep.map(([x, y]) => colourOf(x, y))), meanColour(waterDeep)),
+    sunOverShade: avg(sunny) - avg(shady), glints, deepOverTopsoil: avg(soilDeep.map(([x, y]) => lum(colourOf(x, y)))) - avg(soilTop.map(([x, y]) => lum(colourOf(x, y)))),
+    pebbles, blockRatio: blockSpread / Math.max(0.01, inBlock), sheenJog,
+    stonePieces: showing(flatStone, 22, -1, 4), icePieces: showing(flatIce, 24, 1, 2), woodPieces: showing(flatWood, 18, -1, 8),
+  };
+  const caps = { stoneRepeat: repeats(flatStone, 22, -1), woodRepeat: repeats(flatWood, 42, -1), iceRepeat: repeats(flatIce, 24, 1), glintJump, crackShare: measured.crackShare, planeShare: measured.planeShare };
+  note(`\nSolids on painted scenes: ${stone.length} stone, ${wood.length} wood, ${iceBody.length} ice with ${iceRim.length} rim and ${iceDeep.length} deep, ${sunny.length}/${shady.length} sand, ${soilTop.length}/${soilDeep.length} soil, ${blockMeans.length} wall blocks. ${Object.entries({ ...measured, ...caps }).map(([k, v]) => `${k} ${v.toFixed(2)}`).join(", ")}.`);
+  if (stone.length < 800 || wood.length < 800 || iceBody.length < 500 || iceRim.length < 20 || iceDeep.length < 100 || sunny.length < 30 || shady.length < 30 || surfaceGrains.length < 20 || soilTop.length < 40 || soilDeep.length < 100 || blockMeans.length < 12) failures.push("the solids scene saw too little of something to judge.");
+  // Each between the build and the same thing sabotaged (2026-10-31): `.tmp/solids/sab.py`.
+  const FLOORS = [
+    ["faceStep", 4.8, "Stone has lost its faces (6.3 built, 3.6 flat)."],
+    ["crackShare", 0.06, "Stone has too few cracks (0.10 built, 0.03 sparse)."],
+    ["crackJoined", 0.85, "Stone's dark cells are specks, not cracks that run (1.00 built, 0.73 speckled)."],
+    ["crackWet", 20, "Water hides stone's cracks and it reads as static again (39 built, 13)."],
+    ["crackCosmic", 40, "A starry skin hides stone's cracks (54 built, 29)."],
+    ["grainUpright", 3, "Wood's grain has stopped running upright (4.3 built, 1.7 sparse, 1.1 diagonal)."],
+    ["knotBlocks", 35, "A board of wood has lost its knots (59 built, 18 diagonal, 0 without)."],
+    ["iceRimOverDeep", 8, "Ice has stopped deepening from a pale rim (21 built, -19 flat)."],
+    ["iceBlue", 60, "Thick ice has stopped going blue (89 built, 40 flat)."],
+    ["iceFromWater", 280, "Thick ice has gone the blue of water and reads as water (366 built, 190)."],
+    ["planeShare", 0.02, "Ice has lost its fracture planes (0.04 built, 0.01 without)."],
+    ["planeJoined", 0.78, "Ice's bright cells are specks, not planes (0.86 built, 0.68 sparse)."],
+    ["sunOverShade", 15, "A pile of sand has lost its sunny slope (29 built, -9 without)."],
+    ["glints", 0.04, "Sand's quartz has stopped catching the light (0.09 built, 0)."],
+    ["deepOverTopsoil", 14, "Soil has lost its dark topsoil (23 built, 4 without)."],
+    ["pebbles", 130, "The earth has lost its pebbles (228 grey cells on a board built, 55 without)."],
+    ["blockRatio", 2, "A wall's blocks have stopped holding one tone (7.1 built, 0.3 cell by cell)."],
+    ["sheenJog", 0.25, "Glass's sheen has gone ruler straight (0.54 built, 0)."],
+    ["stonePieces", 0.8, "A small piece of stone can land with no crack on it (0.96 built, 0.65 sparse)."],
+    ["icePieces", 0.65, "A small piece of ice can land with no fracture in it (0.82 built, 0.46 sparse)."],
+    ["woodPieces", 0.6, "A small piece of wood can land with no grain on it (1.00 built, 0.10 sparse)."],
+  ];
+  const CAPS = [
+    ["stoneRepeat", 0.5, "Stone's tile shows twice on a board (0.17 built, 0.93 at 64 cells, 0.90 at 96 down)."],
+    ["woodRepeat", 0.5, "Wood's tile shows twice on a board (0.05 built, 1.00 at 64 and at 128 cells)."],
+    ["iceRepeat", 0.5, "Ice's tile shows twice on a board (0.10 built, 1.00 at 64 cells)."],
+    ["crackShare", 0.18, "Stone has cracked on every face: crazy paving, not a rock (0.10 built, 0.27)."],
+    ["planeShare", 0.12, "Ice has so many planes it is marble again (0.04 built, 0.22)."],
+    ["glintJump", 90, "A glint flashes instead of swelling (39 built, 273 switched)."],
+  ];
+  for (const [name, floor, why] of FLOORS) if (!(measured[name] >= floor)) failures.push(`solids: ${name} ${measured[name].toFixed(2)}, floor ${floor}. ${why}`);
+  for (const [name, cap, why] of CAPS) if (!(caps[name] <= cap)) failures.push(`solids: ${name} ${caps[name].toFixed(2)}, cap ${cap}. ${why}`);
+}
+
 if (!quiet) {
   console.log("\nRendered state pairs, worst case over a full energy/age/species/time sweep:");
   for (const c of checks) {

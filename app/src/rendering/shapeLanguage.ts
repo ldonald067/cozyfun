@@ -3,6 +3,7 @@ import { adjustRgb, hexToRgb, mixRgb, type Rgb, type Rgba } from "./color";
 import { cardinalNeighborCount, contactInfo, edgeInfo, hasNearbyKind, kindAt, readU16, sameKind, sameLiquid } from "./cells";
 import { hashCell } from "./hash";
 import { washAt } from "./nightWash";
+import { FRACTURE_LINE, FRACTURE_SHADE, GRAIN_KNOT, GRAIN_LINE, ICE_BUBBLE, ICE_MARK, SEAM_CRACK, SEAM_LIP, SOIL_PEBBLE, STONE_SEAM, STONE_TONE, tileIndex, WOOD_MARK, WOOD_TONE } from "./solidFields";
 
 export type ShapeContext = {
   kind: number;
@@ -224,6 +225,17 @@ export function applyShapeLanguage(context: ShapeContext): Rgb {
   return nearbyLight(context, out);
 }
 
+// A solid's body takes one colour from its palette and earns its texture from a tile or a block.
+// `color` is picked per cell by variant, and that pick is what striped wood and speckled stone.
+function paletteMean(kind: number): Rgb {
+  const swatches = (MATERIAL_BY_ID.get(kind as MaterialId)?.palette ?? []).map(hexToRgb);
+  const mean = (i: 0 | 1 | 2) => Math.round(swatches.reduce((sum, c) => sum + c[i], 0) / Math.max(1, swatches.length));
+  return [mean(0), mean(1), mean(2)];
+}
+const WALL_FACE = paletteMean(MATERIAL.Wall);
+const STONE_FACE = paletteMean(MATERIAL.Stone);
+const WOOD_FACE = paletteMean(MATERIAL.Wood);
+
 // Branching frost veins for frozen solids, so deep cold reads as growth instead of a flat tint.
 function frostFerns(out: Rgb, hash: number, x: number, y: number): Rgb {
   const branch = (x * 3 + y * 5 + (hash & 7)) % 11 === 0 || ((x ^ y) + (hash >> 3)) % 13 === 0;
@@ -250,7 +262,7 @@ function nearbyLight({ kind, cells, width, height, x, y }: ShapeContext, color: 
   return out;
 }
 
-function wallColor({ color, variant, age, energy, flags, cells, width, height, x, y }: ShapeContext) {
+function wallColor({ variant, age, energy, flags, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x >> 2, y >> 1, variant);
   const brickOffset = ((y >> 2) & 1) * 2;
   const brickX = (x + brickOffset) & 7;
@@ -265,7 +277,9 @@ function wallColor({ color, variant, age, energy, flags, cells, width, height, x
   const cosmic = Boolean(flags & CELL_FLAG.Cosmic);
   const chipped = edge.count > 0 && ((hash + x * 3 + y * 5) % 37 === 0 || (brickX === 6 && brickY === 2));
 
-  let out = adjustRgb(color, (hash % 5) * 3 - 6);
+  // A block was cut as one piece, so it keeps one tone from end to end.
+  const block = hashCell((x + brickOffset) >> 3, y >> 2, 9);
+  let out = adjustRgb(WALL_FACE, (block % 7) * 5 - 15);
   if (brickX === 0 || brickY === 0) out = mixRgb(out, [24, 30, 39], 0.68);
   if (brickX === 1 || brickY === 1) out = mixRgb(out, [225, 232, 241], 0.22);
   if (brickX === 4 && brickY === 2 && hash % 3 === 0) out = mixRgb(out, [132, 142, 156], 0.22);
@@ -337,7 +351,20 @@ function wallColor({ color, variant, age, energy, flags, cells, width, height, x
   return out;
 }
 
-function sandColor({ color, variant, energy, flags, cells, width, height, x, y }: ShapeContext) {
+// How close open air sits along a line up and to one side: 3 touching, 0 none in reach. The scene's
+// light comes from the upper left, as every lit edge here does, so a pile has a sunny slope and a
+// shaded one, and the shade reaches a few grains in rather than stopping at the skin.
+function airReach(cells: Uint8Array, width: number, height: number, x: number, y: number, side: number) {
+  for (let step = 1; step <= 3; step++) if (kindAt(cells, width, height, x + side * step, y - step) === MATERIAL.Empty) return 4 - step;
+  return 0;
+}
+
+// A point of light swells and dies over a third of a second, or it reads as a flash.
+function glint(phase: number) {
+  return Math.max(0, (Math.sin(phase) - 0.8) * 3.6);
+}
+
+function sandColor({ color, variant, energy, flags, time, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x, y, variant);
   const localX = (x + (hash & 1)) & 3;
   const localY = (y + ((hash >> 3) & 1)) & 3;
@@ -353,6 +380,12 @@ function sandColor({ color, variant, energy, flags, cells, width, height, x, y }
   if (localY === 3 || hash % 11 === 0) out = mixRgb(out, [115, 82, 43], 0.24);
   if (localX === 0 && hash % 3 === 0) out = mixRgb(out, [250, 229, 151], 0.28);
   if (hash % 17 === 0) out = mixRgb(out, [84, 62, 38], 0.32);
+  const sunlit = airReach(cells, width, height, x, y, -1);
+  const shaded = airReach(cells, width, height, x, y, 1);
+  if (sunlit > shaded) out = mixRgb(out, [252, 228, 164], sunlit * 0.1);
+  else if (shaded > sunlit) out = mixRgb(out, [120, 86, 58], shaded * 0.13);
+  // A quartz grain turns to the light now and then. Dry sand on the surface only: wet grains lie flat.
+  if (surface && !damp && hash % 29 === 0) out = mixRgb(out, [255, 250, 226], glint(time * 0.0031 + hash * 0.7));
   if (damp) {
     out = mixRgb(out, [111, 91, 69], 0.32);
     if ((localX === 2 || edge.bottom) && hash % 3 !== 0) out = mixRgb(out, [77, 65, 52], 0.24);
@@ -398,8 +431,8 @@ function sandColor({ color, variant, energy, flags, cells, width, height, x, y }
 // the parity harness would have to carry, it would change every material at once, and it
 // would leave soil and wood BOTH as flat per-cell noise — separating them by removing the
 // only texture either one has. Instead soil stops keying its body colour on the variant and
-// beds horizontally, which is what soil actually does, and leaves wood its diagonal, which
-// reads as grain running along the plank. Two materials, two fabrics, one renderer change.
+// beds horizontally, which is what soil actually does. Wood kept that diagonal until the solids
+// batch gave it upright grain (`solidFields.ts`), and it still may not lie along soil's axis.
 //
 // The bed index is jittered by one bit of the cell hash so the seams wander a little rather
 // than ruling perfect lines across the tray.
@@ -431,6 +464,10 @@ function soilColor({ variant, energy, flags, cells, width, height, x, y }: Shape
   const bed = SOIL_BEDS[((y >> 1) + (hash & 1)) % SOIL_BEDS.length];
   let out = adjustRgb(bed, (hash % 7) * 4 - 14);
 
+  // Topsoil is dark with rot; the earth under it is paler and stonier.
+  const topsoil = !sameKind(cells, width, height, x, y - 3, MATERIAL.Soil) || !sameKind(cells, width, height, x, y - 2, MATERIAL.Soil);
+  out = topsoil ? mixRgb(out, [44, 29, 22], 0.34) : mixRgb(out, [150, 112, 78], 0.14);
+  if (!topsoil && SOIL_PEBBLE[tileIndex(x, y)]) out = mixRgb(out, [150, 142, 126], 0.66);
   if (surface) out = mixRgb(out, [141, 96, 61], 0.32);
   if (looseEdge || hash % 11 === 0) out = mixRgb(out, [43, 27, 21], 0.34);
   if ((localX === 1 && hash % 5 === 0) || rootContact.count > 0) out = mixRgb(out, [83, 61, 39], rootContact.count > 0 ? 0.24 : 0.16);
@@ -1344,22 +1381,33 @@ function flowerColor({ variant, age, energy, flags, time, cells, width, height, 
   return out;
 }
 
-function iceColor({ color, variant, cells, width, height, x, y }: ShapeContext) {
-  const hash = hashCell(x >> 2, y >> 2, variant);
-  const localX = (x + (hash & 1)) & 3;
-  const localY = (y + ((hash >> 2) & 1)) & 3;
-  const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Ice);
-  const crack = (localX === localY && hash % 5 === 0) || (localX + localY === 3 && hash % 7 === 0);
-  const heatContact = hasNearbyKind(cells, width, height, x, y, HOT_LIGHT_KINDS);
-  let out = mixRgb(color, [186, 238, 250], 0.44);
+// Ice is clear, so what you see is how much of it the light went through: pale at a thin rim, blue
+// through a thick block. Sampled at two distances rather than walked, since a block is all interior.
+const ICE_TONES: Rgb[] = [[206, 240, 247], [176, 228, 242], [154, 216, 236], [138, 204, 230]];
+function iceDepth(cells: Uint8Array, width: number, height: number, x: number, y: number, edges: number) {
+  if (edges > 0) return 0;
+  // The reach wanders in patches, or the tones nest as a rectangle inside the block.
+  const wander = hashCell(x >> 1, y >> 1, 5) & 3;
+  const thin = (reach: number) =>
+    !sameKind(cells, width, height, x - reach, y, MATERIAL.Ice) || !sameKind(cells, width, height, x + reach, y, MATERIAL.Ice) ||
+    !sameKind(cells, width, height, x, y - reach, MATERIAL.Ice) || !sameKind(cells, width, height, x, y + reach, MATERIAL.Ice);
+  if (thin(1 + (wander & 1))) return 1;
+  return thin(3 + wander) ? 2 : 3;
+}
 
-  if (localX === 0 || localY === 0 || edge.top || edge.left) out = mixRgb(out, [245, 254, 255], 0.66);
-  if (localX === 3 || localY === 3 || edge.right || edge.bottom) out = mixRgb(out, [42, 93, 132], 0.48);
-  if (localX === 1 && localY === 1) out = mixRgb(out, [255, 255, 255], 0.52);
-  if (localX === 2 && localY === 1) out = mixRgb(out, [211, 249, 255], 0.28);
-  if (crack) out = mixRgb(out, [39, 96, 131], 0.58);
+function iceColor({ variant, cells, width, height, x, y }: ShapeContext) {
+  const hash = hashCell(x, y, variant);
+  const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Ice);
+  const heatContact = hasNearbyKind(cells, width, height, x, y, HOT_LIGHT_KINDS);
+  const mark = ICE_MARK[tileIndex(x, y)];
+  let out = adjustRgb(ICE_TONES[iceDepth(cells, width, height, x, y, edge.count)], hash % 3);
+
+  if (mark === FRACTURE_LINE) out = mixRgb(out, [246, 253, 255], 0.74);
+  else if (mark === FRACTURE_SHADE) out = mixRgb(out, [58, 124, 168], 0.3);
+  else if (mark === ICE_BUBBLE) out = mixRgb(out, [238, 250, 255], 0.56);
+  if (edge.top || edge.left) out = mixRgb(out, [245, 254, 255], 0.62);
+  if (edge.right || edge.bottom) out = mixRgb(out, [42, 93, 132], 0.34);
   if (heatContact) out = mixRgb(out, [183, 224, 236], 0.34);
-  if (hash % 31 === 0 && (localX === 1 || localY === 1)) out = mixRgb(out, [255, 255, 255], 0.64);
   return out;
 }
 
@@ -1450,7 +1498,8 @@ function glassColor({ color, variant, age, energy, flags, time, cells, width, he
   let out = mixRgb([9, 14, 20], color, 0.085);
   // A slow diagonal sheen drifts across the pane — the moving band of caught light
   // that says "glass" even where the interior is nearly see-through.
-  const band = (x + y + Math.floor(time * 0.004)) % 11;
+  // Hand-fused glass is never flat, so the band jogs a cell as it crosses the pane.
+  const band = (x + y + (hashCell(0, y >> 2, 3) & 1) + Math.floor(time * 0.004)) % 11;
   if (band === 0) out = mixRgb(out, [214, 240, 236], 0.3);
   else if (band === 1) out = mixRgb(out, [214, 240, 236], 0.14);
   if (((x + y * 2 + (hash & 3)) & 7) === 0) out = mixRgb(out, [216, 252, 240], 0.3);
@@ -1529,7 +1578,7 @@ const SANDSTONE_BEDS: Rgb[] = [
   [146, 142, 136]
 ];
 
-function stoneColor({ color, variant, energy, flags, cells, width, height, x, y }: ShapeContext) {
+function stoneColor({ variant, energy, flags, cells, width, height, x, y }: ShapeContext) {
   const blockHash = hashCell(x >> 1, y >> 1, variant);
   const facet = hashCell(x >> 2, y >> 2, variant);
   const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Stone);
@@ -1565,13 +1614,14 @@ function stoneColor({ color, variant, energy, flags, cells, width, height, x, y 
     // measured on a real lake, the worst floor/rock pair was 44, one under the 45 floor.
     if (((y + seam) & 3) === 0 && !edge.top) out = mixRgb(out, [72, 60, 48], 0.35);
   } else {
-    out = mixRgb(adjustRgb(color, (blockHash % 7) * 5 - 15), [82, 81, 76], 0.16);
-    if (localX === 0 || localY === 0 || edge.top || edge.left) out = mixRgb(out, [171, 172, 168], 0.3);
-    if (localX === 3 || localY === 3 || edge.right || edge.bottom) out = mixRgb(out, [28, 31, 37], 0.38);
-    if ((localX === 1 && localY === 2 && facet % 3 === 0) || (x + y + blockHash) % 13 === 0) {
-      out = mixRgb(out, [24, 26, 31], 0.62);
-    }
-    if (localX + localY === 2 && facet % 5 === 0) out = mixRgb(out, [121, 118, 104], 0.22);
+    const tile = tileIndex(x, y);
+    // Sits a little under the palette's mean: sandstone meets this rock with no lit edge between
+    // them, since both are Stone, so the body tone alone keeps the two apart.
+    out = adjustRgb(STONE_FACE, STONE_TONE[tile] + (blockHash % 3) * 3 - 11);
+    if (STONE_SEAM[tile] === SEAM_CRACK) out = mixRgb(out, [18, 20, 26], 0.6);
+    else if (STONE_SEAM[tile] === SEAM_LIP) out = mixRgb(out, [188, 190, 186], 0.26);
+    if (edge.top || edge.left) out = mixRgb(out, [171, 172, 168], 0.34);
+    if (edge.right || edge.bottom) out = mixRgb(out, [28, 31, 37], 0.38);
     if (((x ^ y ^ blockHash) & 31) === 3) out = mixRgb(out, [192, 187, 169], 0.22);
     if (edge.count === 0) {
       // Mineral veins: rare clustered strata glint inside larger stone masses only.
@@ -1625,6 +1675,8 @@ function stoneColor({ color, variant, energy, flags, cells, width, height, x, y 
     out = mixRgb(out, [94, 145, 203], 0.24);
     if (localX === localY || facet % 11 === 0 || moonContact.bottom) out = mixRgb(out, [202, 193, 255], 0.32);
   }
+  // Weather lies on a rock and does not fill it: its cracks show through, or wet stone is static again.
+  if (!(flags & CELL_FLAG.Bedded) && STONE_SEAM[tileIndex(x, y)] === SEAM_CRACK) out = mixRgb(out, [18, 20, 26], 0.34);
   return out;
 }
 
@@ -2068,10 +2120,11 @@ function growthColor({ kind, color, variant, age, energy, flags, time, cells, wi
   return out;
 }
 
-function woodColor({ color, variant, energy, flags, cells, width, height, x, y }: ShapeContext) {
+function woodColor({ variant, energy, flags, cells, width, height, x, y }: ShapeContext) {
   const hash = hashCell(x >> 1, y, variant);
   const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Wood);
-  const ring = (x + hash) % 6 === 0 || (y + hash) % 11 === 0;
+  const tile = tileIndex(x, y);
+  const ring = WOOD_MARK[tile] !== 0;
   const heatContact = contactInfo(cells, width, height, x, y, HOT_LIGHT_KINDS);
   const dampContact = contactInfo(cells, width, height, x, y, COOL_LIQUID_KINDS);
   const plantContact = contactInfo(cells, width, height, x, y, PLANT_KINDS);
@@ -2081,9 +2134,9 @@ function woodColor({ color, variant, energy, flags, cells, width, height, x, y }
   const frozen = Boolean(flags & CELL_FLAG.Frozen);
   const cosmic = Boolean(flags & CELL_FLAG.Cosmic);
   const endGrain = edge.left || edge.right;
-  let out = adjustRgb(color, (hash % 5) * 4 - 8);
-  if (ring) out = mixRgb(out, [57, 31, 20], 0.38);
-  if ((x + y + hash) % 13 === 0) out = mixRgb(out, [166, 112, 66], 0.26);
+  let out = adjustRgb(WOOD_FACE, WOOD_TONE[tile] + (hash % 3) * 2 - 2);
+  if (WOOD_MARK[tile] === GRAIN_LINE) out = mixRgb(out, [57, 31, 20], 0.46);
+  else if (WOOD_MARK[tile] === GRAIN_KNOT) out = mixRgb(out, [38, 21, 15], 0.72);
   if (edge.top || edge.left) out = mixRgb(out, [175, 119, 71], 0.2);
   if (edge.right || edge.bottom) out = mixRgb(out, [55, 31, 20], 0.2);
   if (endGrain && ((y + hash) & 3) === 0) out = mixRgb(out, [196, 140, 83], 0.22);
