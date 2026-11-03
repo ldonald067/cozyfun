@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowers that answer the world</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&amp;family=Work+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@500&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1440px; height: 820px; box-sizing: border-box; padding: 56px 72px; background: #0d1220; color: #e6e9f0; font-family: 'Work Sans', sans-serif; display: flex; flex-direction: column; gap: 28px">
+  <div style="display: flex; flex-direction: column; gap: 10px; max-width: 940px">
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.08em; color: #f0b45a">WET · FROZEN · SCORCHED · COSMIC · RENDERER ONLY</div>
+    <h2 style="margin: 0; font-family: 'Newsreader', serif; font-weight: 600; font-size: 44px; line-height: 1.1; color: #f4dfb8">Flowers that answer the world</h2>
+    <p style="margin: 0; font-size: 16px; line-height: 1.55; color: #b9c2d3">A flower already knows when it is wet, frozen, scorched or touched by moonwater and stardust. Today each state is one tint over the whole head: wet is a 12% green wash, so a watered poppy just looks a little greener. The proposal draws what each one is.</p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px">
+    <sc-for list="{{states}}" as="item" hint-placeholder-count="5">
+      <div style="background: #151b2c; border: 1px solid #26304a; border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+        <div style="font-family: 'Newsreader', serif; font-size: 24px; font-weight: 600; color: #f4dfb8">{{item.name}}</div>
+        <div style="display: flex; gap: 12px; align-items: flex-end">
+          <div style="display: flex; flex-direction: column; gap: 6px; align-items: center">
+            <img src="{{item.today}}" alt="{{item.name}} poppy today" style="width: 90px; height: 140px; image-rendering: pixelated; border-radius: 6px">
+            <div style="font-size: 12px; color: #a7b0c2">Today</div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px; align-items: center">
+            <img src="{{item.proposed}}" alt="{{item.name}} poppy proposed" style="width: 90px; height: 140px; image-rendering: {{item.rendering}}; border-radius: 6px; outline: 1px solid #f0b45a; outline-offset: 2px">
+            <div style="font-size: 12px; color: #f0b45a; font-weight: 600">Proposed</div>
+          </div>
+        </div>
+        <div style="font-size: 13px; line-height: 1.5; color: #d3d9e4">{{item.note}}</div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
+    <div style="border: 1px dashed #b9a8ff; border-radius: 14px; padding: 18px 22px; display: flex; flex-direction: column; gap: 6px">
+      <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.06em; color: #b9a8ff">SIM CHANGE · FILMSTRIP BEFORE DECIDING</div>
+      <div style="font-family: 'Newsreader', serif; font-size: 22px; font-weight: 600; color: #f4dfb8">Rain revives a fading flower</div>
+      <div style="font-size: 14px; line-height: 1.5; color: #d3d9e4">Watering a head that has started to dull gives it a second, shorter flush of colour and pollen. Today a wet bloom only takes the wet tint: the flower's own rule never reads whether it is wet.</div>
+    </div>
+    <div style="border: 1px dashed #b9a8ff; border-radius: 14px; padding: 18px 22px; display: flex; flex-direction: column; gap: 6px">
+      <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.06em; color: #b9a8ff">SIM CHANGE · FILMSTRIP BEFORE DECIDING</div>
+      <div style="font-family: 'Newsreader', serif; font-size: 22px; font-weight: 600; color: #f4dfb8">Fire curls the petals off as embers</div>
+      <div style="font-size: 14px; line-height: 1.5; color: #d3d9e4">A burning head chars from the rim inward and lets each petal go as a drifting ember mote, the way it sheds petals when it wilts, instead of burning in place.</div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":820}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      states: [
+        { name: 'Open', today: '/_blob/3f847d7db5f876bb438d5acb406466ad', proposed: '/_blob/f2d7bc2b3384aca3b48f7e1b6d3eb07a', rendering: 'pixelated',
+          note: 'The baseline: the proposed poppy from the first board.' },
+        { name: 'Wet', today: '/_blob/bca72e7f44f5666c65b8de2e90f8ce63', proposed: '/_blob/f5feba53f999c2dac7cec5a1b595d7a5', rendering: 'pixelated',
+          note: 'Wet petals deepen, and a few rim tips hold a bead of dew.' },
+        { name: 'Frozen', today: '/_blob/96cd51745cae80521c96ca4d7043805e', proposed: '/_blob/aec7d6ac4a250d44b23fcae023ce64c9', rendering: 'pixelated',
+          note: 'Frost grows in from the rims and glints; the heart keeps its colour, dimmed. Today the whole head goes 56% pale.' },
+        { name: 'Scorched', today: '/_blob/b09fb94ba232bd178f6645eb9f2a6933', proposed: '/_blob/55288de1caa462ef607216c27b1f4db2', rendering: 'pixelated',
+          note: 'Char eats in from the rim with a live ember line where it meets petal. Today the head goes 62% brown.' },
+        { name: 'Moonlit', today: '/_blob/ea9ef70b8f35a3f966c3c5c7d5a35d32', proposed: '/_blob/47e908c38aaefe3384aeac0b89722af9', rendering: 'pixelated',
+          note: 'The plant’s own colours cool toward starlight, brightest at the tips, under a starlight glow. Today moonlight swaps every species for one shared lilac, so every moonlit flower looks the same.' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

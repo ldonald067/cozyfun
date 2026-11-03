@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The garden, flower by flower</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&amp;family=Work+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#f0b45a}a:hover{color:#ffd28a}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1080px; box-sizing: border-box; padding: 64px 72px; background: #0d1220; color: #e6e9f0; font-family: 'Work Sans', sans-serif; display: flex; flex-direction: column; gap: 36px">
+  <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 48px">
+    <div style="display: flex; flex-direction: column; gap: 12px; max-width: 820px">
+      <div style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.08em; color: #f0b45a">FLOWERS · RENDERER ONLY · NO SIM CHANGE</div>
+      <h1 style="margin: 0; font-family: 'Newsreader', serif; font-weight: 600; font-size: 52px; line-height: 1.05; color: #f4dfb8">Every species, drawn so you can tell it apart</h1>
+      <p style="margin: 0; font-size: 17px; line-height: 1.55; color: #b9c2d3">Left of each pair is today, read cell by cell off the game's own showcase capture. Right is the proposal. Same cells, same sizes: the simulation is untouched, only the colour each cell is painted changes, so there is no parity risk.</p>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; line-height: 1.5; color: #a7b0c2; max-width: 300px">
+      <div><span style="color: #e6e9f0; font-weight: 600">Large</span> 1 cell = {{zoom}} px, to see the detail</div>
+      <div><span style="color: #e6e9f0; font-weight: 600">Small</span> 1 cell = 4 px, about the size in play</div>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px">
+    <sc-for list="{{species}}" as="item" hint-placeholder-count="8">
+      <div style="background: #151b2c; border: 1px solid #26304a; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; justify-content: space-between; align-items: baseline">
+          <div style="font-family: 'Newsreader', serif; font-size: 26px; font-weight: 600; color: #f4dfb8">{{item.name}}</div>
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #7f8aa3">variant {{item.v}}</div>
+        </div>
+        <div style="display: flex; gap: 14px; align-items: flex-end">
+          <div style="display: flex; flex-direction: column; gap: 6px; align-items: center">
+            <img src="{{item.today}}" alt="{{item.name}} today, as drawn in the game" style="width: {{bigW}}px; height: {{bigH}}px; image-rendering: pixelated; border-radius: 6px">
+            <div style="font-size: 12px; color: #a7b0c2">Today</div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px; align-items: center">
+            <img src="{{item.proposed}}" alt="{{item.name}} proposed" style="width: {{bigW}}px; height: {{bigH}}px; image-rendering: pixelated; border-radius: 6px; outline: 1px solid #f0b45a; outline-offset: 2px">
+            <div style="font-size: 12px; color: #f0b45a; font-weight: 600">Proposed</div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px; margin-left: auto; align-items: center">
+            <div style="display: flex; gap: 4px">
+              <img src="{{item.today}}" alt="" style="width: 36px; height: 56px; image-rendering: pixelated">
+              <img src="{{item.proposed}}" alt="" style="width: 36px; height: 56px; image-rendering: pixelated">
+            </div>
+            <div style="font-size: 11px; color: #7f8aa3">in play</div>
+          </div>
+        </div>
+        <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #d3d9e4">{{item.change}}</p>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="display: flex; gap: 20px; align-items: stretch">
+    <div style="flex: 1; background: #151b2c; border: 1px solid #26304a; border-radius: 14px; padding: 18px 22px; font-size: 15px; line-height: 1.55; color: #d3d9e4">
+      <span style="color: #f4dfb8; font-weight: 600">Stalks too.</span> A darker node every third cell and a pale tip on each leaf, so a stalk reads as something growing rather than a green line.
+    </div>
+    <div style="flex: 1; background: #151b2c; border: 1px solid #26304a; border-radius: 14px; padding: 18px 22px; font-size: 15px; line-height: 1.55; color: #d3d9e4">
+      <span style="color: #f4dfb8; font-weight: 600">How it would be checked.</span> renderer:probe already gates flower identity; each species' heart and tips would get a distance floor there, so a later change cannot flatten them again.
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"zoom":{"editor":"range","default":8,"min":6,"max":12,"step":1,"unit":"px"},"$preview":{"width":1440,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const zoom = this.props.zoom ?? 8;
+    const species = [
+      { v: 0, name: 'Cornflower', today: '/_blob/3f3dea323ef06c691435501ee3f859bc', proposed: '/_blob/4fef3f452bc65759730d3b46ab39ae9b',
+        change: 'A violet heart, and frilled tips that alternate light and dark, the way a real cornflower’s ragged edge does.' },
+      { v: 1, name: 'Poppy', today: '/_blob/6a7a3e1f4258034cd067983aafb2b59a', proposed: '/_blob/44d1852a5a7fb6798f382c3d61714e21',
+        change: 'The black blotch round a grey-green seed capsule: the one mark everyone knows a poppy by.' },
+      { v: 2, name: 'Daisy', today: '/_blob/dfd57c080a038d0c74dc13766fe6a71e', proposed: '/_blob/263185874a361e293378d6e7b3bd2db9',
+        change: 'A gold eye three cells wide instead of one, and white rays with a cool lilac underside.' },
+      { v: 3, name: 'Sunflower', today: '/_blob/d5d1f196b213e0fce7ee33dc41353417', proposed: '/_blob/6d715d880c4e87c37b180979ad0883da',
+        change: 'A speckled brown seed disc, orange at the base of each petal, yellow at the tips.' },
+      { v: 4, name: 'Tulip', today: '/_blob/64bf5862ba148f325aa78a57757837d6', proposed: '/_blob/96f67e63e11914084040a956f51e70f3',
+        change: 'A lit streak and a darker base help, but it still reads as a crown. Its real fix is a new shape (next board).' },
+      { v: 5, name: 'Lavender', today: '/_blob/c4bf047a1bf4e4c29b94c16a10c779af', proposed: '/_blob/71361f96029b329cdcd8dd919023afc1',
+        change: 'Buds alternate light and dark down the spike, palest at the top, on a grey-green calyx.' },
+      { v: 6, name: 'Bluebell', today: '/_blob/01360ec293004ff97e62685dc4050ae6', proposed: '/_blob/311ca10ca563b7bd5fe88a5ee1a06649',
+        change: 'Bell mouths are lit, but it still reads as an arch. Its real fix is a new shape (next board).' },
+      { v: 7, name: 'Cosmos', today: '/_blob/e62fe5fc13b15ba0575e5e4ebf17c83a', proposed: '/_blob/104e653b1ad92d0ae03ce9efc5e45262',
+        change: 'A deep magenta heart and notched, paler tips. (The showcase only has a spent cosmos, so today’s is shedding.)' },
+    ];
+    return { species, zoom, bigW: 9 * zoom, bigH: 14 * zoom };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowers with more depth</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&amp;family=Work+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@500&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1900px; box-sizing: border-box; padding: 48px 56px; background: #0d1220; color: #e6e9f0; font-family: 'Work Sans', sans-serif; display: flex; flex-direction: column; gap: 24px">
+  <div style="display: flex; flex-direction: column; gap: 10px">
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.08em; color: #b9a8ff">RENDERER ONLY · MEASURED 2026-10-22</div>
+    <h2 style="margin: 0; font-family: 'Newsreader', serif; font-weight: 600; font-size: 40px; line-height: 1.1; color: #f4dfb8">Flowers with more depth</h2>
+    <p style="margin: 0; max-width: 1080px; font-size: 15px; line-height: 1.55; color: #b9c2d3">Your picture 3 gets its depth from big heads: 12 to 16 pixels across, every petal a ramp of three or four tones, and a deep outline in the flower's own colour running round the head (a quarter to a half of its pixels). Ours are 7 cells across, about 23 px on a laptop and 12 on a phone, and every petal is one cell, so a ramp inside a petal cannot exist at our size. These are four ways to get depth anyway, each shown on the eight species up close, a real meadow at play size, and the weather.</p>
+  </div>
+
+  <div style="display: flex; gap: 12px; flex-wrap: wrap">
+    <div style="background: #151b2c; border: 1px solid #26304a; border-radius: 10px; padding: 10px 14px; font-size: 14px; color: #d3d9e4"><span style="color: #f4dfb8; font-weight: 600">Picture 3</span> · darkest to lightest 30 → 240 · 4 to 9 tones a head</div>
+    <div style="background: #151b2c; border: 1px solid #26304a; border-radius: 10px; padding: 10px 14px; font-size: 14px; color: #d3d9e4"><span style="color: #f4dfb8; font-weight: 600">Ours today</span> · spread 85 · 6 tones · 15 cells a head</div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 16px">
+    <sc-for list="{{rows}}" as="row" hint-placeholder-count="5">
+      <div style="background: #151b2c; border: 1px solid #26304a; border-radius: 14px; padding: 20px; display: grid; grid-template-columns: 300px 444px 300px; gap: 28px; align-items: start">
+        <div style="display: flex; flex-direction: column; gap: 10px">
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.06em; color: #b9a8ff">{{row.tag}}</div>
+          <div style="font-family: 'Newsreader', serif; font-size: 26px; font-weight: 600; line-height: 1.15; color: #f4dfb8">{{row.name}}</div>
+          <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #d3d9e4">{{row.what}}</p>
+          <div style="font-size: 14px; font-weight: 600; color: #e6e9f0">{{row.numbers}}</div>
+          <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #a7b0c2">{{row.cost}}</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <div style="font-size: 12px; color: #a7b0c2">The eight species, up close</div>
+          <img src="{{row.species}}" alt="{{row.name}}: the eight species up close" style="width: 444px; height: 96px; image-rendering: pixelated; border-radius: 6px">
+          <div style="font-size: 12px; color: #a7b0c2; margin-top: 6px">A meadow grown from soil, seeds and one watering, at play size</div>
+          <img src="{{row.meadow}}" alt="{{row.name}}: a grown meadow at play size" style="width: 429px; height: 87px; image-rendering: pixelated; border-radius: 6px">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <div style="font-size: 12px; color: #a7b0c2">Plain · wet · frozen · charred · moonlit</div>
+          <img src="{{row.states}}" alt="{{row.name}}: poppy and daisy in five kinds of weather" style="width: 300px; height: 180px; image-rendering: pixelated; border-radius: 6px">
+        </div>
+      </div>
+    </sc-for>
+  </div>
+
+  <p style="margin: 0; max-width: 1080px; font-size: 14px; line-height: 1.55; color: #a7b0c2">Tried and left out: picture 3's layered rings drawn inside the head (a deep rim round a lighter body). Against our night sky the rim reads as missing petals, so every head shrinks and dims, and the spread falls to 75, below today. Numbers are the median over the 15 heads of the meadow, about 35 seconds after the watering.</p>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      rows: [
+        { tag: 'AS IT IS LIVE', name: 'Today', species: '/_blob/8e3c1c832668e7dc0c1708c3c2ef67d8', meadow: '/_blob/6d1a4d4f14034e81e932406f4547abde', states: '/_blob/788eff534e9389a2de1eabbb2c32df03',
+          what: 'Each petal coloured by where it sits in its head: the heart ring, lit tips, a shaded underside.',
+          numbers: 'Spread 85 · 6 tones · 15 cells',
+          cost: 'The tips are the lightest part, the other way round from picture 3.' },
+        { tag: 'A', name: 'Lit from above', species: '/_blob/88c4b2eafda8965d310b5cf13dfc22b2', meadow: '/_blob/308519be93f3fadf1c4a9f961ec093b2', states: '/_blob/8d2ebb1cdbed88c3b969bfaeb9bb749e',
+          what: 'Top faces catch a warm light, undersides fall into a deep shade of the flower’s own colour.',
+          numbers: 'Spread 118 · 7 tones · 15 cells',
+          cost: 'Hard to see at play size. It repaints every petal, so the checks that keep species apart all need measuring again, and the daisy’s white undersides turn grey.' },
+        { tag: 'C', name: 'An outline in its own colour', species: '/_blob/6cd94790755d70241ce1b99fcf134eb7', meadow: '/_blob/301c73e06e2ff7fba77e945a33f22fba', states: '/_blob/12325b8c7535a83ed5ff3b402ef575f6',
+          what: 'A one-cell ring in a deep shade of the head’s colour, drawn on the open air round it, as pictures 2 and 3 outline theirs. The petals stay exactly as they are.',
+          numbers: 'Spread 133 · 7 tones · drawn 27 cells, 9 wide',
+          cost: 'Adds 0.15 ms a frame. A ring only where a head meets open air: none against soil, water or another plant. It follows the weather: frosted, silvered by moonlight, gone when charred.' },
+        { tag: 'A + C', name: 'Lit, and outlined', species: '/_blob/66f677023dd8a591fe6a5a6d7b7b8488', meadow: '/_blob/f403f4ce9b1825b269bb876a8811f325', states: '/_blob/345ddde10230fb7acad2bb43317bec7a',
+          what: 'Both together.',
+          numbers: 'Spread 147 · 8 tones · drawn 27 cells',
+          cost: 'The outline does most of the work. The lighting adds little you can see at play size, and brings A’s costs with it.' },
+        { tag: 'D', name: 'Petals drawn inside the cell', species: '/_blob/7e569e2a8440f49d4c54f5fdc282b01c', meadow: '/_blob/65eaff01806c841c48cff260ea722c18', states: '/_blob/6c5d5e90db7ec8c051409312dba5dbd3',
+          what: 'Each petal split three by three: a lit top, a deep underside, rounded corners. The closest to picture 3 up close.',
+          numbers: 'Spread 127 · 14 tones · 14 cells',
+          cost: 'Breaks the one-pixel-a-cell look of everything else. A third of a cell is 1 px on a laptop and half a pixel on a phone, so at play size heads read thinner, and lavender and bluebell turn to dots. Needs a second, finer canvas.' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,1818 @@
+import { CELL_FLAG, CELL_STRIDE, MATERIAL, MATERIAL_BY_ID, POLLEN_PETAL, WELLSPRING_TAUGHT, type MaterialId } from "../materials";
+import { adjustRgb, hexToRgb, mixRgb, type Rgb, type Rgba } from "./color";
+import { cardinalNeighborCount, contactInfo, edgeInfo, hasNearbyKind, kindAt, readU16, sameKind, sameLiquid } from "./cells";
+import { hashCell } from "./hash";
+
+export type ShapeContext = {
+  kind: number;
+  color: Rgb;
+  variant: number;
+  age: number;
+  energy: number;
+  flags: number;
+  time: number;
+  cells: Uint8Array;
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+};
+
+const HOT_LIGHT_KINDS = [MATERIAL.Fire, MATERIAL.Lava, MATERIAL.Meteor, MATERIAL.Spark] as const;
+const COSMIC_LIGHT_KINDS = [MATERIAL.Stardust, MATERIAL.Moonwater] as const;
+const COOL_LIQUID_KINDS = [MATERIAL.Water, MATERIAL.Moonwater, MATERIAL.Ice] as const;
+const LIFE_KINDS = [MATERIAL.Moss, MATERIAL.Seed, MATERIAL.Fungus, MATERIAL.Flower, MATERIAL.Soil] as const;
+const PLANT_KINDS = [MATERIAL.Moss, MATERIAL.Seed, MATERIAL.Fungus, MATERIAL.Flower] as const;
+const MOONWATER_KINDS = [MATERIAL.Moonwater] as const;
+const STARDUST_KINDS = [MATERIAL.Stardust] as const;
+const WATER_KINDS = [MATERIAL.Water] as const;
+const OIL_KINDS = [MATERIAL.Oil] as const;
+const EMBER_KINDS = [MATERIAL.Ember] as const;
+const ICE_KINDS = [MATERIAL.Ice] as const;
+const STEAM_KINDS = [MATERIAL.Steam] as const;
+const EARTH_CONTACT_KINDS = [MATERIAL.Sand, MATERIAL.Soil, MATERIAL.Stone, MATERIAL.Wall, MATERIAL.Wood] as const;
+// Where a one-deep oil slick shows its film (see liquidColor): soil, and char's ash. Not stone,
+// where the same film lands on the grey (`renderer:probe` gate 12 has the numbers).
+const DARK_GROUND_KINDS = new Set<number>([MATERIAL.Soil, MATERIAL.Ember]);
+
+// One species per plant, indexed by `variant & 7` — the same number that picks its
+// silhouette in BLOOM_SHAPES (sim/src/lib.rs). Keep these two tables in the same order:
+// index 3 must be the sunflower in both, or plants get a shape from one species and a
+// colour from another. The hue is per plant, never per cell — deriving petal colour from
+// a per-cell hash, which this used to do, turned a multi-cell head into confetti.
+//
+// `eye` is whether the crown sits at the middle of the head, where a bright centre
+// belongs. Tulip, lavender and bluebell carry their petals *above* the crown, so gilding
+// it would put a dot at the bloom's base rather than its heart.
+// The end of the arc has no species in it. A seed head is dry husk, and every plant's is
+// the same dry husk — which is exactly what makes it read as an ending rather than as a
+// small flower of some eighth colour.
+const SEED_HEAD_STRAW: Rgb = [156, 136, 98];
+const SEED_HEAD_HUSK: Rgb = [82, 68, 46];
+// The bluebell's scape, crown included: the green the bells hang from, carrying on from the
+// stalk under it rather than reading as a ninth flower colour.
+const BLUEBELL_SCAPE: Rgb = [70, 124, 84];
+// A head's outline is a deep shade of the plant's own colour, pushed toward this violet the
+// way a pixel-art shadow shifts hue rather than going grey.
+const HEAD_RING_SHADE: Rgb = [44, 12, 64];
+// A ring lets 0.3 of the night behind it through.
+const HEAD_RING_OPACITY = 0.7;
+
+// Mirrored from `sim/src/lib.rs` (and `app/src/engine.ts`), where they decide when a crown
+// stops pollinating, when its petals let go, and — in `slow_step` — when it sows. The
+// renderer reads them so a seed head is drawn under exactly the condition that makes it
+// one; if these move in the sim, they must move here or the picture starts lying.
+export const PETAL_SHED_AGE = 1200;
+export const POLLEN_RESERVE = 40;
+
+type Species = { readonly light: Rgb; readonly dark: Rgb; readonly eye: Rgb | null };
+// Exported so `scripts/make-favicon.mjs` can colour the site icon from the real
+// cornflower rather than a hand-copied hex triple that silently goes stale.
+export const SPECIES: readonly Species[] = [
+  { light: [126, 188, 242], dark: [58, 122, 200], eye: [255, 216, 104] },  // 0 cornflower
+  { light: [236, 92, 86], dark: [172, 38, 44], eye: [46, 32, 30] },        // 1 poppy, dark heart
+  { light: [248, 247, 238], dark: [198, 196, 182], eye: [255, 216, 104] }, // 2 daisy
+  { light: [250, 206, 88], dark: [210, 150, 34], eye: [92, 58, 30] },      // 3 sunflower, brown disc
+  { light: [244, 140, 178], dark: [196, 66, 116], eye: null },             // 4 tulip
+  { light: [190, 130, 236], dark: [126, 70, 182], eye: null },             // 5 lavender
+  { light: [96, 108, 214], dark: [52, 60, 156], eye: null },              // 6 bluebell, deep
+  { light: [222, 86, 152], dark: [172, 44, 110], eye: [255, 216, 104] }   // 7 cosmos
+];
+// Slots 0, 6 and 7 used to be three shades of blue. Measured on the rendered showcase
+// rather than on these triples — the contrast gate sees one "Flower" material and cannot
+// look inside it — the heads sat 77, 107 and 126 apart while every other pairing in the
+// row was 168 or more. A third of the garden's variety went to one hue family, and a
+// player who grows three plants could easily get three blues and conclude the species
+// system was not there.
+//
+// Two edits rather than one, because re-hueing a single slot cannot fix a trio. The
+// bluebell went deep — botanically truer anyway — which lifts the worst pair off 77, and
+// the forget-me-not became a COSMOS, the only change here that renames a species. Pale
+// blue had nowhere to go: lighten it and it collides with the daisy at 79, leave it and it
+// stays in the cluster. Orange was tried first and lands 81 from the poppy; magenta is the
+// one direction with real room.
+
+// Open air is the night wash behind the board (nightWash.ts), so air draws nothing of its own
+// unless something lights it or edges it: then it is a colour laid OVER the wash at an opacity,
+// which is what each of these was as a mix into the old flat night.
+export const CLEAR_AIR: Rgba = [0, 0, 0, 0];
+
+const overlay = (color: Rgb, opacity: number): Rgba => [color[0], color[1], color[2], Math.round(Math.max(0, Math.min(1, opacity)) * 255)];
+
+export function airColor(cells: Uint8Array, width: number, height: number, x: number, y: number, time: number): Rgba {
+  if (kindAt(cells, width, height, x, y + 1) === MATERIAL.Ember) {
+    const emberEnergy = readU16(cells, ((y + 1) * width + x) * 8 + 4);
+    if (emberEnergy > 90) {
+      const hash = hashCell(x, y, 3);
+      const spark = Math.sin(time * 0.03 + hash * 1.7 + x * 0.9);
+      if (spark > 0.92 && (hash & 3) === 0) {
+        return overlay([255, 196, 90], 0.62);
+      }
+    }
+  }
+  if (kindAt(cells, width, height, x, y + 1) === MATERIAL.Meteor) {
+    const flicker = (Math.sin(time * 0.02 + x * 1.3) + 1) * 0.5;
+    return overlay([255, 170, 80], 0.2 + flicker * 0.14);
+  }
+  if (kindAt(cells, width, height, x, y + 2) === MATERIAL.Meteor) {
+    return overlay([255, 150, 70], 0.1);
+  }
+  const directions = [
+    [0, -1],
+    [1, 0],
+    [0, 1],
+    [-1, 0]
+  ];
+  // The petal this cell outlines, if any. Read in the same pass as stardust so the ring costs
+  // one more comparison per neighbour rather than a second walk round every empty cell
+  // (measured: 0.15 ms a frame on the full board against 0.42 ms for a loop of its own).
+  let petal = -1;
+  for (let i = 0; i < directions.length; i++) {
+    const [dx, dy] = directions[i];
+    const near = kindAt(cells, width, height, x + dx, y + dy);
+    if (near === MATERIAL.Flower && petal < 0) {
+      const base = ((y + dy) * width + x + dx) * CELL_STRIDE;
+      if (!(readU16(cells, base + 6) & CELL_FLAG.Rooted)) petal = base;
+    }
+    if (near !== MATERIAL.Stardust) continue;
+    const hash = hashCell(x, y, i);
+    if ((hash & 3) === 0) {
+      const twinkle = (Math.sin(time * 0.018 + hash * 0.0001) + 1) * 0.5;
+      return overlay([255, 214, 138], 0.24 + twinkle * 0.16);
+    }
+  }
+  if (petal >= 0) return overlay(headRing(cells[petal + 1], readU16(cells, petal + 6)), HEAD_RING_OPACITY);
+  return CLEAR_AIR;
+}
+
+// A head's outline (the owner's pick from the design canvas, 2026-10-22): open air touching a
+// petal is drawn in a deep shade of the plant's own colour, so a head reads as a drawn shape
+// with an edge, the way the reference sheets outline theirs. A petal is one cell, so a ramp
+// of tones inside it cannot exist at this size; the edge is the part of that depth that does.
+// Only petals are ringed, never a rooted crown, so a bud and a seed head stay single cells on
+// a stalk. The ring follows the weather on the petal it touches: frosted, silvered under
+// moonlight, and gone into the night when charred, since a burnt head has no lit edge. The
+// states stack in `flowerColor`'s order, so frost on a charred petal frosts its ring too
+// (review: the ring stayed black, 20 from the night, round a petal drawn as pale frost).
+function headRing(variant: number, flags: number): Rgb {
+  let ring = mixRgb(SPECIES[variant & 7].dark, HEAD_RING_SHADE, 0.42);
+  if (flags & CELL_FLAG.Cosmic) ring = mixRgb(ring, STARLIGHT, 0.4);
+  if (flags & CELL_FLAG.Scorched) ring = mixRgb(CHAR, BLACK, 0.3);
+  if (flags & CELL_FLAG.Frozen) ring = mixRgb(FROST, ring, 0.55);
+  return ring;
+}
+
+export function applyShapeLanguage(context: ShapeContext): Rgb {
+  const { kind } = context;
+  let out = context.color;
+  if (kind === MATERIAL.Wall) out = wallColor(context);
+  else if (kind === MATERIAL.Sand) out = sandColor(context);
+  else if (kind === MATERIAL.Soil) out = soilColor(context);
+  else if (kind === MATERIAL.Fire) out = fireColor(context);
+  else if (kind === MATERIAL.Lava) out = lavaColor(context);
+  else if (kind === MATERIAL.Meteor) out = meteorColor(context);
+  else if (kind === MATERIAL.Rocket) out = rocketColor(context);
+  else if (kind === MATERIAL.Spark) out = sparkColor(context);
+  else if (kind === MATERIAL.Wellspring) out = wellspringColor(context);
+  else if (kind === MATERIAL.Smoke || kind === MATERIAL.Steam) out = vaporColor(context);
+  else if (kind === MATERIAL.Seed) out = seedColor(context);
+  else if (kind === MATERIAL.Stem) out = stemColor(context);
+  else if (kind === MATERIAL.Flower) out = flowerColor(context);
+  else if (kind === MATERIAL.Ice) out = iceColor(context);
+  else if (kind === MATERIAL.Glass) out = glassColor(context);
+  else if (kind === MATERIAL.Ember) out = emberColor(context);
+  else if (kind === MATERIAL.Stone) out = stoneColor(context);
+  else if (kind === MATERIAL.Water || kind === MATERIAL.Moonwater || kind === MATERIAL.Oil) out = liquidColor(context);
+  else if (kind === MATERIAL.Moss || kind === MATERIAL.Fungus) out = growthColor(context);
+  else if (kind === MATERIAL.Wood) out = woodColor(context);
+  else if (kind === MATERIAL.Stardust) out = stardustColor(context);
+  else if (kind === MATERIAL.Pollen) out = pollenColor(context);
+  return nearbyLight(context, out);
+}
+
+// Branching frost veins for frozen solids, so deep cold reads as growth instead of a flat tint.
+function frostFerns(out: Rgb, hash: number, x: number, y: number): Rgb {
+  const branch = (x * 3 + y * 5 + (hash & 7)) % 11 === 0 || ((x ^ y) + (hash >> 3)) % 13 === 0;
+  const vein = ((x + y * 2 + hash) & 7) === 0;
+  if (branch) return mixRgb(out, [228, 249, 255], 0.5);
+  if (vein) return mixRgb(out, [178, 224, 242], 0.35);
+  return out;
+}
+
+function nearbyLight({ kind, cells, width, height, x, y }: ShapeContext, color: Rgb): Rgb {
+  if (kind === MATERIAL.Fire || kind === MATERIAL.Lava || kind === MATERIAL.Meteor || kind === MATERIAL.Stardust || kind === MATERIAL.Spark)
+    return color;
+  let out = color;
+  if (hasNearbyKind(cells, width, height, x, y, HOT_LIGHT_KINDS)) {
+    out = mixRgb(out, [255, 166, 82], kind === MATERIAL.Smoke || kind === MATERIAL.Steam ? 0.2 : 0.11);
+  }
+  if (kind !== MATERIAL.Moonwater && hasNearbyKind(cells, width, height, x, y, COSMIC_LIGHT_KINDS)) {
+    const amount = kind === MATERIAL.Water || kind === MATERIAL.Ice ? 0.18 : kind === MATERIAL.Smoke || kind === MATERIAL.Steam ? 0.16 : 0.1;
+    out = mixRgb(out, [150, 181, 255], amount);
+  }
+  if (kind === MATERIAL.Stone && hasNearbyKind(cells, width, height, x, y, COOL_LIQUID_KINDS)) {
+    out = mixRgb(out, [126, 164, 183], 0.14);
+  }
+  return out;
+}
+
+function wallColor({ color, variant, age, energy, flags, cells, width, height, x, y }: ShapeContext) {
+  const hash = hashCell(x >> 2, y >> 1, variant);
+  const brickOffset = ((y >> 2) & 1) * 2;
+  const brickX = (x + brickOffset) & 7;
+  const brickY = y & 3;
+  const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Wall);
+  const heatContact = contactInfo(cells, width, height, x, y, HOT_LIGHT_KINDS);
+  const dampContact = contactInfo(cells, width, height, x, y, COOL_LIQUID_KINDS);
+  const plantContact = contactInfo(cells, width, height, x, y, PLANT_KINDS);
+  const moonContact = contactInfo(cells, width, height, x, y, MOONWATER_KINDS);
+  const frozen = Boolean(flags & CELL_FLAG.Frozen);
+  const scorched = Boolean(flags & CELL_FLAG.Scorched);
+  const cosmic = Boolean(flags & CELL_FLAG.Cosmic);
+  const chipped = edge.count > 0 && ((hash + x * 3 + y * 5) % 37 === 0 || (brickX === 6 && brickY === 2));
+
+  let out = adjustRgb(color, (hash % 5) * 3 - 6);
+  if (brickX === 0 || brickY === 0) out = mixRgb(out, [24, 30, 39], 0.68);
+  if (brickX === 1 || brickY === 1) out = mixRgb(out, [225, 232, 241], 0.22);
+  if (brickX === 4 && brickY === 2 && hash % 3 === 0) out = mixRgb(out, [132, 142, 156], 0.22);
+  if (edge.top || edge.left) out = mixRgb(out, [236, 241, 248], 0.3);
+  if (edge.right || edge.bottom) out = mixRgb(out, [28, 32, 41], 0.24);
+  if (chipped) out = mixRgb(out, [20, 24, 31], 0.48);
+  if (dampContact.count > 0 || flags & CELL_FLAG.Wet || energy > 30) {
+    out = mixRgb(out, [83, 105, 114], dampContact.bottom ? 0.34 : 0.26);
+    if (brickX === 0 || brickY === 0 || dampContact.top) out = mixRgb(out, [129, 164, 173], 0.18);
+    if ((brickX === 1 || brickY === 3) && hash % 4 === 0) out = mixRgb(out, [154, 184, 188], 0.18);
+  }
+  if (flags & CELL_FLAG.Wet) {
+    // Condensation proper — the Wet flag steam leaves — reads as beads, not just a tint.
+    // The flag branch used to share the mild damp wash above, and the whole interaction
+    // measured a colour delta of 37: it fired constantly and showed almost nothing. Beads
+    // echo the glass-dew language so "condensed" looks like the same physics everywhere.
+    out = mixRgb(out, [66, 88, 99], 0.3);
+    if (hash % 5 === 0) out = mixRgb(out, [196, 226, 234], 0.5);
+    else if ((hash + x) % 7 === 0) out = mixRgb(out, [44, 58, 68], 0.34);
+  }
+  if (plantContact.count > 0 && (brickY === 3 || plantContact.bottom)) {
+    out = mixRgb(out, [70, 112, 70], 0.28);
+    if (hash % 11 === 0) out = mixRgb(out, [116, 151, 91], 0.36);
+  }
+  if (heatContact.count > 0) {
+    out = mixRgb(out, heatContact.bottom ? [46, 37, 34] : [90, 58, 47], heatContact.bottom ? 0.4 : 0.28);
+    if (brickY === 0 && hash % 3 === 0) out = mixRgb(out, [171, 89, 57], 0.26);
+  }
+  if (scorched) {
+    out = mixRgb(out, [38, 31, 29], 0.46);
+    if ((brickX === 0 || brickY === 0) && hash % 3 === 0) out = mixRgb(out, [16, 15, 16], 0.42);
+    if (brickY === 3 && hash % 5 === 0) out = mixRgb(out, [82, 52, 38], 0.22);
+  }
+  if (frozen) {
+    out = mixRgb(out, [172, 215, 228], edge.top ? 0.52 : 0.36);
+    if (brickY === 0 || (brickX === 1 && hash % 2 === 0)) out = mixRgb(out, [235, 252, 255], 0.3);
+    if (brickY === 3 && hash % 4 === 0) out = mixRgb(out, [122, 190, 211], 0.18);
+    out = frostFerns(out, hash, x, y);
+  }
+  if (energy > 130) {
+    // High freeze-thaw stress: the wall is about to crumble into stone. Draw
+    // spatially coherent fracture veins — a dark fissure with a pale relief lip —
+    // that thread continuously across neighboring cells, so a cracking wall reads
+    // distinctly from the flat bluish damp tint above. Deepens as it nears crumble.
+    const stress = Math.min(1, (energy - 130) / 40);
+    const vein = (x * 3 + y * 2) % 9;
+    const branch = (x * 2 - y * 3 + 33) % 11;
+    if (vein === 0 || branch === 0) out = mixRgb(out, [4, 6, 10], 0.58 + 0.28 * stress);
+    else if (vein === 1 || branch === 1) out = mixRgb(out, [172, 180, 194], 0.32 + 0.2 * stress);
+  }
+  if (cosmic) {
+    // Same star density as stone's etching — see the note there.
+    out = mixRgb(out, [119, 139, 211], 0.26);
+    if (hash % 5 === 0) out = mixRgb(out, [236, 226, 255], 0.48);
+    else if (((x + y * 2) & 7) === 3) out = mixRgb(out, [168, 176, 238], 0.24);
+  }
+  if (moonContact.count > 0) {
+    out = mixRgb(out, [93, 125, 184], 0.18);
+    if ((brickX === 0 || brickY === 0 || moonContact.top) && hash % 5 === 0) out = mixRgb(out, [184, 196, 255], 0.34);
+  }
+  if ((hash + x + y) % 23 === 0) out = mixRgb(out, [70, 78, 91], 0.26);
+  const patina = Math.min(1, age / 12000);
+  if (patina > 0.1) {
+    // Long-standing walls weather visibly: mortar darkens, faces stain, corners chip.
+    if (brickX === 0 || brickY === 0) out = mixRgb(out, [26, 27, 30], 0.3 * patina);
+    if ((hash + brickX * 3 + brickY) % 9 === 0) out = mixRgb(out, [88, 90, 96], 0.35 * patina);
+    if (patina > 0.5 && (hash + x * 5 + y * 7) % 23 === 0) out = mixRgb(out, [20, 24, 31], 0.4 * patina);
+  }
+  return out;
+}
+
+function sandColor({ color, variant, energy, flags, cells, width, height, x, y }: ShapeContext) {
+  const hash = hashCell(x, y, variant);
+  const localX = (x + (hash & 1)) & 3;
+  const localY = (y + ((hash >> 3) & 1)) & 3;
+  const surface = !sameKind(cells, width, height, x, y - 1, MATERIAL.Sand);
+  const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Sand);
+  const damp = Boolean(flags & CELL_FLAG.Wet) || energy > 35 || hasNearbyKind(cells, width, height, x, y, COOL_LIQUID_KINDS);
+  const warm = hasNearbyKind(cells, width, height, x, y, HOT_LIGHT_KINDS);
+  const frozen = Boolean(flags & CELL_FLAG.Frozen);
+  const scorched = Boolean(flags & CELL_FLAG.Scorched);
+  const cosmic = Boolean(flags & CELL_FLAG.Cosmic);
+  let out = adjustRgb(color, (hash % 5) * 3 - 6);
+  if (surface || edge.left || edge.right) out = mixRgb(out, [238, 208, 124], 0.24);
+  if (localY === 3 || hash % 11 === 0) out = mixRgb(out, [115, 82, 43], 0.24);
+  if (localX === 0 && hash % 3 === 0) out = mixRgb(out, [250, 229, 151], 0.28);
+  if (hash % 17 === 0) out = mixRgb(out, [84, 62, 38], 0.32);
+  if (damp) {
+    out = mixRgb(out, [111, 91, 69], 0.32);
+    if ((localX === 2 || edge.bottom) && hash % 3 !== 0) out = mixRgb(out, [77, 65, 52], 0.24);
+    if (surface || edge.top) out = mixRgb(out, [94, 113, 110], 0.16);
+  }
+  if (warm) out = mixRgb(out, [225, 137, 75], 0.18);
+  if (scorched) {
+    out = mixRgb(out, [91, 63, 45], 0.36);
+    if (surface || hash % 5 === 0) out = mixRgb(out, [42, 30, 23], 0.28);
+  }
+  if (frozen) {
+    out = mixRgb(out, [194, 225, 229], surface ? 0.48 : 0.32);
+    if (surface || localY === 0) out = mixRgb(out, [239, 252, 255], 0.22);
+    out = frostFerns(out, hash, x, y);
+  }
+  if (cosmic) {
+    out = mixRgb(out, [142, 154, 215], 0.18);
+    if (hash % 23 === 0) out = mixRgb(out, [219, 209, 255], 0.32);
+  }
+  return out;
+}
+
+// Soil is SEDIMENT, and sediment lies in BEDS. It used to lie on the DIAGONAL, which was
+// nobody's design decision — it is an artefact of how the simulation picks a variant.
+//
+// `variant_for` is `(x*73856093 + y*19349663 + kind*83492791 + rng) % 8`, which reads like a
+// hash and is a LINEAR FORM. Taken mod 8 a linear form is constant along a diagonal, and
+// `materialColor` picks the palette entry with `palette[variant % length]` — so every
+// material with a multi-entry palette gets diagonal stripes for free, whether or not anyone
+// wanted them. Measured through the renderer, the step across soil's stripes was 98 redmean
+// and the step along them 32: a 3.06x anisotropy, stronger structure than Wall's actual
+// brickwork at 1.63x. Proved by substituting the variant source — with a genuinely random
+// variant the same field measures 1.03, i.e. flat.
+//
+// That is a problem because WOOD gets the identical treatment (2.69x, same axis) out of a
+// palette of four browns that overlaps soil's four browns. The two softest substrates were
+// the same fabric in two shades, and they are the pair the game puts together most often: a
+// wooden trough holding a soil bed reads as one brown mass at play zoom, with the bottom
+// rail invisible against the bed. They are also the closest pair in the group by colour
+// (p10 29 redmean, under the 45 floor), so nothing was separating them at all.
+//
+// The fix is deliberately NOT to make `variant_for` a real hash. That is a simulation change
+// the parity harness would have to carry, it would change every material at once, and it
+// would leave soil and wood BOTH as flat per-cell noise — separating them by removing the
+// only texture either one has. Instead soil stops keying its body colour on the variant and
+// beds horizontally, which is what soil actually does, and leaves wood its diagonal, which
+// reads as grain running along the plank. Two materials, two fabrics, one renderer change.
+//
+// The bed index is jittered by one bit of the cell hash so the seams wander a little rather
+// than ruling perfect lines across the tray.
+//
+// DERIVED from the material's own palette, never copied. These four browns were hand-copied
+// here once, which quietly made soil two sources of truth: `soilColor` no longer reads the
+// variant-picked `color` at all, so editing `materials.ts` would have moved what
+// `material:contrast` measures without moving a single pixel on screen. Reading the palette
+// keeps the contrast gate honest about the thing that is actually drawn.
+const SOIL_BEDS: Rgb[] = (() => {
+  const soil = MATERIAL_BY_ID.get(MATERIAL.Soil as MaterialId);
+  const beds = (soil?.palette ?? []).map(hexToRgb);
+  return beds.length ? beds : [hexToRgb(soil?.color ?? "#765238")];
+})();
+
+function soilColor({ variant, energy, flags, cells, width, height, x, y }: ShapeContext) {
+  const hash = hashCell(x, y, variant);
+  const surface = !sameKind(cells, width, height, x, y - 1, MATERIAL.Soil);
+  const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Soil);
+  const looseEdge = edge.count > 0 || cardinalNeighborCount(cells, width, height, x, y, MATERIAL.Soil) < 3;
+  const rootContact = contactInfo(cells, width, height, x, y, PLANT_KINDS);
+  const waterContact = contactInfo(cells, width, height, x, y, COOL_LIQUID_KINDS);
+  const wet = energy > 40 || Boolean(flags & CELL_FLAG.Wet) || waterContact.count > 0;
+  const cosmic = Boolean(flags & CELL_FLAG.Cosmic);
+  const frozen = Boolean(flags & CELL_FLAG.Frozen);
+  const scorched = Boolean(flags & CELL_FLAG.Scorched);
+  const localX = (x + hash) & 3;
+  const localY = (y + (hash >> 2)) & 3;
+  const bed = SOIL_BEDS[((y >> 1) + (hash & 1)) % SOIL_BEDS.length];
+  let out = adjustRgb(bed, (hash % 7) * 4 - 14);
+
+  if (surface) out = mixRgb(out, [141, 96, 61], 0.32);
+  if (looseEdge || hash % 11 === 0) out = mixRgb(out, [43, 27, 21], 0.34);
+  if ((localX === 1 && hash % 5 === 0) || rootContact.count > 0) out = mixRgb(out, [83, 61, 39], rootContact.count > 0 ? 0.24 : 0.16);
+  if (localY === 2 && rootContact.count > 0) out = mixRgb(out, [39, 30, 23], 0.24);
+  if (wet) {
+    out = mixRgb(out, [48, 43, 38], waterContact.top ? 0.32 : 0.24);
+    if (surface || waterContact.top) out = mixRgb(out, [73, 87, 74], 0.22);
+  }
+  if (flags & CELL_FLAG.Wet) {
+    // Soaked earth goes properly dark, the way real soil does, with a glisten on the
+    // surface row. The shared wet tint above also fires on mere water adjacency, so the
+    // flag alone measured a delta of 81 — hydration is the root of the whole garden loop
+    // and deserves to be seen landing.
+    out = mixRgb(out, [30, 25, 22], 0.34);
+    if (surface) out = mixRgb(out, [104, 122, 108], 0.3);
+    else if (hash % 7 === 0) out = mixRgb(out, [118, 136, 124], 0.26);
+  }
+  if (hash % 19 === 0 || (kindAt(cells, width, height, x, y - 1) === MATERIAL.Moss && hash % 5 === 0)) {
+    out = mixRgb(out, [89, 126, 70], wet ? 0.44 : 0.32);
+  }
+  if (cosmic) {
+    out = mixRgb(out, [132, 151, 215], 0.24);
+    if (hash % 17 === 0) out = mixRgb(out, [213, 203, 255], 0.34);
+  }
+  if (scorched) {
+    out = mixRgb(out, [34, 25, 22], 0.46);
+    if (looseEdge || hash % 7 === 0) out = mixRgb(out, [17, 16, 15], 0.28);
+  }
+  if (frozen) {
+    out = mixRgb(out, [172, 214, 230], surface ? 0.52 : 0.38);
+    if (surface || localY === 0) out = mixRgb(out, [233, 252, 255], 0.22);
+    out = frostFerns(out, hash, x, y);
+  }
+  return out;
+}
+
+// A petal a flower shed is a pollen cell the sim marks POLLEN_PETAL, with the species in its
+// variant. It used to be drawn as pollen, so a wilting garden dusted the ground gold. It is
+// drawn as its flower's petal, as dulled as it was on the head when it let go, browning as it
+// lies until it ages out. Falling, it tumbles, showing its pale face and its dark one by turns.
+function shedPetalColor({ variant, age, time, cells, width, height, x, y }: ShapeContext) {
+  const species = SPECIES[variant & 7];
+  const hash = hashCell(x, y, variant);
+  const falling = kindAt(cells, width, height, x, y + 1) === MATERIAL.Empty;
+  const turn = falling ? (Math.sin(time * 0.012 + hash * 1.7) + 1) * 0.5 : (hash & 3) === 0 ? 0.7 : 0.15;
+  let out = mixRgb(species.light, species.dark, turn);
+  // A shed petal is spent, so it leaves the head at the head's full fade (0.4) and browns on.
+  out = mixRgb(out, [122, 108, 88], 0.4 + Math.min(1, age / 150) * 0.25);
+  // No moonlit tint: starlight pulled a white daisy petal to 48 from a moonlit puff, and a
+  // petal is rarely still moonlit when it lets go (its energy, and the flag, run out first).
+  const fade = Math.max(0, 1 - age / 150);
+  return mixRgb([9, 14, 20], out, 0.55 + fade * 0.45);
+}
+
+function pollenColor(context: ShapeContext) {
+  if (context.flags & POLLEN_PETAL) return shedPetalColor(context);
+  const { color, variant, age, flags, time, x, y } = context;
+  const hash = hashCell(x, y, variant);
+  const bob = (Math.sin(time * 0.01 + hash * 1.3 + x) + 1) * 0.5;
+  let out = mixRgb(color, [255, 246, 214], 0.3 + bob * 0.25);
+  if ((hash & 7) === 2) out = mixRgb(out, [232, 194, 106], 0.4);
+  // Cosmic pollen carries a moonlit sheen so the cosmic lineage reads mid-flight.
+  if (flags & CELL_FLAG.Cosmic) out = mixRgb(out, [178, 190, 255], 0.35 + bob * 0.15);
+  const fade = Math.max(0, 1 - age / 150);
+  return mixRgb([9, 14, 20], out, 0.55 + fade * 0.45);
+}
+
+function fireColor({ color, variant, age, energy, flags, time, cells, width, height, x, y }: ShapeContext) {
+  const hash = hashCell(x, y, variant);
+  const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Fire);
+  const wetContact = contactInfo(cells, width, height, x, y, COOL_LIQUID_KINDS);
+  const flicker = Math.sin(time * 0.024 + hash * 1.1 + y * 0.8);
+  const tongue = (x + (hash & 3) + Math.floor(time * 0.02)) % 3;
+  let out = mixRgb(color, [255, 240, 168], 0.2 + Math.max(0, flicker) * 0.2);
+  if (age < 12 || energy > 200) out = mixRgb(out, [255, 250, 214], 0.45);
+  if (edge.top) out = tongue === 0 ? mixRgb(out, [9, 14, 20], 0.6) : mixRgb(out, [255, 238, 150], 0.5);
+  if ((edge.left || edge.right) && tongue === 2) out = mixRgb(out, [9, 14, 20], 0.3);
+  if (edge.bottom) out = mixRgb(out, [255, 118, 36], 0.4);
+  if (wetContact.count > 0) out = mixRgb(out, [196, 231, 255], wetContact.top ? 0.34 : 0.26);
+  if (hash % 17 === 0) out = [255, 248, 205];
+  // A slick stardust gave a sheen burns like a firework, in the shell's colours. Keyed on the
+  // cell and drifting with time, so a burning sheen flickers through all four. Applied after the
+  // white-hot fleck, which otherwise left one cell in 17 plain at every phase.
+  if (flags & CELL_FLAG.Cosmic) out = mixRgb(out, FIREWORK_HUES[(hash + Math.floor(time * 0.01)) & 3], 0.7);
+  return out;
+}
+
+function lavaColor({ color, variant, energy, time, cells, width, height, x, y }: ShapeContext) {
+  const hash = hashCell(x >> 1, y >> 1, variant);
+  const fine = hashCell(x, y, variant);
+  const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Lava);
+  const cooling = hasNearbyKind(cells, width, height, x, y, COOL_LIQUID_KINDS);
+  const pulse = (Math.sin(time * 0.004 + hash * 0.7) + 1) * 0.5;
+  const crusted = edge.top || cooling || (fine % 6 === 0 && edge.count > 0);
+  const seam = ((x + (hash & 3)) & 3) === 0 || ((x ^ y) + fine) % 9 === 0;
+  let out = mixRgb(color, [40, 13, 11], 0.4);
+  out = mixRgb(out, [255, 96, 26], (0.1 + pulse * 0.14) * (energy > 0 ? energy / 255 : 1));
+  if (crusted) {
+    out = mixRgb(out, [24, 16, 18], cooling ? 0.72 : 0.58);
+    if (seam && !cooling) out = mixRgb(out, [255, 158, 54], 0.7 + pulse * 0.15);
+    if (seam && cooling) out = mixRgb(out, [214, 120, 70], 0.4);
+  } else if (seam) {
+    out = mixRgb(out, [255, 190, 80], 0.42 + pulse * 0.2);
+  }
+  if (edge.bottom || edge.left || edge.right) out = mixRgb(out, [30, 12, 12], 0.35);
+  return out;
+}
+
+// The cosmic core of a meteor in flight. A meteor is a COSMIC body that happens to be
+// hot, and it used to render as neither: a cream-gold cell that measured 53 redmean from
+// FIRE at the median and never rose above 61 across its whole state range, against a
+// floor of 45. That matters more than the number looks, because `meteor.impacts` rings
+// the landing with fire and the fall sheds sparks — so the one event that puts a meteor
+// on screen also puts the two things it looks like right beside it.
+//
+// The heat stays in the GLOW layer (`#ff7a30`, untouched) rather than being painted into
+// the rock, which makes the pair cool-body/hot-light — a combination nothing else in the
+// roster has. Fire is a warm body under a warm glow; Stardust is a violet body under a
+// violet one.
+//
+// **DARK cold blue, and that is the whole trick.** Two brighter cores were tried first and
+// both failed by walking into a different neighbour: a violet-white landed the rock at
+// `#debfdd` and **41 redmean from STARDUST**, and an ice-white landed it **22 from SPARK**,
+// which is worse than the fire collision it was fixing — a spark is white-hot at birth, so
+// anything pale collides with one. Fixing a pair by breaking its neighbour is not a fix.
+//
+// Sweeping candidate cores through this renderer against the whole neighbourhood found the
+// free space, and it is not a hue — it is a LUMINANCE. Every other hot or cosmic material
+// here is a light SOURCE and therefore bright; nothing in the roster is dark and cold. A
+// meteor is a rock, and the heat belongs to the air around it, so dark is also the honest
+// reading. `#3c4377` sits 404 from fire, 184 from stardust, 160 from spark and 196 from the
+// night sky, worst pair 98 against stone — more than double the floor, where the warm rock
+// cleared it by 8.
+const METEOR_CORE: Rgb = [48, 68, 124];
+
+function meteorColor({ color, variant, time, cells, width, height, x, y }: ShapeContext) {
+  const hash = hashCell(x, y, variant);
+  const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Meteor);
+  // AIRBORNE MIRRORS THE SIM'S OWN MOVEMENT TEST rather than guessing at it. `update_meteor`
+  // moves with `try_move(..., can_sink_through_gas = true)`, which accepts an empty target
+  // OR Smoke OR Steam — so a rock descending through its own impact smoke is still falling
+  // while a plain `=== Empty` test called it landed and painted it with the hot crust. The
+  // fourth term is a deliberate ADDITION, not part of try_move: a cell with meteor beneath
+  // it cannot move, but it is part of a falling mass, and a mass that renders a cold nose on
+  // a warm body is two objects. At the default brush only 18% of a painted meteor has empty
+  // space below it, so without this the fix covered less than a fifth of what a player makes.
+  const below = kindAt(cells, width, height, x, y + 1);
+  const airborne = below === MATERIAL.Empty || below === MATERIAL.Smoke
+    || below === MATERIAL.Steam || below === MATERIAL.Meteor;
+  let out = airborne ? color : mixRgb(color, [255, 214, 120], 0.35);
+  if (airborne) {
+    // No hot nose. One was tried — a 50% orange mix on any cell with meteor above it, as a
+    // leading-face burn — and it REGRESSED the pair this whole treatment exists to protect.
+    // Measured by driving the real engine (220x140, seed 1107, paint(110,10,4,Meteor,55),
+    // four ticks), the worst meteor/spark pair in an ordinary painted shower went from 79
+    // redmean BEFORE the cold core to 29 WITH the nose, under the 45 floor: the warm brown
+    // it produced landed on the meteor's own decayed trail sparks. The rock is uniformly
+    // cold now and the heat is the glow layer's job, which is the design anyway.
+    out = mixRgb(out, METEOR_CORE, 0.94);
+  } else {
+    if (edge.bottom || edge.right || hash % 7 === 0) out = mixRgb(out, [45, 38, 43], 0.58);
+    if (edge.top || edge.left) out = mixRgb(out, [255, 238, 158], 0.4);
+  }
+  // NO GLINT IN FLIGHT, and the two failed attempts are the argument. This was a GOLD wash
+  // on both branches, left over from the warm rock, and it was the single biggest hole in
+  // the gate: sweeping position and variant so `hash % 11 === 0` actually fires dropped the
+  // meteor/spark score from 183 to 55. Recolouring it to a cold blue-white was worse, 10,
+  // because it walked straight into the SKY spark (`#7fb0ff`).
+  //
+  // The lesson generalises: a spark can be gold, rose, mint, sky OR white-hot at birth, so a
+  // BRIGHT glint of any hue collides with one of them. A meteor's whole identity here is that
+  // it is the one dark, cold thing in a roster of light sources — a twinkle is the one
+  // decoration it cannot afford. It keeps its halo on the glow layer, which is brighter than
+  // any glint would have been and costs the base layer nothing.
+  if (hash % 11 === 0 && !airborne) {
+    out = mixRgb(out, [255, 229, 124], 0.36 + (Math.sin(time * 0.02 + x) + 1) * 0.1);
+  }
+  return out;
+}
+
+// Rune glint tints for an attuned wellspring, keyed by the remembered material id.
+// The hue a wellspring shows for each material it can remember. Shared with the glow
+// layer (materialColor.ts) so the carved rune and its night bloom can never drift
+// apart, and so the key set stays the single source of truth for "is this attuned".
+export const WELLSPRING_TINTS: Record<number, Rgb> = {
+  [MATERIAL.Water]: [120, 178, 255],
+  [MATERIAL.Moonwater]: [170, 180, 242],
+  [MATERIAL.Lava]: [255, 122, 48],
+  [MATERIAL.Fire]: [255, 214, 120],
+  [MATERIAL.Sand]: [228, 200, 130],
+  [MATERIAL.Soil]: [170, 128, 90],
+  [MATERIAL.Oil]: [140, 160, 128],
+  [MATERIAL.Seed]: [150, 210, 120],
+  [MATERIAL.Stardust]: [180, 140, 255],
+  [MATERIAL.Meteor]: [255, 155, 77],
+  [MATERIAL.Rocket]: [216, 92, 106]
+};
+
+function wellspringColor({ color, variant, energy, flags, time, cells, width, height, x, y }: ShapeContext) {
+  const hash = hashCell(x, y, variant);
+  const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Wellspring);
+  // Dark basalt, lifted just enough to silhouette against the #091018 sky. It used to
+  // be slate-BLUE, which was the whole problem: the block's own colour sat in the same
+  // hue family as the water it pours, so an attuned spring measured 77 redmean from its
+  // own fountain and disappeared into it. A near-neutral dark body means the remembered
+  // tint always reads as an inlay of light on stone, whichever material it remembers.
+  let out = mixRgb(color, [112, 106, 126], 0.3 - (hash & 3) * 0.05);
+  // Chiselled rim: bright top/left, deep shadow bottom/right — a carved block reads
+  // from its edges even at a two-cell placement.
+  //
+  // A cell exposed on OPPOSITE faces of an axis is a thin section, not a corner. It used to
+  // take the highlight and the shadow both and they averaged back to a flat mid grey:
+  // measured, all four arms of a five-cell stamp (the brush at its smallest radius) came
+  // out at 124-125,
+  // identical, with the rune lattice erased. Stone's own mottle spans luminance 45 to 136,
+  // so a dormant spring set into a stone wall had no cell anywhere outside the band stone
+  // already occupies, and a player could not find the block they had just painted.
+  //
+  // The test is OPPOSITE faces, not "exposed on both a lit and a shadowed side" — those are
+  // different cells and conflating them was the first fix's mistake. A bank's bottom-left
+  // corner is exposed left and bottom, which are ADJACENT faces: it is a real corner and
+  // still takes its highlight and its shadow exactly as it always did. Suppressing the
+  // shadow there silently re-lit every such corner while the commit message claimed a large
+  // bank was untouched.
+  const thinSection = (edge.top && edge.bottom) || (edge.left && edge.right);
+  if (edge.top || edge.left) out = mixRgb(out, [168, 186, 218], 0.42);
+  if ((edge.bottom || edge.right) && !thinSection) out = mixRgb(out, [8, 12, 22], 0.44);
+  const chilled = hasNearbyKind(cells, width, height, x, y, ICE_KINDS);
+  const tint = WELLSPRING_TINTS[energy & 255];
+  // The state has to live in the BODY, not only in the rune marks, or it does not survive
+  // the brush. Runes are ~19% of a block's cells once it is bigger than a couple of stamps
+  // (the two lattices below, plus every cell of a small placement via `edge.count`), so a
+  // treatment applied only to rune cells is a treatment applied to one cell in five. Measured
+  // whole-block, dormant against attuned fell from 75 at radius 1 to 25 at the default brush
+  // and stayed there: every cell of the block knows it is attuned -- `energy` is the same on
+  // all of them -- and the block barely changed colour.
+  //
+  // So the body takes a WEAK wash of the same lifted tint the runes glow with. Weak is
+  // load-bearing in both directions. Too strong and the block becomes the material it pours,
+  // which is the mistake recorded below: an attuned water spring measured 25-77 redmean from
+  // its own fountain and vanished into it. Too weak and it does not survive being averaged
+  // over 197 cells. The runes stay the bright, characterful marks on top.
+  //
+  // Chill gets the same treatment for the same reason, on the cells the sim actually stills.
+  // `chilled` is a per-cell ice-neighbour test in both the sim and here, so only the rim of a
+  // large block is listening and only the rim may be drawn that way -- but within that rim it
+  // has to reach every cell, not just the lattice ones. Measured on rim cells alone, dormant
+  // against chilled was 140 at radius 1 and 19-32 above it, because the frost was landing on
+  // one rim cell in five.
+  const BODY_WASH = 0.3;
+  const CHILL_WASH = 0.6;
+  // A chilled spring that has LEARNED something is drawn lit with it, under a light rime. The
+  // ice holds the lesson until it is gone, and a water spring's own pool usually freezes solid
+  // around it, so without this a player who did everything right saw nothing change. It
+  // starts from the attuned look rather than from frost on purpose: frost with a little tint
+  // passes through the dormant spring's pewter on the way, and for some materials it landed
+  // within a few redmean of it, which reads as a spring that forgot everything.
+  const learned = chilled && Boolean(flags & WELLSPRING_TAUGHT) && Boolean(tint);
+  const LEARNED_RIME = 0.2;
+  if (chilled && !learned) out = mixRgb(out, [40, 56, 74], CHILL_WASH);
+  else if (tint) out = mixRgb(out, mixRgb(tint, [255, 255, 255], 0.55), BODY_WASH);
+  if (learned) out = mixRgb(out, [40, 56, 74], LEARNED_RIME);
+  // Small placements (1-2 cells, mostly exposed) always carve: a lone block must
+  // still read as runed stone, and attuned-vs-dormant must survive at that size.
+  const rune =
+    edge.count >= 3 ||
+    (x * 5 + y * 3 + (hash & 7)) % 9 === 0 ||
+    ((x ^ y) + (hash >> 2)) % 11 === 0;
+  if (!rune) return out;
+  // A spring held under a chill is LISTENING: the sim stills it and reopens its drinking
+  // branch, so a misattuned spring can be re-taught. Nothing said so on screen, and it is
+  // the least discoverable rule in the game — only two gestures and about six seconds
+  // (docs/MATERIAL_AUDIT.md), but nothing in play suggests trying them. This is a third
+  // rune state, distinct from both dormant pewter and the attuned glow: a cold blue-white
+  // breathing on its own slow clock, which reads as waiting rather than as either sleeping
+  // or lit.
+  //
+  // Presentation only. Reading neighbours is allowed; the stilling itself is the sim's.
+  if (chilled && !learned) {
+    // Frosted DARK with bright pips, not lit. A pale blue glow was the obvious first choice
+    // and it measured 22 from a water-attuned spring — under every contrast floor in the
+    // repo, so a chilled dormant block read as "attuned to water". Hue cannot solve this:
+    // attunement borrows the remembered material's colour, so every hue is already spoken
+    // for. Lightness is free. Attuned is lit, dormant is plain pewter, listening is a cold
+    // block gone dark under a rime of frost pips — three states no two of which are the
+    // same brightness.
+    const listen = (Math.sin(time * 0.0022 + hash * 0.6) + 1) * 0.5;
+    out = mixRgb(out, [40, 56, 74], 0.52);
+    if (hash % 3 === 0) out = mixRgb(out, [214, 238, 250], 0.34 + listen * 0.22);
+    return out;
+  }
+  if (tint) {
+    const pulse = (Math.sin(time * 0.006 + hash * 0.9) + 1) * 0.5;
+    // The tint is an INLAY in carved stone, not a coat of paint. At 0.55-0.85 an
+    // attuned block took on the full colour of the material it pours: a water spring
+    // measured only 77 redmean from its own fountain — a lighter blue standing in a
+    // blue stream — so the source of the water was invisible in the water. Capped
+    // here, the stone body still reads through and the block stays a carved thing
+    // that happens to be lit, which is what "remembers what it drank" should look
+    // like. Legibility moves to the rune cores below, which are hue-independent.
+    // A rune GLOWS with the memory rather than being painted in it. Mixing the raw
+    // material colour in — at any strength — just makes the block that material: an
+    // attuned water spring measured 25-55 redmean from its own fountain even after the
+    // body went basalt, because a cell tinted water-blue is water-blue. Lifting the
+    // hue toward light first gives a pale, lit version that keeps the material's
+    // identity while reading unmistakably as carved stone lit from within.
+    const emberGlow = mixRgb(tint, [255, 255, 255], 0.55);
+    out = mixRgb(out, emberGlow, 0.46 + pulse * 0.2);
+    // Lit rune cores: a few near-white pixels make attunement legible when the
+    // spring is only a couple of cells on screen, and they read against ANY
+    // remembered material rather than depending on its hue.
+    if (hash % 5 === 0) out = mixRgb(out, [255, 253, 244], 0.5 + pulse * 0.24);
+    // Learned and still held by the ice: the same frost pips the listening state wears.
+    if (learned && hash % 3 === 0) out = mixRgb(out, [214, 238, 250], 0.4);
+    return out;
+  }
+  // Dormant runes sleep in colourless pewter. Deliberately desaturated rather than
+  // blue-silver: an unlit rune must not be mistakable for the palest attunement
+  // (Moonwater's lavender), which a cool silver was too close to at one-cell sizes.
+  return mixRgb(out, [176, 178, 174], 0.5);
+}
+
+// Classic firework hues; each spark picks one deterministically, so every
+// burst blooms as a multicolor shell.
+// Warm-leaning festive hues (gold, rose, mint, sky) that read apart from Stardust's cool
+// blue-violet. Keep app/src/materials.ts Spark.palette in sync.
+//
+// FOUR, not five, and the count is load-bearing rather than a trim: `sparkColor` indexes
+// this by `variant & 3`, and SPARK_DIRS is a compass in order, so four hues are exactly
+// what makes opposite arms of a shell match and neighbouring arms differ. Five would leave
+// the shell asymmetric. The hue that went was the magenta, the closest of the set to
+// Stardust — and a burst throws stardust into its own shell, so those two are judged where
+// they actually touch. Dropping it then pulled Spark's AVERAGED palette down to 42 from
+// Steam, under the 45 floor, which is `material:contrast` earning its keep on a change made
+// for reasons it cannot see; deepening the sky from `#a4c6ff` to `#7fb0ff` puts that pair
+// back at 50 and leaves the roster's closest pair where it was.
+export const FIREWORK_HUES: Rgb[] = [
+  [255, 210, 126],
+  [255, 133, 173],
+  [127, 230, 189],
+  [127, 176, 255]
+];
+
+// A spark's hue belongs to the SPARK, not to the cell it happens to be standing in. Keying
+// it on position — which this did — re-rolled the colour every time the spark moved, so a
+// single spark strobed gold, mint, magenta on its way across the sky and a shell had no
+// colour identity at all. Proved on a board of identical spark cells laid out in a row:
+// same kind, same variant, same age, same energy, and the row came out a rainbow.
+//
+// `variant` is the spark's birth direction and the only thing constant for its whole
+// flight, so hue rides on that. SPARK_DIRS is a compass in order, so `& 3` gives opposite
+// arms the same colour and neighbouring arms different ones: the shell reads as a
+// four-fold starburst rather than as confetti, and every spark holds its colour until it
+// twinkles out. One hue for the WHOLE shell would be truer still, but the shell's identity
+// has nowhere to live — `variant` is a 3-bit field by contract (`load_cells` masks imported
+// bytes to `& 7`) and it is already spent on direction.
+function sparkColor({ variant, age, energy, flags, time, x, y }: ShapeContext) {
+  const hash = hashCell(x, y, variant);
+  if (flags & CELL_FLAG.Cosmic) return starSparkColor(hash, variant, age, energy, time);
+  const hue = FIREWORK_HUES[variant & 3];
+  if (age < 3) return mixRgb([255, 250, 230], hue, 0.25);
+  const life = Math.min(1, energy / 235);
+  let out = mixRgb([96, 44, 34], hue, 0.2 + life * 0.8);
+  const blink = (hash + age + Math.floor(time * 0.02)) % 5 === 0;
+  if (blink) out = mixRgb(out, [255, 255, 240], 0.55);
+  return out;
+}
+
+// A star shell's sparks: the shell of a rocket a meteor lit. Violet starlight in four tints,
+// keyed on direction like the firework hues so the shell keeps its four-fold symmetry,
+// twinkling as it flies and fading toward the violet of the stardust each one burns out into
+// instead of to ember red. The owner asked for a colour of their own (2026-10-18): in the
+// firework hues a meteor-lit volley looked like a flame-lit one until it had landed.
+//
+// Violet because no plain spark ever passes through it. The first try was silver, and it read
+// apart at its best moment (190) but not at its worst: a plain spark blinks toward white, and
+// a silver one came within 17 of it. These hold 81 apart at the worst moment (probe gate 11).
+export const STAR_HUES: Rgb[] = [
+  [160, 108, 255],
+  [190, 132, 255],
+  [142, 96, 236],
+  [208, 150, 255]
+];
+
+function starSparkColor(hash: number, variant: number, age: number, energy: number, time: number) {
+  const hue = STAR_HUES[variant & 3];
+  if (age < 3) return mixRgb([255, 255, 255], hue, 0.4);
+  const life = Math.min(1, energy / 235);
+  const out = mixRgb([78, 60, 156], hue, 0.3 + life * 0.7);
+  const twinkle = (hash + age + Math.floor(time * 0.03)) % 2 === 0;
+  return twinkle ? adjustRgb(out, 30) : out;
+}
+
+function rocketColor({ color, variant, energy, time, x, y }: ShapeContext) {
+  const hash = hashCell(x, y, variant);
+  if (energy > 0) {
+    // A lit grain is the bright climbing head of the firework.
+    const flicker = (Math.sin(time * 0.03 + hash * 1.7) + 1) * 0.5;
+    let out = mixRgb(color, [255, 236, 176], 0.55 + flicker * 0.25);
+    if (hash % 5 === 0) out = [255, 248, 214];
+    return out;
+  }
+  let out = mixRgb(color, [58, 18, 22], (hash & 3) * 0.09);
+  if (hash % 6 === 0) out = mixRgb(out, [232, 220, 210], 0.55);
+  return out;
+}
+
+function vaporColor({ kind, color, variant, age, cells, width, height, x, y }: ShapeContext) {
+  const hash = hashCell(x, y, variant);
+  const sameNeighbors = cardinalNeighborCount(cells, width, height, x, y, kind);
+  const localX = (x + (hash & 1)) & 3;
+  const localY = (y + ((hash >> 3) & 1)) & 3;
+  const rim = localX === 0 || localY === 0 || localX === 3 || localY === 3;
+  const edge = sameNeighbors < 3;
+  const fade = Math.max(0, 1 - age / (kind === MATERIAL.Steam ? 155 : 210));
+  const hotContact = contactInfo(cells, width, height, x, y, HOT_LIGHT_KINDS);
+  const cosmicContact = contactInfo(cells, width, height, x, y, COSMIC_LIGHT_KINDS);
+  const warm = hotContact.count > 0;
+  const cosmic = cosmicContact.count > 0;
+
+  const steam = kind === MATERIAL.Steam;
+  let out = steam ? mixRgb(color, [219, 226, 231], 0.34) : mixRgb(color, [86, 88, 92], 0.34);
+  if (edge) out = mixRgb(out, [9, 14, 20], steam ? 0.22 : 0.44);
+  else out = adjustRgb(out, steam ? 16 : 4);
+  if (rim) out = mixRgb(out, [9, 14, 20], steam ? 0.1 : 0.32);
+  if (!rim && hash % 5 === 0) out = mixRgb(out, steam ? [239, 250, 253] : [169, 173, 174], steam ? 0.5 : 0.28);
+  if (localY === 3 || hash % 7 === 0) out = mixRgb(out, steam ? [126, 167, 184] : [54, 53, 50], steam ? 0.16 : 0.34);
+  if (!steam && hash % 11 === 0) out = mixRgb(out, [42, 38, 35], 0.28);
+  if (warm) out = mixRgb(out, [255, 183, 116], steam ? (hotContact.bottom ? 0.24 : 0.18) : 0.1);
+  if (cosmic) out = mixRgb(out, [178, 186, 255], steam ? (cosmicContact.bottom ? 0.28 : 0.22) : 0.12);
+  return mixRgb([9, 14, 20], out, steam ? 0.58 + fade * 0.38 : 0.44 + fade * 0.34);
+}
+
+function seedColor({ color, variant, age, energy, flags, cells, width, height, x, y }: ShapeContext) {
+  const hash = hashCell(x, y, variant);
+  const neighbors = cardinalNeighborCount(cells, width, height, x, y, MATERIAL.Seed);
+  const localX = (x + (hash & 1)) & 3;
+  const localY = (y + ((hash >> 2) & 1)) & 3;
+  const edge = neighbors < 3;
+  const below = kindAt(cells, width, height, x, y + 1);
+  const soilContact = contactInfo(cells, width, height, x, y, [MATERIAL.Soil, MATERIAL.Moss]);
+  const moonContact = contactInfo(cells, width, height, x, y, MOONWATER_KINDS);
+  const oilContact = contactInfo(cells, width, height, x, y, OIL_KINDS);
+  const wet = energy > 70 || Boolean(flags & CELL_FLAG.Wet);
+  const rooted = Boolean(flags & CELL_FLAG.Rooted) || below === MATERIAL.Soil || soilContact.count > 0;
+  const cosmic = Boolean(flags & CELL_FLAG.Cosmic) || moonContact.count > 0;
+  const frozen = Boolean(flags & CELL_FLAG.Frozen);
+  const scorched = Boolean(flags & CELL_FLAG.Scorched);
+  const fed = wet || rooted || cosmic;
+  let out = edge ? mixRgb(color, [47, 25, 17], 0.64) : mixRgb(color, [119, 68, 34], 0.46);
+  if (localX === 1 && localY <= 2) out = mixRgb(out, [222, 154, 82], 0.26);
+  if (localY === 3 || hash % 7 === 0) out = mixRgb(out, [51, 27, 16], 0.3);
+  if (wet) out = mixRgb(out, [168, 117, 58], 0.34);
+  if (fed || hash % 3 === 0 || (age > 24 && hash % 4 === 0)) out = mixRgb(out, [95, 181, 82], rooted ? 0.82 : 0.56);
+  if (below === MATERIAL.Soil && localY === 3) out = mixRgb(out, [39, 27, 18], 0.24);
+  if (rooted && (localY === 3 || soilContact.bottom)) out = mixRgb(out, [35, 73, 32], 0.46);
+  if (rooted && localY === 0 && hash % 4 === 0) out = mixRgb(out, [174, 227, 115], 0.32);
+  if (rooted && wet) {
+    // Germination arc: the shoot visibly climbs and pales toward a bud as the seed feeds.
+    const growth = Math.min(1, (energy - 40) / 160) * Math.min(1, age / 60);
+    if (growth > 0.15) out = mixRgb(out, [104, 178, 84], 0.25 + growth * 0.3);
+    if (growth > 0.35 && localY <= 1) out = mixRgb(out, [138, 214, 102], 0.4 + growth * 0.3);
+    if (growth > 0.6 && localY === 0) out = mixRgb(out, [196, 240, 134], 0.45 + growth * 0.3);
+    if (growth > 0.85 && (localY === 0 || localX === 1) && (hash & 3) !== 1) out = mixRgb(out, [240, 252, 186], 0.55);
+  }
+  if (cosmic) out = mixRgb(out, [184, 211, 255], moonContact.bottom ? 0.3 : 0.24);
+  if (oilContact.count > 0) {
+    out = mixRgb(out, [38, 42, 27], oilContact.top ? 0.56 : 0.42);
+    if (edge || localY === 0 || hash % 6 === 0) out = mixRgb(out, [88, 86, 48], 0.22);
+    if (!wet && hash % 5 === 0) out = mixRgb(out, [18, 22, 15], 0.34);
+  }
+  if (scorched) out = mixRgb(out, [42, 26, 19], 0.62);
+  if (frozen) out = mixRgb(out, [186, 225, 237], 0.58);
+  return out;
+}
+
+function stemColor({ color, variant, energy, flags, cells, width, height, x, y }: ShapeContext) {
+  const hash = hashCell(x, y, variant);
+  const localX = (x + (hash & 1)) & 3;
+  const above = kindAt(cells, width, height, x, y - 1);
+  const below = kindAt(cells, width, height, x, y + 1);
+  const growingTip = energy > 20 && above !== MATERIAL.Stem && above !== MATERIAL.Flower;
+  // A stalk cell only ever gains a horizontal Stem neighbour when a leaf unfurls beside
+  // it, and the leaf itself is the one of the pair with no stalk running through it.
+  const leftStem = sameKind(cells, width, height, x - 1, y, MATERIAL.Stem);
+  const rightStem = sameKind(cells, width, height, x + 1, y, MATERIAL.Stem);
+  const isLeaf =
+    (leftStem || rightStem) && !(above === MATERIAL.Stem && below === MATERIAL.Stem);
+
+  let out = mixRgb(color, [76, 143, 56], 0.25);
+  if (isLeaf) {
+    // A leaf is a single cell, so sub-cell veining would be invisible. What has to read
+    // at play zoom is leaf against stalk, and that is a flatter, deeper green beside the
+    // stalk's lit one.
+    out = mixRgb(out, [68, 132, 54], 0.68);
+    if ((hash & 3) === 0) out = mixRgb(out, [92, 158, 66], 0.22);
+  } else {
+    if (localX === 1 || localX === 2) out = mixRgb(out, [151, 219, 108], 0.4);
+    // A darker node every third cell, so a stalk reads as something growing rather than as
+    // a green line.
+    if (y % 3 === 0) out = mixRgb(out, [44, 92, 44], 0.28);
+    if (growingTip) out = mixRgb(out, [214, 244, 160], 0.45);
+  }
+  if (flags & CELL_FLAG.Cosmic) out = mixRgb(out, [165, 220, 255], 0.2);
+  if (flags & CELL_FLAG.Scorched) out = mixRgb(out, [52, 40, 26], 0.6);
+  if (flags & CELL_FLAG.Frozen) out = mixRgb(out, [190, 228, 238], 0.55);
+  return out;
+}
+
+// A bloom is a small cluster of Flower cells, so a cell's job is read off state the sim
+// already keeps — no new cell data:
+//   rooted, past the shed age, budget empty -> a dry seed head, the arc's end
+//   rooted, still budgeted, no neighbours   -> an unopened bud, the arc's start
+//   rooted, with petals around it           -> the disc, the bright eye of an open head
+//   anything else                           -> a petal
+// Rooted is exactly the crown the stalk produced, and the crown is the cell the petals
+// opened around, so it is the middle of the head by construction. Counting neighbours
+// alone cannot find it: the stem occupies one of the crown's four cardinal sides, so no
+// cell in a real head ever has four Flower neighbours.
+//
+// The count is over all EIGHT faces, not the four cardinals. Petals can open into corners,
+// and a crown whose only petal sits diagonally has zero cardinal neighbours — counting
+// cardinals rendered that half-open bloom as two separate buds.
+//
+// A petal is drawn by WHERE it sits in its head, found by looking for its crown: the ring
+// round the crown is the heart, a petal with nothing beyond it is a tip, one with nothing
+// under it is shaded, and neighbouring petals alternate a little so they read as petals
+// rather than as one block. Each species then has the mark it is known by — a poppy's
+// black blotch round a grey-green capsule, a sunflower's speckled seed disc, a daisy's
+// wide gold eye, a cornflower's violet heart and frilled rim, a tulip's lit streak, a
+// lavender's alternating buds, a bluebell's lit bell mouths, a cosmos's magenta heart.
+// The owner chose these from a design canvas on 2026-10-18. Colour only: every cell drawn
+// here is a cell the sim grew.
+const DEW: Rgb = [236, 246, 255];
+const FROST: Rgb = [216, 240, 250];
+const CHAR: Rgb = [40, 28, 26];
+const EMBER_LINE: Rgb = [232, 110, 40];
+const STARLIGHT: Rgb = [176, 196, 255];
+const POLLEN_GOLD: Rgb = [255, 214, 96];
+const WHITE: Rgb = [255, 255, 255];
+const BLACK: Rgb = [0, 0, 0];
+
+// How far each species' petals reach from their crown, as [minDx, maxDx, minDy, maxDy]: the
+// bounding box of its row of BLOOM_SHAPES (sim/src/lib.rs). renderer:probe checks it against
+// the engine's shapes, so it cannot go stale the way the probe's own copy of the shapes did.
+export const FLOWER_REACH: readonly (readonly [number, number, number, number])[] = [
+  [-3, 3, -2, 1], // 0 cornflower
+  [-3, 3, -1, 1], // 1 poppy
+  [-3, 3, -2, 1], // 2 daisy
+  [-3, 3, -3, 1], // 3 sunflower
+  [-2, 2, -3, 0], // 4 tulip
+  [-1, 1, -5, -1], // 5 lavender
+  [-1, 3, -4, -1], // 6 bluebell
+  [-3, 3, -1, 1]  // 7 cosmos
+];
+
+// The crown a petal belongs to: the nearest rooted Flower cell of the same species that the
+// petal could have grown from, i.e. with the petal inside that species' reach. Nearest alone
+// was not enough (review): two plants of one species standing at different heights — a
+// cosmic plant grows a cell taller — put a lavender's top petal two cells from its
+// neighbour's crown and five from its own.
+type Crown = { dx: number; dy: number; open: number };
+function crownOf(cells: Uint8Array, width: number, height: number, x: number, y: number, variant: number): Crown | null {
+  const [minDx, maxDx, minDy, maxDy] = FLOWER_REACH[variant & 7];
+  let best: Crown | null = null;
+  let bestDistance = Infinity;
+  for (let cy = Math.max(0, y - maxDy); cy <= Math.min(height - 1, y - minDy); cy++) {
+    for (let cx = Math.max(0, x - maxDx); cx <= Math.min(width - 1, x - minDx); cx++) {
+      const base = (cy * width + cx) * CELL_STRIDE;
+      if (cells[base] !== MATERIAL.Flower || (cells[base + 1] & 7) !== (variant & 7)) continue;
+      if (!(readU16(cells, base + 6) & CELL_FLAG.Rooted)) continue;
+      const distance = Math.max(Math.abs(x - cx), Math.abs(y - cy));
+      if (distance >= bestDistance) continue;
+      bestDistance = distance;
+      best = { dx: x - cx, dy: y - cy, open: flowerNeighbours(cells, width, height, cx, cy) };
+    }
+  }
+  return best;
+}
+
+function flowerNeighbours(cells: Uint8Array, width: number, height: number, x: number, y: number) {
+  let count = 0;
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if ((dx || dy) && sameKind(cells, width, height, x + dx, y + dy, MATERIAL.Flower)) count++;
+    }
+  }
+  return count;
+}
+
+// A head with a heart is OPENING while its crown has two petals or fewer: the first petals
+// out are outer colour, cupped over a heart that is not showing yet, so the heart is drawn
+// only once the head is properly open. Only those five species: a full lavender's crown
+// touches ONE petal and a full bluebell's two (review), so for them this test would read a
+// grown head as a bud for its whole life.
+const OPENING_PETALS = 2;
+const isOpening = (species: Species, crownPetals: number) => species.eye !== null && crownPetals <= OPENING_PETALS;
+
+function petalColour(
+  variant: number, species: Species, dx: number, dy: number, opening: boolean,
+  isFlower: (ox: number, oy: number) => boolean
+): Rgb {
+  const light = species.light;
+  const dark = species.dark;
+  const ring = Math.max(Math.abs(dx), Math.abs(dy));
+  const sx = Math.sign(dx);
+  const sy = Math.sign(dy);
+  const tip = ring >= 2 && !isFlower(sx, sy) && !isFlower(sx, 0);
+  const under = dy >= 0 && !isFlower(0, 1);
+  const alternate = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) & 1;
+  const heart = ring === 1 && !opening;
+  // The plain shading, for the species that keep it where they have no mark of their own.
+  const shaded = () => {
+    let out = mixRgb(light, dark, 0.18 + 0.2 * alternate);
+    if (tip) out = mixRgb(light, WHITE, 0.22);
+    if (under) out = mixRgb(out, dark, 0.35);
+    return out;
+  };
+  let out: Rgb;
+  switch (variant & 7) {
+    case 0: // cornflower: bright sky blue round a violet heart, a frilled rim of light tips
+      out = mixRgb(light, dark, 0.08 + 0.18 * alternate);
+      if (under) out = mixRgb(out, dark, 0.3);
+      if (heart) out = [122, 104, 214];
+      else if (tip) out = alternate ? mixRgb(light, WHITE, 0.34) : mixRgb(light, WHITE, 0.12);
+      break;
+    case 1: // poppy: the black blotch round the capsule, warm lit tips
+      out = heart ? mixRgb([34, 20, 24], dark, 0.25) : tip ? [252, 126, 98] : shaded();
+      break;
+    case 2: // daisy: a gold eye three cells wide, white rays, a cool lilac underside
+      if (!opening && ((dx === 0 && dy === -1) || (dy === 0 && Math.abs(dx) === 1))) out = [244, 196, 70];
+      else out = tip ? WHITE : under ? [196, 192, 214] : [250, 249, 242];
+      break;
+    case 3: // sunflower: a speckled brown seed disc, orange at the petal base, yellow tips
+      if (heart) out = (dx + dy) & 1 ? [116, 72, 36] : [84, 52, 26];
+      else if (ring === 2) out = [236, 158, 44];
+      else if (ring >= 3) out = under ? [220, 150, 40] : [252, 214, 96];
+      else out = shaded();
+      break;
+    case 4: // tulip: a cup lit at its three lips and deepening to the base, a pale streak down
+      // the near petal and the far side in shade (the canvas's reshape, 2026-10-22)
+      out = dy <= -3 ? [252, 184, 208] : dy === -2 ? light : dy === -1 ? [222, 98, 146] : [190, 62, 110];
+      if (dx === -1 && (dy === -2 || dy === -1)) out = mixRgb(out, WHITE, 0.3);
+      if (dx === 2 && dy >= -2) out = mixRgb(out, [150, 44, 90], 0.4);
+      break;
+    case 5: // lavender: buds alternating down the spike, palest at its top
+      out = dy <= -5 ? [226, 200, 250] : dy & 1 ? [206, 160, 246] : [128, 74, 186];
+      break;
+    case 6: // bluebell: a green scape climbing and arching over, bells hanging deep blue from
+      // it, each lit at the mouth where it hangs open
+      if ((dx === 0 && dy < 0) || dy === -4 || (dx === 3 && dy === -3)) out = BLUEBELL_SCAPE;
+      else out = !isFlower(0, 1) ? [150, 162, 246] : [64, 70, 178];
+      break;
+    default: // cosmos: deep magenta round a darker heart, its notched tips a shade paler
+      out = mixRgb(light, dark, 0.4 + 0.2 * alternate);
+      if (under) out = mixRgb(out, dark, 0.3);
+      if (heart) out = [132, 22, 84];
+      else if (tip) out = [236, 128, 184];
+      break;
+  }
+  return out;
+}
+
+// The eye of an open head, by species. Tulip, lavender and bluebell carry their petals
+// above the crown, so theirs is the green calyx the head sits in rather than a centre.
+function eyeColour(variant: number, species: Species, x: number, y: number, hash: number): Rgb {
+  const fleck = ((x ^ y) & 1) === 0 ? 0.08 : 0.3;
+  switch (variant & 7) {
+    case 1: return mixRgb([118, 128, 96], [92, 100, 74], fleck);   // poppy's green seed capsule
+    case 3: return mixRgb([132, 108, 40], [104, 84, 30], fleck);   // the disc's fresh olive middle
+    case 4: return [96, 120, 70];
+    case 5: return [104, 120, 92];
+    case 6: return BLUEBELL_SCAPE;
+  }
+  let out = mixRgb(species.eye ?? species.dark, species.dark, fleck);
+  if ((hash & 7) === 0) out = mixRgb(out, [255, 246, 196], 0.35);
+  return out;
+}
+
+// How each species goes to seed. Dry and speciesless by design — a seed head reads as an
+// ending, never as a ninth flower colour, and renderer:probe holds every one 60 or more
+// from its own bloom — but the two whose seed heads everyone knows keep theirs: a poppy's
+// green capsule dries to a pale tan one and a sunflower's olive middle ripens into a dark
+// disc of grey seeds. The rest are husk. The crown is the cell that changes stage, so each
+// living centre has to stay well apart from the seed head it becomes (review: a first
+// pass had the poppy's 25 apart and the sunflower's 12); renderer:probe gates that pair.
+function seedHeadColour(variant: number, x: number, y: number, hash: number): Rgb {
+  const speck = ((x * 5 + y * 3) & 3) === 0;
+  if ((variant & 7) === 1) return mixRgb([176, 160, 120], [132, 116, 86], speck ? 0.5 : 0.1);
+  if ((variant & 7) === 3) return mixRgb([58, 40, 26], [124, 114, 98], speck ? 0.5 : 0.08);
+  let out = mixRgb(SEED_HEAD_STRAW, SEED_HEAD_HUSK, speck ? 0.58 : 0.14);
+  if ((hash & 3) === 0) out = mixRgb(out, SEED_HEAD_HUSK, 0.44);
+  if ((hash & 7) === 1) out = mixRgb(out, [214, 198, 156], 0.4);
+  return out;
+}
+
+function flowerColor({ variant, age, energy, flags, time, cells, width, height, x, y }: ShapeContext) {
+  const hash = hashCell(x, y, variant);
+  const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Flower);
+  const neighbours = flowerNeighbours(cells, width, height, x, y);
+  const cosmic = Boolean(flags & CELL_FLAG.Cosmic) || hasNearbyKind(cells, width, height, x, y, COSMIC_LIGHT_KINDS);
+  // Energy is the bloom's remaining lifetime, not moisture. Reading it as wetness — the
+  // old `energy > 70` — now tints every healthy flower, because a fresh bloom starts at 200.
+  const wet = Boolean(flags & CELL_FLAG.Wet) || hasNearbyKind(cells, width, height, x, y, COOL_LIQUID_KINDS);
+  const oilContact = contactInfo(cells, width, height, x, y, OIL_KINDS);
+  const frozen = Boolean(flags & CELL_FLAG.Frozen);
+  const scorched = Boolean(flags & CELL_FLAG.Scorched);
+  const bloom = Math.min(1, age / 28);
+  // Moonlight no longer swaps the species out for one shared lilac palette, which drew
+  // every moonlit flower alike. It silvers the plant's own colours below, so a moonlit
+  // poppy is still a poppy.
+  const species = SPECIES[variant & 7];
+  const petalLight = species.light;
+  const petalDark = species.dark;
+  // The last of the arc: a bloom dulls toward grey before its petals let go, so a garden
+  // past its peak reads as past its peak rather than staying showroom-fresh until cells
+  // start vanishing.
+  const fade = energy < 80 ? Math.min(0.4, (80 - energy) / 150) : 0;
+
+  const rooted = Boolean(flags & CELL_FLAG.Rooted);
+  // Spent is the SIM's own three-term test — rooted, past PETAL_SHED_AGE, budget below
+  // POLLEN_RESERVE — and not "has no petals left". That distinction is the whole point of
+  // this branch. Measured on a real garden, crowns run their budget to zero by ~1200 ticks
+  // but a head almost always keeps one stubborn petal, so a bare-crown test would render
+  // the seed head essentially never; `Universe::slow_step` learned the same thing when its
+  // bare-crown sow rule turned out to be dead on arrival. Reading the same three terms the
+  // sow rule reads means the picture and the rule cannot drift: what looks like a seed head
+  // IS what sows while you are away.
+  const spent = rooted && age > PETAL_SHED_AGE && energy < POLLEN_RESERVE;
+  // A bud says wait for it; so does a crown with only its first petal or two out, whose
+  // heart is still hidden under them.
+  const budding = rooted && !spent && (neighbours === 0 || isOpening(species, neighbours));
+  let out: Rgb;
+  if (spent) {
+    // A dry seed head. A bud and a spent crown are both a lone Flower cell on a stalk, and
+    // they used to render 5-8 redmean apart — against a floor of 24 for "visible" anywhere
+    // else in this repo — so the two ends of a plant's life were the same picture. That is
+    // the one reading a returning player most needs: a bud says wait for it, a seed head
+    // says this one is already over and will sow.
+    out = seedHeadColour(variant, x, y, hash);
+    // Idle life, in the same idiom as the cold-char wink: a head this dry is FULL, and a
+    // slow deterministic gleam on a ripe pip is what says so at one cell. One cell per
+    // finished plant, well under a quarter of the cycle, so a seedy meadow glints rather
+    // than strobes. Being brown separates a seed head from a bud; being ripe is what makes
+    // it worth looking at, and it is the cell the slow world sows from.
+    const ripe = Math.max(0, Math.sin(time * 0.0011 + hash * 0.97));
+    if (ripe > 0.86) out = mixRgb(out, [236, 220, 168], (ripe - 0.86) * 2.4);
+  } else if (budding) {
+    // Unopened bud. A bud is one cell, so it gets one flat colour and cannot show sepals
+    // wrapping a tip — all four of its edges face open air, so top/bottom shading would
+    // just average back out. It leads with the plant's own hue under a green wash: a knob
+    // of the colour about to open, clearly not the lit stalk beneath it. Leading with green
+    // instead put a muddy olive dot on the stem, and leading with `dark` alone left it too
+    // close to the husk this cell becomes at the other end of the arc.
+    out = mixRgb(mixRgb(petalDark, petalLight, 0.34), [58, 104, 58], 0.26 - bloom * 0.1);
+    if ((hash & 3) === 0) out = mixRgb(out, [104, 160, 82], 0.18);
+  } else if (rooted) {
+    out = eyeColour(variant, species, x, y, hash);
+  } else {
+    const crown = crownOf(cells, width, height, x, y, variant);
+    if (crown) {
+      const isFlower = (ox: number, oy: number) => sameKind(cells, width, height, x + ox, y + oy, MATERIAL.Flower);
+      const opening = isOpening(species, crown.open);
+      out = petalColour(variant, species, crown.dx, crown.dy, opening, isFlower);
+      // Gold dusts a heart cell while that cell is puffing pollen. Every Flower cell puffs
+      // on its own budget — the sim's test is the cell's own energy over POLLEN_RESERVE and
+      // age past 24 — so this reads the petal's state, not the crown's (review: keyed to the
+      // crown, the gold went while petals were still puffing). Never while still opening.
+      const ring = Math.max(Math.abs(crown.dx), Math.abs(crown.dy));
+      if (ring === 1 && species.eye && !opening && energy > POLLEN_RESERVE && age > 24 && (hash & 7) === 1) {
+        out = mixRgb(out, POLLEN_GOLD, 0.7);
+      }
+    } else {
+      // A petal whose crown is gone: drawn as before, the plant's hue darkening to the rim.
+      // A petal exposed both above and below is a bell hanging free, lit like a crest.
+      out = petalLight;
+      const hanging = edge.top && edge.bottom;
+      const rim = hanging ? 0.16 : edge.count >= 2 ? 0.42 : edge.count === 1 ? 0.2 : 0.06;
+      out = mixRgb(out, petalDark, rim);
+      if (edge.top) out = mixRgb(out, [255, 255, 255], 0.16 * bloom);
+      else if (edge.bottom) out = mixRgb(out, petalDark, 0.22);
+    }
+    if ((hash & 7) === 0) out = mixRgb(out, petalDark, 0.12);
+  }
+
+  // The generic dulling is the APPROACH to spent; once a head is actually spent it has its
+  // own finished palette and mixing more grey into husk only mutes the pips.
+  if (fade > 0 && !spent) out = mixRgb(out, [122, 108, 88], fade);
+  // Each state is drawn as what it is rather than as one tint over the whole head. The rim
+  // is any cell open to the air on a side, which is where weather lands.
+  const rimCell = edge.count > 0;
+  if (wet) {
+    // Wet petals deepen, and a few rim cells hold a bead of dew: a regular lattice of them
+    // rather than a hash, so every head gets its share wherever it stands (review: a
+    // hashed choice left one placement with almost none).
+    out = mixRgb(out, BLACK, 0.16);
+    if (rimCell && ((x * 3 + y) & 3) === 0) out = mixRgb(out, DEW, 0.85);
+  }
+  if (cosmic) {
+    // Moonlit: the plant's own colours cool toward starlight, brightest at the rim.
+    const pulse = (Math.sin(time * 0.012 + hash * 0.001) + 1) * 0.5;
+    out = mixRgb(out, STARLIGHT, 0.42);
+    if (rimCell) out = mixRgb(out, WHITE, 0.18 + pulse * 0.1);
+  }
+  if (oilContact.count > 0) {
+    out = mixRgb(out, [45, 49, 31], oilContact.top ? 0.44 : 0.3);
+    if ((edge.top || edge.left) && hash % 3 === 0) out = mixRgb(out, [126, 121, 64], 0.28);
+  }
+  if (scorched) {
+    // Char eats in from the rim, with a live ember line where it meets the petal.
+    out = edge.count >= 2 ? mixRgb(out, CHAR, 0.86) : edge.count === 1 ? mixRgb(out, EMBER_LINE, 0.72) : mixRgb(out, [55, 37, 31], 0.4);
+  }
+  if (frozen) {
+    // Frost grows in from the rims and glints; the heart keeps its colour, dimmed.
+    out = rimCell ? mixRgb(out, FROST, 0.78) : mixRgb(out, [120, 150, 190], 0.4);
+    if (rimCell && (hash & 7) === 3) out = WHITE;
+  }
+  if (age < 8) out = mixRgb(out, [255, 252, 224], 0.55 * (1 - age / 8));
+  return out;
+}
+
+function iceColor({ color, variant, cells, width, height, x, y }: ShapeContext) {
+  const hash = hashCell(x >> 2, y >> 2, variant);
+  const localX = (x + (hash & 1)) & 3;
+  const localY = (y + ((hash >> 2) & 1)) & 3;
+  const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Ice);
+  const crack = (localX === localY && hash % 5 === 0) || (localX + localY === 3 && hash % 7 === 0);
+  const heatContact = hasNearbyKind(cells, width, height, x, y, HOT_LIGHT_KINDS);
+  let out = mixRgb(color, [186, 238, 250], 0.44);
+
+  if (localX === 0 || localY === 0 || edge.top || edge.left) out = mixRgb(out, [245, 254, 255], 0.66);
+  if (localX === 3 || localY === 3 || edge.right || edge.bottom) out = mixRgb(out, [42, 93, 132], 0.48);
+  if (localX === 1 && localY === 1) out = mixRgb(out, [255, 255, 255], 0.52);
+  if (localX === 2 && localY === 1) out = mixRgb(out, [211, 249, 255], 0.28);
+  if (crack) out = mixRgb(out, [39, 96, 131], 0.58);
+  if (heatContact) out = mixRgb(out, [183, 224, 236], 0.34);
+  if (hash % 31 === 0 && (localX === 1 || localY === 1)) out = mixRgb(out, [255, 255, 255], 0.64);
+  return out;
+}
+
+// Cold char used to measure 52 redmean from the EMPTY TRAY — against a palette floor of 45
+// for two different materials, and with every other element in the roster sitting 185-578
+// from the night. A body of it read as a hole in the scene, which matters more here than
+// for any other dark material: char is where every fire a player lights ends up, the slow
+// world's headline rule acts on it, and `ember.cools` promises relightable fuel a player
+// could not find. A burnt-out hearth read as ERASED rather than as spent.
+//
+// The fix is a hearth's own physics rather than a brightness dial: char that has gone out
+// wears ASH. The mass stays dark so a cosy scene keeps its dark hearth, and the top surface
+// — the one a cooling bed actually powders over — takes a matte grey skin, the same trick
+// stone uses for its lit exposed edges. Matte is doing real work: ash must read as spent,
+// not as lit, so this deliberately lands on the base layer and touches no glow (an ember at
+// energy 0 emits none, and that stays true).
+const CHAR_BODY: Rgb = [46, 36, 30];
+// Pale grey, which is what wood ash actually is — and the mid warm grey this used to be
+// landed on top of Stone. Measured across the whole neighbourhood rather than one pair: at
+// [132,124,118] a spent bed sat **29 redmean from stone**, under the 45 palette floor, and a
+// hearth is precisely char against a stone firebox. The trade had been made blind — the ash
+// treatment fixed char-against-the-NIGHT (52 to 213) while quietly breaking
+// char-against-STONE (152 to 29), which is the commoner adjacency of the two. Every pair now
+// clears 70: night 281, stone 93, wall 231, wood 71, soil 159, sand 225, smoke 166, steam 70,
+// ice 185, wet char 194. Still matte and still glowless, so a dead hearth reads as ash rather
+// than as light.
+const CHAR_ASH: Rgb = [186, 180, 172];
+/// Mirrored from `sim/src/lib.rs`: below this an ember has gone out. The ash reaches full
+/// exactly there, so what a player sees going grey is the same line the sim calls dead.
+export const COLD_CHAR_ENERGY = 30;
+function emberColor({ variant, energy, flags, time, cells, width, height, x, y }: ShapeContext) {
+  const hash = hashCell(x, y, variant);
+  const heat = Math.min(1, energy / 220);
+  let out: Rgb = CHAR_BODY;
+  if ((x + (hash & 1)) % 3 === 0) out = mixRgb(out, [60, 41, 25], 0.5);
+  if ((hash & 15) === 2) out = mixRgb(out, [74, 50, 29], 0.4);
+  // Ash builds as the bed cools rather than switching on at a threshold, so a hearth powders
+  // over while it dies instead of snapping grey in one frame — and it is FULL by the moment
+  // the sim calls the ember out, not on the way to zero afterwards. Ramping to full at
+  // energy 0 instead put only 3% ash on a newly dead ember at energy 29, so the state the
+  // sim already treats as cold char, and that the slow world converts to soil, still read as
+  // the near-black hole this was meant to fix. Ash forms only where the bed meets air, so a
+  // deep pile keeps a dark mass under a powdered crust rather than a uniformly grey slab.
+  //
+  // A soaked bed grows no ash at all: wet ash is a slurry, not a powder. That is physically
+  // the obvious call and it is also what keeps `ember.quenched` visible — laying the full
+  // ash under the wet wash instead pulled dry char and wet char back to 23 redmean apart,
+  // under the interaction audit's own 24 floor, which is the state this whole treatment was
+  // meant to rescue in the first place.
+  const ashed =
+    flags & CELL_FLAG.Wet
+      ? 0
+      : Math.min(1, Math.max(0, (COLD_CHAR_ENERGY * 2 - energy) / COLD_CHAR_ENERGY));
+  if (ashed > 0) {
+    const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Ember);
+    if (edge.top) out = mixRgb(out, CHAR_ASH, ashed * ((hash & 3) === 0 ? 0.34 : 0.56));
+    else if (edge.left || edge.right) out = mixRgb(out, CHAR_ASH, ashed * 0.26);
+    if (edge.top && (hash & 7) === 3) out = mixRgb(out, [222, 216, 208], ashed * 0.4);
+  }
+  if (heat > 0.05) {
+    const pulse = (Math.sin(time * 0.008 + hash * 0.7 + x + y) + 1) * 0.5;
+    out = mixRgb(out, [255, 120, 40], heat * (0.4 + pulse * 0.3));
+    if ((hash & 7) === 0) out = mixRgb(out, [255, 208, 120], heat * 0.7);
+  } else if (!(flags & CELL_FLAG.Wet) && (hash % 13 === 0 || hash % 17 === 0)) {
+    // Idle life: cold dry char keeps a memory of fire. A few scattered cells wink a dim
+    // orange on a slow cycle — far below live ember so a dead hearth never reads as lit,
+    // but a settled scene keeps breathing instead of going entirely still.
+    const wink = Math.max(0, Math.sin(time * 0.0012 + hash * 1.31));
+    if (wink > 0.82) out = mixRgb(out, [141, 74, 32], (wink - 0.82) * 2.2);
+  }
+  if (flags & CELL_FLAG.Wet) out = mixRgb(out, [40, 52, 58], 0.4);
+  return out;
+}
+
+function glassColor({ color, variant, age, energy, flags, time, cells, width, height, x, y }: ShapeContext) {
+  const hash = hashCell(x >> 1, y >> 1, variant);
+  const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Glass);
+  // A pane is mostly the night behind it: start from the sky and lay only a whisper
+  // of mint film over it, so glass reads transparent instead of as solid chalk.
+  //
+  // The film was 0.18, which put the interior 90 redmean units from the night behind
+  // it — twice the distance `material:contrast` demands between two DIFFERENT
+  // materials, so a sealed dome went murky inside and the fill was doing the rim's
+  // job. Measured, not eyeballed: at 0.085 the interior sits ~45 from night while the
+  // rim stays ~590, which is what "the rims carry the identity" was supposed to mean.
+  let out = mixRgb([9, 14, 20], color, 0.085);
+  // A slow diagonal sheen drifts across the pane — the moving band of caught light
+  // that says "glass" even where the interior is nearly see-through.
+  const band = (x + y + Math.floor(time * 0.004)) % 11;
+  if (band === 0) out = mixRgb(out, [214, 240, 236], 0.3);
+  else if (band === 1) out = mixRgb(out, [214, 240, 236], 0.14);
+  if (((x + y * 2 + (hash & 3)) & 7) === 0) out = mixRgb(out, [216, 252, 240], 0.3);
+  // The frame carries the identity: bright lit rim up top, deep teal shadow below.
+  if (edge.top || edge.left) out = mixRgb(out, [234, 255, 246], 0.5);
+  if (edge.bottom || edge.right) out = mixRgb(out, [46, 116, 98], 0.42);
+  if ((hash & 31) === 5) out = mixRgb(out, [255, 255, 255], 0.6);
+  const misting = hasNearbyKind(cells, width, height, x, y, STEAM_KINDS);
+  const dewed = (flags & CELL_FLAG.Wet) !== 0;
+  if (misting || dewed) {
+    // Condensation is a field of micro-droplets, not a coat of paint. Two flat
+    // washes used to stack here and turn a steamy dome back into grey chalk, so
+    // instead: keep the dark see-through body under only a breath of haze, scatter
+    // beads that catch the light, and — once there is enough water to move — carve
+    // the vertical tracks where drops have slid down and wiped the pane clear.
+    // Bright speckle over dark glass, streaked by even darker runs, is a texture
+    // nothing else in the roster wears.
+    const dew = dewed ? Math.min(1, energy / 46) : 0;
+    const drop = hashCell(x, y, variant + 5);
+    // The haze stays deliberately thin — most of the pane must still read through.
+    out = mixRgb(out, [188, 214, 220], (misting ? 0.11 : 0.05) + dew * 0.07);
+    // Beads first, over the whole pane, so a track cell is a wiped bead rather than a
+    // cell that took a different branch. Keeping these independent is what lets the
+    // track fade in continuously below.
+    if ((drop & 3) === 1) out = mixRgb(out, [224, 240, 244], 0.24 + dew * 0.32);
+    else if ((drop & 7) === 4) out = mixRgb(out, [198, 222, 228], 0.12 + dew * 0.14);
+    // A track has to be stable down a column or it reads as speckle instead of a run,
+    // so it can only be seeded on x: both `variant` and the 2x2 block hash change as y
+    // advances, and folding either one in chops the track into two-row dashes. Spacing
+    // is modular rather than a hash test, because hashed columns clump and leave gaps
+    // wide enough for a small pane to contain no track at all; the jitter keeps that
+    // spacing from looking ruled, and the jog lets a track wander a column every eight
+    // rows the way a real drip does.
+    const jog = hashCell(0, y >> 3, 7) & 1;
+    const jitter = hashCell(x >> 3, 0, 11) & 3;
+    const track = (x + jog + jitter) % 5 === 0;
+    // Wipe strength ramps with dew rather than switching on at a threshold, so a pane
+    // does not darken all at once when one more unit of water lands on it.
+    const wipe = Math.max(0, Math.min(1, (dew - 0.2) / 0.45));
+    if (track && wipe > 0) {
+      // A track reads DARKER than the fog around it: the glass behind it has been
+      // wiped clear, so the night shows through the runs.
+      out = mixRgb(out, [11, 19, 25], (0.38 + dew * 0.24) * wipe);
+      // The bead riding down that track is the brightest thing on the pane.
+      if (((y * 5 + (drop >> 2)) & 7) === 0) out = mixRgb(out, [238, 250, 255], 0.72 * wipe);
+    }
+  }
+  if (age < 8) out = mixRgb(out, [255, 244, 214], 0.6 * (1 - age / 8));
+  if (age < 70) out = mixRgb(out, [255, 176, 96], 0.36 * (1 - age / 70));
+  return out;
+}
+
+// Sandstone: stone that was laid down as sediment rather than cooled from lava, carried by
+// `CELL_FLAG.Bedded`, which the slow world sets when a flooded sand bed compacts.
+//
+// A light warm buff, and the colour was the hard part, because texture could only do half
+// the job. Sandstone is striped — but so are SAND (1.60x), SOIL (1.14x) and WALL (1.63x), all
+// horizontal, so strata separate it only from the igneous stone it is not, which is
+// isotropic (1.08x). Against everything else colour has to carry it alone, and the loose sand
+// floor sits DIRECTLY on this rock. Eleven palettes were swept through this renderer on a
+// 72x40 board, and they split along exactly that line. Every warm brown landed on soil (p10
+// 24-31, under the 45 floor) where no texture could rescue it; the first buff-grey landed on
+// plain stone (36) where texture could. Lifting that grey lighter and warmer cleared both.
+//
+// Measured on cells that actually TOUCH, in the geometry each neighbour has in play, these
+// four sit at p10 73 from the lake's wet sand floor and 89-94 from dry sand, which is the
+// pair colour has to carry. They do NOT clear lava rock (44) or wall (47) on colour alone:
+// both have pale lit edges that land on this buff, and strata — 5.65x against lava rock's
+// 1.08x — are what separate those two. An earlier version of this note said "every
+// neighbour clear on colour alone"; that was true of field MEANS, which is not what anyone
+// sees. `npm run renderer:probe` gates both halves.
+const SANDSTONE_BEDS: Rgb[] = [
+  [192, 184, 166],
+  [164, 158, 142],
+  [208, 200, 182],
+  [146, 142, 136]
+];
+
+function stoneColor({ color, variant, energy, flags, cells, width, height, x, y }: ShapeContext) {
+  const blockHash = hashCell(x >> 1, y >> 1, variant);
+  const facet = hashCell(x >> 2, y >> 2, variant);
+  const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Stone);
+  const dampContact = contactInfo(cells, width, height, x, y, COOL_LIQUID_KINDS);
+  const plantContact = contactInfo(cells, width, height, x, y, PLANT_KINDS);
+  const heatContact = contactInfo(cells, width, height, x, y, HOT_LIGHT_KINDS);
+  const moonContact = contactInfo(cells, width, height, x, y, MOONWATER_KINDS);
+  const frozen = Boolean(flags & CELL_FLAG.Frozen);
+  const scorched = Boolean(flags & CELL_FLAG.Scorched);
+  const cosmic = Boolean(flags & CELL_FLAG.Cosmic);
+  const localX = (x + (facet & 1)) & 3;
+  const localY = (y + ((facet >> 2) & 1)) & 3;
+  let out: Rgb;
+  if (flags & CELL_FLAG.Bedded) {
+    // Laid down in beds, so it is drawn in beds: two-row strata with a dark bedding plane
+    // every fourth row, and NONE of the igneous block/crack/vein structure below, which is
+    // isotropic and would drown the one thing that says this rock was sediment.
+    //
+    // The seam wanders by RUNS OF COLUMNS, not per cell, and that one decision is most of
+    // the look. The first version jittered each cell's band independently — the same shape
+    // soil uses — and it made speckle rather than layers: measured, only 31% of adjacent
+    // cells along a row held the same stratum, and the rock came out LESS stratified than the
+    // loose sand it formed from (v/h 1.26 against sand's 1.59). The rock whose whole identity
+    // is layers was the mottled one. Stepping the seam once per 8-column block keeps each
+    // layer continuous for a run and lets it drift like a real bed: 58% of pairs hold their
+    // stratum and v/h is 5.0. Quieting the grain further pushed runs to 94%, which is the
+    // ruled-line look the soil bedding was written to avoid.
+    const grain = hashCell(x, y, variant);
+    const seam = hashCell(x >> 3, y >> 3, 7) & 1;
+    out = adjustRgb(SANDSTONE_BEDS[((y >> 1) + seam) % SANDSTONE_BEDS.length], (grain % 5) * 2 - 4);
+    // A bedding plane lies BETWEEN layers, so it is never drawn on the bed's exposed top.
+    // There it also sat right under the lake's wet sand floor and dragged the rock toward it:
+    // measured on a real lake, the worst floor/rock pair was 44, one under the 45 floor.
+    if (((y + seam) & 3) === 0 && !edge.top) out = mixRgb(out, [72, 60, 48], 0.35);
+  } else {
+    out = mixRgb(adjustRgb(color, (blockHash % 7) * 5 - 15), [82, 81, 76], 0.16);
+    if (localX === 0 || localY === 0 || edge.top || edge.left) out = mixRgb(out, [171, 172, 168], 0.3);
+    if (localX === 3 || localY === 3 || edge.right || edge.bottom) out = mixRgb(out, [28, 31, 37], 0.38);
+    if ((localX === 1 && localY === 2 && facet % 3 === 0) || (x + y + blockHash) % 13 === 0) {
+      out = mixRgb(out, [24, 26, 31], 0.62);
+    }
+    if (localX + localY === 2 && facet % 5 === 0) out = mixRgb(out, [121, 118, 104], 0.22);
+    if (((x ^ y ^ blockHash) & 31) === 3) out = mixRgb(out, [192, 187, 169], 0.22);
+    if (edge.count === 0) {
+      // Mineral veins: rare clustered strata glint inside larger stone masses only.
+      const veinSeed = hashCell(x >> 3, y >> 3, 1);
+      if ((veinSeed & 15) === 3 && (x * 2 + y * 3 + (veinSeed & 7)) % 19 < 2) {
+        out = mixRgb(out, (veinSeed & 16) !== 0 ? [212, 190, 140] : [176, 196, 214], 0.4);
+        if (((x ^ y) & 7) === 2) out = mixRgb(out, [236, 226, 190], 0.35);
+      }
+    }
+  }
+  if (dampContact.count > 0 || flags & CELL_FLAG.Wet || energy > 30) {
+    out = mixRgb(out, [86, 111, 122], dampContact.top ? 0.36 : 0.26);
+    if (edge.top || localY === 0 || dampContact.bottom) out = mixRgb(out, [128, 166, 179], 0.22);
+    if ((localX === 1 || localY === 0) && facet % 4 === 0) out = mixRgb(out, [150, 181, 185], 0.18);
+  }
+  if (flags & CELL_FLAG.Wet) {
+    // Condensation beads for the Wet flag itself — see the matching note on wallColor.
+    // Stone condenses harder than wall, so its beads sit a touch denser.
+    out = mixRgb(out, [64, 90, 102], 0.32);
+    if (facet % 4 === 0) out = mixRgb(out, [192, 224, 232], 0.5);
+    else if ((facet + x) % 7 === 0) out = mixRgb(out, [42, 60, 70], 0.34);
+  }
+  if (plantContact.count > 0 && (edge.top || edge.left || plantContact.bottom)) {
+    out = mixRgb(out, [78, 105, 75], 0.24);
+    if (facet % 9 === 0 || localX === 1) out = mixRgb(out, [109, 145, 83], 0.34);
+  }
+  if (heatContact.count > 0 && (localX === 0 || localY === 0 || edge.top)) {
+    out = mixRgb(out, [152, 96, 68], 0.28);
+    if (facet % 5 === 0) out = mixRgb(out, [211, 119, 72], 0.22);
+  }
+  if (scorched) {
+    out = mixRgb(out, [63, 46, 41], 0.48);
+    if (localX === localY || facet % 11 === 0) out = mixRgb(out, [22, 20, 22], 0.44);
+    if (edge.top && facet % 5 === 0) out = mixRgb(out, [119, 72, 50], 0.22);
+  }
+  if (frozen) {
+    out = mixRgb(out, [179, 220, 232], edge.top || localY === 0 ? 0.54 : 0.38);
+    if (localX + localY === 3 || facet % 13 === 0) out = mixRgb(out, [237, 253, 255], 0.3);
+    if (edge.left || localX === 0) out = mixRgb(out, [123, 190, 211], 0.16);
+    out = frostFerns(out, facet, x, y);
+  }
+  if (cosmic) {
+    // A constellation needs visible stars: at 1-in-17 flecks a ten-cell etching drew
+    // none at all (measured delta 77 against plain stone). Star density is 1-in-5 now,
+    // with a faint diagonal glimmer threading between them like a chart line.
+    out = mixRgb(out, [118, 134, 204], 0.28);
+    if (facet % 5 === 0) out = mixRgb(out, [235, 226, 255], 0.5);
+    else if (((x + y * 2) & 7) === 3) out = mixRgb(out, [166, 172, 236], 0.26);
+  }
+  if (moonContact.count > 0) {
+    out = mixRgb(out, [94, 145, 203], 0.24);
+    if (localX === localY || facet % 11 === 0 || moonContact.bottom) out = mixRgb(out, [202, 193, 255], 0.32);
+  }
+  return out;
+}
+
+const STARDUST_SHEEN: Rgb[] = [
+  [255, 104, 104],
+  [255, 174, 76],
+  [246, 230, 96],
+  [104, 218, 132],
+  [94, 160, 255],
+  [178, 112, 255]
+];
+
+function liquidColor({ kind, color, variant, energy, flags, time, cells, width, height, x, y }: ShapeContext) {
+  const top = !sameLiquid(cells, width, height, x, y - 1, kind);
+  const left = sameLiquid(cells, width, height, x - 1, y, kind);
+  const right = sameLiquid(cells, width, height, x + 1, y, kind);
+  const bottom = sameLiquid(cells, width, height, x, y + 1, kind);
+  const hash = hashCell(x, y, variant);
+  const ripple = (x + y * 2 + Math.floor(time * 0.012) + hash) % 17 === 0;
+  const heatContact = contactInfo(cells, width, height, x, y, HOT_LIGHT_KINDS);
+  const lifeContact = contactInfo(cells, width, height, x, y, LIFE_KINDS);
+  const earthContact = contactInfo(cells, width, height, x, y, EARTH_CONTACT_KINDS);
+  const oilContact = contactInfo(cells, width, height, x, y, OIL_KINDS);
+  let out = color;
+  if (kind === MATERIAL.Water && hasNearbyKind(cells, width, height, x, y, EMBER_KINDS)) {
+    // Charcoal ink: water running over char picks up a sooty murk.
+    out = mixRgb(out, [31, 29, 27], 0.32);
+  }
+  if (kind === MATERIAL.Oil && top) {
+    // Iridescent slick: real oil films split light into faint green-violet-blue bands.
+    const phase = (x * 2 + y + Math.floor(time * 0.006)) % 9;
+    const sheen: Rgb = phase < 3 ? [96, 122, 90] : phase < 6 ? [110, 92, 128] : [80, 108, 130];
+    out = mixRgb(out, sheen, 0.35);
+    if ((hash + phase) % 7 === 0) out = mixRgb(out, [150, 160, 172], 0.3);
+  }
+  if (kind === MATERIAL.Water && energy > 120) {
+    // Water's energy is temperature: simmering water warms and bubbles, boiling water churns.
+    const rolling = energy > 190;
+    out = mixRgb(out, [186, 170, 158], 0.1 + (energy / 255) * 0.1);
+    const bubble = (x * 7 + y * 13 + Math.floor(time * 0.02) + hash) % (rolling ? 4 : 9) === 0;
+    if (bubble) out = mixRgb(out, [240, 252, 255], rolling ? 0.66 : 0.5);
+  }
+
+  if (kind === MATERIAL.Oil) {
+    const nearHeat = heatContact.count > 0;
+    const frozen = Boolean(flags & CELL_FLAG.Frozen);
+    const sheen = top || ((left || right) && (hash % 13 === 0 || ripple));
+    out = mixRgb(out, [8, 13, 12], 0.18);
+    if (top) out = mixRgb(out, [73, 88, 62], 0.3);
+    if (!bottom) out = mixRgb(out, [3, 7, 7], 0.48);
+    if (sheen) out = mixRgb(out, nearHeat ? [218, 132, 78] : [166, 158, 93], nearHeat ? 0.36 : 0.34);
+    if (hash % 17 === 0 && (top || left || right)) out = mixRgb(out, [214, 192, 116], 0.24);
+    if (nearHeat) out = mixRgb(out, heatContact.top ? [240, 158, 82] : [95, 49, 30], heatContact.top ? 0.42 : 0.28);
+    if (lifeContact.count > 0) out = mixRgb(out, [19, 24, 18], lifeContact.bottom ? 0.38 : 0.24);
+    // A thin slick on soil shows its film, as a real one does on wet asphalt. Poured oil rests one
+    // cell deep, and that sheet sat within the 45 floor of the soil under it on most cells: the
+    // slick that smothers a garden was the one slick you could not see. Only a cell that is both
+    // the surface and lying on the ground takes it, so a deeper pool on soil looks as it did.
+    if (top && !bottom && !nearHeat && DARK_GROUND_KINDS.has(kindAt(cells, width, height, x, y + 1))) {
+      out = mixRgb(out, [70, 150, 170], 0.55);
+    }
+    if (frozen) out = mixRgb(out, [158, 190, 190], 0.44);
+    if (flags & CELL_FLAG.Cosmic) {
+      // Stardust's sheen: a rainbow film over the WHOLE slick, not the faint green-violet
+      // banding every slick's top shows, drifting slowly and glinting. Last, so the heat, life
+      // and frost tints above cannot wash it out: under them it fell to 30 from plain oil.
+      const band = Math.floor((x + y * 2 + Math.floor(time * 0.008)) / 2) % STARDUST_SHEEN.length;
+      out = mixRgb(out, STARDUST_SHEEN[band], top ? 0.78 : 0.68);
+      if ((hash + Math.floor(time * 0.02)) % 7 === 0) out = mixRgb(out, [255, 255, 240], 0.55);
+    }
+    return out;
+  }
+
+  if (left || right) out = mixRgb(out, kind === MATERIAL.Moonwater ? [126, 164, 244] : [72, 148, 218], kind === MATERIAL.Moonwater ? 0.28 : 0.2);
+  if (top) out = mixRgb(out, kind === MATERIAL.Moonwater ? [238, 250, 255] : [166, 226, 255], kind === MATERIAL.Moonwater ? 0.54 : 0.44);
+  if (!bottom) out = mixRgb(out, [24, 58, 106], kind === MATERIAL.Moonwater ? 0.1 : 0.2);
+  if (!left || !right) out = mixRgb(out, [20, 56, 96], kind === MATERIAL.Moonwater ? 0.08 : 0.12);
+  if (heatContact.count > 0) {
+    out = mixRgb(out, [226, 245, 255], kind === MATERIAL.Moonwater ? 0.34 : 0.28);
+    if (top || heatContact.top) out = mixRgb(out, [255, 255, 255], 0.18);
+  }
+  if (kind === MATERIAL.Water) {
+    if (earthContact.count > 0) {
+      out = mixRgb(out, [76, 116, 120], earthContact.bottom ? 0.22 : 0.14);
+      if ((top || ripple) && hash % 5 === 0) out = mixRgb(out, [139, 183, 185], 0.18);
+    }
+    if (lifeContact.count > 0) out = mixRgb(out, [89, 151, 128], lifeContact.bottom ? 0.18 : 0.12);
+    if (oilContact.count > 0) {
+      out = mixRgb(out, [68, 76, 62], oilContact.top ? 0.36 : 0.24);
+      if (top || ripple || hash % 11 === 0) out = mixRgb(out, [156, 171, 136], 0.28);
+    }
+  }
+  if ((left || right) && (ripple || hash % 29 === 0)) out = adjustRgb(out, 24 + Math.sin(time * 0.005 + variant) * 10);
+  if (kind === MATERIAL.Moonwater) {
+    const moonPulse = (Math.sin(time * 0.006 + hash * 0.0004) + 1) * 0.5;
+    const crescent = (top && (x + hash) % 5 <= 1) || (!left && y % 3 === 0) || (!right && y % 4 === 0);
+    out = mixRgb(out, [141, 143, 255], 0.12);
+    if (crescent) out = mixRgb(out, [250, 243, 255], 0.56 + moonPulse * 0.16);
+    if (hash % 19 === 0) out = mixRgb(out, [229, 203, 255], 0.56);
+    if (lifeContact.count > 0) out = mixRgb(out, [180, 255, 207], lifeContact.top ? 0.32 : 0.24);
+    if (oilContact.count > 0) {
+      out = mixRgb(out, [216, 199, 255], 0.34);
+      if (top || hash % 7 === 0) out = mixRgb(out, [255, 242, 191], 0.24);
+    }
+  }
+  return out;
+}
+
+function growthColor({ kind, color, variant, age, energy, flags, time, cells, width, height, x, y }: ShapeContext) {
+  const hash = hashCell(x, y, variant);
+  const edge = edgeInfo(cells, width, height, x, y, kind);
+  const moonFed = hasNearbyKind(cells, width, height, x, y, MOONWATER_KINDS);
+  const starFed = hasNearbyKind(cells, width, height, x, y, STARDUST_KINDS);
+  const cosmic = moonFed || starFed || Boolean(flags & CELL_FLAG.Cosmic);
+  const damp = cosmic || Boolean(flags & CELL_FLAG.Wet) || energy > 70 || hasNearbyKind(cells, width, height, x, y, WATER_KINDS);
+  const oilContact = contactInfo(cells, width, height, x, y, OIL_KINDS);
+  const heatContact = contactInfo(cells, width, height, x, y, HOT_LIGHT_KINDS);
+  const frozen = Boolean(flags & CELL_FLAG.Frozen);
+  const scorched = Boolean(flags & CELL_FLAG.Scorched);
+  let out = color;
+
+  if (kind === MATERIAL.Moss) {
+    const localX = (x + (hash & 1)) & 3;
+    const localY = (y + ((hash >> 2) & 1)) & 3;
+    const leafy = localY === 0 || localX === 1 || hash % 7 === 0 || age > 90;
+    if (edge.top || edge.left || leafy) out = mixRgb(out, damp ? [153, 230, 108] : [124, 187, 78], leafy ? 0.44 : 0.34);
+    if (edge.bottom || localY === 3 || hash % 9 === 0) out = mixRgb(out, [21, 68, 36], 0.38);
+    if (hash % 13 === 0) out = mixRgb(out, [214, 235, 112], 0.38);
+    if (damp) {
+      out = mixRgb(out, [102, 180, 83], 0.22);
+      if (edge.top || hash % 11 === 0) out = mixRgb(out, [207, 241, 153], 0.38);
+    }
+    if (Boolean(flags & CELL_FLAG.Wet) && energy > 150) {
+      // Deeply hydrated moss reads vividly lush, so a generous watering shows at a glance.
+      out = mixRgb(out, [96, 214, 118], 0.28);
+    }
+    if (Boolean(flags & CELL_FLAG.Wet) && energy > 110 && (hash % 4 === 0 || (edge.top && hash % 3 === 0))) {
+      out = mixRgb(out, [222, 248, 255], 0.55);
+    }
+    if (cosmic) {
+      out = mixRgb(out, [143, 238, 177], moonFed ? 0.34 : 0.22);
+      if (edge.top && hash % 3 !== 2) out = mixRgb(out, [196, 255, 219], 0.4);
+    }
+    if (edge.top && age > 150 && damp && hash % 5 === 0) {
+      // Mature damp moss raises tiny sporophyte tufts, like the real plant.
+      out = mixRgb(out, [186, 224, 120], 0.5);
+    }
+    if (edge.top && age > 120 && hash % 31 === 0) {
+      // Idle life: a firefly blink over old moss. Rare cells, short duty cycle, so a
+      // settled carpet twinkles once in a while rather than strobing.
+      const blink = Math.sin(time * 0.0018 + hash * 2.7);
+      if (blink > 0.88) out = mixRgb(out, [228, 255, 158], (blink - 0.88) * 6);
+    }
+    if (oilContact.count > 0) {
+      out = mixRgb(out, [32, 42, 27], oilContact.top ? 0.42 : 0.28);
+      if (edge.top || hash % 4 === 0) out = mixRgb(out, [86, 88, 47], 0.24);
+    }
+    if (heatContact.count > 0) out = mixRgb(out, [116, 68, 43], heatContact.top ? 0.34 : 0.22);
+    if (scorched) out = mixRgb(out, [48, 39, 28], 0.58);
+    if (frozen) {
+      out = mixRgb(out, [176, 224, 232], 0.6);
+      if (edge.top || localY === 0) out = mixRgb(out, [239, 252, 255], 0.34);
+    }
+    return out;
+  }
+
+  const localX = (x + (hash & 1)) & 3;
+  const localY = (y + ((hash >> 3) & 1)) & 3;
+  const seedContact = contactInfo(cells, width, height, x, y, [MATERIAL.Seed]);
+  const mossContact = contactInfo(cells, width, height, x, y, [MATERIAL.Moss]);
+  const woodContact = contactInfo(cells, width, height, x, y, [MATERIAL.Wood]);
+  const soilContact = contactInfo(cells, width, height, x, y, [MATERIAL.Soil]);
+  const rottingSeed = seedContact.count > 0;
+  const digestingWood = woodContact.count > 0;
+  const overtakingMoss = mossContact.count > 0;
+  const soilDecomposer = soilContact.count > 0;
+  // Fungus grows in CLUMPS; moss is an even mat. Measured on the showcase, the two used to
+  // be the same fabric — luminance 176 +/- 31 against 169 +/- 31, and a cell-to-cell step of
+  // 33 apiece — so with colour removed there was no boundary between them at all and a
+  // fungus overtaking a carpet read as a recolour rather than as something eating it.
+  //
+  // The clump hash is taken at HALF resolution so a 2x2 patch shares its fate, and it drives
+  // the CAP, which is the strongest mark on the mat. Layering a clump wash over per-cell
+  // caps was tried first and moved the step metric by one point: a 0.34 mix cannot outvote
+  // marks painted at 0.66. Spores stay per-cell but are rarer, so they read as occasional
+  // flecks on a lumpy mat instead of the grain that made it moss-shaped.
+  const clump = hashCell(x >> 1, y >> 1, (variant ^ 0x5b) & 255);
+  const capCluster = clump % 3 === 0;
+  const cap = edge.top || capCluster || (localY === 0 && clump % 3 !== 1);
+  const gill = localY === 1 && (localX === 1 || localX === 2) && clump % 3 !== 0;
+  const spore = hash % 23 === 0 || (age > 80 && hash % 17 === 0);
+
+  out = mixRgb(out, [108, 61, 128], 0.16);
+  if (cosmic) out = mixRgb(out, moonFed ? [158, 153, 255] : [190, 147, 255], 0.22);
+  if (soilDecomposer) out = mixRgb(out, [176, 126, 103], 0.2);
+  if (digestingWood) out = mixRgb(out, [196, 139, 82], 0.3);
+  if (overtakingMoss) out = mixRgb(out, [132, 158, 96], 0.26);
+  if (rottingSeed) out = mixRgb(out, [161, 67, 117], 0.34);
+  if (oilContact.count > 0) {
+    out = mixRgb(out, [42, 42, 31], oilContact.top ? 0.42 : 0.28);
+    if (cap || hash % 5 === 0) out = mixRgb(out, [99, 90, 49], 0.22);
+  }
+  if (heatContact.count > 0) out = mixRgb(out, [111, 62, 50], heatContact.top ? 0.32 : 0.22);
+
+  const capColor: Rgb = rottingSeed
+    ? [216, 91, 151]
+    : cosmic
+      ? moonFed
+        ? [158, 168, 255]
+        : [198, 143, 255]
+      : digestingWood
+        ? [223, 160, 93]
+        : overtakingMoss
+          ? [181, 190, 104]
+          : soilDecomposer
+            ? [202, 143, 118]
+            : [230, 164, 224];
+  const gillColor: Rgb = rottingSeed
+    ? [255, 181, 211]
+    : cosmic
+      ? [226, 215, 255]
+      : digestingWood
+        ? [252, 214, 159]
+        : overtakingMoss
+          ? [227, 232, 151]
+          : [254, 218, 244];
+  const sporeColor: Rgb = rottingSeed
+    ? [255, 194, 220]
+    : cosmic
+      ? [235, 224, 255]
+      : digestingWood
+        ? [255, 226, 178]
+        : overtakingMoss
+          ? [229, 240, 173]
+          : [250, 229, 239];
+
+  if (cap) out = mixRgb(out, capColor, 0.66);
+  if (gill) out = mixRgb(out, gillColor, 0.6);
+  // The shadow between caps is clump-scale too, or it re-speckles everything the caps just
+  // gathered together.
+  if (edge.bottom || (localY === 3 && clump % 3 !== 0) || clump % 7 === 1) {
+    out = mixRgb(out, rottingSeed ? [86, 33, 65] : digestingWood ? [98, 58, 42] : [83, 45, 104], 0.42);
+  }
+  if (spore) out = mixRgb(out, sporeColor, 0.72);
+  if (damp) out = mixRgb(out, cosmic ? [195, 190, 255] : [168, 216, 190], cosmic ? 0.36 : 0.22);
+  if (flags & CELL_FLAG.Cosmic) {
+    // The stored charge, as opposed to standing near something cosmic. Proximity already
+    // drives every cosmic palette above, so a fungus that actually absorbed the charge
+    // used to look identical to its merely-adjacent neighbour (measured delta 48). This
+    // sits AFTER the cap/gill/spore painting on purpose — an earlier draft ran before it
+    // and the 0.6-0.72 role mixes simply painted the charge back out. The charged one is
+    // the one that sows fairy rings; it reads lit from within, with star-flecks.
+    out = mixRgb(out, [150, 112, 244], 0.34);
+    if (hash % 4 === 0) out = mixRgb(out, [240, 231, 255], 0.6);
+  }
+  if (age > 110 && !damp) out = mixRgb(out, [93, 68, 84], 0.24);
+  if (scorched) {
+    out = mixRgb(out, [50, 34, 38], 0.58);
+    if (cap || hash % 7 === 0) out = mixRgb(out, [24, 20, 22], 0.26);
+  }
+  if (frozen) {
+    out = mixRgb(out, [188, 222, 240], 0.5);
+    if (cap || gill) out = mixRgb(out, [238, 251, 255], 0.22);
+  }
+  return out;
+}
+
+function woodColor({ color, variant, energy, flags, cells, width, height, x, y }: ShapeContext) {
+  const hash = hashCell(x >> 1, y, variant);
+  const edge = edgeInfo(cells, width, height, x, y, MATERIAL.Wood);
+  const ring = (x + hash) % 6 === 0 || (y + hash) % 11 === 0;
+  const heatContact = contactInfo(cells, width, height, x, y, HOT_LIGHT_KINDS);
+  const dampContact = contactInfo(cells, width, height, x, y, COOL_LIQUID_KINDS);
+  const plantContact = contactInfo(cells, width, height, x, y, PLANT_KINDS);
+  const charred = heatContact.count > 0;
+  const damp = dampContact.count > 0 || Boolean(flags & CELL_FLAG.Wet) || energy > 30;
+  const scorched = Boolean(flags & CELL_FLAG.Scorched);
+  const frozen = Boolean(flags & CELL_FLAG.Frozen);
+  const cosmic = Boolean(flags & CELL_FLAG.Cosmic);
+  const endGrain = edge.left || edge.right;
+  let out = adjustRgb(color, (hash % 5) * 4 - 8);
+  if (ring) out = mixRgb(out, [57, 31, 20], 0.38);
+  if ((x + y + hash) % 13 === 0) out = mixRgb(out, [166, 112, 66], 0.26);
+  if (edge.top || edge.left) out = mixRgb(out, [175, 119, 71], 0.2);
+  if (edge.right || edge.bottom) out = mixRgb(out, [55, 31, 20], 0.2);
+  if (endGrain && ((y + hash) & 3) === 0) out = mixRgb(out, [196, 140, 83], 0.22);
+  if (charred || scorched) {
+    out = mixRgb(out, heatContact.top || scorched ? [42, 23, 18] : [63, 34, 24], heatContact.top || scorched ? 0.54 : 0.4);
+    if (ring || hash % 9 === 0) out = mixRgb(out, [16, 12, 11], 0.36);
+    if (edge.top && hash % 5 === 0) out = mixRgb(out, [101, 51, 32], 0.2);
+  }
+  if (damp) {
+    out = mixRgb(out, [66, 60, 47], dampContact.bottom ? 0.32 : 0.24);
+    if (edge.bottom || dampContact.top) out = mixRgb(out, [86, 108, 83], 0.24);
+    if (edge.top || endGrain) out = mixRgb(out, [112, 132, 104], 0.16);
+  }
+  if (plantContact.count > 0 && hash % 5 === 0) out = mixRgb(out, [74, 113, 64], 0.28);
+  if (cosmic) {
+    out = mixRgb(out, [116, 138, 201], 0.28);
+    if (hash % 19 === 0) out = mixRgb(out, [182, 189, 255], 0.34);
+    if (ring && hash % 5 === 0) out = mixRgb(out, [221, 212, 255], 0.24);
+  }
+  if (frozen) {
+    out = mixRgb(out, [166, 205, 216], 0.48);
+    if (edge.top || endGrain) out = mixRgb(out, [228, 248, 255], 0.3);
+    out = frostFerns(out, hash, x, y);
+  }
+  return out;
+}
+
+function stardustColor({ color, variant, age, time, cells, width, height, x, y }: ShapeContext) {
+  const hash = hashCell(x, y, variant);
+  const twinkle = (Math.sin(time * 0.02 + age * 0.2 + hash * 0.0002) + 1) * 0.5;
+  const moonContact = hasNearbyKind(cells, width, height, x, y, MOONWATER_KINDS);
+  let out = mixRgb(color, hash % 3 === 0 ? [186, 214, 255] : [255, 224, 140], 0.32 + twinkle * 0.28);
+  if (moonContact) out = mixRgb(out, [236, 222, 255], 0.34);
+  if (hash % 9 === 0) out = [255, 240, 180];
+  return adjustRgb(out, twinkle * 22);
+}

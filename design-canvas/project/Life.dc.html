@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>A flower's life, readable at a glance</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&amp;family=Work+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@500&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1440px; height: 700px; box-sizing: border-box; padding: 56px 72px; background: #0d1220; color: #e6e9f0; font-family: 'Work Sans', sans-serif; display: flex; flex-direction: column; gap: 30px">
+  <div style="display: flex; flex-direction: column; gap: 10px; max-width: 900px">
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.08em; color: #f0b45a">FLOWER.OPENS · FLOWER.POLLEN · FLOWER.WILTS · RENDERER ONLY</div>
+    <h2 style="margin: 0; font-family: 'Newsreader', serif; font-weight: 600; font-size: 44px; line-height: 1.1; color: #f4dfb8">A life you can read from across the room</h2>
+    <p style="margin: 0; font-size: 16px; line-height: 1.55; color: #b9c2d3">The sim already tracks every stage. Today the picture shows only some of them: a bud is one cell of its colour, slightly greened, and every species goes to seed as the same straw-and-husk head. The proposal draws each stage the sim already knows, shown here for the poppy.</p>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 12px">
+    <div style="font-size: 14px; font-weight: 600; color: #a7b0c2">Today, from the game's showcase (the only stages it exhibits, across three species)</div>
+    <div style="display: flex; gap: 28px; align-items: flex-end">
+      <sc-for list="{{today}}" as="item" hint-placeholder-count="4">
+        <div style="display: flex; flex-direction: column; gap: 8px; align-items: center">
+          <img src="{{item.src}}" alt="{{item.label}}" style="height: 140px; width: {{item.w}}px; image-rendering: pixelated; border-radius: 6px">
+          <div style="font-size: 13px; color: #a7b0c2">{{item.label}}</div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 12px">
+    <div style="font-size: 14px; font-weight: 600; color: #f0b45a">Proposed, poppy</div>
+    <div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px">
+      <sc-for list="{{stages}}" as="item" hint-placeholder-count="6">
+        <div style="background: #151b2c; border: 1px solid #26304a; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start">
+          <img src="{{item.src}}" alt="{{item.label}}" style="height: 140px; width: 90px; image-rendering: pixelated; border-radius: 6px; align-self: center">
+          <div style="font-family: 'Newsreader', serif; font-size: 20px; font-weight: 600; color: #f4dfb8">{{item.label}}</div>
+          <div style="font-size: 13px; line-height: 1.45; color: #d3d9e4">{{item.note}}</div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":700}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      today: [
+        { label: 'Bud (daisy)', src: '/_blob/ef9f55a514f66a24dda8e3cd1d5361ac', w: 50 },
+        { label: 'Open (poppy)', src: '/_blob/1629a2c0892c43def11077c8bd4de006', w: 90 },
+        { label: 'Shedding (cosmos)', src: '/_blob/9757814a460f2dce86346016c413db3d', w: 90 },
+        { label: 'Seed head (daisy)', src: '/_blob/8e6ffb4c0b7249d7ed3f8be77205848d', w: 50 },
+      ],
+      stages: [
+        { label: 'Bud', src: '/_blob/4569aff24d01c3ddbdaf7510c31b1f45', note: 'A sliver of red over a green bud, so you know what is coming.' },
+        { label: 'Opening', src: '/_blob/b59da2c22248fe8e39f2113687553ed4', note: 'The outer reds come first, cupped over a heart not yet showing.' },
+        { label: 'Open', src: '/_blob/a1b8b2e9a45e9ee84b62ef4902f150be', note: 'Black blotch, grey-green capsule, lighter tips.' },
+        { label: 'Pollen', src: '/_blob/c5b59fbd53b64b62932325798bf7c1fd', note: 'Gold dusts the heart while the head is puffing pollen.' },
+        { label: 'Fading', src: '/_blob/6ef0c3e24a5c278b9265fdf8e877704e', note: 'Petals dull and drop one at a time, as today, but fall in its own colour.' },
+        { label: 'Seed head', src: '/_blob/c1604fdf416d0dd069357c0de8dd142c', note: 'A capsule with a dark star cap. Each species goes to seed in its own way.' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Two species need a new shape</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&amp;family=Work+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@500&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 880px; height: 620px; box-sizing: border-box; padding: 48px 56px; background: #0d1220; color: #e6e9f0; font-family: 'Work Sans', sans-serif; display: flex; flex-direction: column; gap: 28px">
+  <div style="display: flex; flex-direction: column; gap: 10px">
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.08em; color: #b9a8ff">SIM CHANGE · THE BLOOM SHAPE TABLE</div>
+    <h2 style="margin: 0; font-family: 'Newsreader', serif; font-weight: 600; font-size: 40px; line-height: 1.1; color: #f4dfb8">Two species need a new shape</h2>
+    <p style="margin: 0; font-size: 15px; line-height: 1.55; color: #b9c2d3">Colour cannot rescue these: today a tulip is a seven-wide crown and a bluebell is a bare arch. A tulip is a cup, and a bluebell nods its bells off one side of a curved stem.</p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px">
+    <sc-for list="{{pairs}}" as="item" hint-placeholder-count="2">
+      <div style="background: #151b2c; border: 1px solid #26304a; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+        <div style="font-family: 'Newsreader', serif; font-size: 26px; font-weight: 600; color: #f4dfb8">{{item.name}}</div>
+        <div style="display: flex; gap: 18px; align-items: flex-end">
+          <div style="display: flex; flex-direction: column; gap: 6px; align-items: center">
+            <img src="{{item.today}}" alt="{{item.name}} today" style="width: 90px; height: 140px; image-rendering: pixelated; border-radius: 6px">
+            <div style="font-size: 12px; color: #a7b0c2">Today</div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px; align-items: center">
+            <img src="{{item.reshaped}}" alt="{{item.name}} reshaped" style="width: 90px; height: 140px; image-rendering: pixelated; border-radius: 6px; outline: 1px solid #b9a8ff; outline-offset: 2px">
+            <div style="font-size: 12px; color: #b9a8ff; font-weight: 600">Reshaped</div>
+          </div>
+        </div>
+        <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #d3d9e4">{{item.note}}</p>
+      </div>
+    </sc-for>
+  </div>
+
+  <p style="margin: 0; font-size: 14px; line-height: 1.55; color: #a7b0c2">Cost: the shape table lives in three places (the Rust sim, the JS engine, the showcase), and renderer:probe already fails when they disagree. It needs a parity scenario that grows each new head, and the test that two species grow different silhouettes keeps guarding it.</p>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":880,"height":620}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      pairs: [
+        { name: 'Tulip', today: '/_blob/64bf5862ba148f325aa78a57757837d6', reshaped: '/_blob/5bb5cdfcf2c3cea39adac18e2a455406',
+          note: 'Five cells wide and four tall: three lit petal lips, a pale streak down the near petal, deepening to the base. Fifteen cells, the same as today.' },
+        { name: 'Bluebell', today: '/_blob/01360ec293004ff97e62685dc4050ae6', reshaped: '/_blob/55152f0d5e08faeb191bba91f19a98b9',
+          note: 'A green scape that climbs and bends over, with bells hanging from it, each bell’s mouth lit. Twelve cells against today’s eight.' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

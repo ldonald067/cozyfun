@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>If we do eight things</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&amp;family=Work+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@500&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1080px; box-sizing: border-box; padding: 56px 72px; background: #0d1220; color: #e6e9f0; font-family: 'Work Sans', sans-serif; display: flex; flex-direction: column; gap: 26px">
+  <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 48px">
+    <div style="display: flex; flex-direction: column; gap: 10px; max-width: 860px">
+      <div style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.08em; color: #f0b45a">RANKED BY WHAT A PLAYER SEES, AGAINST WHAT IT RISKS</div>
+      <h2 style="margin: 0; font-family: 'Newsreader', serif; font-weight: 600; font-size: 48px; line-height: 1.08; color: #f4dfb8">If we do eight things</h2>
+      <p style="margin: 0; font-size: 16px; line-height: 1.55; color: #b9c2d3">Renderer changes come first: every player sees them, and they cannot move the simulation. Then your two open questions from the handoff, which are real physics and need filmstrips before anything ships.</p>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 8px; font-size: 14px; color: #a7b0c2">
+      <div style="display: flex; gap: 10px; align-items: center"><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: #f0b45a; color: #1a1408">Renderer</span> colour only, no parity risk</div>
+      <div style="display: flex; gap: 10px; align-items: center"><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid #b9a8ff; color: #b9a8ff">Sim</span> both engines, parity, audit, drift</div>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 12px">
+    <sc-for list="{{items}}" as="item" hint-placeholder-count="8">
+      <div style="display: grid; grid-template-columns: 56px minmax(0, 1.2fr) minmax(0, 1.6fr) 110px minmax(0, 1.2fr) 150px; gap: 20px; align-items: center; background: #151b2c; border: 1px solid #26304a; border-radius: 12px; padding: 16px 20px">
+        <div style="font-family: 'Newsreader', serif; font-size: 34px; font-weight: 600; color: #f0b45a; text-align: center">{{item.rank}}</div>
+        <div style="font-family: 'Newsreader', serif; font-size: 21px; font-weight: 600; line-height: 1.2; color: #f4dfb8">{{item.title}}</div>
+        <div style="font-size: 14px; line-height: 1.5; color: #d3d9e4">{{item.sees}}</div>
+        <div>
+          <sc-if value="{{item.renderer}}" hint-placeholder-val="{{true}}">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: #f0b45a; color: #1a1408">Renderer</span>
+          </sc-if>
+          <sc-if value="{{item.sim}}" hint-placeholder-val="{{false}}">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid #b9a8ff; color: #b9a8ff">Sim</span>
+          </sc-if>
+        </div>
+        <div style="font-size: 13px; line-height: 1.5; color: #a7b0c2">{{item.takes}}</div>
+        <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-start">
+          <sc-if value="{{item.shipped}}" hint-placeholder-val="{{true}}">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: #7fcf9a; color: #0d1a12">Shipped</span>
+          </sc-if>
+          <sc-if value="{{item.dropped}}" hint-placeholder-val="{{false}}">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid #6b7488; color: #a7b0c2">Dropped</span>
+          </sc-if>
+          <sc-if value="{{item.open}}" hint-placeholder-val="{{false}}">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid #f0b45a; color: #f0b45a">Your pick</span>
+          </sc-if>
+          <div style="font-size: 12px; line-height: 1.4; color: #a7b0c2">{{item.when}}</div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="font-size: 15px; line-height: 1.55; color: #d3d9e4; background: #151b2c; border: 1px solid #26304a; border-radius: 12px; padding: 16px 22px">
+    <span style="color: #f4dfb8; font-weight: 600">Where it stands (22 Oct).</span> 1, 2 and 7 shipped together as one renderer batch on 19 Oct. 3 shipped as the heat batch on 20 Oct. 4 was built and dropped: lava's heat across a gap moved nothing (84 ice cells left without it, 85 with it). 8 shipped on 22 Oct together with an outline round every flower head. 5 and 6 are open, waiting on your pick.
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const status = { 1: ['shipped', '19 Oct'], 2: ['shipped', '19 Oct'], 3: ['shipped', '20 Oct, the heat batch'], 4: ['dropped', 'Built and measured; it moved nothing'], 7: ['shipped', '19 Oct'], 8: ['shipped', '22 Oct, with the outline'] };
+    const r = (rank, title, sees, layer, takes) => {
+      const [state, when] = status[rank] ?? ['open', 'Waiting on a filmstrip'];
+      return { rank, title, sees, takes, renderer: layer === 'r', sim: layer === 's', shipped: state === 'shipped', dropped: state === 'dropped', open: state === 'open', when };
+    };
+    return {
+      items: [
+        r(1, 'Every flower species, distinct', 'A garden reads as eight kinds of flower: a poppy’s black heart, a sunflower’s seed disc, a cornflower’s violet frill.', 'r',
+          'Species palettes plus shading by position in the head; renderer:probe gets a floor per species so it cannot flatten again.'),
+        r(2, 'Dew, frost, char and moonlight on petals', 'A watered garden glints, a frosted one is rimmed in white, a scorched one smoulders at the edges, a moonlit one shines silver.', 'r',
+          'Redraws four states the sim already flags. No new rules.'),
+        r(3, 'Hot water melts ice, visibly (your item 7)', 'A pool a flame has warmed warms its edges and eats into the ice around it.', 's',
+          'Heat that spreads through water. Wide drift (boiling, steam, mist, water:budget), so audit:drift on every check and a filmstrip first.'),
+        r(4, 'Lava thaws across a gap (your item 6)', 'Lava beside an ice wall softens it from a distance instead of only quenching on contact.', 's',
+          'A wider radiant heat. The first attempt reached 8 of 32 seeds; it shares a mechanism with 3.'),
+        r(5, 'Steam billows instead of a dotted thread', 'A kettle, a hot pond or a quenched ember puts up soft merging wisps.', 's',
+          'The handoff notes the lever is in the sim, not the renderer.'),
+        r(6, 'A burning log stays alive', 'The hearth smoulders with glowing cracks well past today’s 5–7 seconds.', 's',
+          'A slower ember arc for wood; check rocket.lights and fire.dries, which ride on embers.'),
+        r(7, 'A flower’s life you can read', 'Bud, opening, pollen-dusted, fading, and a seed head that is each species’ own.', 'r',
+          'Draws stages the sim already tracks (age, budget, rooted).'),
+        r(8, 'Tulip cup and nodding bluebell', 'The two species that read as shapes, not flowers, finally look like themselves.', 's',
+          'The bloom shape table, in its three copies, plus a parity scenario that grows each new head.'),
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+<title>Cozy Phone Timer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: one column, the board on top, the measurements under it, like the game itself on a phone. */
+:root { --night:#0f1424; --panel:#1a2136; --line:#34405f; --moon:#e9e6f7; --dim:#a4adc6; --water:#6fb3e8; --warn:#f0a65a; color-scheme:dark;
+  --type:ui-rounded,"SF Pro Rounded",system-ui,sans-serif; --mono:ui-monospace,Menlo,monospace }
+body { background:var(--night); color:var(--moon); font:16px/1.45 var(--type); padding-block:20px 32px;
+  padding-left:max(16px,env(safe-area-inset-left,0px)); padding-right:max(16px,env(safe-area-inset-right,0px)) }
+main { max-width:560px; margin:0 auto; display:grid; gap:16px }
+h1 { font-size:1.5rem; margin:0; text-wrap:balance } p { margin:0; color:var(--dim) }
+.stage { position:relative; width:100%; aspect-ratio:220/140; background:#0a0e1b; overflow:hidden; border-radius:4px }
+.stage canvas { position:absolute; inset:0; width:100%; height:100%; image-rendering:pixelated }
+#base { visibility:hidden } #glow { image-rendering:auto; filter:blur(16px) saturate(1.35); opacity:.9; transform:scale(1.025); mix-blend-mode:screen }
+button { font:600 1.05rem var(--type); padding:14px 18px; border-radius:10px; border:0; background:var(--water); color:#0b1320; width:100% }
+button:disabled { opacity:.55 } button:focus-visible { outline:2px solid var(--moon); outline-offset:2px }
+#copy { background:transparent; color:var(--moon); border:1px solid var(--line) }
+.row { display:grid; gap:6px; padding-block:12px; border-top:1px solid var(--line) }
+.row b { font-weight:600 } .nums { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; font-variant-numeric:tabular-nums }
+.nums span { display:grid; color:var(--dim); font-size:.8rem } .nums strong { font:600 1.3rem var(--mono); color:var(--moon) }
+.track { height:6px; background:var(--panel); border-radius:3px; overflow:hidden } .fill { height:100%; width:0; background:var(--water) }
+#state { color:var(--moon); min-height:1.4em }
+#device { color:#0b1320; background:var(--warn); padding:12px; border-radius:8px; font-weight:600 }
+pre { margin:0; padding:12px; background:var(--panel); border-radius:8px; font:.75rem/1.5 var(--mono); white-space:pre-wrap; overflow-wrap:anywhere; user-select:all }
+</style>
+<main>
+  <h1>How fast does the sandbox draw on this phone?</h1>
+  <p>Tap the button and leave the phone alone for about 20 seconds. It draws four boards with the game's real renderer, 150 frames each. Close other apps first if you can.</p>
+  <p id="device" hidden>This is a computer, not a phone. Open this same link on your phone to get the numbers we need.</p>
+  <div class="stage"><canvas id="display" width="880" height="560"></canvas><canvas id="glow"></canvas><canvas id="motes"></canvas><canvas id="base"></canvas></div>
+  <button id="run" type="button">Start timing</button>
+  <div id="state" role="status">Not run yet. The zeros below fill in as it goes.</div>
+  <section>
+    <div class="row"><b id="water-name">Two-thirds deep water</b><div class="nums"><span><strong id="water-ms">0</strong>ms a frame</span><span><strong id="water-p95">0</strong>ms, slow frames</span><span><strong id="water-fps">0</strong>frames a second</span></div><div class="track"><div class="fill" id="water-bar"></div></div></div>
+    <div class="row"><b id="heat-name">Lava, smoke and fire</b><div class="nums"><span><strong id="heat-ms">0</strong>ms a frame</span><span><strong id="heat-p95">0</strong>ms, slow frames</span><span><strong id="heat-fps">0</strong>frames a second</span></div><div class="track"><div class="fill" id="heat-bar"></div></div></div>
+    <div class="row"><b id="moonoil-name">Two-thirds moonwater and oil</b><div class="nums"><span><strong id="moonoil-ms">0</strong>ms a frame</span><span><strong id="moonoil-p95">0</strong>ms, slow frames</span><span><strong id="moonoil-fps">0</strong>frames a second</span></div><div class="track"><div class="fill" id="moonoil-bar"></div></div></div>
+    <div class="row"><b id="garden-name">A played garden and pond</b><div class="nums"><span><strong id="garden-ms">0</strong>ms a frame</span><span><strong id="garden-p95">0</strong>ms, slow frames</span><span><strong id="garden-fps">0</strong>frames a second</span></div><div class="track"><div class="fill" id="garden-bar"></div></div></div>
+  </section>
+  <p>The bar fills at 16.7 ms, which is one frame on a 60 Hz screen. It times drawing only, with the sim paused.</p>
+  <pre id="out" hidden></pre>
+  <button id="copy" type="button" hidden>Copy the numbers</button>
+</main>
