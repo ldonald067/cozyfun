@@ -2,7 +2,8 @@
 
 *Rewritten at each handoff, never appended to. Shipped work lives in `git log`, whose commit
 messages carry each batch's measurements. Written 2026-10-31, after the solids batch: stone, sand,
-soil, ice, glass, wood and wall drawn as the real thing. Nothing else is in flight.*
+soil, ice, glass, wood and wall drawn as the real thing. Nothing else is in flight. The project was
+paused on 2026-11-03; `docs/RESUMING.md` covers setting up again and where the scratch tools went.*
 
 ## Keep chats lean
 
@@ -385,8 +386,9 @@ publish against a stale version is refused.
 
 ## Scratch tools (`.tmp/`, untracked)
 
-Nothing backs these up. Each script's header gives its purpose and arguments; read the header,
-not this list.
+These were backed up to the `scratch-tools` branch on 2026-11-03 (scripts only, not the `base`
+copies or captures); `docs/RESUMING.md` says how to restore them. Each script's header gives its
+purpose and arguments; read the header, not this list.
 
 - **Solids:** `.tmp/solids/` — `film.mjs` + `sheet.py` (today against the build, moving, the template for
   each new batch), `states.mjs` + `states.py` (each solid plain, wet, frozen, scorched, cosmic),

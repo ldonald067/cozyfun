@@ -95,6 +95,8 @@ handing the build to another server to mount under a path.
 
 ## Deeper references
 
+**Picking the project up after a break, or on a new machine? Start at `docs/RESUMING.md`.**
+
 **Work in progress and the next steps live in `docs/HANDOFF.md`.** Read it first when picking
 the project up; it is rewritten at each handoff rather than accumulated, so it is never stale
 history.
